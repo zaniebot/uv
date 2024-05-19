@@ -1955,3 +1955,24 @@ pub(crate) struct ToolRunArgs {
     )]
     pub(crate) python: Option<String>,
 }
+
+
+
+#[derive(Args)]
+#[allow(clippy::struct_excessive_bools)]
+pub(crate) struct ToolInstallArgs {
+    /// The tool to install.
+    pub(crate) target: String,
+
+    /// The Python interpreter to use for the tool's environment.
+    /// 
+    /// If not provided, the latest available Python version supported by the tool will be used.
+    #[arg(
+        long,
+        short,
+        env = "UV_PYTHON",
+        verbatim_doc_comment,
+        group = "discovery"
+    )]
+    pub(crate) python: Option<String>,
+}
