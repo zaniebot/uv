@@ -20,6 +20,7 @@ use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 #[archive(check_bytes)]
 #[archive_attr(derive(Debug, Eq, PartialEq, PartialOrd, Ord))]
 #[cfg_attr(feature = "pyo3", pyclass)]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub enum Operator {
     /// `== 1.2.3`
     Equal,
@@ -245,6 +246,7 @@ impl std::fmt::Display for OperatorParseError {
 #[derive(Clone, rkyv::Archive, rkyv::Deserialize, rkyv::Serialize)]
 #[archive(check_bytes)]
 #[archive_attr(derive(Debug, Eq, PartialEq, PartialOrd, Ord))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct Version {
     inner: Arc<VersionInner>,
 }
@@ -252,6 +254,7 @@ pub struct Version {
 #[derive(Clone, Debug, rkyv::Archive, rkyv::Deserialize, rkyv::Serialize)]
 #[archive(check_bytes)]
 #[archive_attr(derive(Debug, Eq, PartialEq, PartialOrd, Ord))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 enum VersionInner {
     Small { small: VersionSmall },
     Full { full: VersionFull },
@@ -820,6 +823,7 @@ impl FromStr for Version {
 #[derive(Clone, Debug, rkyv::Archive, rkyv::Deserialize, rkyv::Serialize)]
 #[archive(check_bytes)]
 #[archive_attr(derive(Debug, Eq, PartialEq, PartialOrd, Ord))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 struct VersionSmall {
     /// The representation discussed above.
     repr: u64,
@@ -1159,6 +1163,7 @@ impl VersionSmall {
 #[derive(Clone, Debug, rkyv::Archive, rkyv::Deserialize, rkyv::Serialize)]
 #[archive(check_bytes)]
 #[archive_attr(derive(Debug, Eq, PartialEq, PartialOrd, Ord))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 struct VersionFull {
     /// The [versioning
     /// epoch](https://peps.python.org/pep-0440/#version-epochs). Normally

@@ -38,6 +38,7 @@ use crate::{
 #[archive(check_bytes)]
 #[archive_attr(derive(Debug))]
 #[cfg_attr(feature = "pyo3", pyclass(sequence))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct VersionSpecifiers(Vec<VersionSpecifier>);
 
 impl std::ops::Deref for VersionSpecifiers {
@@ -254,6 +255,7 @@ impl std::error::Error for VersionSpecifiersParseError {}
 #[archive(check_bytes)]
 #[archive_attr(derive(Debug))]
 #[cfg_attr(feature = "pyo3", pyclass(get_all))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct VersionSpecifier {
     /// ~=|==|!=|<=|>=|<|>|===, plus whether the version ended with a star
     pub(crate) operator: Operator,

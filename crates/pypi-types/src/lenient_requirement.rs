@@ -114,6 +114,7 @@ fn parse_with_fixups<Err, T: FromStr<Err = Err>>(input: &str, type_name: &str) -
 
 /// Like [`Requirement`], but attempts to correct some common errors in user-provided requirements.
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct LenientRequirement<T: Pep508Url = VerbatimUrl>(Requirement<T>);
 
 impl<T: Pep508Url> FromStr for LenientRequirement<T> {
