@@ -605,6 +605,8 @@ pub enum CacheBucket {
     /// that cache entries can be atomically replaced and removed, as storing directories in the
     /// other buckets directly would make atomic operations impossible.
     Archive,
+    /// A cache of virtual environments.
+    Environments,
 }
 
 impl CacheBucket {
@@ -617,6 +619,7 @@ impl CacheBucket {
             Self::Simple => "simple-v7",
             Self::Wheels => "wheels-v1",
             Self::Archive => "archive-v0",
+            Self::Environments => "environments-v0"
         }
     }
 
@@ -727,6 +730,9 @@ impl CacheBucket {
             Self::Archive => {
                 // Nothing to do.
             }
+            Self::Environments => {
+                // Nothing to do.
+            }
         }
         Ok(summary)
     }
@@ -741,6 +747,7 @@ impl CacheBucket {
             CacheBucket::Interpreter,
             CacheBucket::Simple,
             CacheBucket::Archive,
+            CacheBucket::Environments
         ]
         .iter()
         .copied()
