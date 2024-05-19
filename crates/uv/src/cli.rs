@@ -1933,6 +1933,8 @@ pub(crate) struct ToolNamespace {
 pub(crate) enum ToolCommand {
     /// Run a tool
     Run(ToolRunArgs),
+    /// Install a tool
+    Install(ToolInstallArgs),
 }
 
 #[derive(Args)]
