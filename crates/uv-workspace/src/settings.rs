@@ -1,6 +1,5 @@
 use std::{num::NonZeroUsize, path::PathBuf};
 
-use pypi_types::LenientRequirement;
 use serde::Deserialize;
 
 use distribution_types::{FlatIndexLocation, IndexUrl};
@@ -92,16 +91,14 @@ pub struct PipOptions {
     pub concurrent_installs: Option<NonZeroUsize>,
 }
 
-
 /// A `[tool.uv.tools]` section.
 #[allow(dead_code)]
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct ToolOptions {
-    installed: Option<Vec<InstalledToolSpecifier>>
+    installed: Option<Vec<InstalledToolSpecifier>>,
 }
-
 
 /// A `[tool.uv.tools.installed]` section.
 #[allow(dead_code)]
@@ -112,6 +109,9 @@ pub struct InstalledToolSpecifier {
     name: Option<String>,
     /// The Python interpreter request
     pub(crate) python: Option<String>,
+
+    // TOOD(zanieb): A schema should be enforced for requirements but adding schemars support everywhere
+    // is non-trivial
     /// The requirements
-    pub(crate) requirements: Vec<LenientRequirement>,
+    pub(crate) requirements: Vec<String>,
 }

@@ -1,7 +1,6 @@
 
 use anyhow::Result;
 use itertools::Itertools;
-use tempfile::tempdir_in;
 use tracing::debug;
 
 use uv_cache::Cache;
@@ -46,20 +45,32 @@ pub(crate) async fn install(
         PythonEnvironment::from_default_python(cache)?.into_interpreter()
     };
 
+    // Load the user workspace so we can add a tool entry
     let workspace = Workspace::user()?;
-    
+
+    if let Some(workspace) = workspace {
+        // Update the entry
+    } else {
+        // Create a new user config file...
+        todo!()
+    }
+
     // Create a virtual environment
-    // TODO(zanieb): Move this path derivation elsewhere
-    let uv_state_path = std::env::home_dir()?.join(".uv");
-    fs_err::create_dir_all(&uv_state_path)?;
-    let tmpdir = tempdir_in(uv_state_path)?;
-    let venv = uv_virtualenv::create_venv(
-        tmpdir.path(),
-        interpreter,
-        uv_virtualenv::Prompt::None,
-        false,
-        false,
-    )?;
+    let env_path = cache.bucket(uv_cache::CacheBucket::Environments).join(target);
+
+    let venv = if !env_path.try_exists()? {
+        fs_err::create_dir_all(&env_path)?;
+
+        uv_virtualenv::create_venv(
+            &env_path,
+            interpreter,
+            uv_virtualenv::Prompt::None,
+            false,
+            false,
+        )?
+    } else {
+        PythonEnvironment::from_root(&env_path, cache)?
+    };
 
     // Install the requirements.
     update_environment(venv, &requirements, preview, cache, printer).await?;
