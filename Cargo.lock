@@ -1069,6 +1069,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "dirs"
+version = "5.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "44c45a9d03d6676652bcb5e724c7e988de1acad23a711b5217ab9cbecbec2225"
+dependencies = [
+ "dirs-sys",
+]
+
+[[package]]
 name = "dirs-sys"
 version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4732,6 +4741,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "uv-dirs"
+version = "0.0.1"
+dependencies = [
+ "dirs",
+ "dirs-sys",
+]
+
+[[package]]
 name = "uv-dispatch"
 version = "0.0.1"
 dependencies = [
@@ -5100,6 +5117,7 @@ dependencies = [
  "toml",
  "tracing",
  "uv-configuration",
+ "uv-dirs",
  "uv-fs",
  "uv-interpreter",
  "uv-normalize",

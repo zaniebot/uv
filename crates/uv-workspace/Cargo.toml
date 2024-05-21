@@ -16,6 +16,7 @@ workspace = true
 distribution-types = { workspace = true, features = ["schemars"] }
 install-wheel-rs = { workspace = true, features = ["schemars"] }
 uv-configuration = { workspace = true, features = ["schemars"] }
+uv-dirs = { workspace = true }
 uv-fs = { workspace = true }
 uv-normalize = { workspace = true, features = ["schemars"] }
 uv-resolver = { workspace = true, features = ["schemars"] }

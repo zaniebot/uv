@@ -32,6 +32,7 @@ uv-build = { path = "crates/uv-build" }
 uv-cache = { path = "crates/uv-cache" }
 uv-client = { path = "crates/uv-client" }
 uv-configuration = { path = "crates/uv-configuration" }
+uv-dirs = { path = "crates/uv-dirs" }
 uv-dispatch = { path = "crates/uv-dispatch" }
 uv-distribution = { path = "crates/uv-distribution" }
 uv-extract = { path = "crates/uv-extract" }
@@ -71,6 +72,7 @@ dashmap = { version = "5.5.3" }
 data-encoding = { version = "2.5.0" }
 derivative = { version = "2.2.0" }
 directories = { version = "5.0.1" }
+dirs = { version = "5.0.0" }
 dirs-sys = { version = "0.4.1" }
 dunce = { version = "1.0.4" }
 either = { version = "1.9.0" }
