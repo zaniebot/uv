@@ -71,6 +71,11 @@ impl VenvTestContext {
             filters.push((venv_full, ".venv".to_string()));
         }
 
+        filters.extend(
+            TestContext::path_patterns(&self.temp_dir)
+                .into_iter()
+                .map(|pattern| (pattern, "[TEMP_DIR]/".to_string())),
+        );
         filters.push((
             r"interpreter at: .+".to_string(),
             "interpreter at: [PATH]".to_string(),
@@ -612,4 +617,110 @@ fn path_with_trailing_space_gives_proper_error() {
       Caused by: The system cannot find the path specified. (os error 3)
     "###
     );
+}
+
+#[test]
+fn create_venv_from_venv() {
+    let context = VenvTestContext::new(&["3.11", "3.12"]);
+
+    // Create a virtual environment at `.venv`.
+    uv_snapshot!(context.filters(), context.venv_command()
+        .arg(context.venv.as_os_str())
+        .arg("--python")
+        .arg("3.12"), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Using Python 3.12.[X] interpreter at: [PATH]
+    Creating virtualenv at: .venv
+    Activate with: source .venv/bin/activate
+    "###
+    );
+
+    context.venv.assert(predicates::path::is_dir());
+
+    // Activate the environment, then create a new virtual environment
+    // We should use the Python interpreter from the active environment
+    uv_snapshot!(context.filters(), context.venv_command()
+        .arg(context.temp_dir.child("bar").as_os_str())
+        .env("VIRTUAL_ENV", context.venv.as_os_str()), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Using Python 3.11.[X] interpreter at: [PATH]
+    Creating virtualenv at: [TEMP_DIR]/bar
+    Activate with: source bar/bin/activate
+    "###
+    );
+
+    context
+        .temp_dir
+        .child("bar")
+        .assert(predicates::path::is_dir());
+
+    // Create a new context without Python 3.12
+    // We should still use the Python interpreter from the active environment
+    // instead of the one in the search path
+    let context2 = VenvTestContext::new(&["3.11"]);
+    uv_snapshot!(context2.filters(), context2.venv_command()
+        .arg(context2.temp_dir.child("bar").as_os_str())
+        .env("VIRTUAL_ENV", context.venv.as_os_str()), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Using Python 3.11.[X] interpreter at: [PATH]
+    Creating virtualenv at: [TEMP_DIR]/bar
+    Activate with: source bar/bin/activate
+    "###
+    );
+
+    // Request Python 3.12 specifically, this should still use the Python interpreter
+    // from the active environment
+    let context2 = VenvTestContext::new(&["3.11"]);
+    uv_snapshot!(context2.filters(), context2.venv_command()
+        .arg(context2.temp_dir.child("bar").as_os_str())
+        .arg("--python")
+        .arg("3.12")
+        .env("VIRTUAL_ENV", context.venv.as_os_str()), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+
+    ----- stderr -----
+      × No interpreter found for Python 3.12 in active virtual environment or search path
+    "###
+    );
+
+    context2
+        .temp_dir
+        .child("bar")
+        .assert(predicates::path::is_dir());
+
+    // Create a new context with different Python version
+    // We should still find the Python interpreter from the active environment
+    let context3 = VenvTestContext::new(&[]);
+    uv_snapshot!(context3.filters(), context3.venv_command()
+        .arg(context3.temp_dir.child("bar").as_os_str())
+        .env("VIRTUAL_ENV", context.venv.as_os_str()), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Using Python 3.11.[X] interpreter at: [PATH]
+    Creating virtualenv at: [TEMP_DIR]/bar
+    Activate with: source bar/bin/activate
+    "###
+    );
+
+    context3
+        .temp_dir
+        .child("bar")
+        .assert(predicates::path::is_dir());
 }
