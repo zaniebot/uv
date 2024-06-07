@@ -4592,7 +4592,6 @@ dependencies = [
  "fs-err",
  "futures",
  "install-wheel-rs",
- "itertools 0.13.0",
  "mimalloc",
  "owo-colors",
  "pep508_rs",
