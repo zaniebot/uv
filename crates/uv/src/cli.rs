@@ -130,6 +130,8 @@ pub(crate) enum Commands {
     Pip(PipNamespace),
     /// Run and manage executable Python packages.
     Tool(ToolNamespace),
+    /// Manage Python installations.
+    Toolchain(ToolchainNamespace),
     /// Create a virtual environment.
     #[command(alias = "virtualenv", alias = "v")]
     Venv(VenvArgs),
@@ -1953,6 +1955,30 @@ pub(crate) struct ToolRunArgs {
     /// - `/home/ferris/.local/bin/python3.10` uses the exact Python at the given path.
     #[arg(long, short, env = "UV_PYTHON", verbatim_doc_comment)]
     pub(crate) python: Option<String>,
+}
+
+#[derive(Args)]
+pub(crate) struct ToolchainNamespace {
+    #[command(subcommand)]
+    pub(crate) command: ToolchainCommand,
+}
+
+#[derive(Subcommand)]
+pub(crate) enum ToolchainCommand {
+    /// List the available toolchains.
+    List(ToolchainListArgs),
+}
+
+#[derive(Args)]
+#[allow(clippy::struct_excessive_bools)]
+pub(crate) struct ToolchainListArgs {
+    /// List all available toolchains, including those that do not match the current platform.
+    #[arg(long)]
+    pub(crate) all: bool,
+
+    /// Only list installed toolchains.
+    #[arg(long)]
+    pub(crate) only_installed: bool,
 }
 
 #[derive(Args)]
