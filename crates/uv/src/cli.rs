@@ -1967,6 +1967,9 @@ pub(crate) struct ToolchainNamespace {
 pub(crate) enum ToolchainCommand {
     /// List the available toolchains.
     List(ToolchainListArgs),
+
+    /// Download and install a specific toolchain.
+    Install(ToolchainInstallArgs),
 }
 
 #[derive(Args)]
@@ -1979,6 +1982,15 @@ pub(crate) struct ToolchainListArgs {
     /// Only list installed toolchains.
     #[arg(long)]
     pub(crate) only_installed: bool,
+}
+
+#[derive(Args)]
+#[allow(clippy::struct_excessive_bools)]
+pub(crate) struct ToolchainInstallArgs {
+    /// The toolchain to fetch.
+    ///
+    /// If not provided, the latest available version will be installed.
+    pub(crate) target: Option<String>,
 }
 
 #[derive(Args)]
