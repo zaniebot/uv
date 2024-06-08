@@ -30,9 +30,12 @@ uv-warnings = { workspace = true }
 anyhow = { workspace = true }
 configparser = { workspace = true }
 fs-err = { workspace = true, features = ["tokio"] }
-itertools = { workspace = true }
 futures = { workspace = true }
+goblin = { workspace = true }
+itertools = { workspace = true }
 once_cell = { workspace = true }
+platform-info = { workspace = true }
+plist = { workspace = true }
 regex = { workspace = true }
 reqwest = { workspace = true }
 reqwest-middleware = { workspace = true }
@@ -41,6 +44,7 @@ same-file = { workspace = true }
 schemars = { workspace = true, optional = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
+target-lexicon = { workspace = true }
 tempfile = { workspace = true }
 thiserror = { workspace = true }
 tokio-util = { workspace = true, features = ["compat"] }

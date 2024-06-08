@@ -19,6 +19,7 @@ pub mod downloads;
 mod environment;
 mod implementation;
 mod interpreter;
+mod libc;
 pub mod managed;
 pub mod platform;
 mod pointer_size;

@@ -2,6 +2,8 @@
 
 use std::{fmt, io};
 
+use crate::{linux::detect_linux_libc, macos::get_macos_version};
+use platform_info::{PlatformInfo, PlatformInfoAPI, UNameAPI};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 

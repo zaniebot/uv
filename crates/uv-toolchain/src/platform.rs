@@ -133,7 +133,7 @@ impl Libc {
         // TODO(zanieb): Perform this lookup
         match std::env::consts::OS {
             // Supported platforms.
-            "linux" => Libc::Gnu,
+            "linux" => detect_linux_libc()?,
             "windows" | "macos" => Libc::None,
             // Platforms without explicit support.
             _ => Libc::None,
