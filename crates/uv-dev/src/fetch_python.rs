@@ -18,7 +18,7 @@ pub(crate) struct FetchPythonArgs {
 pub(crate) async fn fetch_python(args: FetchPythonArgs) -> Result<()> {
     let start = Instant::now();
 
-    let toolchains = InstalledToolchains::from_settings()?.init()?;
+    let toolchains = InstalledToolchains::from_settings().init()?;
     let toolchain_dir = toolchains.root();
 
     let versions = if args.versions.is_empty() {

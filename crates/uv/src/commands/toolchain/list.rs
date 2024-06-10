@@ -39,7 +39,7 @@ pub(crate) async fn list(
     };
 
     let installed = {
-        InstalledToolchains::from_settings()?
+        InstalledToolchains::from_settings()
             .init()?
             .find_all()?
             .collect_vec()

@@ -149,7 +149,7 @@ impl Toolchain {
         client_builder: BaseClientBuilder<'a>,
         cache: &Cache,
     ) -> Result<Self, Error> {
-        let toolchains = InstalledToolchains::from_settings()?.init()?;
+        let toolchains = InstalledToolchains::from_settings().init()?;
         let toolchain_dir = toolchains.root();
 
         let request = PythonDownloadRequest::from_request(request)?.fill()?;

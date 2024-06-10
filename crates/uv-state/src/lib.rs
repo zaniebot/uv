@@ -24,11 +24,11 @@ pub struct StateStore {
 
 impl StateStore {
     /// A persistent state store at `root`.
-    pub fn from_path(root: impl Into<PathBuf>) -> Result<Self, io::Error> {
-        Ok(Self {
+    pub fn from_path(root: impl Into<PathBuf>) -> Self {
+        Self {
             root: root.into(),
             _temp_dir_drop: None,
-        })
+        }
     }
 
     /// Create a temporary state store.
@@ -79,8 +79,8 @@ impl StateStore {
     /// 2. The system-appropriate user-level data directory.
     /// 3. A `.uv` directory in the current working directory.
     ///
-    /// Returns an absolute cache dir.
-    pub fn from_settings(state_dir: Option<PathBuf>) -> Result<Self, io::Error> {
+    /// Returns a new [`StateStore`] instance. The directory is not created.
+    pub fn from_settings(state_dir: Option<PathBuf>) -> Self {
         if let Some(state_dir) = state_dir {
             StateStore::from_path(state_dir)
         } else if let Some(project_dirs) = ProjectDirs::from("", "", "uv") {

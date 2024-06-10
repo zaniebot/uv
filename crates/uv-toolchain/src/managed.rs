@@ -1,3 +1,4 @@
+use anyhow::Context;
 use core::fmt;
 use fs_err as fs;
 use std::collections::BTreeSet;
@@ -42,6 +43,12 @@ pub enum Error {
         #[source]
         err: io::Error,
     },
+    #[error("Failed to initialize toolchain storage directory: {0}", dir.user_display())]
+    InitError {
+        dir: PathBuf,
+        #[source]
+        err: io::Error,
+    },
     #[error("Failed to parse toolchain directory name: {0}")]
     NameError(String),
 }
@@ -62,13 +69,11 @@ impl InstalledToolchains {
     /// 1. The specific toolchain directory specified by the user, i.e., `UV_TOOLCHAIN_DIR`
     /// 2. A directory in the system-appropriate user-level data directory, e.g., `~/.local/uv/toolchains`
     /// 3. A directory in the local data directory, e.g., `./.uv/toolchains`
-    pub fn from_settings() -> Result<Self, Error> {
+    pub fn from_settings() -> Self {
         if let Some(toolchain_dir) = std::env::var_os("UV_TOOLCHAIN_DIR") {
-            Ok(Self::from_path(toolchain_dir))
+            Self::from_path(toolchain_dir)
         } else {
-            Ok(Self::from_path(
-                StateStore::from_settings(None)?.bucket(StateBucket::Toolchains),
-            ))
+            Self::from_path(StateStore::from_settings(None).bucket(StateBucket::Toolchains))
         }
     }
 
@@ -86,7 +91,10 @@ impl InstalledToolchains {
         let root = &self.root;
 
         // Create the cache directory, if it doesn't exist.
-        fs::create_dir_all(root)?;
+        fs::create_dir_all(root).map_err(|err| Error::InitError {
+            dir: root.clone(),
+            err,
+        })?;
 
         // Add a .gitignore.
         match fs::OpenOptions::new()
@@ -96,7 +104,12 @@ impl InstalledToolchains {
         {
             Ok(mut file) => file.write_all(b"*")?,
             Err(err) if err.kind() == io::ErrorKind::AlreadyExists => (),
-            Err(err) => return Err(err.into()),
+            Err(err) => {
+                return Err(Error::InitError {
+                    dir: root.clone(),
+                    err,
+                })
+            }
         }
 
         Ok(self)
@@ -147,7 +160,7 @@ impl InstalledToolchains {
     ) -> Result<impl DoubleEndedIterator<Item = InstalledToolchain>, Error> {
         let platform_key = platform_key_from_env()?;
 
-        let iter = InstalledToolchains::from_settings()?
+        let iter = InstalledToolchains::from_settings()
             .find_all()?
             .filter(move |toolchain| {
                 toolchain

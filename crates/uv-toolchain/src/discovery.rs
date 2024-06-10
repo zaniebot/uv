@@ -231,22 +231,20 @@ fn python_executables<'a>(
     // (5) Managed toolchains
     .chain(
         sources.contains(ToolchainSource::Managed).then(move ||
-            std::iter::once(
-                InstalledToolchains::from_settings().map_err(Error::from).and_then(|installed_toolchains| {
-                    debug!("Searching for managed toolchains at `{}`", installed_toolchains.root().user_display());
-                    let toolchains = installed_toolchains.find_matching_current_platform()?;
-                    // Check that the toolchain version satisfies the request to avoid unnecessary interpreter queries later
-                    Ok(
-                        toolchains.into_iter().filter(move |toolchain|
-                            version.is_none() || version.is_some_and(|version|
-                                version.matches_version(toolchain.python_version())
-                            )
+            std::iter::once({
+                let installed_toolchains = InstalledToolchains::from_settings();
+                debug!("Searching for managed toolchains at `{}`", installed_toolchains.root().user_display());
+                // Check that the toolchain version satisfies the request to avoid unnecessary interpreter queries later
+                Ok(installed_toolchains.find_matching_current_platform().and_then(|toolchains| {
+                    toolchains.into_iter().filter(move |toolchain|
+                        version.is_none() || version.is_some_and(|version|
+                            version.matches_version(toolchain.python_version())
                         )
-                        .inspect(|toolchain| debug!("Found managed toolchain `{toolchain}`"))
-                        .map(|toolchain| (ToolchainSource::Managed, toolchain.executable()))
                     )
-                })
-            ).flatten_ok()
+                    .inspect(|toolchain| debug!("Found managed toolchain `{toolchain}`"))
+                    .map(|toolchain| (ToolchainSource::Managed, toolchain.executable()))
+                }).map_err(Error::from))
+            }).flatten_ok()
         ).into_iter().flatten()
     )
     // (6) The search path
