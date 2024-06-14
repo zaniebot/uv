@@ -47,6 +47,8 @@ pub enum ToolchainRequest {
     Implementation(ImplementationName),
     /// A Python implementation name and version e.g. `pypy3.8` or `pypy@3.8`
     ImplementationVersion(ImplementationName, VersionRequest),
+    /// A toolchain key e.g. `cpython-3.11.8-macos-aarch64-none`
+    Key(String),
 }
 
 /// The sources to consider when finding a Python toolchain.

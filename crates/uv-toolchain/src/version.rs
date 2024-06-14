@@ -89,7 +89,7 @@ impl PythonVersion {
 
         // Ex) `implementation_version == "3.12.0"`
         if markers.implementation_name() == "cpython" {
-            let python_full_version = self.python_full_version();
+            let python_full_version = self.python_full_version_marker();
             markers = markers.with_implementation_version(StringVersion {
                 // Retain the verbatim representation, provided by the user.
                 string: self.0.to_string(),
@@ -98,7 +98,7 @@ impl PythonVersion {
         }
 
         // Ex) `python_full_version == "3.12.0"`
-        let python_full_version = self.python_full_version();
+        let python_full_version = self.python_full_version_marker();
         markers = markers.with_python_full_version(StringVersion {
             // Retain the verbatim representation, provided by the user.
             string: self.0.to_string(),
@@ -106,7 +106,7 @@ impl PythonVersion {
         });
 
         // Ex) `python_version == "3.12"`
-        let python_version = self.python_version();
+        let python_version = self.python_version_marker();
         markers = markers.with_python_version(StringVersion {
             string: python_version.to_string(),
             version: python_version,
@@ -120,9 +120,9 @@ impl PythonVersion {
     /// This should include exactly a major and minor version, but no patch version.
     ///
     /// Ex) `python_version == "3.12"`
-    pub fn python_version(&self) -> Version {
-        let major = self.release().first().copied().unwrap_or(0);
-        let minor = self.release().get(1).copied().unwrap_or(0);
+    pub fn python_version_marker(&self) -> Version {
+        let major = self.major();
+        let minor = self.minor();
         Version::new([major, minor])
     }
 
@@ -132,10 +132,10 @@ impl PythonVersion {
     /// with any pre-release or post-release information.
     ///
     /// Ex) `python_full_version == "3.12.0b1"`
-    pub fn python_full_version(&self) -> Version {
-        let major = self.release().first().copied().unwrap_or(0);
-        let minor = self.release().get(1).copied().unwrap_or(0);
-        let patch = self.release().get(2).copied().unwrap_or(0);
+    pub fn python_full_version_marker(&self) -> Version {
+        let major = self.major();
+        let minor = self.minor();
+        let patch = self.patch().unwrap_or(0);
         Version::new([major, minor, patch])
             .with_pre(self.0.pre())
             .with_post(self.0.post())
@@ -184,27 +184,33 @@ mod tests {
     #[test]
     fn python_markers() {
         let version = PythonVersion::from_str("3.11.0").expect("valid python version");
-        assert_eq!(version.python_version(), Version::new([3, 11]));
-        assert_eq!(version.python_version().to_string(), "3.11");
-        assert_eq!(version.python_full_version(), Version::new([3, 11, 0]));
-        assert_eq!(version.python_full_version().to_string(), "3.11.0");
+        assert_eq!(version.python_version_marker(), Version::new([3, 11]));
+        assert_eq!(version.python_version_marker().to_string(), "3.11");
+        assert_eq!(
+            version.python_full_version_marker(),
+            Version::new([3, 11, 0])
+        );
+        assert_eq!(version.python_full_version_marker().to_string(), "3.11.0");
 
         let version = PythonVersion::from_str("3.11").expect("valid python version");
-        assert_eq!(version.python_version(), Version::new([3, 11]));
-        assert_eq!(version.python_version().to_string(), "3.11");
-        assert_eq!(version.python_full_version(), Version::new([3, 11, 0]));
-        assert_eq!(version.python_full_version().to_string(), "3.11.0");
+        assert_eq!(version.python_version_marker(), Version::new([3, 11]));
+        assert_eq!(version.python_version_marker().to_string(), "3.11");
+        assert_eq!(
+            version.python_full_version_marker(),
+            Version::new([3, 11, 0])
+        );
+        assert_eq!(version.python_full_version_marker().to_string(), "3.11.0");
 
         let version = PythonVersion::from_str("3.11.8a1").expect("valid python version");
-        assert_eq!(version.python_version(), Version::new([3, 11]));
-        assert_eq!(version.python_version().to_string(), "3.11");
+        assert_eq!(version.python_version_marker(), Version::new([3, 11]));
+        assert_eq!(version.python_version_marker().to_string(), "3.11");
         assert_eq!(
-            version.python_full_version(),
+            version.python_full_version_marker(),
             Version::new([3, 11, 8]).with_pre(Some(PreRelease {
                 kind: PreReleaseKind::Alpha,
                 number: 1
             }))
         );
-        assert_eq!(version.python_full_version().to_string(), "3.11.8a1");
+        assert_eq!(version.python_full_version_marker().to_string(), "3.11.8a1");
     }
 }

@@ -24,7 +24,7 @@ impl PythonRequirement {
             installed: interpreter.python_full_version().clone(),
             target: Some(PythonTarget::Version(StringVersion {
                 string: python_version.to_string(),
-                version: python_version.python_full_version(),
+                version: python_version.python_full_version_marker(),
             })),
         }
     }

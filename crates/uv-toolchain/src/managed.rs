@@ -202,7 +202,7 @@ pub struct InstalledToolchain {
     /// The path to the top-level directory of the installed toolchain.
     path: PathBuf,
     /// The Python version of the toolchain.
-    python_version: PythonVersion,
+    version: PythonVersion,
     /// The name of the Python implementation of the toolchain.
     implementation: ImplementationName,
     /// An install key for the toolchain.
@@ -230,13 +230,13 @@ impl InstalledToolchain {
             Error::NameParseError(key.clone(), format!("invalid Python implementation: {err}"))
         })?;
 
-        let python_version = PythonVersion::from_str(version).map_err(|err| {
+        let version = PythonVersion::from_str(version).map_err(|err| {
             Error::NameParseError(key.clone(), format!("invalid Python version: {err}"))
         })?;
 
         Ok(Self {
             path,
-            python_version,
+            version,
             implementation,
             key,
         })
@@ -252,8 +252,8 @@ impl InstalledToolchain {
         }
     }
 
-    pub fn python_version(&self) -> &PythonVersion {
-        &self.python_version
+    pub fn version(&self) -> &PythonVersion {
+        &self.version
     }
 
     pub fn path(&self) -> &Path {
@@ -277,10 +277,9 @@ impl InstalledToolchain {
                 *implementation == self.implementation
             }
             ToolchainRequest::ImplementationVersion(implementation, version) => {
-                *implementation == self.implementation
-                    && version.matches_version(&self.python_version)
+                *implementation == self.implementation && version.matches_version(&self.version)
             }
-            ToolchainRequest::Version(version) => version.matches_version(&self.python_version),
+            ToolchainRequest::Version(version) => version.matches_version(&self.version),
         }
     }
 }

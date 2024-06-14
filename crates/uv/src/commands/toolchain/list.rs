@@ -6,7 +6,7 @@ use anyhow::Result;
 use uv_cache::Cache;
 use uv_configuration::PreviewMode;
 use uv_fs::Simplified;
-use uv_toolchain::downloads::PythonDownloadRequest;
+use uv_toolchain::downloads::ToolchainKey;
 use uv_toolchain::{
     find_toolchains, DiscoveryError, SystemPython, Toolchain, ToolchainNotFound, ToolchainRequest,
     ToolchainSource, ToolchainSources,
@@ -41,15 +41,15 @@ pub(crate) async fn list(
     let download_request = match kinds {
         ToolchainListKinds::Installed => None,
         ToolchainListKinds::Default => Some(if all_platforms {
-            PythonDownloadRequest::default()
+            ToolchainKey::default()
         } else {
-            PythonDownloadRequest::from_env()?
+            ToolchainKey::from_env()?
         }),
     };
 
     let downloads = download_request
         .as_ref()
-        .map(uv_toolchain::downloads::PythonDownloadRequest::iter_downloads)
+        .map(uv_toolchain::downloads::ToolchainKey::iter_downloads)
         .into_iter()
         .flatten();
 

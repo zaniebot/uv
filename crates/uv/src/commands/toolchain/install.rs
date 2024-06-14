@@ -4,7 +4,7 @@ use uv_cache::Cache;
 use uv_client::Connectivity;
 use uv_configuration::PreviewMode;
 use uv_fs::Simplified;
-use uv_toolchain::downloads::{DownloadResult, PythonDownload, PythonDownloadRequest};
+use uv_toolchain::downloads::{DownloadResult, PythonDownload, ToolchainKey};
 use uv_toolchain::managed::InstalledToolchains;
 use uv_toolchain::ToolchainRequest;
 use uv_warnings::warn_user;
@@ -79,7 +79,7 @@ pub(crate) async fn install(
     }
 
     // Fill platform information missing from the request
-    let request = PythonDownloadRequest::from_request(request)?.fill()?;
+    let request = ToolchainKey::from_request(request)?.fill()?;
 
     // Find the corresponding download
     let download = PythonDownload::from_request(&request)?;

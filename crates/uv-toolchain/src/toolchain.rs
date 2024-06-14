@@ -9,11 +9,11 @@ use crate::discovery::{
     find_best_toolchain, find_default_toolchain, find_toolchain, SystemPython, ToolchainRequest,
     ToolchainSources,
 };
-use crate::downloads::{DownloadResult, PythonDownload, PythonDownloadRequest};
+use crate::downloads::{DownloadResult, PythonDownload, ToolchainKey};
 use crate::implementation::LenientImplementationName;
 use crate::managed::{InstalledToolchain, InstalledToolchains};
 use crate::platform::{Arch, Libc, Os};
-use crate::{Error, Interpreter, ToolchainSource};
+use crate::{Error, Interpreter, PythonVersion, ToolchainSource};
 
 /// A Python interpreter and accompanying tools.
 #[derive(Clone, Debug)]
@@ -165,7 +165,7 @@ impl Toolchain {
         let toolchains = InstalledToolchains::from_settings()?.init()?;
         let toolchain_dir = toolchains.root();
 
-        let request = PythonDownloadRequest::from_request(request)?.fill()?;
+        let request = ToolchainKey::from_request(request)?.fill()?;
         let download = PythonDownload::from_request(&request)?;
         let client = client_builder.build();
 
@@ -241,5 +241,125 @@ impl Toolchain {
 
     pub fn into_interpreter(self) -> Interpreter {
         self.interpreter
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct ToolchainKey {
+    version: Option<PythonVersion>,
+    implementation: Option<ImplementationName>,
+    arch: Option<Arch>,
+    os: Option<Os>,
+    libc: Option<Libc>,
+}
+
+impl ToolchainKey {
+    pub fn new(
+        version: Option<PythonVersion>,
+        implementation: Option<ImplementationName>,
+        arch: Option<Arch>,
+        os: Option<Os>,
+        libc: Option<Libc>,
+    ) -> Self {
+        Self {
+            version,
+            implementation,
+            arch,
+            os,
+            libc,
+        }
+    }
+
+    #[must_use]
+    pub fn with_implementation(mut self, implementation: ImplementationName) -> Self {
+        self.implementation = Some(implementation);
+        self
+    }
+
+    #[must_use]
+    pub fn with_version(mut self, version: PythonVersion) -> Self {
+        self.version = Some(version);
+        self
+    }
+
+    #[must_use]
+    pub fn with_arch(mut self, arch: Arch) -> Self {
+        self.arch = Some(arch);
+        self
+    }
+
+    #[must_use]
+    pub fn with_os(mut self, os: Os) -> Self {
+        self.os = Some(os);
+        self
+    }
+
+    #[must_use]
+    pub fn with_libc(mut self, libc: Libc) -> Self {
+        self.libc = Some(libc);
+        self
+    }
+
+    /// Fill empty entries with default values.
+    ///
+    /// Platform information is pulled from the environment.
+    pub fn fill(mut self) -> Result<Self, Error> {
+        if self.implementation.is_none() {
+            self.implementation = Some(ImplementationName::CPython);
+        }
+        if self.arch.is_none() {
+            self.arch = Some(Arch::from_env());
+        }
+        if self.os.is_none() {
+            self.os = Some(Os::from_env());
+        }
+        if self.libc.is_none() {
+            self.libc = Some(Libc::from_env());
+        }
+        Ok(self)
+    }
+
+    /// Construct a new [`ToolchainKey`] with platform information from the environment.
+    pub fn from_env() -> Result<Self, Error> {
+        Ok(Self::new(
+            None,
+            None,
+            Some(Arch::from_env()),
+            Some(Os::from_env()),
+            Some(Libc::from_env()),
+        ))
+    }
+}
+
+impl Display for ToolchainKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut parts = Vec::new();
+        if let Some(version) = &self.version {
+            parts.push(version.to_string());
+        }
+        if let Some(implementation) = self.implementation {
+            parts.push(implementation.to_string());
+        }
+        if let Some(os) = &self.os {
+            parts.push(os.to_string());
+        }
+        if let Some(arch) = self.arch {
+            parts.push(arch.to_string());
+        }
+        if let Some(libc) = self.libc {
+            parts.push(libc.to_string());
+        }
+        write!(f, "{}", parts.join("-"))
+    }
+}
+
+impl FromStr for ToolchainKey {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        // TODO(zanieb): Implement parsing of additional request parts
+        let version =
+            PythonVersion::from_str(s).map_err(|_| Error::InvalidPythonVersion(s.to_string()))?;
+        Ok(Self::new(Some(version), None, None, None, None))
     }
 }

@@ -7,7 +7,7 @@ use tracing::{info, info_span, Instrument};
 use uv_toolchain::ToolchainRequest;
 
 use uv_fs::Simplified;
-use uv_toolchain::downloads::{DownloadResult, Error, PythonDownload, PythonDownloadRequest};
+use uv_toolchain::downloads::{DownloadResult, Error, PythonDownload, ToolchainKey};
 use uv_toolchain::managed::InstalledToolchains;
 
 #[derive(Parser, Debug)]
@@ -31,9 +31,9 @@ pub(crate) async fn fetch_python(args: FetchPythonArgs) -> Result<()> {
     let requests = versions
         .iter()
         .map(|version| {
-            PythonDownloadRequest::from_request(ToolchainRequest::parse(version))
+            ToolchainKey::from_request(ToolchainRequest::parse(version))
                 // Populate platform information on the request
-                .and_then(PythonDownloadRequest::fill)
+                .and_then(ToolchainKey::fill)
         })
         .collect::<Result<Vec<_>, Error>>()?;
 
