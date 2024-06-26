@@ -1889,6 +1889,12 @@ pub struct ToolInstallArgs {
     /// The package to install commands from.
     pub package: String,
 
+    /// The package to install commands from.
+    ///
+    /// This option is provided for parity with `uv tool run`, but is redundant with `package`.
+    #[arg(long, hide = true)]
+    pub from: Option<String>,
+
     /// Include the following extra requirements.
     #[arg(long)]
     pub with: Vec<String>,

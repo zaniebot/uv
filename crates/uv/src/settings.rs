@@ -248,6 +248,7 @@ impl ToolInstallSettings {
     #[allow(clippy::needless_pass_by_value)]
     pub(crate) fn resolve(args: ToolInstallArgs, filesystem: Option<FilesystemOptions>) -> Self {
         let ToolInstallArgs {
+            package,
             from,
             with,
             installer,
@@ -257,8 +258,12 @@ impl ToolInstallSettings {
             python,
         } = args;
 
+        if let Some(from) = from {
+           if from
+        }
+
         Self {
-            from,
+            package,
             with,
             python,
             force,
