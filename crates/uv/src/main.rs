@@ -810,9 +810,8 @@ async fn run() -> Result<ExitStatus> {
             let cache = cache.init()?.with_refresh(args.refresh);
 
             commands::tool_install(
-                args.name,
-                args.python,
                 args.from,
+                args.python,
                 args.with,
                 args.force,
                 args.settings,

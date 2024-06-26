@@ -30,9 +30,8 @@ use crate::settings::ResolverInstallerSettings;
 /// Install a tool.
 #[allow(clippy::too_many_arguments)]
 pub(crate) async fn install(
-    name: String,
+    package: String,
     python: Option<String>,
-    from: Option<String>,
     with: Vec<String>,
     force: bool,
     settings: ResolverInstallerSettings,
@@ -47,12 +46,12 @@ pub(crate) async fn install(
     if preview.is_disabled() {
         warn_user!("`uv tool install` is experimental and may change without warning.");
     }
-    let from = from.unwrap_or(name.clone());
+    let from = Requirement::<VerbatimParsedUrl>::from_str(&package)?;
+    let name = from.name.to_string();
 
     let installed_tools = InstalledTools::from_settings()?;
 
     // TODO(zanieb): Figure out the interface here, do we infer the name or do we match the `run --from` interface?
-    let from = Requirement::<VerbatimParsedUrl>::from_str(&from)?;
     let existing_tool_entry = installed_tools.find_tool_entry(&name)?;
     // TODO(zanieb): Automatically replace an existing tool if the request differs
     let reinstall_entry_points = if existing_tool_entry.is_some() {
