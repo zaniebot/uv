@@ -39,6 +39,8 @@ fn tool_install() {
      + packaging==24.0
      + pathspec==0.12.1
      + platformdirs==4.2.0
+    Installed `black`
+    Installed `blackd`
     "###);
 
     tool_dir.child("black").assert(predicate::path::is_dir());
@@ -109,6 +111,7 @@ fn tool_install() {
      + jinja2==3.1.3
      + markupsafe==2.1.5
      + werkzeug==3.0.1
+    Installed `flask`
     "###);
 
     tool_dir.child("flask").assert(predicate::path::is_dir());
@@ -156,9 +159,9 @@ fn tool_install() {
     });
 }
 
-/// Test installing a tool twice with `uv tool install`
+/// Test installing and reinstalling an already installed tool
 #[test]
-fn tool_install_twice() {
+fn tool_install_already_installed() {
     let context = TestContext::new("3.12");
     let tool_dir = context.temp_dir.child("tools");
     let bin_dir = context.temp_dir.child("bin");
@@ -183,6 +186,8 @@ fn tool_install_twice() {
      + packaging==24.0
      + pathspec==0.12.1
      + platformdirs==4.2.0
+    Installed `black`
+    Installed `blackd`
     "###);
 
     tool_dir.child("black").assert(predicate::path::is_dir());
@@ -250,6 +255,76 @@ fn tool_install_twice() {
         black = { requirements = ["black"] }
         "###);
     });
+
+    // Install `black` again with the `--reinstall` flag
+    // We should recreate the entire environment and reinstall the entry points
+    uv_snapshot!(context.filters(), context.tool_install()
+        .arg("black")
+        .arg("--reinstall")
+        .env("UV_TOOL_DIR", tool_dir.as_os_str())
+        .env("XDG_BIN_HOME", bin_dir.as_os_str()), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    warning: `uv tool install` is experimental and may change without warning.
+    Resolved 6 packages in [TIME]
+    Installed 6 packages in [TIME]
+     + black==24.3.0
+     + click==8.1.7
+     + mypy-extensions==1.0.0
+     + packaging==24.0
+     + pathspec==0.12.1
+     + platformdirs==4.2.0
+    Installed `black`
+    Installed `blackd`
+    "###);
+
+    // Install `black` again with `--reinstall-package` for `black`
+    // We should reinstall `black` in the environment and reinstall the entry points
+    uv_snapshot!(context.filters(), context.tool_install()
+        .arg("black")
+        .arg("--reinstall-package")
+        .arg("black")
+        .env("UV_TOOL_DIR", tool_dir.as_os_str())
+        .env("XDG_BIN_HOME", bin_dir.as_os_str()), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    warning: `uv tool install` is experimental and may change without warning.
+    Resolved 6 packages in [TIME]
+    Uninstalled 1 package in [TIME]
+    Installed 1 package in [TIME]
+     - black==24.3.0
+     + black==24.3.0
+    Installed `black`
+    Installed `blackd`
+    "###);
+
+    // Install `black` again with `--reinstall-package` for a dependency
+    // We should reinstall `click` in the environment but not reinstall the entry points
+    uv_snapshot!(context.filters(), context.tool_install()
+        .arg("black")
+        .arg("--reinstall-package")
+        .arg("click")
+        .env("UV_TOOL_DIR", tool_dir.as_os_str())
+        .env("XDG_BIN_HOME", bin_dir.as_os_str()), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    warning: `uv tool install` is experimental and may change without warning.
+    Resolved 6 packages in [TIME]
+    Uninstalled 1 package in [TIME]
+    Installed 1 package in [TIME]
+     - click==8.1.7
+     + click==8.1.7
+    Updated environment for tool `black`
+    "###);
 }
 
 /// Test installing a tool when its entry point already exists
@@ -262,14 +337,18 @@ fn tool_install_entry_point_exists() {
     let executable = bin_dir.child(format!("black{}", std::env::consts::EXE_SUFFIX));
     executable.touch().unwrap();
 
-    // Drop executable suffixes for cross-platform snapshtos
+    // Drop executable suffixes for cross-platform snapshots
+    // Drop resolved counts, they differ on Windows and are not relevant here
     let filters = context
         .filters()
         .into_iter()
-        .chain([(std::env::consts::EXE_SUFFIX, "")])
+        .chain([
+            (std::env::consts::EXE_SUFFIX, ""),
+            ("Resolved [0-9] packages", "Resolved [COUNT] packages"),
+        ])
         .collect::<Vec<_>>();
 
-    // Install `black`
+    // Attempt to install `black`
     uv_snapshot!(filters, context.tool_install()
         .arg("black")
         .env("UV_TOOL_DIR", tool_dir.as_os_str())
@@ -280,7 +359,7 @@ fn tool_install_entry_point_exists() {
 
     ----- stderr -----
     warning: `uv tool install` is experimental and may change without warning.
-    Resolved 6 packages in [TIME]
+    Resolved [COUNT] packages in [TIME]
     Prepared 6 packages in [TIME]
     Installed 6 packages in [TIME]
      + black==24.3.0
@@ -306,6 +385,44 @@ fn tool_install_entry_point_exists() {
 
     });
 
+    // Attempt to install `black` with the `--reinstall` flag
+    // Should have no effect
+    uv_snapshot!(filters, context.tool_install()
+        .arg("black")
+        .arg("--reinstall")
+        .env("UV_TOOL_DIR", tool_dir.as_os_str())
+        .env("XDG_BIN_HOME", bin_dir.as_os_str()), @r###"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    warning: `uv tool install` is experimental and may change without warning.
+    Resolved [COUNT] packages in [TIME]
+    Installed 6 packages in [TIME]
+     + black==24.3.0
+     + click==8.1.7
+     + mypy-extensions==1.0.0
+     + packaging==24.0
+     + pathspec==0.12.1
+     + platformdirs==4.2.0
+    error: Entry point for tool already exists: black (use `--force` to overwrite)
+    "###);
+
+    // We should not create a virtual environment
+    assert!(!tool_dir.child("black").exists());
+
+    // We should not write a tools entry
+    assert!(!tool_dir.join("tools.toml").exists());
+
+    insta::with_settings!({
+        filters => context.filters(),
+    }, {
+        // Nor should we change the `black` entry point that exists
+        assert_snapshot!(fs_err::read_to_string(bin_dir.join("black")).unwrap(), @"");
+
+    });
+
     // Test error message when multiple entry points exist
     bin_dir
         .child(format!("blackd{}", std::env::consts::EXE_SUFFIX))
@@ -321,7 +438,7 @@ fn tool_install_entry_point_exists() {
 
     ----- stderr -----
     warning: `uv tool install` is experimental and may change without warning.
-    Resolved 6 packages in [TIME]
+    Resolved [COUNT] packages in [TIME]
     Installed 6 packages in [TIME]
      + black==24.3.0
      + click==8.1.7
@@ -333,7 +450,7 @@ fn tool_install_entry_point_exists() {
     "###);
 
     // Install `black` with `--force`
-    uv_snapshot!(context.filters(), context.tool_install()
+    uv_snapshot!(filters, context.tool_install()
         .arg("black")
         .arg("--force")
         .env("UV_TOOL_DIR", tool_dir.as_os_str())
@@ -344,7 +461,7 @@ fn tool_install_entry_point_exists() {
 
     ----- stderr -----
     warning: `uv tool install` is experimental and may change without warning.
-    Resolved 6 packages in [TIME]
+    Resolved [COUNT] packages in [TIME]
     Installed 6 packages in [TIME]
      + black==24.3.0
      + click==8.1.7
@@ -352,6 +469,8 @@ fn tool_install_entry_point_exists() {
      + packaging==24.0
      + pathspec==0.12.1
      + platformdirs==4.2.0
+    Installed `black`
+    Installed `blackd`
     "###);
 
     tool_dir.child("black").assert(predicate::path::is_dir());
@@ -435,6 +554,8 @@ fn tool_install_home() {
      + packaging==24.0
      + pathspec==0.12.1
      + platformdirs==4.2.0
+    Installed `black`
+    Installed `blackd`
     "###);
 
     context
@@ -470,6 +591,8 @@ fn tool_install_xdg_data_home() {
      + packaging==24.0
      + pathspec==0.12.1
      + platformdirs==4.2.0
+    Installed `black`
+    Installed `blackd`
     "###);
 
     context
@@ -505,6 +628,8 @@ fn tool_install_xdg_bin_home() {
      + packaging==24.0
      + pathspec==0.12.1
      + platformdirs==4.2.0
+    Installed `black`
+    Installed `blackd`
     "###);
 
     bin_dir
