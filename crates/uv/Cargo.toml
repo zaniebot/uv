@@ -90,6 +90,10 @@ reqwest = { workspace = true, features = ["blocking"], default-features = false 
 [package.metadata.cargo-shear]
 ignored = ["flate2"]
 
+[package.metadata.dist.bin-aliases]
+# A special alias for `uvx`
+uv = ["uvx"]
+
 [features]
 default = ["flate2/zlib-ng", "python", "pypi", "git"]
 # Introduces a dependency on a local Python installation.
@@ -102,4 +106,3 @@ pypi = []
 git = []
 # Adds self-update functionality.
 self-update = ["axoupdater", "uv-cli/self-update"]
-
