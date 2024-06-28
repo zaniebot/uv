@@ -1,0 +1,19 @@
+[package]
+name = "uvx"
+version = "0.2.17"
+edition = { workspace = true }
+rust-version = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
+repository = { workspace = true }
+authors = { workspace = true }
+license = { workspace = true }
+default-run = "uvx"
+
+[lints]
+workspace = true
+
+[dependencies]
+uv = {workspace = true }
+
+[dev-dependencies]
