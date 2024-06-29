@@ -25,6 +25,47 @@ pub enum Libc {
     None,
 }
 
+impl Ord for Arch {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.0.to_string().cmp(&other.0.to_string())
+    }
+}
+
+impl Ord for Libc {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        match (self, other) {
+            (Self::Some(env), Self::Some(other_env)) => env.to_string().cmp(&other_env.to_string()),
+            (Self::Some(_), Self::None) => std::cmp::Ordering::Greater,
+            (Self::None, Self::Some(_)) => std::cmp::Ordering::Less,
+            (Self::None, Self::None) => std::cmp::Ordering::Equal,
+        }
+    }
+}
+
+impl Ord for Os {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.0.to_string().cmp(&other.0.to_string())
+    }
+}
+
+impl PartialOrd for Arch {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl PartialOrd for Libc {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl PartialOrd for Os {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
 impl Libc {
     pub(crate) fn from_env() -> Self {
         match std::env::consts::OS {
