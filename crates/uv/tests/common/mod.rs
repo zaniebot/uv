@@ -277,6 +277,13 @@ impl TestContext {
         }
     }
 
+    /// Create a `uv` command for testing.
+    pub fn command(&self) -> Command {
+        let mut command = Command::new(get_bin());
+        self.add_shared_args(&mut command);
+        command
+    }
+
     /// Shared behaviour for almost all test commands.
     ///
     /// * Use a temporary cache directory
@@ -351,6 +358,14 @@ impl TestContext {
     pub fn pip_tree(&self) -> Command {
         let mut command = Command::new(get_bin());
         command.arg("pip").arg("tree");
+        self.add_shared_args(&mut command);
+        command
+    }
+
+    /// Create a `uv help` command with options shared across scenarios.
+    pub fn help(&self) -> Command {
+        let mut command = Command::new(get_bin());
+        command.arg("help");
         self.add_shared_args(&mut command);
         command
     }
