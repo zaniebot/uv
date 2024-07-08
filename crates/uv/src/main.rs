@@ -8,6 +8,7 @@ use anstream::eprintln;
 use anyhow::Result;
 use clap::error::{ContextKind, ContextValue};
 use clap::{CommandFactory, Parser};
+use itertools::Itertools;
 use owo_colors::OwoColorize;
 use tracing::{debug, instrument};
 
@@ -217,6 +218,7 @@ async fn run() -> Result<ExitStatus> {
     let cache = Cache::from_settings(cache_settings.no_cache, cache_settings.cache_dir)?;
 
     match *cli.command {
+        Commands::Help(args) => commands::help(args.command.unwrap_or_default(), printer),
         Commands::Pip(PipNamespace {
             command: PipCommand::Compile(args),
         }) => {

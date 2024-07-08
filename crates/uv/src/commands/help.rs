@@ -1,0 +1,198 @@
+use std::fmt::Write;
+
+use anyhow::{anyhow, bail, Error, Result};
+use clap::CommandFactory;
+use itertools::Itertools;
+
+use super::ExitStatus;
+use crate::printer::Printer;
+use uv_cli::Cli;
+
+pub(crate) fn help(command: Vec<String>, printer: Printer) -> Result<ExitStatus> {
+    let uv = Cli::command();
+    let command = find_command(command.as_slice(), &uv).map_err(|(unmatched, nearest)| {
+        let missing = if unmatched.len() == command.len() {
+            format!("command `{}` for `uv`", command.join(" "))
+        } else {
+            format!(
+                "command `{}` for `uv {}`",
+                unmatched.join(" "),
+                nearest.get_name()
+            )
+        };
+        anyhow!(
+            "There is no {}. Did you mean one of:\n    {}",
+            missing,
+            nearest
+                .get_subcommands()
+                .filter(|cmd| !cmd.is_hide_set())
+                .map(|cmd| cmd.get_name())
+                .filter(|name| *name != "help")
+                .join("\n    "),
+        )
+    })?;
+
+    let mut command = command.clone();
+    let help = command.render_long_help();
+    writeln!(printer.stderr(), "{}", help.ansi())?;
+
+    Ok(ExitStatus::Success)
+}
+
+/// Find the command corresponding to a set of arguments, e.g., `["uv", "pip", "install"]`.
+///
+/// If the command cannot be found, the nearest command is returned.
+fn find_command<'a>(
+    query: &'a [String],
+    cmd: &'a clap::Command,
+) -> Result<&'a clap::Command, (&'a [String], &'a clap::Command)> {
+    let Some(next) = query.first() else {
+        return Ok(cmd);
+    };
+
+    let subcommand = cmd.find_subcommand(next).ok_or((query, cmd))?;
+    find_command(&query[1..], subcommand)
+}
+
+// use flate2::read::GzDecoder;
+// use std::ffi::OsStr;
+// use std::ffi::OsString;
+// use std::io::Read;
+// use std::io::Write;
+// use std::path::Path;
+
+// const COMPRESSED_MAN: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/man.tgz"));
+
+// pub fn cli() -> Command {
+//     subcommand("help")
+//         .about("Displays help for a cargo subcommand")
+//         .arg(Arg::new("COMMAND").action(ArgAction::Set))
+// }
+
+// pub fn exec(gctx: &mut GlobalContext, args: &ArgMatches) -> CliResult {
+//     let subcommand = args.get_one::<String>("COMMAND");
+//     if let Some(subcommand) = subcommand {
+//         if !try_help(gctx, subcommand)? {
+//             match check_builtin(&subcommand) {
+//                 Some(s) => {
+//                     crate::execute_internal_subcommand(
+//                         gctx,
+//                         &[OsStr::new(s), OsStr::new("--help")],
+//                     )?;
+//                 }
+//                 None => {
+//                     crate::execute_external_subcommand(
+//                         gctx,
+//                         subcommand,
+//                         &[OsStr::new(subcommand), OsStr::new("--help")],
+//                     )?;
+//                 }
+//             }
+//         }
+//     } else {
+//         let mut cmd = crate::cli::cli(gctx);
+//         let _ = cmd.print_help();
+//     }
+//     Ok(())
+// }
+
+// fn try_help(gctx: &GlobalContext, subcommand: &str) -> CargoResult<bool> {
+//     let subcommand = match check_alias(gctx, subcommand) {
+//         // If this alias is more than a simple subcommand pass-through, show the alias.
+//         Some(argv) if argv.len() > 1 => {
+//             let alias = argv.join(" ");
+//             drop_println!(gctx, "`{}` is aliased to `{}`", subcommand, alias);
+//             return Ok(true);
+//         }
+//         // Otherwise, resolve the alias into its subcommand.
+//         Some(argv) => {
+//             // An alias with an empty argv can be created via `"empty-alias" = ""`.
+//             let first = argv.get(0).map(String::as_str).unwrap_or(subcommand);
+//             first.to_string()
+//         }
+//         None => subcommand.to_string(),
+//     };
+
+//     let subcommand = match check_builtin(&subcommand) {
+//         Some(s) => s,
+//         None => return Ok(false),
+//     };
+
+//     if resolve_executable(Path::new("man")).is_ok() {
+//         let man = match extract_man(subcommand, "1") {
+//             Some(man) => man,
+//             None => return Ok(false),
+//         };
+//         write_and_spawn(subcommand, &man, "man")?;
+//     } else {
+//         let txt = match extract_man(subcommand, "txt") {
+//             Some(txt) => txt,
+//             None => return Ok(false),
+//         };
+//         if resolve_executable(Path::new("less")).is_ok() {
+//             write_and_spawn(subcommand, &txt, "less")?;
+//         } else if resolve_executable(Path::new("more")).is_ok() {
+//             write_and_spawn(subcommand, &txt, "more")?;
+//         } else {
+//             drop(std::io::stdout().write_all(&txt));
+//         }
+//     }
+//     Ok(true)
+// }
+
+// /// Checks if the given subcommand is an alias.
+// ///
+// /// Returns None if it is not an alias.
+// fn check_alias(gctx: &GlobalContext, subcommand: &str) -> Option<Vec<String>> {
+//     aliased_command(gctx, subcommand).ok().flatten()
+// }
+
+// /// Checks if the given subcommand is a built-in command (not via an alias).
+// ///
+// /// Returns None if it is not a built-in command.
+// fn check_builtin(subcommand: &str) -> Option<&str> {
+//     super::builtin_exec(subcommand).map(|_| subcommand)
+// }
+
+// /// Extracts the given man page from the compressed archive.
+// ///
+// /// Returns None if the command wasn't found.
+// fn extract_man(subcommand: &str, extension: &str) -> Option<Vec<u8>> {
+//     let extract_name = OsString::from(format!("cargo-{}.{}", subcommand, extension));
+//     let gz = GzDecoder::new(COMPRESSED_MAN);
+//     let mut ar = tar::Archive::new(gz);
+//     // Unwraps should be safe here, since this is a static archive generated
+//     // by our build script. It should never be an invalid format!
+//     for entry in ar.entries().unwrap() {
+//         let mut entry = entry.unwrap();
+//         let path = entry.path().unwrap();
+//         if path.file_name().unwrap() != extract_name {
+//             continue;
+//         }
+//         let mut result = Vec::new();
+//         entry.read_to_end(&mut result).unwrap();
+//         return Some(result);
+//     }
+//     None
+// }
+
+// /// Write the contents of a man page to disk and spawn the given command to
+// /// display it.
+// fn write_and_spawn(name: &str, contents: &[u8], command: &str) -> CargoResult<()> {
+//     let prefix = format!("uv-{}.", name);
+//     let mut tmp = tempfile::Builder::new().prefix(&prefix).tempfile()?;
+//     let f = tmp.as_file_mut();
+//     f.write_all(contents)?;
+//     f.flush()?;
+//     let path = tmp.path();
+//     // Use a path relative to the temp directory so that it can work on
+//     // cygwin/msys systems which don't handle windows-style paths.
+//     let mut relative_name = std::ffi::OsString::from("./");
+//     relative_name.push(path.file_name().unwrap());
+//     let mut cmd = std::process::Command::new(command)
+//         .arg(relative_name)
+//         .current_dir(path.parent().unwrap())
+//         .spawn()?;
+//     drop(cmd.wait());
+//     Ok(())
+// }
