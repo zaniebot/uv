@@ -39,6 +39,7 @@ pub(crate) async fn install(
     from: Option<String>,
     python: Option<String>,
     with: Vec<String>,
+    executable: Vec<String>,
     force: bool,
     settings: ResolverInstallerSettings,
     preview: PreviewMode,

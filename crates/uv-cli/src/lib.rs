@@ -2105,6 +2105,10 @@ pub struct ToolInstallArgs {
     #[arg(long)]
     pub with: Vec<String>,
 
+    /// Only include the following executables.
+    #[arg(short, long)]
+    pub executable: Vec<String>,
+
     #[command(flatten)]
     pub installer: ResolverInstallerArgs,
 

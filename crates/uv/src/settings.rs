@@ -243,6 +243,7 @@ impl ToolRunSettings {
 pub(crate) struct ToolInstallSettings {
     pub(crate) package: String,
     pub(crate) from: Option<String>,
+    pub(crate) executable: Vec<String>,
     pub(crate) with: Vec<String>,
     pub(crate) python: Option<String>,
     pub(crate) refresh: Refresh,
@@ -261,6 +262,7 @@ impl ToolInstallSettings {
             installer,
             force,
             build,
+            executable,
             refresh,
             python,
         } = args;
@@ -270,6 +272,7 @@ impl ToolInstallSettings {
             from,
             with,
             python,
+            executable,
             force,
             refresh: Refresh::from(refresh),
             settings: ResolverInstallerSettings::combine(

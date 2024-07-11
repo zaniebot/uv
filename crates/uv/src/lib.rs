@@ -638,6 +638,7 @@ async fn run(cli: Cli) -> Result<ExitStatus> {
                 args.from,
                 args.python,
                 args.with,
+                args.executable,
                 args.force,
                 args.settings,
                 globals.preview,
