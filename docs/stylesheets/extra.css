@@ -114,7 +114,7 @@ This is a consequence of the reduced nav spacing below. */
 
 /* Reducing spacing between nav items to fit more content */
 .md-nav__link {
-  margin-top: 0.25em;
+  margin-top: 0.3em;
 }
 /* Retain larger spacing for each top-level section in the nav */
 .md-nav__item--nested {
@@ -125,10 +125,7 @@ This is a consequence of the reduced nav spacing below. */
   margin-top: 0.5em;
 }
 
-/* Bold section names
-See: https://github.com/astral-sh/uv/issues/5614 */
-[for="__toc"] + .md-nav__link .md-ellipsis,
-.md-nav__link[for^="__nav_"] .md-ellipsis,
 .md-nav__container .md-ellipsis {
-  font-weight: bold;
+  text-transform: uppercase;
+  font-size: 12.5px;
 }
