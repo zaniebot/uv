@@ -5,6 +5,8 @@ use assert_cmd::assert::OutputAssertExt;
 use assert_fs::{fixture::ChildPath, prelude::*};
 use indoc::indoc;
 
+use uv_python::PYTHON_VERSION_FILENAME;
+
 use common::{uv_snapshot, TestContext};
 
 mod common;
@@ -765,6 +767,249 @@ fn run_requirements_txt_arguments() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + idna==3.6
+    "###);
+
+    Ok(())
+}
+
+/// Ensure that we can import from the root project when layering `--with` requirements.
+#[test]
+fn run_editable() -> Result<()> {
+    let context = TestContext::new("3.12");
+
+    let pyproject_toml = context.temp_dir.child("pyproject.toml");
+    pyproject_toml.write_str(indoc! { r#"
+        [build-system]
+        requires = ["hatchling"]
+        build-backend = "hatchling.build"
+
+        [project]
+        name = "foo"
+        version = "1.0.0"
+        requires-python = ">=3.8"
+        dependencies = []
+        "#
+    })?;
+
+    let src = context.temp_dir.child("src").child("foo");
+    src.create_dir_all()?;
+
+    let init = src.child("__init__.py");
+    init.touch()?;
+
+    let main = context.temp_dir.child("main.py");
+    main.write_str(indoc! { r"
+        import foo
+        print('Hello, world!')
+       "
+    })?;
+
+    // We treat arguments before the command as uv arguments
+    uv_snapshot!(context.filters(), context.run().arg("--with").arg("iniconfig").arg("main.py"), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    Hello, world!
+
+    ----- stderr -----
+    warning: `uv run` is experimental and may change without warning
+    Resolved 1 package in [TIME]
+    Prepared 1 package in [TIME]
+    Installed 1 package in [TIME]
+     + foo==1.0.0 (from file://[TEMP_DIR]/)
+    Resolved 1 package in [TIME]
+    Prepared 1 package in [TIME]
+    Installed 1 package in [TIME]
+     + iniconfig==2.0.0
+    "###);
+
+    Ok(())
+}
+
+#[test]
+fn run_from_directory() -> Result<()> {
+    // default 3.11 so that the .python-version is meaningful
+    let context = TestContext::new_with_versions(&["3.11", "3.12"]);
+
+    let project_dir = context.temp_dir.child("project");
+    project_dir.create_dir_all()?;
+    project_dir
+        .child(PYTHON_VERSION_FILENAME)
+        .write_str("3.12")?;
+
+    let pyproject_toml = project_dir.child("pyproject.toml");
+    pyproject_toml.write_str(indoc! { r#"
+        [project]
+        name = "foo"
+        version = "1.0.0"
+        requires-python = ">=3.11, <4"
+        dependencies = []
+
+        [project.scripts]
+        main = "main:main"
+        "#
+    })?;
+    let main_script = project_dir.child("main.py");
+    main_script.write_str(indoc! { r"
+        import platform
+
+        def main():
+            print(platform.python_version())
+       "
+    })?;
+
+    let mut command = context.run();
+    let command_with_args = command
+        .arg("--preview")
+        .arg("--directory")
+        .arg("project")
+        .arg("main");
+
+    uv_snapshot!(context.filters(), command_with_args, @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    3.12.[X]
+
+    ----- stderr -----
+    Using Python 3.12.[X] interpreter at: [PYTHON-3.12]
+    Creating virtualenv at: .venv
+    Resolved 1 package in [TIME]
+    Prepared 1 package in [TIME]
+    Installed 1 package in [TIME]
+     + foo==1.0.0 (from file://[TEMP_DIR]/project)
+    "###);
+
+    Ok(())
+}
+
+/// By default, omit resolver and installer output.
+#[test]
+fn run_without_output() -> Result<()> {
+    let context = TestContext::new("3.12");
+
+    let pyproject_toml = context.temp_dir.child("pyproject.toml");
+    pyproject_toml.write_str(indoc! { r#"
+        [project]
+        name = "foo"
+        version = "1.0.0"
+        requires-python = ">=3.8"
+        dependencies = ["anyio", "sniffio==1.3.1"]
+        "#
+    })?;
+
+    let test_script = context.temp_dir.child("main.py");
+    test_script.write_str(indoc! { r"
+        import sniffio
+       "
+    })?;
+
+    uv_snapshot!(context.filters(), context.run().env_remove("UV_SHOW_RESOLUTION").arg("--with").arg("iniconfig").arg("main.py"), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    warning: `uv run` is experimental and may change without warning
+    "###);
+
+    Ok(())
+}
+
+/// Ensure that we can import from the root project when layering `--with` requirements.
+#[test]
+fn run_isolated_python_version() -> Result<()> {
+    let context = TestContext::new_with_versions(&["3.8", "3.12"]);
+
+    let pyproject_toml = context.temp_dir.child("pyproject.toml");
+    pyproject_toml.write_str(indoc! { r#"
+        [build-system]
+        requires = ["hatchling"]
+        build-backend = "hatchling.build"
+
+        [project]
+        name = "foo"
+        version = "1.0.0"
+        requires-python = ">=3.8"
+        dependencies = ["anyio"]
+        "#
+    })?;
+
+    let src = context.temp_dir.child("src").child("foo");
+    src.create_dir_all()?;
+
+    let init = src.child("__init__.py");
+    init.touch()?;
+
+    let main = context.temp_dir.child("main.py");
+    main.write_str(indoc! { r"
+        import sys
+
+        print((sys.version_info.major, sys.version_info.minor))
+       "
+    })?;
+
+    uv_snapshot!(context.filters(), context.run().arg("main.py"), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    (3, 8)
+
+    ----- stderr -----
+    warning: `uv run` is experimental and may change without warning
+    Using Python 3.8.[X] interpreter at: [PYTHON-3.8]
+    Creating virtualenv at: .venv
+    Resolved 6 packages in [TIME]
+    Prepared 6 packages in [TIME]
+    Installed 6 packages in [TIME]
+     + anyio==4.3.0
+     + exceptiongroup==1.2.0
+     + foo==1.0.0 (from file://[TEMP_DIR]/)
+     + idna==3.6
+     + sniffio==1.3.1
+     + typing-extensions==4.10.0
+    "###);
+
+    uv_snapshot!(context.filters(), context.run().arg("--isolated").arg("main.py"), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    (3, 8)
+
+    ----- stderr -----
+    warning: `uv run` is experimental and may change without warning
+    Resolved 6 packages in [TIME]
+    Prepared 5 packages in [TIME]
+    Installed 6 packages in [TIME]
+     + anyio==4.3.0
+     + exceptiongroup==1.2.0
+     + foo==1.0.0 (from file://[TEMP_DIR]/)
+     + idna==3.6
+     + sniffio==1.3.1
+     + typing-extensions==4.10.0
+    "###);
+
+    // Set the `.python-version` to `3.12`.
+    context
+        .temp_dir
+        .child(PYTHON_VERSION_FILENAME)
+        .write_str("3.12")?;
+
+    uv_snapshot!(context.filters(), context.run().arg("--isolated").arg("main.py"), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    (3, 12)
+
+    ----- stderr -----
+    warning: `uv run` is experimental and may change without warning
+    Resolved 6 packages in [TIME]
+    Prepared 3 packages in [TIME]
+    Installed 4 packages in [TIME]
+     + anyio==4.3.0
+     + foo==1.0.0 (from file://[TEMP_DIR]/)
+     + idna==3.6
+     + sniffio==1.3.1
     "###);
 
     Ok(())

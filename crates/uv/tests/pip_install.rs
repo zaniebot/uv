@@ -6,14 +6,16 @@ use anyhow::Result;
 use assert_cmd::prelude::*;
 use assert_fs::prelude::*;
 use base64::{prelude::BASE64_STANDARD as base64, Engine};
+use fs_err as fs;
 use indoc::indoc;
 use itertools::Itertools;
+use predicates::prelude::predicate;
 use url::Url;
 
 use common::{uv_snapshot, TestContext};
 use uv_fs::Simplified;
 
-use crate::common::{get_bin, venv_bin_path, BUILD_VENDOR_LINKS_URL};
+use crate::common::{build_vendor_links_url, get_bin, venv_bin_path};
 
 mod common;
 
@@ -4429,7 +4431,7 @@ fn already_installed_dependent_editable() {
         // Disable the index to guard this test against dependency confusion attacks
         .arg("--no-index")
         .arg("--find-links")
-        .arg(BUILD_VENDOR_LINKS_URL), @r###"
+        .arg(build_vendor_links_url()), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -4466,7 +4468,7 @@ fn already_installed_dependent_editable() {
         // Disable the index to guard this test against dependency confusion attacks
         .arg("--no-index")
         .arg("--find-links")
-        .arg(BUILD_VENDOR_LINKS_URL), @r###"
+        .arg(build_vendor_links_url()), @r###"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -4530,7 +4532,7 @@ fn already_installed_local_path_dependent() {
         // Disable the index to guard this test against dependency confusion attacks
         .arg("--no-index")
         .arg("--find-links")
-        .arg(BUILD_VENDOR_LINKS_URL), @r###"
+        .arg(build_vendor_links_url()), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -4565,7 +4567,7 @@ fn already_installed_local_path_dependent() {
         // Disable the index to guard this test against dependency confusion attacks
         .arg("--no-index")
         .arg("--find-links")
-        .arg(BUILD_VENDOR_LINKS_URL), @r###"
+        .arg(build_vendor_links_url()), @r###"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -4607,7 +4609,7 @@ fn already_installed_local_path_dependent() {
         // Disable the index to guard this test against dependency confusion attacks
         .arg("--no-index")
         .arg("--find-links")
-        .arg(BUILD_VENDOR_LINKS_URL), @r###"
+        .arg(build_vendor_links_url()), @r###"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -4629,7 +4631,7 @@ fn already_installed_local_path_dependent() {
         // Disable the index to guard this test against dependency confusion attacks
         .arg("--no-index")
         .arg("--find-links")
-        .arg(BUILD_VENDOR_LINKS_URL), @r###"
+        .arg(build_vendor_links_url()), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -6146,6 +6148,152 @@ fn accept_existing_prerelease() -> Result<()> {
     Prepared [N] packages in [TIME]
     Installed [N] packages in [TIME]
      + flask-login==0.6.0
+    "###
+    );
+
+    Ok(())
+}
+
+/// Allow `pip install` of an unmanaged project.
+#[test]
+fn unmanaged() -> Result<()> {
+    let context = TestContext::new("3.12");
+    let pyproject_toml = context.temp_dir.child("pyproject.toml");
+    pyproject_toml.write_str(
+        r#"[project]
+    name = "example"
+    version = "0.0.0"
+    dependencies = [
+      "anyio==3.7.0"
+    ]
+
+    [tool.uv]
+    managed = false
+    "#,
+    )?;
+
+    uv_snapshot!(context.filters(), context.pip_install().arg("."), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Resolved 4 packages in [TIME]
+    Prepared 4 packages in [TIME]
+    Installed 4 packages in [TIME]
+     + anyio==3.7.0
+     + example==0.0.0 (from file://[TEMP_DIR]/)
+     + idna==3.6
+     + sniffio==1.3.1
+    "###
+    );
+
+    Ok(())
+}
+
+#[test]
+fn install_relocatable() -> Result<()> {
+    let context = TestContext::new("3.12");
+
+    // Remake the venv as relocatable
+    context
+        .venv()
+        .arg(context.venv.as_os_str())
+        .arg("--python")
+        .arg("3.12")
+        .arg("--relocatable")
+        .assert()
+        .success();
+
+    // Install a package with a hello-world console script entrypoint.
+    // (we use black_editable because it's convenient, but we don't actually install it as editable)
+    context
+        .pip_install()
+        .arg(
+            context
+                .workspace_root
+                .join("scripts/packages/black_editable"),
+        )
+        .assert()
+        .success();
+
+    // Script should run correctly in-situ.
+    let script_path = if cfg!(windows) {
+        context.venv.child(r"Scripts\black.exe")
+    } else {
+        context.venv.child("bin/black")
+    };
+    Command::new(script_path.as_os_str())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Hello world!"));
+
+    // Relocate the venv, and see if it still works.
+    let new_venv_path = context.venv.with_file_name("relocated");
+    fs::rename(context.venv, new_venv_path.clone())?;
+
+    let script_path = if cfg!(windows) {
+        new_venv_path.join(r"Scripts\black.exe")
+    } else {
+        new_venv_path.join("bin/black")
+    };
+    Command::new(script_path.as_os_str())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Hello world!"));
+
+    Ok(())
+}
+
+/// Include a `build_constraints.txt` file with an incompatible constraint.
+#[test]
+fn incompatible_build_constraint() -> Result<()> {
+    let context = TestContext::new("3.8");
+
+    let constraints_txt = context.temp_dir.child("build_constraints.txt");
+    constraints_txt.write_str("setuptools==1")?;
+
+    uv_snapshot!(context.pip_install()
+        .arg("requests==1.2")
+        .arg("--build-constraint")
+        .arg("build_constraints.txt"), @r###"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    error: Failed to download and build `requests==1.2.0`
+      Caused by: Failed to build: `requests==1.2.0`
+      Caused by: Failed to install requirements from setup.py build (resolve)
+      Caused by: No solution found when resolving: setuptools>=40.8.0
+      Caused by: Because you require setuptools>=40.8.0 and setuptools==1, we can conclude that the requirements are unsatisfiable.
+    "###
+    );
+
+    Ok(())
+}
+
+/// Include a `build_constraints.txt` file with a compatible constraint.
+#[test]
+fn compatible_build_constraint() -> Result<()> {
+    let context = TestContext::new("3.8");
+
+    let constraints_txt = context.temp_dir.child("build_constraints.txt");
+    constraints_txt.write_str("setuptools>=40")?;
+
+    uv_snapshot!(context.pip_install()
+        .arg("requests==1.2")
+        .arg("--build-constraint")
+        .arg("build_constraints.txt"), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Resolved 1 package in [TIME]
+    Prepared 1 package in [TIME]
+    Installed 1 package in [TIME]
+     + requests==1.2.0
     "###
     );
 

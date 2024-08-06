@@ -1,5 +1,81 @@
 # Changelog
 
+## 0.2.33
+
+### Enhancements
+
+- Add support for `ksh` to relocatable virtual environments ([#5640](https://github.com/astral-sh/uv/pull/5640))
+
+### CLI
+
+- Add help sections for global options ([#5665](https://github.com/astral-sh/uv/pull/5665))
+- Move `--python` and `--python-version` into the "Python options" help ([#5691](https://github.com/astral-sh/uv/pull/5691))
+- Show help specific options (i.e. `--no-pager`) in `uv help` ([#5516](https://github.com/astral-sh/uv/pull/5516))
+- Update top-level command descriptions ([#5706](https://github.com/astral-sh/uv/pull/5706))
+
+### Bug fixes
+
+- Remove lingering executables after failed installs ([#5666](https://github.com/astral-sh/uv/pull/5666))
+- Switch from heuristic freshness lifetime to hard-coded value ([#5654](https://github.com/astral-sh/uv/pull/5654))
+
+### Documentation
+
+- Don't use equals signs for CLI options with values ([#5704](https://github.com/astral-sh/uv/pull/5704))
+
+## 0.2.32
+
+### Enhancements
+
+- Deprecate the `--isolated` flag in favor of `--no-config` ([#5466](https://github.com/astral-sh/uv/pull/5466))
+- Re-enable `requires-python` narrowing in forks ([#5583](https://github.com/astral-sh/uv/pull/5583))
+
+### Performance
+
+- Skip copying to empty entries in seekable zip ([#5571](https://github.com/astral-sh/uv/pull/5571))
+- Use a consistent buffer size for downloads ([#5569](https://github.com/astral-sh/uv/pull/5569))
+- Use a consistent buffer size when writing out zip files ([#5570](https://github.com/astral-sh/uv/pull/5570))
+
+### Bug fixes
+
+- Avoid setting executable permissions on files we might not own ([#5582](https://github.com/astral-sh/uv/pull/5582))
+- Statically link liblzma ([#5577](https://github.com/astral-sh/uv/pull/5577))
+
+## 0.2.31
+
+### Enhancements
+
+- Add `--relocatable` flag to `uv venv` ([#5515](https://github.com/astral-sh/uv/pull/5515))
+- Support `xz`-compressed packages ([#5513](https://github.com/astral-sh/uv/pull/5513))
+- Warn, but don't error, when encountering tilde `.dist-info` directories ([#5520](https://github.com/astral-sh/uv/pull/5520))
+
+### Bug fixes
+
+- Make `pip list --editable` conflict with `--exclude-editable` ([#5506](https://github.com/astral-sh/uv/pull/5506))
+- Add some missing reinstall-refresh calls ([#5497](https://github.com/astral-sh/uv/pull/5497))
+- Avoid warning users for missing self-extra lower bounds ([#5518](https://github.com/astral-sh/uv/pull/5518))
+- Generate hashes for `--find-links` entries ([#5544](https://github.com/astral-sh/uv/pull/5544))
+- Retain editable designation for cached wheel installs ([#5545](https://github.com/astral-sh/uv/pull/5545))
+- Use 666 rather than 644 for default permissions ([#5498](https://github.com/astral-sh/uv/pull/5498))
+- Retry on incomplete body ([#5555](https://github.com/astral-sh/uv/pull/5555))
+- Ban `--no-cache` with `--link-mode=symlink` ([#5519](https://github.com/astral-sh/uv/pull/5519))
+
+## 0.2.30
+
+### Enhancements
+
+- Infer missing `.exe` in Windows Python discovery ([#5456](https://github.com/astral-sh/uv/pull/5456))
+- Make `--reinstall` imply `--refresh` ([#5425](https://github.com/astral-sh/uv/pull/5425))
+
+### CLI
+
+- Add `--no-config` to replace `--isolated` ([#5463](https://github.com/astral-sh/uv/pull/5463))
+- Cache metadata for source tree dependencies ([#5423](https://github.com/astral-sh/uv/pull/5423))
+
+### Bug fixes
+
+- Avoid canonicalizing executables on Windows ([#5446](https://github.com/astral-sh/uv/pull/5446))
+- Set standard permissions for temporary files ([#5457](https://github.com/astral-sh/uv/pull/5457))
+
 ## 0.2.29
 
 ### Enhancements
@@ -44,7 +120,7 @@
 - Match wheel tags against `Requires-Python` major-minor ([#5289](https://github.com/astral-sh/uv/pull/5289))
 - Remove Simple API cache files for alternative indexes in `cache clean` ([#5353](https://github.com/astral-sh/uv/pull/5353))
 - Remove extraneous `are` from wheel tag error messages ([#5303](https://github.com/astral-sh/uv/pull/5303))
-- Allow conflicting prerelease strategies when forking ([#5150](https://github.com/astral-sh/uv/pull/5150))
+- Allow conflicting pre-release strategies when forking ([#5150](https://github.com/astral-sh/uv/pull/5150))
 - Use tag error rather than requires-python error for ABI filtering ([#5296](https://github.com/astral-sh/uv/pull/5296))
 
 ## 0.2.27
@@ -1053,7 +1129,7 @@ See [#2976](https://github.com/astral-sh/uv/pull/2976#discussion_r1566521453) fo
 
 - Accept `setup.py` and `setup.cfg` files in compile ([#2634](https://github.com/astral-sh/uv/pull/2634))
 - Add `--no-binary` and `--only-binary` support to `requirements.txt` ([#2680](https://github.com/astral-sh/uv/pull/2680))
-- Allow prereleases, locals, and URLs in non-editable path requirements ([#2671](https://github.com/astral-sh/uv/pull/2671))
+- Allow pre-releases, locals, and URLs in non-editable path requirements ([#2671](https://github.com/astral-sh/uv/pull/2671))
 - Use PEP 517 to extract dynamic `pyproject.toml` metadata ([#2633](https://github.com/astral-sh/uv/pull/2633))
 - Add `Editable project location` and `Required-by` to `pip show` ([#2589](https://github.com/astral-sh/uv/pull/2589))
 - Avoid `prepare_metadata_for_build_wheel` calls for Hatch packages with dynamic dependencies ([#2645](https://github.com/astral-sh/uv/pull/2645))
@@ -1403,7 +1479,7 @@ pass the `--native-tls` command-line flag to enable this behavior.
 - Expand scope of archive timestamping ([#1960](https://github.com/astral-sh/uv/pull/1960))
 - Gracefully handle virtual environments with conflicting packages ([#1893](https://github.com/astral-sh/uv/pull/1893))
 - Invalidate dependencies when editables are updated ([#1955](https://github.com/astral-sh/uv/pull/1955))
-- Make < exclusive for non-prerelease markers ([#1878](https://github.com/astral-sh/uv/pull/1878))
+- Make < exclusive for non-pre-release markers ([#1878](https://github.com/astral-sh/uv/pull/1878))
 - Properly apply constraints in venv audit ([#1956](https://github.com/astral-sh/uv/pull/1956))
 - Re-sync editables on-change ([#1959](https://github.com/astral-sh/uv/pull/1959))
 - Remove current directory from PATH in PEP 517 hooks ([#1975](https://github.com/astral-sh/uv/pull/1975))
@@ -1679,3 +1755,4 @@ pass the `--native-tls` command-line flag to enable this behavior.
 
 - Fix diagram alignment ([#1354](https://github.com/astral-sh/uv/pull/1354))
 - Grammar nit ([#1345](https://github.com/astral-sh/uv/pull/1345))
+<!-- prettier-ignore-end -->

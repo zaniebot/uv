@@ -3,7 +3,7 @@
 use std::ops::Bound::{self, *};
 use std::ops::RangeBounds;
 
-use pubgrub::range::{Range as PubGrubRange, Range};
+use pubgrub::Range as PubGrubRange;
 use rustc_hash::FxHashMap;
 
 use pep440_rs::{Version, VersionSpecifier};
@@ -125,7 +125,7 @@ fn string_is_disjoint(this: &MarkerExpression, other: &MarkerExpression) -> bool
     true
 }
 
-pub(crate) fn python_range(expr: &MarkerExpression) -> Option<Range<Version>> {
+pub(crate) fn python_range(expr: &MarkerExpression) -> Option<PubGrubRange<Version>> {
     match expr {
         MarkerExpression::Version {
             key: MarkerValueVersion::PythonFullVersion,
@@ -192,6 +192,11 @@ pub(crate) fn requires_python_marker(tree: &MarkerTree) -> Option<RequiresPython
 ///
 /// This is useful in cases where creating conjunctions or disjunctions might occur in a non-deterministic
 /// order. This routine will attempt to erase the distinction created by such a construction.
+///
+/// This returns `None` in the case of normalization turning a `MarkerTree`
+/// into an expression that is known to match all possible marker
+/// environments. Note though that this may return an empty disjunction, e.g.,
+/// `MarkerTree::Or(vec![])`, which matches precisely zero marker environments.
 pub(crate) fn normalize(
     mut tree: MarkerTree,
     bound: Option<&RequiresPythonBound>,
@@ -326,7 +331,7 @@ pub(crate) fn normalize_all(
         MarkerTree::Expression(expr)
             if bound.is_some_and(|bound| {
                 python_range(&expr).is_some_and(|supported_range| {
-                    Range::from(bound.clone()).subset_of(&supported_range)
+                    PubGrubRange::from(bound.clone()).subset_of(&supported_range)
                 })
             }) =>
         {

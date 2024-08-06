@@ -1,22 +1,13 @@
 use std::collections::BTreeMap;
 use std::path::Path;
 
-use once_cell::sync::Lazy;
-
 use uv_configuration::PreviewMode;
-use uv_normalize::{ExtraName, GroupName, PackageName};
+use uv_normalize::{ExtraName, GroupName, PackageName, DEV_DEPENDENCIES};
 use uv_workspace::{DiscoveryOptions, ProjectWorkspace};
 
 use crate::metadata::lowering::lower_requirement;
 use crate::metadata::MetadataError;
 use crate::Metadata;
-
-/// The name of the global `dev-dependencies` group.
-///
-/// Internally, we model dependency groups as a generic concept; but externally, we only expose the
-/// `dev-dependencies` group.
-pub static DEV_DEPENDENCIES: Lazy<GroupName> =
-    Lazy::new(|| GroupName::new("dev".to_string()).unwrap());
 
 #[derive(Debug, Clone)]
 pub struct RequiresDist {

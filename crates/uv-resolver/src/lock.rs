@@ -2,6 +2,7 @@
 
 use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
+use std::convert::Infallible;
 use std::fmt::{Debug, Display};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
@@ -9,10 +10,8 @@ use std::sync::Arc;
 
 use either::Either;
 use itertools::Itertools;
-use path_slash::PathExt;
 use petgraph::visit::EdgeRef;
 use rustc_hash::{FxHashMap, FxHashSet};
-use serde::{Deserialize, Deserializer};
 use toml_edit::{value, Array, ArrayOfTables, InlineTable, Item, Table, Value};
 use url::Url;
 
@@ -20,10 +19,10 @@ use cache_key::RepositoryUrl;
 use distribution_filename::WheelFilename;
 use distribution_types::{
     BuiltDist, DirectUrlBuiltDist, DirectUrlSourceDist, DirectorySourceDist, Dist,
-    DistributionMetadata, FileLocation, GitSourceDist, HashComparison, IndexUrl, PathBuiltDist,
-    PathSourceDist, PrioritizedDist, RegistryBuiltDist, RegistryBuiltWheel, RegistrySourceDist,
-    RemoteSource, Resolution, ResolvedDist, SourceDistCompatibility, ToUrlError, UrlString,
-    VersionId, WheelCompatibility,
+    DistributionMetadata, FileLocation, GitSourceDist, HashComparison, IndexUrl, Name,
+    PathBuiltDist, PathSourceDist, PrioritizedDist, RegistryBuiltDist, RegistryBuiltWheel,
+    RegistrySourceDist, RemoteSource, Resolution, ResolvedDist, SourceDistCompatibility,
+    ToUrlError, UrlString, VersionId, WheelCompatibility,
 };
 use pep440_rs::{Version, VersionSpecifier};
 use pep508_rs::{
@@ -35,6 +34,7 @@ use pypi_types::{
 };
 use uv_configuration::{ExtrasSpecification, Upgrade};
 use uv_distribution::{ArchiveMetadata, Metadata};
+use uv_fs::{PortablePath, PortablePathBuf};
 use uv_git::{GitReference, GitSha, RepositoryReference, ResolvedRepositoryReference};
 use uv_normalize::{ExtraName, GroupName, PackageName};
 use uv_workspace::VirtualProject;
@@ -42,7 +42,7 @@ use uv_workspace::VirtualProject;
 use crate::resolution::{AnnotatedDist, ResolutionGraphNode};
 use crate::resolver::FxOnceMap;
 use crate::{
-    ExcludeNewer, InMemoryIndex, MetadataResponse, PreReleaseMode, RequiresPython, ResolutionGraph,
+    ExcludeNewer, InMemoryIndex, MetadataResponse, PrereleaseMode, RequiresPython, ResolutionGraph,
     ResolutionMode, VersionMap, VersionsResponse,
 };
 
@@ -53,15 +53,20 @@ const VERSION: u32 = 1;
 #[serde(try_from = "LockWire")]
 pub struct Lock {
     version: u32,
-    distributions: Vec<Distribution>,
+    /// If this lockfile was built from a forking resolution with non-identical forks, store the
+    /// forks in the lockfile so we can recreate them in subsequent resolutions.
+    #[serde(rename = "environment-markers")]
+    fork_markers: Option<BTreeSet<MarkerTree>>,
     /// The range of supported Python versions.
     requires_python: Option<RequiresPython>,
     /// The [`ResolutionMode`] used to generate this lock.
     resolution_mode: ResolutionMode,
-    /// The [`PreReleaseMode`] used to generate this lock.
-    prerelease_mode: PreReleaseMode,
+    /// The [`PrereleaseMode`] used to generate this lock.
+    prerelease_mode: PrereleaseMode,
     /// The [`ExcludeNewer`] used to generate this lock.
     exclude_newer: Option<ExcludeNewer>,
+    /// The actual locked version and their metadata.
+    distributions: Vec<Distribution>,
     /// A map from distribution ID to index in `distributions`.
     ///
     /// This can be used to quickly lookup the full distribution for any ID
@@ -87,7 +92,12 @@ impl Lock {
                 continue;
             };
             if dist.is_base() {
-                let mut locked_dist = Distribution::from_annotated_dist(dist)?;
+                let fork_markers = graph
+                    .fork_markers(dist.name(), &dist.version, dist.dist.version_or_url().url())
+                    .cloned();
+                let mut locked_dist = Distribution::from_annotated_dist(dist, fork_markers)?;
+
+                // Add all dependencies
                 for edge in graph.petgraph.edges(node_index) {
                     let ResolutionGraphNode::Dist(dependency_dist) = &graph.petgraph[edge.target()]
                     else {
@@ -159,6 +169,7 @@ impl Lock {
             options.resolution_mode,
             options.prerelease_mode,
             options.exclude_newer,
+            graph.fork_markers.clone(),
         )?;
         Ok(lock)
     }
@@ -169,8 +180,9 @@ impl Lock {
         mut distributions: Vec<Distribution>,
         requires_python: Option<RequiresPython>,
         resolution_mode: ResolutionMode,
-        prerelease_mode: PreReleaseMode,
+        prerelease_mode: PrereleaseMode,
         exclude_newer: Option<ExcludeNewer>,
+        fork_markers: Option<BTreeSet<MarkerTree>>,
     ) -> Result<Self, LockError> {
         // Put all dependencies for each distribution in a canonical order and
         // check for duplicates.
@@ -324,11 +336,12 @@ impl Lock {
         }
         Ok(Self {
             version,
-            distributions,
+            fork_markers,
             requires_python,
             resolution_mode,
             prerelease_mode,
             exclude_newer,
+            distributions,
             by_id,
         })
     }
@@ -354,13 +367,19 @@ impl Lock {
     }
 
     /// Returns the pre-release mode used to generate this lock.
-    pub fn prerelease_mode(&self) -> PreReleaseMode {
+    pub fn prerelease_mode(&self) -> PrereleaseMode {
         self.prerelease_mode
     }
 
     /// Returns the exclude newer setting used to generate this lock.
     pub fn exclude_newer(&self) -> Option<ExcludeNewer> {
         self.exclude_newer
+    }
+
+    /// If this lockfile was built from a forking resolution with non-identical forks, return the
+    /// markers of those forks, otherwise `None`.
+    pub fn fork_markers(&self) -> &Option<BTreeSet<MarkerTree>> {
+        &self.fork_markers
     }
 
     /// Convert the [`Lock`] to a [`Resolution`] using the given marker environment, tags, and root.
@@ -398,6 +417,18 @@ impl Lock {
                         queue.push_back((root, Some(extra)));
                     }
                 }
+            }
+        }
+
+        // Add any dependency groups that are exclusive to the workspace root (e.g., dev
+        // dependencies in virtual workspaces).
+        for group in dev {
+            for dependency in project.group(group) {
+                let root = self
+                    .find_by_name(dependency)
+                    .expect("found too many distributions matching root")
+                    .expect("could not find root");
+                queue.push_back((root, None));
             }
         }
 
@@ -451,6 +482,11 @@ impl Lock {
         if let Some(ref requires_python) = self.requires_python {
             doc.insert("requires-python", value(requires_python.to_string()));
         }
+        if let Some(ref fork_markers) = self.fork_markers {
+            let fork_markers =
+                each_element_on_its_line_array(fork_markers.iter().map(ToString::to_string));
+            doc.insert("environment-markers", value(fork_markers));
+        }
 
         // Write the settings that were used to generate the resolution.
         // This enables us to invalidate the lockfile if the user changes
@@ -458,7 +494,7 @@ impl Lock {
         if self.resolution_mode != ResolutionMode::default() {
             doc.insert("resolution-mode", value(self.resolution_mode.to_string()));
         }
-        if self.prerelease_mode != PreReleaseMode::default() {
+        if self.prerelease_mode != PrereleaseMode::default() {
             doc.insert("prerelease-mode", value(self.prerelease_mode.to_string()));
         }
         if let Some(exclude_newer) = self.exclude_newer {
@@ -571,30 +607,36 @@ impl Lock {
 #[serde(rename_all = "kebab-case")]
 struct LockWire {
     version: u32,
-    #[serde(rename = "distribution")]
-    distributions: Vec<DistributionWire>,
+    #[serde(default)]
     requires_python: Option<RequiresPython>,
+    /// If this lockfile was built from a forking resolution with non-identical forks, store the
+    /// forks in the lockfile so we can recreate them in subsequent resolutions.
+    #[serde(rename = "environment-markers")]
+    fork_markers: Option<BTreeSet<MarkerTree>>,
     #[serde(default)]
     resolution_mode: ResolutionMode,
     #[serde(default)]
-    prerelease_mode: PreReleaseMode,
+    prerelease_mode: PrereleaseMode,
     #[serde(default)]
     exclude_newer: Option<ExcludeNewer>,
+    #[serde(rename = "distribution", default)]
+    distributions: Vec<DistributionWire>,
 }
 
 impl From<Lock> for LockWire {
     fn from(lock: Lock) -> LockWire {
         LockWire {
             version: lock.version,
+            requires_python: lock.requires_python,
+            fork_markers: lock.fork_markers,
+            resolution_mode: lock.resolution_mode,
+            prerelease_mode: lock.prerelease_mode,
+            exclude_newer: lock.exclude_newer,
             distributions: lock
                 .distributions
                 .into_iter()
                 .map(DistributionWire::from)
                 .collect(),
-            requires_python: lock.requires_python,
-            resolution_mode: lock.resolution_mode,
-            prerelease_mode: lock.prerelease_mode,
-            exclude_newer: lock.exclude_newer,
         }
     }
 }
@@ -632,6 +674,7 @@ impl TryFrom<LockWire> for Lock {
             wire.resolution_mode,
             wire.prerelease_mode,
             wire.exclude_newer,
+            wire.fork_markers,
         )
     }
 }
@@ -641,13 +684,22 @@ pub struct Distribution {
     pub(crate) id: DistributionId,
     sdist: Option<SourceDist>,
     wheels: Vec<Wheel>,
+    /// If there are multiple distributions for the same package name, we add the markers of the
+    /// fork(s) that contained this distribution, so we can set the correct preferences in the next
+    /// resolution.
+    ///
+    /// Named `environment-markers` in `uv.lock`.
+    fork_markers: Option<BTreeSet<MarkerTree>>,
     dependencies: Vec<Dependency>,
     optional_dependencies: BTreeMap<ExtraName, Vec<Dependency>>,
     dev_dependencies: BTreeMap<GroupName, Vec<Dependency>>,
 }
 
 impl Distribution {
-    fn from_annotated_dist(annotated_dist: &AnnotatedDist) -> Result<Self, LockError> {
+    fn from_annotated_dist(
+        annotated_dist: &AnnotatedDist,
+        fork_markers: Option<BTreeSet<MarkerTree>>,
+    ) -> Result<Self, LockError> {
         let id = DistributionId::from_annotated_dist(annotated_dist);
         let sdist = SourceDist::from_annotated_dist(&id, annotated_dist)?;
         let wheels = Wheel::from_annotated_dist(annotated_dist)?;
@@ -655,6 +707,7 @@ impl Distribution {
             id,
             sdist,
             wheels,
+            fork_markers,
             dependencies: vec![],
             optional_dependencies: BTreeMap::default(),
             dev_dependencies: BTreeMap::default(),
@@ -1004,6 +1057,12 @@ impl Distribution {
 
         self.id.to_toml(None, &mut table);
 
+        if let Some(ref fork_markers) = self.fork_markers {
+            let wheels =
+                each_element_on_its_line_array(fork_markers.iter().map(ToString::to_string));
+            table.insert("environment-markers", value(wheels));
+        }
+
         if !self.dependencies.is_empty() {
             let deps = each_element_on_its_line_array(
                 self.dependencies
@@ -1085,6 +1144,10 @@ impl Distribution {
         &self.id.version
     }
 
+    pub fn fork_markers(&self) -> Option<&BTreeSet<MarkerTree>> {
+        self.fork_markers.as_ref()
+    }
+
     /// Returns a [`VersionId`] for this package that can be used for resolution.
     fn version_id(&self, workspace_root: &Path) -> Result<VersionId, LockError> {
         match &self.id.source {
@@ -1144,6 +1207,8 @@ struct DistributionWire {
     sdist: Option<SourceDist>,
     #[serde(default)]
     wheels: Vec<Wheel>,
+    #[serde(default, rename = "environment-markers")]
+    fork_markers: BTreeSet<MarkerTree>,
     #[serde(default)]
     dependencies: Vec<DependencyWire>,
     #[serde(default)]
@@ -1166,6 +1231,7 @@ impl DistributionWire {
             id: self.id,
             sdist: self.sdist,
             wheels: self.wheels,
+            fork_markers: (!self.fork_markers.is_empty()).then_some(self.fork_markers),
             dependencies: unwire_deps(self.dependencies)?,
             optional_dependencies: self
                 .optional_dependencies
@@ -1190,6 +1256,7 @@ impl From<Distribution> for DistributionWire {
             id: dist.id,
             sdist: dist.sdist,
             wheels: dist.wheels,
+            fork_markers: dist.fork_markers.unwrap_or_default(),
             dependencies: wire_deps(dist.dependencies),
             optional_dependencies: dist
                 .optional_dependencies
@@ -1313,19 +1380,6 @@ enum Source {
     Path(PathBuf),
     Directory(PathBuf),
     Editable(PathBuf),
-}
-
-/// A [`PathBuf`], but we show `.` instead of an empty path.
-///
-/// We also normalize backslashes to forward slashes on Windows, to ensure
-/// that the lockfile contains portable paths.
-fn serialize_path_with_dot(path: &Path) -> Cow<str> {
-    let path = path.to_slash_lossy();
-    if path.is_empty() {
-        Cow::Borrowed(".")
-    } else {
-        path
-    }
 }
 
 impl Source {
@@ -1459,21 +1513,18 @@ impl Source {
                 }
             }
             Source::Path(ref path) => {
-                source_table.insert(
-                    "path",
-                    Value::from(serialize_path_with_dot(path).into_owned()),
-                );
+                source_table.insert("path", Value::from(PortablePath::from(path).to_string()));
             }
             Source::Directory(ref path) => {
                 source_table.insert(
                     "directory",
-                    Value::from(serialize_path_with_dot(path).into_owned()),
+                    Value::from(PortablePath::from(path).to_string()),
                 );
             }
             Source::Editable(ref path) => {
                 source_table.insert(
                     "editable",
-                    Value::from(serialize_path_with_dot(path).into_owned()),
+                    Value::from(PortablePath::from(path).to_string()),
                 );
             }
         }
@@ -1488,7 +1539,7 @@ impl std::fmt::Display for Source {
                 write!(f, "{}+{}", self.name(), url)
             }
             Source::Path(path) | Source::Directory(path) | Source::Editable(path) => {
-                write!(f, "{}+{}", self.name(), serialize_path_with_dot(path))
+                write!(f, "{}+{}", self.name(), PortablePath::from(path))
             }
         }
     }
@@ -1537,16 +1588,13 @@ enum SourceWire {
         subdirectory: Option<String>,
     },
     Path {
-        #[serde(deserialize_with = "deserialize_path_with_dot")]
-        path: PathBuf,
+        path: PortablePathBuf,
     },
     Directory {
-        #[serde(deserialize_with = "deserialize_path_with_dot")]
-        directory: PathBuf,
+        directory: PortablePathBuf,
     },
     Editable {
-        #[serde(deserialize_with = "deserialize_path_with_dot")]
-        editable: PathBuf,
+        editable: PortablePathBuf,
     },
 }
 
@@ -1579,9 +1627,9 @@ impl TryFrom<SourceWire> for Source {
                 Ok(Source::Git(url, git_source))
             }
             Direct { url, subdirectory } => Ok(Source::Direct(url, DirectSource { subdirectory })),
-            Path { path } => Ok(Source::Path(path)),
-            Directory { directory } => Ok(Source::Directory(directory)),
-            Editable { editable } => Ok(Source::Editable(editable)),
+            Path { path } => Ok(Source::Path(path.into())),
+            Directory { directory } => Ok(Source::Directory(directory.into())),
+            Editable { editable } => Ok(Source::Editable(editable.into())),
         }
     }
 }
@@ -1664,7 +1712,7 @@ struct SourceDistMetadata {
 /// future, so this should be treated as only a hint to where to look
 /// and/or recording where the source dist file originally came from.
 #[derive(Clone, Debug, serde::Deserialize, PartialEq, Eq)]
-#[serde(untagged)]
+#[serde(try_from = "SourceDistWire")]
 enum SourceDist {
     Url {
         url: UrlString,
@@ -1672,24 +1720,10 @@ enum SourceDist {
         metadata: SourceDistMetadata,
     },
     Path {
-        #[serde(deserialize_with = "deserialize_path_with_dot")]
         path: PathBuf,
         #[serde(flatten)]
         metadata: SourceDistMetadata,
     },
-}
-
-/// A [`PathBuf`], but we show `.` instead of an empty path.
-fn deserialize_path_with_dot<'de, D>(deserializer: D) -> Result<PathBuf, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let path = String::deserialize(deserializer)?;
-    if path == "." {
-        Ok(PathBuf::new())
-    } else {
-        Ok(PathBuf::from(path))
-    }
 }
 
 impl SourceDist {
@@ -1725,26 +1759,6 @@ impl SourceDist {
 }
 
 impl SourceDist {
-    /// Returns the TOML representation of this source distribution.
-    fn to_toml(&self) -> anyhow::Result<InlineTable> {
-        let mut table = InlineTable::new();
-        match &self {
-            SourceDist::Url { url, .. } => {
-                table.insert("url", Value::from(url.as_ref()));
-            }
-            SourceDist::Path { path, .. } => {
-                table.insert("path", Value::from(serialize_path_with_dot(path).as_ref()));
-            }
-        }
-        if let Some(hash) = self.hash() {
-            table.insert("hash", Value::from(hash.to_string()));
-        }
-        if let Some(size) = self.size() {
-            table.insert("size", Value::from(i64::try_from(size)?));
-        }
-        Ok(table)
-    }
-
     fn from_annotated_dist(
         id: &DistributionId,
         annotated_dist: &AnnotatedDist,
@@ -1832,6 +1846,57 @@ impl SourceDist {
                 size: None,
             },
         })
+    }
+}
+
+#[derive(Clone, Debug, serde::Deserialize)]
+#[serde(untagged)]
+enum SourceDistWire {
+    Url {
+        url: UrlString,
+        #[serde(flatten)]
+        metadata: SourceDistMetadata,
+    },
+    Path {
+        path: PortablePathBuf,
+        #[serde(flatten)]
+        metadata: SourceDistMetadata,
+    },
+}
+
+impl SourceDist {
+    /// Returns the TOML representation of this source distribution.
+    fn to_toml(&self) -> anyhow::Result<InlineTable> {
+        let mut table = InlineTable::new();
+        match &self {
+            SourceDist::Url { url, .. } => {
+                table.insert("url", Value::from(url.as_ref()));
+            }
+            SourceDist::Path { path, .. } => {
+                table.insert("path", Value::from(PortablePath::from(path).to_string()));
+            }
+        }
+        if let Some(hash) = self.hash() {
+            table.insert("hash", Value::from(hash.to_string()));
+        }
+        if let Some(size) = self.size() {
+            table.insert("size", Value::from(i64::try_from(size)?));
+        }
+        Ok(table)
+    }
+}
+
+impl TryFrom<SourceDistWire> for SourceDist {
+    type Error = Infallible;
+
+    fn try_from(wire: SourceDistWire) -> Result<SourceDist, Infallible> {
+        match wire {
+            SourceDistWire::Url { url, metadata } => Ok(SourceDist::Url { url, metadata }),
+            SourceDistWire::Path { path, metadata } => Ok(SourceDist::Path {
+                path: path.into(),
+                metadata,
+            }),
+        }
     }
 }
 
@@ -2545,12 +2610,13 @@ impl std::fmt::Display for HashParseError {
 ///     { name = "sniffio" },
 /// ]
 /// ```
-fn each_element_on_its_line_array(elements: impl Iterator<Item = InlineTable>) -> Array {
+fn each_element_on_its_line_array(elements: impl Iterator<Item = impl Into<Value>>) -> Array {
     let mut array = elements
-        .map(|mut inline_table| {
+        .map(|item| {
+            let mut value = item.into();
             // Each dependency is on its own line and indented.
-            inline_table.decor_mut().set_prefix("\n    ");
-            inline_table
+            value.decor_mut().set_prefix("\n    ");
+            value
         })
         .collect::<Array>();
     // With a trailing comma, inserting another entry doesn't change the preceding line,
@@ -2559,6 +2625,374 @@ fn each_element_on_its_line_array(elements: impl Iterator<Item = InlineTable>) -
     // The line break between the last element's comma and the closing square bracket.
     array.set_trailing("\n");
     array
+}
+
+#[derive(Debug)]
+pub struct TreeDisplay<'env> {
+    /// The root nodes in the [`Lock`].
+    roots: Vec<&'env DistributionId>,
+    /// The edges in the [`Lock`].
+    ///
+    /// While the dependencies exist on the [`Lock`] directly, if `--invert` is enabled, the
+    /// direction must be inverted when constructing the tree.
+    dependencies: FxHashMap<&'env DistributionId, Vec<Cow<'env, Dependency>>>,
+    optional_dependencies:
+        FxHashMap<&'env DistributionId, FxHashMap<ExtraName, Vec<Cow<'env, Dependency>>>>,
+    dev_dependencies:
+        FxHashMap<&'env DistributionId, FxHashMap<GroupName, Vec<Cow<'env, Dependency>>>>,
+    /// Maximum display depth of the dependency tree
+    depth: usize,
+    /// Prune the given packages from the display of the dependency tree.
+    prune: Vec<PackageName>,
+    /// Display only the specified packages.
+    package: Vec<PackageName>,
+    /// Whether to de-duplicate the displayed dependencies.
+    no_dedupe: bool,
+}
+
+impl<'env> TreeDisplay<'env> {
+    /// Create a new [`DisplayDependencyGraph`] for the set of installed distributions.
+    pub fn new(
+        lock: &'env Lock,
+        markers: Option<&'env MarkerEnvironment>,
+        depth: usize,
+        prune: Vec<PackageName>,
+        package: Vec<PackageName>,
+        no_dedupe: bool,
+        invert: bool,
+    ) -> Self {
+        let mut non_roots = FxHashSet::default();
+
+        // Index all the dependencies. We could read these from the `Lock` directly, but we have to
+        // support `--invert`, so we might as well build them up in either case.
+        let mut dependencies: FxHashMap<_, Vec<_>> = FxHashMap::default();
+        let mut optional_dependencies: FxHashMap<_, FxHashMap<_, Vec<_>>> = FxHashMap::default();
+        let mut dev_dependencies: FxHashMap<_, FxHashMap<_, Vec<_>>> = FxHashMap::default();
+
+        for distribution in &lock.distributions {
+            for dependency in &distribution.dependencies {
+                let parent = if invert {
+                    &dependency.distribution_id
+                } else {
+                    &distribution.id
+                };
+                let child = if invert {
+                    Cow::Owned(Dependency {
+                        distribution_id: distribution.id.clone(),
+                        extra: dependency.extra.clone(),
+                        marker: dependency.marker.clone(),
+                    })
+                } else {
+                    Cow::Borrowed(dependency)
+                };
+
+                non_roots.insert(child.distribution_id.clone());
+
+                // Skip dependencies that don't apply to the current environment.
+                if let Some(environment_markers) = markers {
+                    if let Some(dependency_markers) = dependency.marker.as_ref() {
+                        if !dependency_markers.evaluate(environment_markers, &[]) {
+                            continue;
+                        }
+                    }
+                }
+
+                dependencies.entry(parent).or_default().push(child);
+            }
+
+            for (extra, dependencies) in &distribution.optional_dependencies {
+                for dependency in dependencies {
+                    let parent = if invert {
+                        &dependency.distribution_id
+                    } else {
+                        &distribution.id
+                    };
+                    let child = if invert {
+                        Cow::Owned(Dependency {
+                            distribution_id: distribution.id.clone(),
+                            extra: dependency.extra.clone(),
+                            marker: dependency.marker.clone(),
+                        })
+                    } else {
+                        Cow::Borrowed(dependency)
+                    };
+
+                    non_roots.insert(child.distribution_id.clone());
+
+                    // Skip dependencies that don't apply to the current environment.
+                    if let Some(environment_markers) = markers {
+                        if let Some(dependency_markers) = dependency.marker.as_ref() {
+                            if !dependency_markers.evaluate(environment_markers, &[]) {
+                                continue;
+                            }
+                        }
+                    }
+
+                    optional_dependencies
+                        .entry(parent)
+                        .or_default()
+                        .entry(extra.clone())
+                        .or_default()
+                        .push(child);
+                }
+            }
+
+            for (group, dependencies) in &distribution.dev_dependencies {
+                for dependency in dependencies {
+                    let parent = if invert {
+                        &dependency.distribution_id
+                    } else {
+                        &distribution.id
+                    };
+                    let child = if invert {
+                        Cow::Owned(Dependency {
+                            distribution_id: distribution.id.clone(),
+                            extra: dependency.extra.clone(),
+                            marker: dependency.marker.clone(),
+                        })
+                    } else {
+                        Cow::Borrowed(dependency)
+                    };
+
+                    non_roots.insert(child.distribution_id.clone());
+
+                    // Skip dependencies that don't apply to the current environment.
+                    if let Some(environment_markers) = markers {
+                        if let Some(dependency_markers) = dependency.marker.as_ref() {
+                            if !dependency_markers.evaluate(environment_markers, &[]) {
+                                continue;
+                            }
+                        }
+                    }
+
+                    dev_dependencies
+                        .entry(parent)
+                        .or_default()
+                        .entry(group.clone())
+                        .or_default()
+                        .push(child);
+                }
+            }
+        }
+
+        // Compute the root nodes.
+        let roots = lock
+            .distributions
+            .iter()
+            .map(|dist| &dist.id)
+            .filter(|id| !non_roots.contains(*id))
+            .collect::<Vec<_>>();
+
+        Self {
+            roots,
+            dependencies,
+            optional_dependencies,
+            dev_dependencies,
+            depth,
+            prune,
+            package,
+            no_dedupe,
+        }
+    }
+
+    /// Perform a depth-first traversal of the given distribution and its dependencies.
+    fn visit(
+        &'env self,
+        node: Node<'env>,
+        visited: &mut FxHashMap<&'env DistributionId, Vec<&'env DistributionId>>,
+        path: &mut Vec<&'env DistributionId>,
+    ) -> Vec<String> {
+        // Short-circuit if the current path is longer than the provided depth.
+        if path.len() > self.depth {
+            return Vec::new();
+        }
+
+        let line = {
+            let mut line = format!("{}", node.distribution_id().name);
+
+            if let Some(extras) = node.extras().filter(|extras| !extras.is_empty()) {
+                line.push_str(&format!("[{}]", extras.iter().join(",")));
+            }
+
+            line.push_str(&format!(" v{}", node.distribution_id().version));
+
+            match node {
+                Node::Root(_) => line,
+                Node::Dependency(_) => line,
+                Node::OptionalDependency(extra, _) => format!("{line} (extra: {extra})"),
+                Node::DevDependency(group, _) => format!("{line} (group: {group})"),
+            }
+        };
+
+        // Skip the traversal if:
+        // 1. The package is in the current traversal path (i.e., a dependency cycle).
+        // 2. The package has been visited and de-duplication is enabled (default).
+        if let Some(requirements) = visited.get(node.distribution_id()) {
+            if !self.no_dedupe || path.contains(&node.distribution_id()) {
+                return if requirements.is_empty() {
+                    vec![line]
+                } else {
+                    vec![format!("{} (*)", line)]
+                };
+            }
+        }
+
+        let dependencies: Vec<Node<'env>> = self
+            .dependencies
+            .get(node.distribution_id())
+            .into_iter()
+            .flatten()
+            .map(|dep| Node::Dependency(dep.as_ref()))
+            .chain(
+                self.optional_dependencies
+                    .get(node.distribution_id())
+                    .into_iter()
+                    .flatten()
+                    .flat_map(|(extra, deps)| {
+                        deps.iter()
+                            .map(move |dep| Node::OptionalDependency(extra, dep))
+                    }),
+            )
+            .chain(
+                self.dev_dependencies
+                    .get(node.distribution_id())
+                    .into_iter()
+                    .flatten()
+                    .flat_map(|(group, deps)| {
+                        deps.iter().map(move |dep| Node::DevDependency(group, dep))
+                    }),
+            )
+            .filter(|dep| !self.prune.contains(&dep.distribution_id().name))
+            .collect::<Vec<_>>();
+
+        let mut lines = vec![line];
+
+        // Keep track of the dependency path to avoid cycles.
+        visited.insert(
+            node.distribution_id(),
+            dependencies.iter().map(Node::distribution_id).collect(),
+        );
+        path.push(node.distribution_id());
+
+        for (index, dep) in dependencies.iter().enumerate() {
+            // For sub-visited packages, add the prefix to make the tree display user-friendly.
+            // The key observation here is you can group the tree as follows when you're at the
+            // root of the tree:
+            // root_package
+            // ├── level_1_0          // Group 1
+            // │   ├── level_2_0      ...
+            // │   │   ├── level_3_0  ...
+            // │   │   └── level_3_1  ...
+            // │   └── level_2_1      ...
+            // ├── level_1_1          // Group 2
+            // │   ├── level_2_2      ...
+            // │   └── level_2_3      ...
+            // └── level_1_2          // Group 3
+            //     └── level_2_4      ...
+            //
+            // The lines in Group 1 and 2 have `├── ` at the top and `|   ` at the rest while
+            // those in Group 3 have `└── ` at the top and `    ` at the rest.
+            // This observation is true recursively even when looking at the subtree rooted
+            // at `level_1_0`.
+            let (prefix_top, prefix_rest) = if dependencies.len() - 1 == index {
+                ("└── ", "    ")
+            } else {
+                ("├── ", "│   ")
+            };
+            for (visited_index, visited_line) in self.visit(*dep, visited, path).iter().enumerate()
+            {
+                let prefix = if visited_index == 0 {
+                    prefix_top
+                } else {
+                    prefix_rest
+                };
+                lines.push(format!("{prefix}{visited_line}"));
+            }
+        }
+
+        path.pop();
+
+        lines
+    }
+
+    /// Depth-first traverse the nodes to render the tree.
+    fn render(&self) -> Vec<String> {
+        let mut visited = FxHashMap::default();
+        let mut path = Vec::new();
+        let mut lines = Vec::new();
+
+        if self.package.is_empty() {
+            for id in &self.roots {
+                path.clear();
+                lines.extend(self.visit(Node::Root(id), &mut visited, &mut path));
+            }
+        } else {
+            let by_package: FxHashMap<_, _> = self.roots.iter().map(|id| (&id.name, id)).collect();
+            let mut first = true;
+            for package in &self.package {
+                if std::mem::take(&mut first) {
+                    lines.push(String::new());
+                }
+                if let Some(id) = by_package.get(package) {
+                    path.clear();
+                    lines.extend(self.visit(Node::Root(id), &mut visited, &mut path));
+                }
+            }
+        }
+
+        lines
+    }
+}
+
+#[derive(Debug, Copy, Clone)]
+enum Node<'env> {
+    Root(&'env DistributionId),
+    Dependency(&'env Dependency),
+    OptionalDependency(&'env ExtraName, &'env Dependency),
+    DevDependency(&'env GroupName, &'env Dependency),
+}
+
+impl<'env> Node<'env> {
+    fn distribution_id(&self) -> &'env DistributionId {
+        match self {
+            Self::Root(id) => id,
+            Self::Dependency(dep) => &dep.distribution_id,
+            Self::OptionalDependency(_, dep) => &dep.distribution_id,
+            Self::DevDependency(_, dep) => &dep.distribution_id,
+        }
+    }
+
+    fn extras(&self) -> Option<&BTreeSet<ExtraName>> {
+        match self {
+            Self::Root(_) => None,
+            Self::Dependency(dep) => Some(&dep.extra),
+            Self::OptionalDependency(_, dep) => Some(&dep.extra),
+            Self::DevDependency(_, dep) => Some(&dep.extra),
+        }
+    }
+}
+
+impl std::fmt::Display for TreeDisplay<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        use owo_colors::OwoColorize;
+
+        let mut deduped = false;
+        for line in self.render() {
+            deduped |= line.contains('*');
+            writeln!(f, "{line}")?;
+        }
+
+        if deduped {
+            let message = if self.no_dedupe {
+                "(*) Package tree is a cycle and cannot be shown".italic()
+            } else {
+                "(*) Package tree already displayed".italic()
+            };
+            writeln!(f, "{message}")?;
+        }
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]

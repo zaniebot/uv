@@ -162,6 +162,11 @@ impl PythonEnvironment {
         Ok(PyVenvConfiguration::parse(self.0.root.join("pyvenv.cfg"))?)
     }
 
+    /// Returns `true` if the environment is "relocatable".
+    pub fn relocatable(&self) -> bool {
+        self.cfg().is_ok_and(|cfg| cfg.is_relocatable())
+    }
+
     /// Returns the location of the Python executable.
     pub fn python_executable(&self) -> &Path {
         self.0.interpreter.sys_executable()
@@ -197,7 +202,7 @@ impl PythonEnvironment {
         } else {
             // Otherwise, use a global lockfile.
             LockedFile::acquire(
-                env::temp_dir().join(format!("uv-{}.lock", cache_key::digest(&self.0.root))),
+                env::temp_dir().join(format!("uv-{}.lock", cache_key::cache_digest(&self.0.root))),
                 self.0.root.user_display(),
             )
         }

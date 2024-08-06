@@ -4,6 +4,7 @@ use std::path::PathBuf;
 use std::str::FromStr;
 
 use anyhow::{anyhow, Result};
+use clap::builder::styling::Style;
 use clap::{Args, Parser, Subcommand};
 
 use distribution_types::{FlatIndexLocation, IndexUrl};
@@ -15,7 +16,7 @@ use uv_configuration::{
 };
 use uv_normalize::{ExtraName, PackageName};
 use uv_python::{PythonFetch, PythonPreference, PythonVersion};
-use uv_resolver::{AnnotationStyle, ExcludeNewer, PreReleaseMode, ResolutionMode};
+use uv_resolver::{AnnotationStyle, ExcludeNewer, PrereleaseMode, ResolutionMode};
 
 pub mod compat;
 pub mod options;
@@ -51,14 +52,15 @@ fn extra_name_with_clap_error(arg: &str) -> Result<ExtraName> {
 }
 
 #[derive(Parser)]
-#[command(name = "uv", author, version = uv_version::version(), long_version = crate::version::version())]
+#[command(name = "uv", author, long_version = crate::version::version())]
 #[command(about = "An extremely fast Python package manager.")]
 #[command(propagate_version = true)]
 #[command(
     after_help = "Use `uv help` for more details.",
     after_long_help = "",
     disable_help_flag = true,
-    disable_help_subcommand = true
+    disable_help_subcommand = true,
+    disable_version_flag = true
 )]
 #[allow(clippy::struct_excessive_bools)]
 pub struct Cli {
@@ -66,23 +68,53 @@ pub struct Cli {
     pub command: Box<Commands>,
 
     #[command(flatten)]
-    pub global_args: Box<GlobalArgs>,
-
-    #[command(flatten)]
     pub cache_args: Box<CacheArgs>,
 
+    #[command(flatten)]
+    pub global_args: Box<GlobalArgs>,
+
     /// The path to a `uv.toml` file to use for configuration.
-    #[arg(global = true, long, env = "UV_CONFIG_FILE")]
+    #[arg(
+        global = true,
+        long,
+        env = "UV_CONFIG_FILE",
+        help_heading = "Global options"
+    )]
     pub config_file: Option<PathBuf>,
 
+    /// Avoid discovering configuration files (`pyproject.toml`, `uv.toml`) in the current directory,
+    /// parent directories, or user configuration directories.
+    #[arg(global = true, long, env = "UV_NO_CONFIG", value_parser = clap::builder::BoolishValueParser::new(), help_heading = "Global options")]
+    pub no_config: bool,
+
     /// Print help.
-    #[arg(global = true, short, long, action = clap::ArgAction::HelpShort)]
+    #[arg(global = true, short, long, action = clap::ArgAction::HelpShort, help_heading = "Global options")]
     help: Option<bool>,
+
+    /// Print version.
+    // This enable it to show under Global options section.
+    #[arg(global = true, short = 'V', long, action = clap::ArgAction::Version, help_heading = "Global options")]
+    version: Option<bool>,
 }
 
 #[derive(Parser, Debug, Clone)]
+#[command(next_help_heading = "Global options", next_display_order = 1000)]
 #[allow(clippy::struct_excessive_bools)]
 pub struct GlobalArgs {
+    /// Whether to prefer using Python installations that are already present on the system, or
+    /// those that are downloaded and installed by uv.
+    #[arg(
+        global = true,
+        long,
+        help_heading = "Python options",
+        display_order = 700
+    )]
+    pub python_preference: Option<PythonPreference>,
+
+    /// Whether to automatically download Python when required.
+    #[arg(global = true, long, help_heading = "Python options")]
+    pub python_fetch: Option<PythonFetch>,
+
     /// Do not print any output.
     #[arg(global = true, long, short, conflicts_with = "verbose")]
     pub quiet: bool,
@@ -131,15 +163,6 @@ pub struct GlobalArgs {
     #[arg(global = true, long, overrides_with("offline"), hide = true)]
     pub no_offline: bool,
 
-    /// Whether to prefer using Python installations that are already present on the system, or
-    /// those that are downloaded and installed by uv.
-    #[arg(global = true, long)]
-    pub python_preference: Option<PythonPreference>,
-
-    /// Whether to automatically download Python when required.
-    #[arg(global = true, long)]
-    pub python_fetch: Option<PythonFetch>,
-
     /// Whether to enable experimental, preview features.
     #[arg(global = true, long, hide = true, env = "UV_PREVIEW", value_parser = clap::builder::BoolishValueParser::new(), overrides_with("no_preview"))]
     pub preview: bool,
@@ -149,7 +172,7 @@ pub struct GlobalArgs {
 
     /// Avoid discovering a `pyproject.toml` or `uv.toml` file in the current directory or any
     /// parent directories.
-    #[arg(global = true, long)]
+    #[arg(global = true, long, hide = true)]
     pub isolated: bool,
 
     /// Show the resolved settings for the current command.
@@ -159,6 +182,10 @@ pub struct GlobalArgs {
     /// Hides all progress outputs when set
     #[arg(global = true, long)]
     pub no_progress: bool,
+
+    /// Change to the given directory prior to running the command.
+    #[arg(global = true, long, hide = true)]
+    pub directory: Option<PathBuf>,
 }
 
 #[derive(Debug, Copy, Clone, clap::ValueEnum)]
@@ -186,19 +213,19 @@ impl From<ColorChoice> for anstream::ColorChoice {
 #[derive(Subcommand)]
 #[allow(clippy::large_enum_variant)]
 pub enum Commands {
-    /// Resolve and install Python packages.
+    /// Manage Python packages with a pip-compatible interface.
     #[command(
         after_help = "Use `uv help pip`` for more details.",
         after_long_help = ""
     )]
     Pip(PipNamespace),
-    /// Run and manage executable Python packages.
+    /// Run and manage tools provided by Python packages (experimental).
     #[command(
         after_help = "Use `uv help tool` for more details.",
         after_long_help = ""
     )]
     Tool(ToolNamespace),
-    /// Manage Python installations.
+    /// Manage Python versions and installations (experimental).
     #[command(
         after_help = "Use `uv help python` for more details.",
         after_long_help = ""
@@ -237,10 +264,20 @@ pub enum Commands {
     #[command(alias = "--generate-shell-completion", hide = true)]
     GenerateShellCompletion { shell: clap_complete_command::Shell },
     /// Display documentation for a command.
+    // To avoid showing the global options when displaying help for the help command, we are
+    // responsible for maintaining the options using the `after_help`.
     #[command(help_template = "\
 {about-with-newline}
-{usage-heading} {usage}
-")]
+{usage-heading} {usage}{after-help}
+",
+        after_help = format!("\
+{heading}Options:{heading:#}
+  {option}--no-pager{option:#}  Disable pager when printing help
+",
+            heading = Style::new().bold().underline(),
+            option = Style::new().bold(),
+        ),
+    )]
     Help(HelpArgs),
 }
 
@@ -378,46 +415,39 @@ pub enum PipCommand {
 
 #[derive(Subcommand)]
 pub enum ProjectCommand {
-    /// Initialize a project.
-    #[clap(hide = true)]
+    /// Create a new project (experimental).
     Init(InitArgs),
-    /// Run a command in the project environment.
-    #[clap(hide = true)]
+    /// Run a command in an environment (experimental).
     #[command(
         after_help = "Use `uv help run` for more details.",
         after_long_help = ""
     )]
     Run(RunArgs),
-    /// Sync the project's dependencies with the environment.
-    #[clap(hide = true)]
+    /// Update the project's environment to match the project's dependencies (experimental).
     #[command(
         after_help = "Use `uv help sync` for more details.",
         after_long_help = ""
     )]
     Sync(SyncArgs),
-    /// Resolve the project requirements into a lockfile.
-    #[clap(hide = true)]
+    /// Create or update a lockfile for the project's dependencies (experimental).
     #[command(
         after_help = "Use `uv help lock` for more details.",
         after_long_help = ""
     )]
     Lock(LockArgs),
-    /// Add one or more packages to the project requirements.
-    #[clap(hide = true)]
+    /// Add one or more packages to the project's dependencies (experimental).
     #[command(
         after_help = "Use `uv help add` for more details.",
         after_long_help = ""
     )]
     Add(AddArgs),
-    /// Remove one or more packages from the project requirements.
-    #[clap(hide = true)]
+    /// Remove one or more packages from the project's dependencies (experimental).
     #[command(
         after_help = "Use `uv help remove` for more details.",
         after_long_help = ""
     )]
     Remove(RemoveArgs),
-    /// Display the dependency tree for the project.
-    #[clap(hide = true)]
+    /// Display the dependency tree for the project (experimental).
     Tree(TreeArgs),
 }
 
@@ -510,6 +540,15 @@ pub struct PipCompileArgs {
     /// requirements of the constituent packages.
     #[arg(long, env = "UV_OVERRIDE", value_delimiter = ' ', value_parser = parse_maybe_file_path)]
     pub r#override: Vec<Maybe<PathBuf>>,
+
+    /// Constrain build dependencies using the given requirements files when building source
+    /// distributions.
+    ///
+    /// Constraints files are `requirements.txt`-like files that only control the _version_ of a
+    /// requirement that's installed. However, including a package in a constraints file will _not_
+    /// trigger the installation of that package.
+    #[arg(long, short, env = "UV_BUILD_CONSTRAINT", value_delimiter = ' ', value_parser = parse_maybe_file_path)]
+    pub build_constraint: Vec<Maybe<PathBuf>>,
 
     /// Include optional dependencies from the extra group name; may be provided more than once.
     ///
@@ -606,7 +645,7 @@ pub struct PipCompileArgs {
     ///   `python3.10` on Linux and macOS.
     /// - `python3.10` or `python.exe` looks for a binary with the given name in `PATH`.
     /// - `/home/ferris/.local/bin/python3.10` uses the exact Python at the given path.
-    #[arg(long, verbatim_doc_comment)]
+    #[arg(long, verbatim_doc_comment, help_heading = "Python options")]
     pub python: Option<String>,
 
     /// Install packages into the system Python environment.
@@ -705,7 +744,7 @@ pub struct PipCompileArgs {
     ///
     /// If a patch version is omitted, the minimum patch version is assumed. For example, `3.8` is
     /// mapped to `3.8.0`.
-    #[arg(long, short)]
+    #[arg(long, short, help_heading = "Python options")]
     pub python_version: Option<PythonVersion>,
 
     /// The platform for which requirements should be resolved.
@@ -808,6 +847,15 @@ pub struct PipSyncArgs {
     #[arg(long, short, env = "UV_CONSTRAINT", value_delimiter = ' ', value_parser = parse_maybe_file_path)]
     pub constraint: Vec<Maybe<PathBuf>>,
 
+    /// Constrain build dependencies using the given requirements files when building source
+    /// distributions.
+    ///
+    /// Constraints files are `requirements.txt`-like files that only control the _version_ of a
+    /// requirement that's installed. However, including a package in a constraints file will _not_
+    /// trigger the installation of that package.
+    #[arg(long, short, env = "UV_BUILD_CONSTRAINT", value_delimiter = ' ', value_parser = parse_maybe_file_path)]
+    pub build_constraint: Vec<Maybe<PathBuf>>,
+
     #[command(flatten)]
     pub installer: InstallerArgs,
 
@@ -865,7 +913,13 @@ pub struct PipSyncArgs {
     ///   `python3.10` on Linux and macOS.
     /// - `python3.10` or `python.exe` looks for a binary with the given name in `PATH`.
     /// - `/home/ferris/.local/bin/python3.10` uses the exact Python at the given path.
-    #[arg(long, short, env = "UV_PYTHON", verbatim_doc_comment)]
+    #[arg(
+        long,
+        short,
+        env = "UV_PYTHON",
+        verbatim_doc_comment,
+        help_heading = "Python options"
+    )]
     pub python: Option<String>,
 
     /// Install packages into the system Python environment.
@@ -1075,6 +1129,15 @@ pub struct PipInstallArgs {
     #[arg(long, env = "UV_OVERRIDE", value_delimiter = ' ', value_parser = parse_maybe_file_path)]
     pub r#override: Vec<Maybe<PathBuf>>,
 
+    /// Constrain build dependencies using the given requirements files when building source
+    /// distributions.
+    ///
+    /// Constraints files are `requirements.txt`-like files that only control the _version_ of a
+    /// requirement that's installed. However, including a package in a constraints file will _not_
+    /// trigger the installation of that package.
+    #[arg(long, short, env = "UV_BUILD_CONSTRAINT", value_delimiter = ' ', value_parser = parse_maybe_file_path)]
+    pub build_constraint: Vec<Maybe<PathBuf>>,
+
     /// Include optional dependencies from the extra group name; may be provided more than once.
     ///
     /// Only applies to `pyproject.toml`, `setup.py`, and `setup.cfg` sources.
@@ -1155,7 +1218,13 @@ pub struct PipInstallArgs {
     ///   `python3.10` on Linux and macOS.
     /// - `python3.10` or `python.exe` looks for a binary with the given name in `PATH`.
     /// - `/home/ferris/.local/bin/python3.10` uses the exact Python at the given path.
-    #[arg(long, short, env = "UV_PYTHON", verbatim_doc_comment)]
+    #[arg(
+        long,
+        short,
+        env = "UV_PYTHON",
+        verbatim_doc_comment,
+        help_heading = "Python options"
+    )]
     pub python: Option<String>,
 
     /// Install packages into the system Python environment.
@@ -1339,7 +1408,13 @@ pub struct PipUninstallArgs {
     ///   `python3.10` on Linux and macOS.
     /// - `python3.10` or `python.exe` looks for a binary with the given name in `PATH`.
     /// - `/home/ferris/.local/bin/python3.10` uses the exact Python at the given path.
-    #[arg(long, short, env = "UV_PYTHON", verbatim_doc_comment)]
+    #[arg(
+        long,
+        short,
+        env = "UV_PYTHON",
+        verbatim_doc_comment,
+        help_heading = "Python options"
+    )]
     pub python: Option<String>,
 
     /// Attempt to use `keyring` for authentication for remote requirements files.
@@ -1425,7 +1500,13 @@ pub struct PipFreezeArgs {
     ///   `python3.10` on Linux and macOS.
     /// - `python3.10` or `python.exe` looks for a binary with the given name in `PATH`.
     /// - `/home/ferris/.local/bin/python3.10` uses the exact Python at the given path.
-    #[arg(long, short, env = "UV_PYTHON", verbatim_doc_comment)]
+    #[arg(
+        long,
+        short,
+        env = "UV_PYTHON",
+        verbatim_doc_comment,
+        help_heading = "Python options"
+    )]
     pub python: Option<String>,
 
     /// List packages for the system Python.
@@ -1460,7 +1541,7 @@ pub struct PipListArgs {
     pub editable: bool,
 
     /// Exclude any editable packages from output.
-    #[arg(long)]
+    #[arg(long, conflicts_with = "editable")]
     pub exclude_editable: bool,
 
     /// Exclude the specified package(s) from the output.
@@ -1490,7 +1571,13 @@ pub struct PipListArgs {
     ///   `python3.10` on Linux and macOS.
     /// - `python3.10` or `python.exe` looks for a binary with the given name in `PATH`.
     /// - `/home/ferris/.local/bin/python3.10` uses the exact Python at the given path.
-    #[arg(long, short, env = "UV_PYTHON", verbatim_doc_comment)]
+    #[arg(
+        long,
+        short,
+        env = "UV_PYTHON",
+        verbatim_doc_comment,
+        help_heading = "Python options"
+    )]
     pub python: Option<String>,
 
     /// List packages for the system Python.
@@ -1531,7 +1618,13 @@ pub struct PipCheckArgs {
     ///   `python3.10` on Linux and macOS.
     /// - `python3.10` or `python.exe` looks for a binary with the given name in `PATH`.
     /// - `/home/ferris/.local/bin/python3.10` uses the exact Python at the given path.
-    #[arg(long, short, env = "UV_PYTHON", verbatim_doc_comment)]
+    #[arg(
+        long,
+        short,
+        env = "UV_PYTHON",
+        verbatim_doc_comment,
+        help_heading = "Python options"
+    )]
     pub python: Option<String>,
 
     /// List packages for the system Python.
@@ -1580,7 +1673,13 @@ pub struct PipShowArgs {
     ///   `python3.10` on Linux and macOS.
     /// - `python3.10` or `python.exe` looks for a binary with the given name in `PATH`.
     /// - `/home/ferris/.local/bin/python3.10` uses the exact Python at the given path.
-    #[arg(long, short, env = "UV_PYTHON", verbatim_doc_comment)]
+    #[arg(
+        long,
+        short,
+        env = "UV_PYTHON",
+        verbatim_doc_comment,
+        help_heading = "Python options"
+    )]
     pub python: Option<String>,
 
     /// List packages for the system Python.
@@ -1610,6 +1709,10 @@ pub struct PipShowArgs {
 #[derive(Args)]
 #[allow(clippy::struct_excessive_bools)]
 pub struct PipTreeArgs {
+    /// Show the version constraint(s) imposed on each package.
+    #[arg(long)]
+    pub show_version_specifiers: bool,
+
     #[command(flatten)]
     pub tree: DisplayTreeArgs,
 
@@ -1632,7 +1735,13 @@ pub struct PipTreeArgs {
     ///   `python3.10` on Linux and macOS.
     /// - `python3.10` or `python.exe` looks for a binary with the given name in `PATH`.
     /// - `/home/ferris/.local/bin/python3.10` uses the exact Python at the given path.
-    #[arg(long, short, env = "UV_PYTHON", verbatim_doc_comment)]
+    #[arg(
+        long,
+        short,
+        env = "UV_PYTHON",
+        verbatim_doc_comment,
+        help_heading = "Python options"
+    )]
     pub python: Option<String>,
 
     /// List packages for the system Python.
@@ -1672,7 +1781,13 @@ pub struct VenvArgs {
     ///
     /// Note that this is different from `--python-version` in `pip compile`, which takes `3.10` or `3.10.13` and
     /// doesn't look for a Python interpreter on disk.
-    #[arg(long, short, env = "UV_PYTHON", verbatim_doc_comment)]
+    #[arg(
+        long,
+        short,
+        env = "UV_PYTHON",
+        verbatim_doc_comment,
+        help_heading = "Python options"
+    )]
     pub python: Option<String>,
 
     /// Use the system Python to uninstall packages.
@@ -1737,6 +1852,22 @@ pub struct VenvArgs {
     /// behavior of uv commands.
     #[arg(long)]
     pub system_site_packages: bool,
+
+    /// Make the virtual environment relocatable.
+    ///
+    /// A relocatable virtual environment can be moved around and redistributed without
+    /// invalidating its associated entrypoint and activation scripts.
+    ///
+    /// Note that this can only be guaranteed for standard `console_scripts` and `gui_scripts`.
+    /// Other scripts may be adjusted if they ship with a generic `#!python[w]` shebang,
+    /// and binaries are left as-is.
+    ///
+    /// As a result of making the environment relocatable (by way of writing relative, rather than
+    /// absolute paths), the entrypoints and scripts themselves will _not_ be relocatable. In other
+    /// words, copying those entrypoints and scripts to a location outside the environment will not
+    /// work, as they reference paths relative to the environment itself.
+    #[arg(long)]
+    pub relocatable: bool,
 
     #[command(flatten)]
     pub index_args: IndexArgs,
@@ -1822,6 +1953,11 @@ pub struct InitArgs {
     #[arg(long)]
     pub no_readme: bool,
 
+    /// Avoid discovering the workspace in the current directory or any parent directory. Instead,
+    /// create a standalone project.
+    #[arg(long, alias = "no_project")]
+    pub no_workspace: bool,
+
     /// The Python interpreter to use to determine the minimum supported Python version.
     ///
     /// By default, uv uses the virtual environment in the current working directory or any parent
@@ -1833,7 +1969,13 @@ pub struct InitArgs {
     ///   `python3.10` on Linux and macOS.
     /// - `python3.10` or `python.exe` looks for a binary with the given name in `PATH`.
     /// - `/home/ferris/.local/bin/python3.10` uses the exact Python at the given path.
-    #[arg(long, short, env = "UV_PYTHON", verbatim_doc_comment)]
+    #[arg(
+        long,
+        short,
+        env = "UV_PYTHON",
+        verbatim_doc_comment,
+        help_heading = "Python options"
+    )]
     pub python: Option<String>,
 }
 
@@ -1877,6 +2019,11 @@ pub struct RunArgs {
     #[arg(long, value_parser = parse_maybe_file_path)]
     pub with_requirements: Vec<Maybe<PathBuf>>,
 
+    /// Run the tool in an isolated virtual environment, rather than leveraging the base environment
+    /// for the current project, to enforce strict isolation between dependencies.
+    #[arg(long)]
+    pub isolated: bool,
+
     /// Assert that the `uv.lock` will remain unchanged.
     #[arg(long, conflicts_with = "frozen")]
     pub locked: bool,
@@ -1895,8 +2042,13 @@ pub struct RunArgs {
     pub refresh: RefreshArgs,
 
     /// Run the command in a specific package in the workspace.
-    #[arg(long, conflicts_with = "isolated")]
+    #[arg(long)]
     pub package: Option<PackageName>,
+
+    /// Avoid discovering the project or workspace in the current directory or any parent directory.
+    /// Instead, run in an isolated, ephemeral environment populated by the `--with` requirements.
+    #[arg(long, alias = "no_workspace", conflicts_with = "package")]
+    pub no_project: bool,
 
     /// The Python interpreter to use to build the run environment.
     ///
@@ -1909,8 +2061,20 @@ pub struct RunArgs {
     ///   `python3.10` on Linux and macOS.
     /// - `python3.10` or `python.exe` looks for a binary with the given name in `PATH`.
     /// - `/home/ferris/.local/bin/python3.10` uses the exact Python at the given path.
-    #[arg(long, short, env = "UV_PYTHON", verbatim_doc_comment)]
+    #[arg(
+        long,
+        short,
+        env = "UV_PYTHON",
+        verbatim_doc_comment,
+        help_heading = "Python options"
+    )]
     pub python: Option<String>,
+
+    /// Whether to show resolver and installer output from any environment modifications.
+    ///
+    /// By default, environment modifications are omitted, but enabled under `--verbose`.
+    #[arg(long, env = "UV_SHOW_RESOLUTION", value_parser = clap::builder::BoolishValueParser::new(), hide = true)]
+    pub show_resolution: bool,
 }
 
 #[derive(Args)]
@@ -1962,6 +2126,10 @@ pub struct SyncArgs {
     #[command(flatten)]
     pub refresh: RefreshArgs,
 
+    /// Sync a specific package in the workspace.
+    #[arg(long)]
+    pub package: Option<PackageName>,
+
     /// The Python interpreter to use to build the run environment.
     ///
     /// By default, uv uses the virtual environment in the current working directory or any parent
@@ -1973,7 +2141,13 @@ pub struct SyncArgs {
     ///   `python3.10` on Linux and macOS.
     /// - `python3.10` or `python.exe` looks for a binary with the given name in `PATH`.
     /// - `/home/ferris/.local/bin/python3.10` uses the exact Python at the given path.
-    #[arg(long, short, env = "UV_PYTHON", verbatim_doc_comment)]
+    #[arg(
+        long,
+        short,
+        env = "UV_PYTHON",
+        verbatim_doc_comment,
+        help_heading = "Python options"
+    )]
     pub python: Option<String>,
 }
 
@@ -2008,7 +2182,13 @@ pub struct LockArgs {
     ///   `python3.10` on Linux and macOS.
     /// - `python3.10` or `python.exe` looks for a binary with the given name in `PATH`.
     /// - `/home/ferris/.local/bin/python3.10` uses the exact Python at the given path.
-    #[arg(long, short, env = "UV_PYTHON", verbatim_doc_comment)]
+    #[arg(
+        long,
+        short,
+        env = "UV_PYTHON",
+        verbatim_doc_comment,
+        help_heading = "Python options"
+    )]
     pub python: Option<String>,
 }
 
@@ -2049,15 +2229,15 @@ pub struct AddArgs {
     pub raw_sources: bool,
 
     /// Specific commit to use when adding from Git.
-    #[arg(long)]
+    #[arg(long, group = "git-ref", action = clap::ArgAction::Set)]
     pub rev: Option<String>,
 
     /// Tag to use when adding from git.
-    #[arg(long)]
+    #[arg(long, group = "git-ref", action = clap::ArgAction::Set)]
     pub tag: Option<String>,
 
     /// Branch to use when adding from git.
-    #[arg(long)]
+    #[arg(long, group = "git-ref", action = clap::ArgAction::Set)]
     pub branch: Option<String>,
 
     /// Extras to activate for the dependency; may be provided more than once.
@@ -2097,7 +2277,13 @@ pub struct AddArgs {
     ///   `python3.10` on Linux and macOS.
     /// - `python3.10` or `python.exe` looks for a binary with the given name in `PATH`.
     /// - `/home/ferris/.local/bin/python3.10` uses the exact Python at the given path.
-    #[arg(long, short, env = "UV_PYTHON", verbatim_doc_comment)]
+    #[arg(
+        long,
+        short,
+        env = "UV_PYTHON",
+        verbatim_doc_comment,
+        help_heading = "Python options"
+    )]
     pub python: Option<String>,
 }
 
@@ -2149,13 +2335,24 @@ pub struct RemoveArgs {
     ///   `python3.10` on Linux and macOS.
     /// - `python3.10` or `python.exe` looks for a binary with the given name in `PATH`.
     /// - `/home/ferris/.local/bin/python3.10` uses the exact Python at the given path.
-    #[arg(long, short, env = "UV_PYTHON", verbatim_doc_comment)]
+    #[arg(
+        long,
+        short,
+        env = "UV_PYTHON",
+        verbatim_doc_comment,
+        help_heading = "Python options"
+    )]
     pub python: Option<String>,
 }
 
 #[derive(Args)]
 #[allow(clippy::struct_excessive_bools)]
 pub struct TreeArgs {
+    /// Show the resolved package versions for all Python versions and platforms, rather than
+    /// filtering to those that are relevant for the current environment.
+    #[arg(long)]
+    pub universal: bool,
+
     #[command(flatten)]
     pub tree: DisplayTreeArgs,
 
@@ -2173,6 +2370,21 @@ pub struct TreeArgs {
     #[command(flatten)]
     pub resolver: ResolverArgs,
 
+    /// The Python version to use when filtering the tree (via `--filter`). For example, pass
+    /// `--python-version 3.10` to display the dependencies that would be included when installing
+    /// on Python 3.10.
+    #[arg(long, conflicts_with = "universal")]
+    pub python_version: Option<PythonVersion>,
+
+    /// The platform to use when filtering the tree (via `--filter`). For example, pass `--platform
+    /// windows` to display the dependencies that would be included when installing on Windows.
+    ///
+    /// Represented as a "target triple", a string that describes the target platform in terms of
+    /// its CPU, vendor, and operating system name, like `x86_64-unknown-linux-gnu` or
+    /// `aaarch64-apple-darwin`.
+    #[arg(long, conflicts_with = "universal")]
+    pub python_platform: Option<TargetTriple>,
+
     /// The Python interpreter for which packages should be listed.
     ///
     /// By default, uv installs into the virtual environment in the current working directory or
@@ -2185,7 +2397,13 @@ pub struct TreeArgs {
     ///   `python3.10` on Linux and macOS.
     /// - `python3.10` or `python.exe` looks for a binary with the given name in `PATH`.
     /// - `/home/ferris/.local/bin/python3.10` uses the exact Python at the given path.
-    #[arg(long, short, env = "UV_PYTHON", verbatim_doc_comment)]
+    #[arg(
+        long,
+        short,
+        env = "UV_PYTHON",
+        verbatim_doc_comment,
+        help_heading = "Python options"
+    )]
     pub python: Option<String>,
 }
 
@@ -2231,8 +2449,10 @@ pub struct ToolRunArgs {
     ///
     /// If more complex version specification is desired or if the command is provided by a different
     /// package, use `--from`.
+    ///
+    /// If omitted, lists the available tools.
     #[command(subcommand)]
-    pub command: ExternalCommand,
+    pub command: Option<ExternalCommand>,
 
     /// Use the given package to provide the command.
     ///
@@ -2247,6 +2467,10 @@ pub struct ToolRunArgs {
     /// Run with all packages listed in the given `requirements.txt` files.
     #[arg(long, value_parser = parse_maybe_file_path)]
     pub with_requirements: Vec<Maybe<PathBuf>>,
+
+    /// Run the tool in an isolated virtual environment, ignoring any already-installed tools.
+    #[arg(long)]
+    pub isolated: bool,
 
     #[command(flatten)]
     pub installer: ResolverInstallerArgs,
@@ -2268,8 +2492,20 @@ pub struct ToolRunArgs {
     ///   `python3.10` on Linux and macOS.
     /// - `python3.10` or `python.exe` looks for a binary with the given name in `PATH`.
     /// - `/home/ferris/.local/bin/python3.10` uses the exact Python at the given path.
-    #[arg(long, short, env = "UV_PYTHON", verbatim_doc_comment)]
+    #[arg(
+        long,
+        short,
+        env = "UV_PYTHON",
+        verbatim_doc_comment,
+        help_heading = "Python options"
+    )]
     pub python: Option<String>,
+
+    /// Whether to show resolver and installer output from any environment modifications.
+    ///
+    /// By default, environment modifications are omitted, but enabled under `--verbose`.
+    #[arg(long, env = "UV_SHOW_RESOLUTION", value_parser = clap::builder::BoolishValueParser::new(), hide = true)]
+    pub show_resolution: bool,
 }
 
 #[derive(Args)]
@@ -2277,6 +2513,9 @@ pub struct ToolRunArgs {
 pub struct ToolInstallArgs {
     /// The package to install commands from.
     pub package: String,
+
+    #[arg(short, long)]
+    pub editable: bool,
 
     /// The package to install commands from.
     ///
@@ -2318,7 +2557,13 @@ pub struct ToolInstallArgs {
     ///   `python3.10` on Linux and macOS.
     /// - `python3.10` or `python.exe` looks for a binary with the given name in `PATH`.
     /// - `/home/ferris/.local/bin/python3.10` uses the exact Python at the given path.
-    #[arg(long, short, env = "UV_PYTHON", verbatim_doc_comment)]
+    #[arg(
+        long,
+        short,
+        env = "UV_PYTHON",
+        verbatim_doc_comment,
+        help_heading = "Python options"
+    )]
     pub python: Option<String>,
 }
 
@@ -2445,6 +2690,11 @@ pub struct PythonPinArgs {
 
     #[arg(long, overrides_with("no_resolved"), hide = true)]
     pub no_resolved: bool,
+
+    /// Avoid validating the Python pin against the workspace in the current directory or any parent
+    /// directory.
+    #[arg(long)]
+    pub no_workspace: bool,
 }
 
 #[derive(Args)]
@@ -2669,7 +2919,7 @@ pub struct ResolverArgs {
     /// along with first-party requirements that contain an explicit pre-release marker in the
     /// declared specifiers (`if-necessary-or-explicit`).
     #[arg(long, value_enum, env = "UV_PRERELEASE")]
-    pub prerelease: Option<PreReleaseMode>,
+    pub prerelease: Option<PrereleaseMode>,
 
     #[arg(long, hide = true)]
     pub pre: bool,
@@ -2758,7 +3008,7 @@ pub struct ResolverInstallerArgs {
     /// along with first-party requirements that contain an explicit pre-release marker in the
     /// declared specifiers (`if-necessary-or-explicit`).
     #[arg(long, value_enum, env = "UV_PRERELEASE")]
-    pub prerelease: Option<PreReleaseMode>,
+    pub prerelease: Option<PrereleaseMode>,
 
     #[arg(long, hide = true)]
     pub pre: bool,
@@ -2828,8 +3078,4 @@ pub struct DisplayTreeArgs {
     /// Show the reverse dependencies for the given package. This flag will invert the tree and display the packages that depend on the given package.
     #[arg(long, alias = "reverse")]
     pub invert: bool,
-
-    /// Show the version constraint(s) imposed on each package.
-    #[arg(long)]
-    pub show_version_specifiers: bool,
 }

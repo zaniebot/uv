@@ -1,11 +1,12 @@
 use std::fmt::Write;
+use std::path::PathBuf;
 
 use itertools::Itertools;
 use owo_colors::OwoColorize;
 use tracing::debug;
 
 use distribution_types::{Resolution, UnresolvedRequirementSpecification};
-use pep440_rs::Version;
+use pep440_rs::{Version, VersionSpecifiers};
 use pypi_types::Requirement;
 use uv_auth::store_credentials_from_url;
 use uv_cache::Cache;
@@ -17,6 +18,7 @@ use uv_dispatch::BuildDispatch;
 use uv_distribution::DistributionDatabase;
 use uv_fs::Simplified;
 use uv_installer::{SatisfiesResult, SitePackages};
+use uv_normalize::PackageName;
 use uv_python::{
     request_from_version_file, EnvironmentPreference, Interpreter, PythonEnvironment, PythonFetch,
     PythonInstallation, PythonPreference, PythonRequest, VersionRequest,
@@ -60,6 +62,15 @@ pub(crate) enum ProjectError {
     #[error("The requested Python interpreter ({0}) is incompatible with the project Python requirement: `{1}`")]
     RequestedPythonIncompatibility(Version, RequiresPython),
 
+    #[error("The requested Python interpreter ({0}) is incompatible with the project Python requirement: `{1}`. However, a workspace member (`{member}`) supports Python {3}. To install the workspace member on its own, navigate to `{path}`, then run `{venv}` followed by `{install}`.", member = _2.cyan(), venv = format!("uv venv --python {_0}").green(), install = "uv pip install -e .".green(), path = _4.user_display().cyan() )]
+    RequestedMemberPythonIncompatibility(
+        Version,
+        RequiresPython,
+        PackageName,
+        VersionSpecifiers,
+        PathBuf,
+    ),
+
     #[error(transparent)]
     Python(#[from] uv_python::Error),
 
@@ -101,7 +112,7 @@ pub(crate) enum ProjectError {
 pub(crate) fn find_requires_python(
     workspace: &Workspace,
 ) -> Result<Option<RequiresPython>, uv_resolver::RequiresPythonError> {
-    RequiresPython::union(workspace.packages().values().filter_map(|member| {
+    RequiresPython::intersection(workspace.packages().values().filter_map(|member| {
         member
             .pyproject_toml()
             .project
@@ -137,9 +148,51 @@ fn interpreter_meets_requirements(
 }
 
 #[derive(Debug)]
+#[allow(clippy::large_enum_variant)]
 pub(crate) enum FoundInterpreter {
     Interpreter(Interpreter),
     Environment(PythonEnvironment),
+}
+
+/// The resolved Python request and requirement for a [`Workspace`].
+#[derive(Debug, Clone)]
+pub(crate) struct WorkspacePython {
+    /// The resolved Python request, computed by considering (1) any explicit request from the user
+    /// via `--python`, (2) any implicit request from the user via `.python-version`, and (3) any
+    /// `Requires-Python` specifier in the `pyproject.toml`.
+    python_request: Option<PythonRequest>,
+    /// The resolved Python requirement for the project, computed by taking the intersection of all
+    /// `Requires-Python` specifiers in the workspace.
+    requires_python: Option<RequiresPython>,
+}
+
+impl WorkspacePython {
+    /// Determine the [`WorkspacePython`] for the current [`Workspace`].
+    pub(crate) async fn from_request(
+        python_request: Option<PythonRequest>,
+        workspace: &Workspace,
+    ) -> Result<Self, ProjectError> {
+        let requires_python = find_requires_python(workspace)?;
+
+        // (1) Explicit request from user
+        let python_request = if let Some(request) = python_request {
+            Some(request)
+            // (2) Request from `.python-version`
+        } else if let Some(request) = request_from_version_file(workspace.install_path()).await? {
+            Some(request)
+            // (3) `Requires-Python` in `pyproject.toml`
+        } else {
+            requires_python
+                .as_ref()
+                .map(RequiresPython::specifiers)
+                .map(|specifiers| PythonRequest::Version(VersionRequest::Range(specifiers.clone())))
+        };
+
+        Ok(Self {
+            python_request,
+            requires_python,
+        })
+    }
 }
 
 impl FoundInterpreter {
@@ -154,21 +207,11 @@ impl FoundInterpreter {
         cache: &Cache,
         printer: Printer,
     ) -> Result<Self, ProjectError> {
-        let requires_python = find_requires_python(workspace)?;
-
-        // (1) Explicit request from user
-        let python_request = if let Some(request) = python_request {
-            Some(request)
-            // (2) Request from `.python-version`
-        } else if let Some(request) = request_from_version_file().await? {
-            Some(request)
-            // (3) `Requires-Python` in `pyproject.toml`
-        } else {
-            requires_python
-                .as_ref()
-                .map(RequiresPython::specifiers)
-                .map(|specifiers| PythonRequest::Version(VersionRequest::Range(specifiers.clone())))
-        };
+        // Resolve the Python request and requirement for the workspace.
+        let WorkspacePython {
+            python_request,
+            requires_python,
+        } = WorkspacePython::from_request(python_request, workspace).await?;
 
         // Read from the virtual environment first.
         match find_environment(workspace, cache) {
@@ -238,6 +281,29 @@ impl FoundInterpreter {
 
         if let Some(requires_python) = requires_python.as_ref() {
             if !requires_python.contains(interpreter.python_version()) {
+                // If the Python version is compatible with one of the workspace _members_, raise
+                // a dedicated error. For example, if the workspace root requires Python >=3.12, but
+                // a library in the workspace is compatible with Python >=3.8, the user may attempt
+                // to sync on Python 3.8. This will fail, but we should provide a more helpful error
+                // message.
+                for (name, member) in workspace.packages() {
+                    let Some(project) = member.pyproject_toml().project.as_ref() else {
+                        continue;
+                    };
+                    let Some(specifiers) = project.requires_python.as_ref() else {
+                        continue;
+                    };
+                    if specifiers.contains(interpreter.python_version()) {
+                        return Err(ProjectError::RequestedMemberPythonIncompatibility(
+                            interpreter.python_version().clone(),
+                            requires_python.clone(),
+                            name.clone(),
+                            specifiers.clone(),
+                            member.root().clone(),
+                        ));
+                    }
+                }
+
                 return Err(ProjectError::RequestedPythonIncompatibility(
                     interpreter.python_version().clone(),
                     requires_python.clone(),
@@ -312,6 +378,7 @@ pub(crate) async fn get_or_init_environment(
                 uv_virtualenv::Prompt::None,
                 false,
                 false,
+                false,
             )?)
         }
     }
@@ -369,10 +436,13 @@ pub(crate) async fn resolve_names(
     let setup_py = SetupPyStrategy::default();
     let flat_index = FlatIndex::default();
 
+    // TODO: read locked build constraints
+    let build_constraints = [];
     // Create a build dispatch.
     let build_dispatch = BuildDispatch::new(
         &client,
         cache,
+        &build_constraints,
         interpreter,
         index_locations,
         &flat_index,
@@ -489,10 +559,13 @@ pub(crate) async fn resolve_environment<'a>(
         FlatIndex::from_entries(entries, Some(tags), &hasher, build_options)
     };
 
+    // TODO: read locked build constraints
+    let build_constraints = [];
     // Create a build dispatch.
     let resolve_dispatch = BuildDispatch::new(
         &client,
         cache,
+        &build_constraints,
         interpreter,
         index_locations,
         &flat_index,
@@ -602,10 +675,13 @@ pub(crate) async fn sync_environment(
         FlatIndex::from_entries(entries, Some(tags), &hasher, build_options)
     };
 
+    // TODO: read locked build constraints
+    let build_constraints = [];
     // Create a build dispatch.
     let build_dispatch = BuildDispatch::new(
         &client,
         cache,
+        &build_constraints,
         interpreter,
         index_locations,
         &flat_index,
@@ -763,10 +839,14 @@ pub(crate) async fn update_environment(
         FlatIndex::from_entries(entries, Some(tags), &hasher, build_options)
     };
 
+    // TODO: read locked build constraints
+    let build_constraints = [];
+
     // Create a build dispatch.
     let build_dispatch = BuildDispatch::new(
         &client,
         cache,
+        &build_constraints,
         interpreter,
         index_locations,
         &flat_index,

@@ -54,7 +54,6 @@ fn resolve_uv_toml() -> anyhow::Result<()> {
         color: Auto,
         native_tls: false,
         connectivity: Online,
-        isolated: false,
         show_settings: true,
         preview: Disabled,
         python_preference: OnlySystem,
@@ -75,6 +74,7 @@ fn resolve_uv_toml() -> anyhow::Result<()> {
         override: [],
         constraints_from_workspace: [],
         overrides_from_workspace: [],
+        build_constraint: [],
         refresh: None(
             Timestamp(
                 SystemTime {
@@ -188,7 +188,6 @@ fn resolve_uv_toml() -> anyhow::Result<()> {
         color: Auto,
         native_tls: false,
         connectivity: Online,
-        isolated: false,
         show_settings: true,
         preview: Disabled,
         python_preference: OnlySystem,
@@ -209,6 +208,7 @@ fn resolve_uv_toml() -> anyhow::Result<()> {
         override: [],
         constraints_from_workspace: [],
         overrides_from_workspace: [],
+        build_constraint: [],
         refresh: None(
             Timestamp(
                 SystemTime {
@@ -323,7 +323,6 @@ fn resolve_uv_toml() -> anyhow::Result<()> {
         color: Auto,
         native_tls: false,
         connectivity: Online,
-        isolated: false,
         show_settings: true,
         preview: Disabled,
         python_preference: OnlySystem,
@@ -344,6 +343,7 @@ fn resolve_uv_toml() -> anyhow::Result<()> {
         override: [],
         constraints_from_workspace: [],
         overrides_from_workspace: [],
+        build_constraint: [],
         refresh: None(
             Timestamp(
                 SystemTime {
@@ -490,7 +490,6 @@ fn resolve_pyproject_toml() -> anyhow::Result<()> {
         color: Auto,
         native_tls: false,
         connectivity: Online,
-        isolated: false,
         show_settings: true,
         preview: Disabled,
         python_preference: OnlySystem,
@@ -511,6 +510,7 @@ fn resolve_pyproject_toml() -> anyhow::Result<()> {
         override: [],
         constraints_from_workspace: [],
         overrides_from_workspace: [],
+        build_constraint: [],
         refresh: None(
             Timestamp(
                 SystemTime {
@@ -626,7 +626,6 @@ fn resolve_pyproject_toml() -> anyhow::Result<()> {
         color: Auto,
         native_tls: false,
         connectivity: Online,
-        isolated: false,
         show_settings: true,
         preview: Disabled,
         python_preference: OnlySystem,
@@ -647,6 +646,7 @@ fn resolve_pyproject_toml() -> anyhow::Result<()> {
         override: [],
         constraints_from_workspace: [],
         overrides_from_workspace: [],
+        build_constraint: [],
         refresh: None(
             Timestamp(
                 SystemTime {
@@ -748,7 +748,6 @@ fn resolve_pyproject_toml() -> anyhow::Result<()> {
         color: Auto,
         native_tls: false,
         connectivity: Online,
-        isolated: false,
         show_settings: true,
         preview: Disabled,
         python_preference: OnlySystem,
@@ -769,6 +768,7 @@ fn resolve_pyproject_toml() -> anyhow::Result<()> {
         override: [],
         constraints_from_workspace: [],
         overrides_from_workspace: [],
+        build_constraint: [],
         refresh: None(
             Timestamp(
                 SystemTime {
@@ -907,7 +907,6 @@ fn resolve_index_url() -> anyhow::Result<()> {
         color: Auto,
         native_tls: false,
         connectivity: Online,
-        isolated: false,
         show_settings: true,
         preview: Disabled,
         python_preference: OnlySystem,
@@ -928,6 +927,7 @@ fn resolve_index_url() -> anyhow::Result<()> {
         override: [],
         constraints_from_workspace: [],
         overrides_from_workspace: [],
+        build_constraint: [],
         refresh: None(
             Timestamp(
                 SystemTime {
@@ -1066,7 +1066,6 @@ fn resolve_index_url() -> anyhow::Result<()> {
         color: Auto,
         native_tls: false,
         connectivity: Online,
-        isolated: false,
         show_settings: true,
         preview: Disabled,
         python_preference: OnlySystem,
@@ -1087,6 +1086,7 @@ fn resolve_index_url() -> anyhow::Result<()> {
         override: [],
         constraints_from_workspace: [],
         overrides_from_workspace: [],
+        build_constraint: [],
         refresh: None(
             Timestamp(
                 SystemTime {
@@ -1270,7 +1270,6 @@ fn resolve_find_links() -> anyhow::Result<()> {
         color: Auto,
         native_tls: false,
         connectivity: Online,
-        isolated: false,
         show_settings: true,
         preview: Disabled,
         python_preference: OnlySystem,
@@ -1291,6 +1290,7 @@ fn resolve_find_links() -> anyhow::Result<()> {
         override: [],
         constraints_from_workspace: [],
         overrides_from_workspace: [],
+        build_constraint: [],
         refresh: None(
             Timestamp(
                 SystemTime {
@@ -1428,7 +1428,6 @@ fn resolve_top_level() -> anyhow::Result<()> {
         color: Auto,
         native_tls: false,
         connectivity: Online,
-        isolated: false,
         show_settings: true,
         preview: Disabled,
         python_preference: OnlySystem,
@@ -1449,6 +1448,7 @@ fn resolve_top_level() -> anyhow::Result<()> {
         override: [],
         constraints_from_workspace: [],
         overrides_from_workspace: [],
+        build_constraint: [],
         refresh: None(
             Timestamp(
                 SystemTime {
@@ -1556,7 +1556,6 @@ fn resolve_top_level() -> anyhow::Result<()> {
         color: Auto,
         native_tls: false,
         connectivity: Online,
-        isolated: false,
         show_settings: true,
         preview: Disabled,
         python_preference: OnlySystem,
@@ -1577,6 +1576,7 @@ fn resolve_top_level() -> anyhow::Result<()> {
         override: [],
         constraints_from_workspace: [],
         overrides_from_workspace: [],
+        build_constraint: [],
         refresh: None(
             Timestamp(
                 SystemTime {
@@ -1712,7 +1712,6 @@ fn resolve_top_level() -> anyhow::Result<()> {
         color: Auto,
         native_tls: false,
         connectivity: Online,
-        isolated: false,
         show_settings: true,
         preview: Disabled,
         python_preference: OnlySystem,
@@ -1733,6 +1732,7 @@ fn resolve_top_level() -> anyhow::Result<()> {
         override: [],
         constraints_from_workspace: [],
         overrides_from_workspace: [],
+        build_constraint: [],
         refresh: None(
             Timestamp(
                 SystemTime {
@@ -1892,7 +1892,6 @@ fn resolve_user_configuration() -> anyhow::Result<()> {
         color: Auto,
         native_tls: false,
         connectivity: Online,
-        isolated: false,
         show_settings: true,
         preview: Disabled,
         python_preference: OnlySystem,
@@ -1913,6 +1912,7 @@ fn resolve_user_configuration() -> anyhow::Result<()> {
         override: [],
         constraints_from_workspace: [],
         overrides_from_workspace: [],
+        build_constraint: [],
         refresh: None(
             Timestamp(
                 SystemTime {
@@ -2010,7 +2010,6 @@ fn resolve_user_configuration() -> anyhow::Result<()> {
         color: Auto,
         native_tls: false,
         connectivity: Online,
-        isolated: false,
         show_settings: true,
         preview: Disabled,
         python_preference: OnlySystem,
@@ -2031,6 +2030,7 @@ fn resolve_user_configuration() -> anyhow::Result<()> {
         override: [],
         constraints_from_workspace: [],
         overrides_from_workspace: [],
+        build_constraint: [],
         refresh: None(
             Timestamp(
                 SystemTime {
@@ -2128,7 +2128,6 @@ fn resolve_user_configuration() -> anyhow::Result<()> {
         color: Auto,
         native_tls: false,
         connectivity: Online,
-        isolated: false,
         show_settings: true,
         preview: Disabled,
         python_preference: OnlySystem,
@@ -2149,6 +2148,7 @@ fn resolve_user_configuration() -> anyhow::Result<()> {
         override: [],
         constraints_from_workspace: [],
         overrides_from_workspace: [],
+        build_constraint: [],
         refresh: None(
             Timestamp(
                 SystemTime {
@@ -2248,7 +2248,6 @@ fn resolve_user_configuration() -> anyhow::Result<()> {
         color: Auto,
         native_tls: false,
         connectivity: Online,
-        isolated: false,
         show_settings: true,
         preview: Disabled,
         python_preference: OnlySystem,
@@ -2269,6 +2268,7 @@ fn resolve_user_configuration() -> anyhow::Result<()> {
         override: [],
         constraints_from_workspace: [],
         overrides_from_workspace: [],
+        build_constraint: [],
         refresh: None(
             Timestamp(
                 SystemTime {
@@ -2393,7 +2393,6 @@ fn resolve_poetry_toml() -> anyhow::Result<()> {
         color: Auto,
         native_tls: false,
         connectivity: Online,
-        isolated: false,
         show_settings: true,
         preview: Disabled,
         python_preference: OnlySystem,
@@ -2414,6 +2413,7 @@ fn resolve_poetry_toml() -> anyhow::Result<()> {
         override: [],
         constraints_from_workspace: [],
         overrides_from_workspace: [],
+        build_constraint: [],
         refresh: None(
             Timestamp(
                 SystemTime {
@@ -2539,7 +2539,6 @@ fn resolve_both() -> anyhow::Result<()> {
         color: Auto,
         native_tls: false,
         connectivity: Online,
-        isolated: false,
         show_settings: true,
         preview: Disabled,
         python_preference: OnlySystem,
@@ -2560,6 +2559,7 @@ fn resolve_both() -> anyhow::Result<()> {
         override: [],
         constraints_from_workspace: [],
         overrides_from_workspace: [],
+        build_constraint: [],
         refresh: None(
             Timestamp(
                 SystemTime {

@@ -1,9 +1,9 @@
-
 # Features
 
-uv supports the full Python development experience — from installing Python and hacking on simple scripts to working on large projects that support multiple Python versions and platforms.
+uv provides essential features for Python development — from installing Python and hacking on simple
+scripts to working on large projects that support multiple Python versions and platforms.
 
-uv's commands can be broken down into sections of discrete features, which can be used independently.
+uv's interface can be broken down into sections, which can be used independently or together.
 
 ## Python versions
 
@@ -53,7 +53,8 @@ See the [guide on tools](./guides/tools.md) to get started.
 
 ## The pip interface
 
-Manually managing environments and packages — intended to be used in legacy workflows or cases where the high-level commands do not provide enough control.
+Manually managing environments and packages — intended to be used in legacy workflows or cases where
+the high-level commands do not provide enough control.
 
 Creating virtual environments (replacing `venv` and `virtualenv`):
 
@@ -61,7 +62,8 @@ Creating virtual environments (replacing `venv` and `virtualenv`):
 
 See the documentation on [using environments](./pip/environments.md) for details.
 
-Managing packages in an environment (replacing [`pip`](https://github.com/pypa/pip) and [`pipdeptree`](https://github.com/tox-dev/pipdeptree)):
+Managing packages in an environment (replacing [`pip`](https://github.com/pypa/pip) and
+[`pipdeptree`](https://github.com/tox-dev/pipdeptree)):
 
 - `uv pip install`: Install packages into the current environment.
 - `uv pip show`: Show details about an installed package.
@@ -84,9 +86,10 @@ See the documentation on [locking environments](./pip/compile.md) for details.
 
     These commands do not exactly implement the interfaces and behavior of the tools they are based on. The further you stray from common workflows, the more likely you are to encounter differences. Consult the [pip-compatibility guide](./pip/compatibility.md) for details.
 
-## Internal
+## Utility
 
-Managing and inspecting uv's state, such as the cache, storage directories, or performing a self-update:
+Managing and inspecting uv's state, such as the cache, storage directories, or performing a
+self-update:
 
 - `uv cache clean`: Remove cache entries.
 - `uv cache prune`: Remove outdated cache entries.

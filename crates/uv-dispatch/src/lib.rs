@@ -17,7 +17,7 @@ use uv_build::{SourceBuild, SourceBuildContext};
 use uv_cache::Cache;
 use uv_client::RegistryClient;
 use uv_configuration::{
-    BuildKind, BuildOptions, ConfigSettings, IndexStrategy, Reinstall, SetupPyStrategy,
+    BuildKind, BuildOptions, ConfigSettings, Constraints, IndexStrategy, Reinstall, SetupPyStrategy,
 };
 use uv_configuration::{Concurrency, PreviewMode};
 use uv_distribution::DistributionDatabase;
@@ -35,6 +35,7 @@ use uv_types::{BuildContext, BuildIsolation, EmptyInstalledPackages, HashStrateg
 pub struct BuildDispatch<'a> {
     client: &'a RegistryClient,
     cache: &'a Cache,
+    constraints: Constraints,
     interpreter: &'a Interpreter,
     index_locations: &'a IndexLocations,
     index_strategy: IndexStrategy,
@@ -58,6 +59,7 @@ impl<'a> BuildDispatch<'a> {
     pub fn new(
         client: &'a RegistryClient,
         cache: &'a Cache,
+        constraints: &'a [Requirement],
         interpreter: &'a Interpreter,
         index_locations: &'a IndexLocations,
         flat_index: &'a FlatIndex,
@@ -77,6 +79,7 @@ impl<'a> BuildDispatch<'a> {
         Self {
             client,
             cache,
+            constraints: Constraints::from_requirements(constraints.iter().cloned()),
             interpreter,
             index_locations,
             flat_index,
@@ -124,10 +127,6 @@ impl<'a> BuildContext for BuildDispatch<'a> {
         self.git
     }
 
-    fn interpreter(&self) -> &Interpreter {
-        self.interpreter
-    }
-
     fn build_options(&self) -> &BuildOptions {
         self.build_options
     }
@@ -140,8 +139,9 @@ impl<'a> BuildContext for BuildDispatch<'a> {
         let python_requirement = PythonRequirement::from_interpreter(self.interpreter);
         let markers = self.interpreter.markers();
         let tags = self.interpreter.tags()?;
+
         let resolver = Resolver::new(
-            Manifest::simple(requirements.to_vec()),
+            Manifest::simple(requirements.to_vec()).with_constraints(self.constraints.clone()),
             OptionsBuilder::new()
                 .exclude_newer(self.exclude_newer)
                 .index_strategy(self.index_strategy)
@@ -288,6 +288,7 @@ impl<'a> BuildContext for BuildDispatch<'a> {
             );
             wheels = Installer::new(venv)
                 .with_link_mode(self.link_mode)
+                .with_cache(self.cache)
                 .install(wheels)
                 .await
                 .context("Failed to install build dependencies")?;

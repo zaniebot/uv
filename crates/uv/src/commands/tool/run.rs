@@ -31,7 +31,7 @@ use crate::commands::reporters::PythonDownloadReporter;
 
 use crate::commands::project::resolve_names;
 use crate::commands::{
-    project, project::environment::CachedEnvironment, tool::common::matching_packages,
+    project::environment::CachedEnvironment, tool::common::matching_packages, tool_list,
 };
 use crate::commands::{ExitStatus, SharedState};
 use crate::printer::Printer;
@@ -56,9 +56,10 @@ impl Display for ToolRunCommand {
 
 /// Run a command.
 pub(crate) async fn run(
-    command: ExternalCommand,
+    command: Option<ExternalCommand>,
     from: Option<String>,
     with: &[RequirementsSource],
+    show_resolution: bool,
     python: Option<String>,
     settings: ResolverInstallerSettings,
     invocation_source: ToolRunCommand,
@@ -75,6 +76,11 @@ pub(crate) async fn run(
     if preview.is_disabled() {
         warn_user_once!("`{invocation_source}` is experimental and may change without warning");
     }
+
+    // treat empty command as `uv tool list`
+    let Some(command) = command else {
+        return tool_list(false, PreviewMode::Enabled, cache, printer).await;
+    };
 
     let (target, args) = command.split();
     let Some(target) = target else {
@@ -101,7 +107,7 @@ pub(crate) async fn run(
         concurrency,
         native_tls,
         cache,
-        printer,
+        printer.filter(show_resolution),
     )
     .await?;
 
@@ -123,17 +129,6 @@ pub(crate) async fn run(
     )?;
     process.env("PATH", new_path);
 
-    // Construct the `PYTHONPATH` environment variable.
-    let new_python_path = std::env::join_paths(
-        environment.site_packages().map(PathBuf::from).chain(
-            std::env::var_os("PYTHONPATH")
-                .as_ref()
-                .iter()
-                .flat_map(std::env::split_paths),
-        ),
-    )?;
-    process.env("PYTHONPATH", new_python_path);
-
     // Spawn and wait for completion
     // Standard input, output, and error streams are all inherited
     // TODO(zanieb): Throw a nicer error message if the command is not found
@@ -144,26 +139,39 @@ pub(crate) async fn run(
         args.iter().map(|arg| arg.to_string_lossy()).join(" ")
     );
 
+    let site_packages = SitePackages::from_environment(&environment)?;
+
     // We check if the provided command is not part of the executables for the `from` package.
     // If the command is found in other packages, we warn the user about the correct package to use.
+
     warn_executable_not_provided_by_package(
         &executable.to_string_lossy(),
         &from.name,
-        &environment,
+        &site_packages,
         &invocation_source,
     );
 
     let mut handle = match process.spawn() {
         Ok(handle) => Ok(handle),
         Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
-            match get_entrypoints(&from.name, &environment) {
+            match get_entrypoints(&from.name, &site_packages) {
                 Ok(entrypoints) => {
                     writeln!(
                         printer.stdout(),
                         "The executable `{}` was not found.",
                         executable.to_string_lossy().cyan(),
                     )?;
-                    if !entrypoints.is_empty() {
+                    if entrypoints.is_empty() {
+                        warn_user!(
+                            "Package `{}` does not provide any executables.",
+                            from.name.red()
+                        );
+                    } else {
+                        warn_user!(
+                            "An executable named `{}` is not provided by package `{}`.",
+                            executable.to_string_lossy().cyan(),
+                            from.name.red()
+                        );
                         writeln!(
                             printer.stdout(),
                             "The following executables are provided by `{}`:",
@@ -204,17 +212,15 @@ pub(crate) async fn run(
 /// Return the entry points for the specified package.
 fn get_entrypoints(
     from: &PackageName,
-    environment: &PythonEnvironment,
+    site_packages: &SitePackages,
 ) -> Result<Vec<(String, PathBuf)>> {
-    let site_packages = SitePackages::from_environment(environment)?;
-
     let installed = site_packages.get_packages(from);
     let Some(installed_dist) = installed.first().copied() else {
         bail!("Expected at least one requirement")
     };
 
     Ok(entrypoint_paths(
-        environment,
+        site_packages,
         installed_dist.name(),
         installed_dist.version(),
     )?)
@@ -226,51 +232,44 @@ fn get_entrypoints(
 fn warn_executable_not_provided_by_package(
     executable: &str,
     from_package: &PackageName,
-    environment: &PythonEnvironment,
+    site_packages: &SitePackages,
     invocation_source: &ToolRunCommand,
 ) {
-    if let Ok(packages) = matching_packages(executable, environment) {
-        if !packages
-            .iter()
-            .any(|package| package.name() == from_package)
-        {
-            match packages.as_slice() {
-                [] => {
-                    warn_user!(
-                        "An executable named `{}` is not provided by package `{}`.",
-                        executable.cyan(),
-                        from_package.red()
-                    );
-                }
-                [package] => {
-                    let suggested_command = format!(
-                        "{invocation_source} --from {} {}",
-                        package.name(),
-                        executable
-                    );
-                    warn_user!(
-                        "An executable named `{}` is not provided by package `{}` but is available via the dependency `{}`. Consider using `{}` instead.",
-                        executable.cyan(),
-                        from_package.cyan(),
-                        package.name().cyan(),
-                        suggested_command.green()
-                    );
-                }
-                packages => {
-                    let suggested_command = format!("{invocation_source} --from PKG {executable}");
-                    let provided_by = packages
-                        .iter()
-                        .map(distribution_types::Name::name)
-                        .map(|name| format!("- {}", name.cyan()))
-                        .join("\n");
-                    warn_user!(
-                        "An executable named `{}` is not provided by package `{}` but is available via the following dependencies:\n- {}\nConsider using `{}` instead.",
-                        executable.cyan(),
-                        from_package.cyan(),
-                        provided_by,
-                        suggested_command.green(),
-                    );
-                }
+    let packages = matching_packages(executable, site_packages);
+    if !packages
+        .iter()
+        .any(|package| package.name() == from_package)
+    {
+        match packages.as_slice() {
+            [] => {}
+            [package] => {
+                let suggested_command = format!(
+                    "{invocation_source} --from {} {}",
+                    package.name(),
+                    executable
+                );
+                warn_user!(
+                    "An executable named `{}` is not provided by package `{}` but is available via the dependency `{}`. Consider using `{}` instead.",
+                    executable.cyan(),
+                    from_package.cyan(),
+                    package.name().cyan(),
+                    suggested_command.green()
+                );
+            }
+            packages => {
+                let suggested_command = format!("{invocation_source} --from PKG {executable}");
+                let provided_by = packages
+                    .iter()
+                    .map(distribution_types::Name::name)
+                    .map(|name| format!("- {}", name.cyan()))
+                    .join("\n");
+                warn_user!(
+                    "An executable named `{}` is not provided by package `{}` but is available via the following dependencies:\n- {}\nConsider using `{}` instead.",
+                    executable.cyan(),
+                    from_package.cyan(),
+                    provided_by,
+                    suggested_command.green(),
+                );
             }
         }
     }
@@ -321,7 +320,7 @@ async fn get_or_create_environment(
 
     // Resolve the `from` requirement.
     let from = {
-        project::resolve_names(
+        resolve_names(
             vec![RequirementsSpecification::parse_package(from)?],
             &interpreter,
             settings,
@@ -369,7 +368,7 @@ async fn get_or_create_environment(
     };
 
     // Check if the tool is already installed in a compatible environment.
-    if !isolated {
+    if !isolated && settings.reinstall.is_none() && settings.upgrade.is_none() {
         let installed_tools = InstalledTools::from_settings()?.init()?;
         let _lock = installed_tools.acquire_lock()?;
 

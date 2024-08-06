@@ -15,9 +15,9 @@ use uv_cache::Cache;
 use uv_client::{Connectivity, FlatIndexClient, RegistryClientBuilder};
 use uv_configuration::{Concurrency, ExtrasSpecification, PreviewMode, Reinstall, SetupPyStrategy};
 use uv_dispatch::BuildDispatch;
-use uv_distribution::DEV_DEPENDENCIES;
+use uv_fs::CWD;
 use uv_git::ResolvedRepositoryReference;
-use uv_normalize::PackageName;
+use uv_normalize::{PackageName, DEV_DEPENDENCIES};
 use uv_python::{Interpreter, PythonFetch, PythonPreference, PythonRequest};
 use uv_requirements::upgrade::{read_lock_requirements, LockedRequirements};
 use uv_resolver::{
@@ -61,8 +61,7 @@ pub(crate) async fn lock(
     }
 
     // Find the project requirements.
-    let workspace =
-        Workspace::discover(&std::env::current_dir()?, &DiscoveryOptions::default()).await?;
+    let workspace = Workspace::discover(&CWD, &DiscoveryOptions::default()).await?;
 
     // Find an interpreter for the project
     let interpreter = FoundInterpreter::discover(
@@ -228,8 +227,8 @@ async fn do_lock(
 
     // When locking, include the project itself (as editable).
     let requirements = workspace
-        .members_as_requirements()
-        .into_iter()
+        .members_requirements()
+        .chain(workspace.root_requirements())
         .map(UnresolvedRequirementSpecification::from)
         .collect::<Vec<_>>();
     let overrides = workspace
@@ -312,7 +311,7 @@ async fn do_lock(
         if lock.prerelease_mode() != options.prerelease_mode {
             let _ = writeln!(
                 printer.stderr(),
-                "Ignoring existing lockfile due to change in prerelease mode: `{}` vs. `{}`",
+                "Ignoring existing lockfile due to change in pre-release mode: `{}` vs. `{}`",
                 lock.prerelease_mode().cyan(),
                 options.prerelease_mode.cyan()
             );
@@ -379,6 +378,14 @@ async fn do_lock(
         }
     });
 
+    // When we run the same resolution from the lockfile again, we could get a different result the
+    // second time due to the preferences causing us to skip a fork point (see
+    // "preferences-dependent-forking" packse scenario). To avoid this, we store the forks in the
+    // lockfile. We read those after all the lockfile filters, to allow the forks to change when
+    // the environment changed, e.g. the python bound check above can lead to different forking.
+    let resolver_markers =
+        ResolverMarkers::universal(existing_lock.and_then(|lock| lock.fork_markers().clone()));
+
     let resolution = match existing_lock {
         None => None,
 
@@ -396,10 +403,13 @@ async fn do_lock(
             // Prefill the index with the lockfile metadata.
             let index = lock.to_index(workspace.install_path(), upgrade)?;
 
+            // TODO: read locked build constraints
+            let build_constraints = [];
             // Create a build dispatch.
             let build_dispatch = BuildDispatch::new(
                 &client,
                 cache,
+                &build_constraints,
                 interpreter,
                 index_locations,
                 &flat_index,
@@ -432,7 +442,7 @@ async fn do_lock(
                 &Reinstall::default(),
                 upgrade,
                 None,
-                ResolverMarkers::Universal,
+                resolver_markers.clone(),
                 python_requirement.clone(),
                 &client,
                 &flat_index,
@@ -472,10 +482,13 @@ async fn do_lock(
         None => {
             debug!("Starting clean resolution");
 
+            // TODO: read locked build constraints
+            let build_constraints = [];
             // Create a build dispatch.
             let build_dispatch = BuildDispatch::new(
                 &client,
                 cache,
+                &build_constraints,
                 interpreter,
                 index_locations,
                 &flat_index,
@@ -508,7 +521,7 @@ async fn do_lock(
                 &Reinstall::default(),
                 upgrade,
                 None,
-                ResolverMarkers::Universal,
+                resolver_markers,
                 python_requirement,
                 &client,
                 &flat_index,

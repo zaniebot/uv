@@ -19,8 +19,7 @@ use uv_fs::Simplified;
 use uv_installer::SitePackages;
 use uv_normalize::PackageName;
 use uv_python::{
-    EnvironmentPreference, PythonEnvironment, PythonFetch, PythonInstallation, PythonPreference,
-    PythonRequest,
+    EnvironmentPreference, PythonFetch, PythonInstallation, PythonPreference, PythonRequest,
 };
 use uv_requirements::{RequirementsSource, RequirementsSpecification};
 use uv_shell::Shell;
@@ -40,6 +39,7 @@ use crate::settings::ResolverInstallerSettings;
 /// Install a tool.
 pub(crate) async fn install(
     package: String,
+    editable: bool,
     from: Option<String>,
     with: &[RequirementsSource],
     python: Option<String>,
@@ -82,6 +82,9 @@ pub(crate) async fn install(
 
     // Initialize any shared state.
     let state = SharedState::default();
+    let client_builder = BaseClientBuilder::new()
+        .connectivity(connectivity)
+        .native_tls(native_tls);
 
     // Resolve the `from` requirement.
     let from = if let Some(from) = from {
@@ -91,9 +94,18 @@ pub(crate) async fn install(
             bail!("Package requirement (`{from}`) provided with `--from` conflicts with install request (`{package}`)", from = from.cyan(), package = package.cyan())
         };
 
+        let source = if editable {
+            RequirementsSource::Editable(from)
+        } else {
+            RequirementsSource::Package(from)
+        };
+        let requirements = RequirementsSpecification::from_source(&source, &client_builder)
+            .await?
+            .requirements;
+
         let from_requirement = {
             resolve_names(
-                vec![RequirementsSpecification::parse_package(&from)?],
+                requirements,
                 &interpreter,
                 &settings,
                 &state,
@@ -121,8 +133,17 @@ pub(crate) async fn install(
 
         from_requirement
     } else {
+        let source = if editable {
+            RequirementsSource::Editable(package.clone())
+        } else {
+            RequirementsSource::Package(package.clone())
+        };
+        let requirements = RequirementsSpecification::from_source(&source, &client_builder)
+            .await?
+            .requirements;
+
         resolve_names(
-            vec![RequirementsSpecification::parse_package(&package)?],
+            requirements,
             &interpreter,
             &settings,
             &state,
@@ -139,12 +160,7 @@ pub(crate) async fn install(
     };
 
     // Read the `--with` requirements.
-    let spec = {
-        let client_builder = BaseClientBuilder::new()
-            .connectivity(connectivity)
-            .native_tls(native_tls);
-        RequirementsSpecification::from_simple_sources(with, &client_builder).await?
-    };
+    let spec = RequirementsSpecification::from_simple_sources(with, &client_builder).await?;
 
     // Resolve the `--from` and `--with` requirements.
     let requirements = {
@@ -179,10 +195,10 @@ pub(crate) async fn install(
     //
     // (If we find existing entrypoints later on, and the tool _doesn't_ exist, we'll avoid removing
     // the external tool's entrypoints (without `--force`).)
-    let (existing_tool_receipt, reinstall_entry_points) =
+    let (existing_tool_receipt, invalid_tool_receipt) =
         match installed_tools.get_tool_receipt(&from.name) {
             Ok(None) => (None, false),
-            Ok(Some(receipt)) => (Some(receipt), true),
+            Ok(Some(receipt)) => (Some(receipt), false),
             Err(_) => {
                 // If the tool is not installed properly, remove the environment and continue.
                 match installed_tools.remove_environment(&from.name) {
@@ -223,12 +239,7 @@ pub(crate) async fn install(
     // If the requested and receipt requirements are the same...
     if existing_environment.is_some() {
         if let Some(tool_receipt) = existing_tool_receipt.as_ref() {
-            let receipt = tool_receipt
-                .requirements()
-                .iter()
-                .cloned()
-                .map(Requirement::from)
-                .collect::<Vec<_>>();
+            let receipt = tool_receipt.requirements().to_vec();
             if requirements == receipt {
                 // And the user didn't request a reinstall or upgrade...
                 if !force && settings.reinstall.is_none() && settings.upgrade.is_none() {
@@ -259,7 +270,7 @@ pub(crate) async fn install(
     // entrypoints always contain an absolute path to the relevant Python interpreter, which would
     // be invalidated by moving the environment.
     let environment = if let Some(environment) = existing_environment {
-        update_environment(
+        let environment = update_environment(
             environment,
             spec,
             &settings,
@@ -271,7 +282,15 @@ pub(crate) async fn install(
             cache,
             printer,
         )
-        .await?
+        .await?;
+
+        // At this point, we updated the existing environment, so we should remove any of its
+        // existing executables.
+        if let Some(existing_receipt) = existing_tool_receipt {
+            remove_entrypoints(&existing_receipt);
+        }
+
+        environment
     } else {
         // If we're creating a new environment, ensure that we can resolve the requirements prior
         // to removing any existing tools.
@@ -290,6 +309,12 @@ pub(crate) async fn install(
         .await?;
 
         let environment = installed_tools.create_environment(&from.name, interpreter)?;
+
+        // At this point, we removed any existing environment, so we should remove any of its
+        // executables.
+        if let Some(existing_receipt) = existing_tool_receipt {
+            remove_entrypoints(&existing_receipt);
+        }
 
         // Sync the environment with the resolved requirements.
         sync_environment(
@@ -324,7 +349,7 @@ pub(crate) async fn install(
     );
 
     let entry_points = entrypoint_paths(
-        &environment,
+        &site_packages,
         installed_dist.name(),
         installed_dist.version(),
     )?;
@@ -351,10 +376,11 @@ pub(crate) async fn install(
             from = from.name.cyan()
         )?;
 
-        hint_executable_from_dependency(&from, &environment, printer)?;
+        hint_executable_from_dependency(&from, &site_packages, printer)?;
 
-        // Clean up the environment we just created
+        // Clean up the environment we just created.
         installed_tools.remove_environment(&from.name)?;
+
         return Ok(ExitStatus::Failure);
     }
 
@@ -364,9 +390,9 @@ pub(crate) async fn install(
         .filter(|(_, _, target_path)| target_path.exists())
         .peekable();
 
-    // Note we use `reinstall_entry_points` here instead of `reinstall`; requesting reinstall
-    // will _not_ remove existing entry points when they are not managed by uv.
-    if force || reinstall_entry_points {
+    // Ignore any existing entrypoints if the user passed `--force`, or the existing recept was
+    // broken.
+    if force || invalid_tool_receipt {
         for (name, _, target) in existing_entry_points {
             debug!("Removing existing executable: `{name}`");
             fs_err::remove_file(target)?;
@@ -418,10 +444,7 @@ pub(crate) async fn install(
 
     debug!("Adding receipt for tool `{}`", from.name);
     let tool = Tool::new(
-        requirements
-            .into_iter()
-            .map(pep508_rs::Requirement::from)
-            .collect(),
+        requirements.into_iter().collect(),
         python,
         target_entry_points
             .into_iter()
@@ -464,43 +487,56 @@ pub(crate) async fn install(
     Ok(ExitStatus::Success)
 }
 
+/// Remove any entrypoints attached to the [`Tool`].
+fn remove_entrypoints(tool: &Tool) {
+    for executable in tool
+        .entrypoints()
+        .iter()
+        .map(|entrypoint| &entrypoint.install_path)
+    {
+        debug!("Removing executable: `{}`", executable.simplified_display());
+        if let Err(err) = fs_err::remove_file(executable) {
+            warn!(
+                "Failed to remove executable: `{}`: {err}",
+                executable.simplified_display()
+            );
+        }
+    }
+}
+
 /// Displays a hint if an executable matching the package name can be found in a dependency of the package.
 fn hint_executable_from_dependency(
     from: &Requirement,
-    environment: &PythonEnvironment,
+    site_packages: &SitePackages,
     printer: Printer,
 ) -> Result<()> {
-    match matching_packages(from.name.as_ref(), environment) {
-        Ok(packages) => match packages.as_slice() {
-            [] => {}
-            [package] => {
-                let command = format!("uv tool install {}", package.name());
-                writeln!(
-                        printer.stdout(),
-                        "However, an executable with the name `{}` is available via dependency `{}`.\nDid you mean `{}`?",
-                        from.name.cyan(),
-                        package.name().cyan(),
-                        command.bold(),
-                    )?;
-            }
-            packages => {
-                writeln!(
+    let packages = matching_packages(from.name.as_ref(), site_packages);
+    match packages.as_slice() {
+        [] => {}
+        [package] => {
+            let command = format!("uv tool install {}", package.name());
+            writeln!(
+                    printer.stdout(),
+                    "However, an executable with the name `{}` is available via dependency `{}`.\nDid you mean `{}`?",
+                    from.name.cyan(),
+                    package.name().cyan(),
+                    command.bold(),
+                )?;
+        }
+        packages => {
+            writeln!(
                     printer.stdout(),
                     "However, an executable with the name `{}` is available via the following dependencies::",
                     from.name.cyan(),
                 )?;
 
-                for package in packages {
-                    writeln!(printer.stdout(), "- {}", package.name().cyan())?;
-                }
-                writeln!(
-                    printer.stdout(),
-                    "Did you mean to install one of them instead?"
-                )?;
+            for package in packages {
+                writeln!(printer.stdout(), "- {}", package.name().cyan())?;
             }
-        },
-        Err(err) => {
-            warn!("Failed to determine executables for packages: {err}");
+            writeln!(
+                printer.stdout(),
+                "Did you mean to install one of them instead?"
+            )?;
         }
     }
 
