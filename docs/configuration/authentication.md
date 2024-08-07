@@ -52,7 +52,7 @@ Authentication may be used for hosts specified in the following contexts:
 - `find-links`
 - `package @ https://...`
 
-See the [`pip` compatibility guide](../pip/compatibility.md#registry-authentication) for details on
+See the [`pip` compatibility guide](/uv/pip/compatibility.md#registry-authentication) for details on
 differences from `pip`.
 
 ## Custom CA certificates
@@ -76,5 +76,5 @@ key.
 
 ## Authentication with alternative package indexes
 
-See the [alternative indexes integration guide](../guides/integration/alternative-indexes.md) for
+See the [alternative indexes integration guide](/uv/guides/integration/alternative-indexes.md) for
 details on authentication with popular alternative Python package indexes.

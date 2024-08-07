@@ -20,14 +20,14 @@ An extremely fast Python package and project manager, written in Rust.
 - ⚡️ [10-100x faster](https://github.com/astral-sh/uv/blob/main/BENCHMARKS.md) than `pip`.
 - 🐍 [Installs and manages](#python-management) Python versions.
 - 🛠️ [Runs and installs](#tool-management) Python applications.
-- ❇️ [Runs scripts](./guides/scripts.md), with support for
-  [inline dependency metadata](./guides/scripts.md#declaring-script-dependencies).
+- ❇️ [Runs scripts](/uv/guides/scripts.md), with support for
+  [inline dependency metadata](/uv/guides/scripts.md#declaring-script-dependencies).
 - 🗂️ Provides [comprehensive project management](#project-management), with a
-  [universal lockfile](./concepts/projects.md#lockfile).
+  [universal lockfile](/uv/concepts/projects.md#lockfile).
 - 🔩 Includes a [pip-compatible interface](#the-pip-interface) for a performance boost with a
   familiar CLI.
-- 🏢 Supports Cargo-style [workspaces](./concepts/workspaces.md) for scalable projects.
-- 💾 Disk-space efficient, with a [global cache](./concepts/cache.md) for dependency deduplication.
+- 🏢 Supports Cargo-style [workspaces](/uv/concepts/workspaces.md) for scalable projects.
+- 💾 Disk-space efficient, with a [global cache](/uv/concepts/cache.md) for dependency deduplication.
 - ⏬ Installable without Rust or Python via `curl` or `pip`.
 - 🖥️ Supports macOS, Linux, and Windows.
 
@@ -46,12 +46,12 @@ $ curl -LsSf https://astral.sh/uv/install.sh | sh
 $ powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
 ```
 
-Then, check out the [first steps](./first-steps.md) or read on for a brief overview.
+Then, check out the [first steps](/uv/first-steps.md) or read on for a brief overview.
 
 !!! tip
 
     uv may also be installed with pip, Homebrew, and more. See all of the methods on the
-    [installation page](./installation.md).
+    [installation page](/uv/installation.md).
 
 ## Project management
 
@@ -77,7 +77,7 @@ $ uv run ruff check
 All checks passed!
 ```
 
-See the [project guide](./guides/projects.md) to get started.
+See the [project guide](/uv/guides/projects.md) to get started.
 
 ## Tool management
 
@@ -115,7 +115,7 @@ $ ruff --version
 ruff 0.5.4
 ```
 
-See the [tools guide](./guides/tools.md) to get started.
+See the [tools guide](/uv/guides/tools.md) to get started.
 
 ## Python management
 
@@ -156,7 +156,7 @@ $ uv python pin pypy@3.11
 Pinned `.python-version` to `pypy@3.11`
 ```
 
-See the [installing Python guide](./guides/install-python.md) to get started.
+See the [installing Python guide](/uv/guides/install-python.md) to get started.
 
 ## The pip interface
 
@@ -199,9 +199,9 @@ Installed 43 packages in 208ms
  ...
 ```
 
-See the [pip interface documentation](./pip/index.md) to get started.
+See the [pip interface documentation](/uv/pip/index.md) to get started.
 
 ## Learn more
 
-See the [first steps](./first-steps.md) or jump straight to the [guides](./guides/index.md) to start
+See the [first steps](/uv/first-steps.md) or jump straight to the [guides](./guides/index.md) to start
 using uv.

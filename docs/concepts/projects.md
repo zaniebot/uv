@@ -4,7 +4,7 @@ Python projects help manage Python applications spanning multiple files.
 
 !!! tip
 
-    Looking for an introduction to creating a project with uv? See the [projects guide](../guides/projects.md) first.
+    Looking for an introduction to creating a project with uv? See the [projects guide](/uv/guides/projects.md) first.
 
 ## Project metadata
 
@@ -33,7 +33,7 @@ versions of dependencies which can be used (they must support the same Python ra
 
 The `pyproject.toml` also lists dependencies of the project. uv supports modifying the standard
 dependency list from the command line with `uv add` and `uv remove`. uv also supports
-[extended package sources](./dependencies.md) for advanced users.
+[extended package sources](/uv/concepts/dependencies.md) for advanced users.
 
 !!! tip
 
@@ -56,7 +56,7 @@ it is up to date if it exists. The project environment can also be explicitly cr
 
 It is _not_ recommended to modify the project environment manually, e.g., with `uv pip install`. For
 project dependencies, use `uv add` to add a package to the environment. For one-off requirements,
-use [`uvx`](../guides/tools.md) or
+use [`uvx`](/uv/guides/tools.md) or
 [`uv run --with`](#running-commands-with-additional-dependencies).
 
 ## Lockfile
@@ -97,11 +97,11 @@ To add a dependency:
 $ uv add httpx
 ```
 
-uv supports adding [editable dependencies](./dependencies.md#editable-dependencies),
-[development dependencies](./dependencies.md#development-dependencies),
-[optional dependencies](./dependencies.md#optional-dependencies), and alternative
-[dependency sources](./dependencies.md#dependency-sources). See the
-[dependency specification](./dependencies.md) documentation for more details.
+uv supports adding [editable dependencies](/uv/concepts/dependencies.md#editable-dependencies),
+[development dependencies](/uv/concepts/dependencies.md#development-dependencies),
+[optional dependencies](/uv/concepts/dependencies.md#optional-dependencies), and alternative
+[dependency sources](/uv/concepts/dependencies.md#dependency-sources). See the
+[dependency specification](/uv/concepts/dependencies.md) documentation for more details.
 
 uv will raise an error if the dependency cannot be resolved, e.g.:
 
@@ -179,7 +179,7 @@ if the project requires `httpx==0.24.0`, the output above would be the same.
 ### Running scripts
 
 Scripts that declare inline metadata are automatically executed in environments isolated from the
-project. See the [scripts guide](../guides/scripts.md#declaring-script-dependencies) for more
+project. See the [scripts guide](/uv/guides/scripts.md#declaring-script-dependencies) for more
 details.
 
 For example, given a script:
@@ -203,5 +203,5 @@ dependencies listed.
 
 ## Projects with many packages
 
-If working in a project composed of many packages, see the [workspaces](./workspaces.md)
+If working in a project composed of many packages, see the [workspaces](/uv/concepts/workspaces.md)
 documentation.

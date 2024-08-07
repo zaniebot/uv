@@ -57,7 +57,7 @@ $ # Install a branch
 $ uv pip install "git+https://github.com/astral-sh/ruff@main"
 ```
 
-See the [Git authentication](../configuration/authentication.md#git-authentication) documentation
+See the [Git authentication](/uv/configuration/authentication.md#git-authentication) documentation
 for installation from a private repository.
 
 ## Editable packages
@@ -86,7 +86,7 @@ Install from a `requirements.txt` file:
 $ uv pip install -r requirements.txt
 ```
 
-See the [`uv pip compile`](./compile.md) documentation for more information on `requirements.txt`
+See the [`uv pip compile`](/uv/pip/compile.md) documentation for more information on `requirements.txt`
 files.
 
 Install from a `pyproject.toml` file:

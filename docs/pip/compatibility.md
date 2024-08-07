@@ -190,7 +190,7 @@ Python, which can lead to breakages and other complications, and should only be 
 circumstances.
 
 For more, see
-["Using arbitrary Python environments"](./environments.md#using-arbitrary-python-environments).
+["Using arbitrary Python environments"](/uv/pip/environments.md#using-arbitrary-python-environments).
 
 ## Resolution strategy
 

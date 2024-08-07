@@ -8,7 +8,7 @@ environment is still used but it is not treated as disposable.
 
 !!! note
 
-    See the [tools guide](../guides/tools.md) for an introduction to working with the tools
+    See the [tools guide](/uv/guides/tools.md) for an introduction to working with the tools
     interface — this document discusses details of tool management.
 
 ## Tool environments

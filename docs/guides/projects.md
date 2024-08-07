@@ -41,7 +41,7 @@ If you are migrating from an alternative Python package manager, you may need to
 `pyproject.toml` manually before using uv. Most Python package managers extend the `pyproject.toml`
 standard to support common features, such as development dependencies. These extensions are specific
 to each package manager and will need to be converted to uv's format. See the documentation on
-[project dependencies](../concepts/dependencies.md) for more details.
+[project dependencies](/uv/concepts/dependencies.md) for more details.
 
 ## Project structure
 
@@ -79,7 +79,7 @@ your project through the CLI.
 The `.venv` folder contains your project's virtual environment, a Python environment that is
 isolated from the rest of your system. This is where uv will install your project's dependencies.
 
-See the [project environment](../concepts/projects.md#project-environments) documentation for more
+See the [project environment](/uv/concepts/projects.md#project-environments) documentation for more
 details.
 
 ### `uv.lock`
@@ -92,7 +92,7 @@ reproducible installations across machines.
 
 `uv.lock` is a human-readable TOML file but is managed by uv and should not be edited manually.
 
-See the [lockfile](../concepts/projects.md#lock-file) documentation for more details.
+See the [lockfile](/uv/concepts/projects.md#lock-file) documentation for more details.
 
 ## Managing dependencies
 
@@ -119,7 +119,7 @@ To remove a package, you can use `uv remove`:
 $ uv remove requests
 ```
 
-See the documentation on [managing dependencies](../concepts/projects.md#managing-dependencies) for
+See the documentation on [managing dependencies](/uv/concepts/projects.md#managing-dependencies) for
 more details.
 
 ## Running commands
@@ -165,12 +165,12 @@ $ python example.py
 
     The virtual environment must be active to run scripts and commands in the project without `uv run`. Virtual environment activation differs per shell and platform.
 
-See the documentation on [running commands](../concepts/projects.md#running-commands) and
-[running scripts](../concepts/projects.md#running-scripts) in projects for more details.
+See the documentation on [running commands](/uv/concepts/projects.md#running-commands) and
+[running scripts](/uv/concepts/projects.md#running-scripts) in projects for more details.
 
 ## Next steps
 
-To learn more about working on projects with uv, see the [Projects concept](../concepts/projects.md)
-page and the [command reference](../reference/cli.md#uv).
+To learn more about working on projects with uv, see the [Projects concept](/uv/concepts/projects.md)
+page and the [command reference](/uv/reference/cli.md#uv).
 
-Or, read on to learn how to [publish your project as a package](./publish.md).
+Or, read on to learn how to [publish your project as a package](/uv/guides/publish.md).

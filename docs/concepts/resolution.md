@@ -86,10 +86,10 @@ uv supports both [platform-specific](#platform-specific-resolution) and
 uv's lockfile (`uv.lock`) is created with a universal resolution and is portable across platforms.
 This ensures that dependencies are locked for everyone working on the project, regardless of
 operating system, architecture, and Python version. The uv lockfile is created and modified by
-[project](../concepts/projects.md) commands such as `uv lock`, `uv sync`, and `uv add`.
+[project](/uv/concepts/projects.md) commands such as `uv lock`, `uv sync`, and `uv add`.
 
 universal resolution is also available in uv's pip interface, i.e.,
-[`uv pip compile`](../pip/compile.md), with the `--universal` flag. The resulting requirements file
+[`uv pip compile`](/uv/pip/compile.md), with the `--universal` flag. The resulting requirements file
 will contain markers to indicate which platform each dependency is relevant for.
 
 During universal resolution, a package may be listed multiple times with different versions or URLs
@@ -111,7 +111,7 @@ the lower bound of any Python requirement, upper bounds are always ignored.
 
 ## Platform-specific resolution
 
-By default, uv's pip interface, i.e., [`uv pip compile`](../pip/compile.md), produces a resolution
+By default, uv's pip interface, i.e., [`uv pip compile`](/uv/pip/compile.md), produces a resolution
 that is platform-specific, like `pip-tools`. There is no way to use platform-specific resolution in
 the uv's project interface.
 
@@ -223,7 +223,7 @@ model, and are a frequent source of bugs in other packaging tools. uv's pre-rele
 _intentionally_ limited and requires user opt-in for pre-releases to ensure correctness.
 
 For more details, see
-[Pre-release compatibility](../pip/compatibility.md#pre-release-compatibility).
+[Pre-release compatibility](/uv/pip/compatibility.md#pre-release-compatibility).
 
 ## Dependency constraints
 
@@ -277,4 +277,4 @@ as if they do not exist.
 ## Learn more
 
 For more details about the internals of the resolver, see the
-[resolver reference](../reference/resolver-internals.md) documentation.
+[resolver reference](/uv/reference/resolver-internals.md) documentation.

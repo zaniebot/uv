@@ -64,7 +64,7 @@ $ # Note, it is important that the flag comes _before_ the script
 $ uv run --no-project example.py
 ```
 
-See the [projects guide](./projects.md) for more details on working in projects.
+See the [projects guide](/uv/guides/projects.md) for more details on working in projects.
 
 ## Running a script with dependencies
 
@@ -72,7 +72,7 @@ When your script requires other packages, they must be installed into the enviro
 script runs in. uv prefers to create these environments on-demand instead of using a long-lived
 virtual environment with manually managed dependencies. This requires explicit declaration of
 dependencies that are required for the script. Generally, it's recommended to use a
-[project](./projects.md) or [inline metadata](#declaring-script-dependencies) to declare
+[project](/uv/guides/projects.md) or [inline metadata](#declaring-script-dependencies) to declare
 dependencies, but uv supports requesting dependencies per invocation as well.
 
 For example, the following script requires `rich`.
@@ -158,7 +158,7 @@ $ uv run example.py
 
 !!! important
 
-    When using inline script metadata, even if `uv run` is [used in a _project_](../concepts/projects.md#running-scripts), the project's dependencies will be ignored. The `--no-project` flag is not required.
+    When using inline script metadata, even if `uv run` is [used in a _project_](/uv/concepts/projects.md#running-scripts), the project's dependencies will be ignored. The `--no-project` flag is not required.
 
 uv also respects Python version requirements:
 
@@ -178,7 +178,7 @@ print(Point)
     The `dependencies` field must be provided even if empty.
 
 `uv run` will search for and use the required Python version. The Python version will download if it
-is not installed — see the documentation on [Python versions](../concepts/python-versions.md) for
+is not installed — see the documentation on [Python versions](/uv/concepts/python-versions.md) for
 more details.
 
 ## Using different Python versions
@@ -203,11 +203,11 @@ $ uv run --python 3.10 example.py
 3.10.13
 ```
 
-See the [Python version request](../concepts/python-versions.md#requesting-a-version) documentation
+See the [Python version request](/uv/concepts/python-versions.md#requesting-a-version) documentation
 for more details on requesting Python versions.
 
 ## Next steps
 
-To learn more about `uv run`, see the [command reference](../reference/cli.md#uv-run).
+To learn more about `uv run`, see the [command reference](/uv/reference/cli.md#uv-run).
 
-Or, read on to learn how to [run and install tools](./tools.md) with uv.
+Or, read on to learn how to [run and install tools](/uv/guides/tools.md) with uv.

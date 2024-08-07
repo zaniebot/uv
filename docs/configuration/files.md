@@ -46,4 +46,4 @@ configuration files (e.g., user-level configuration will be ignored).
 
 ## Settings
 
-See the [settings reference](../reference/settings.md) for an enumeration of the available settings.
+See the [settings reference](/uv/reference/settings.md) for an enumeration of the available settings.

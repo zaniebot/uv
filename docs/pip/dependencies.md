@@ -1,7 +1,7 @@
 # Declaring dependencies
 
 It is best practice to declare dependencies in a static file instead of modifying environments with
-ad-hoc installations. Once dependencies are defined, they can be [locked](./compile.md) to create a
+ad-hoc installations. Once dependencies are defined, they can be [locked](/uv/pip/compile.md) to create a
 consistent, reproducible environment.
 
 ## Using `pyproject.toml`
@@ -30,7 +30,7 @@ cli = [
 
 Each of the keys defines an "extra", which can be installed using the `--extra` and `--all-extras`
 flags or `package[<extra>]` syntax. See the documentation on
-[installing packages](./packages.md#installing-packages-from-files) for more details.
+[installing packages](/uv/pip/packages.md#installing-packages-from-files) for more details.
 
 See the official
 [`pyproject.toml` guide](https://packaging.python.org/en/latest/guides/writing-pyproject-toml/) for

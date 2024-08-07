@@ -23,7 +23,7 @@ system. If you've previously installed Python with uv, a new version will not be
 
 !!! note
 
-    Python does not publish official distributable binaries. As such, uv uses third-party distributions from the [`python-build-standalone`](https://github.com/indygreg/python-build-standalone) project. The project is partially maintained by the uv maintainers and is used by other prominent Python projects (e.g., [Rye](https://github.com/astral-sh/rye), [Bazel](https://github.com/bazelbuild/rules_python)). See the [Python distributions](../concepts/python-versions.md#python-distributions) documentation for more details.
+    Python does not publish official distributable binaries. As such, uv uses third-party distributions from the [`python-build-standalone`](https://github.com/indygreg/python-build-standalone) project. The project is partially maintained by the uv maintainers and is used by other prominent Python projects (e.g., [Rye](https://github.com/astral-sh/rye), [Bazel](https://github.com/bazelbuild/rules_python)). See the [Python distributions](/uv/concepts/python-versions.md#python-distributions) documentation for more details.
 
 <!-- TODO(zanieb): Restore when Python shim management is added
 Note that when an automatic Python installation occurs, the `python` command will not be added to the shell. Use `uv python install-shim` to ensure the `python` shim is installed.
@@ -43,8 +43,8 @@ Once Python is installed, it will be used by `uv` commands automatically.
 
     When Python is installed by uv, it will not be available globally (i.e. via the `python` command).
     Support for this feature is planned for a future release. In the meantime, use
-    [`uv run`](../guides/scripts.md#using-different-python-versions) or
-    [create and activate a virtual environment](../pip/environments.md) to use `python` directly.
+    [`uv run`](/uv/guides/scripts.md#using-different-python-versions) or
+    [create and activate a virtual environment](/uv/pip/environments.md) to use `python` directly.
 
 ## Installing a specific version
 
@@ -66,7 +66,7 @@ To install an alternative Python implementation, e.g. PyPy:
 $ uv python install pypy@3.12
 ```
 
-See the [`python install`](../concepts/python-versions.md#installing-a-python-version) documentation
+See the [`python install`](/uv/concepts/python-versions.md#installing-a-python-version) documentation
 for more details.
 
 ## Viewing Python installations
@@ -77,7 +77,7 @@ To view available and installed Python versions:
 $ uv python list
 ```
 
-See the [`python list`](../concepts/python-versions.md#viewing-available-python-versions)
+See the [`python list`](/uv/concepts/python-versions.md#viewing-available-python-versions)
 documentation for more details.
 
 <!--TODO(zanieb): The above should probably link to a CLI reference and that content should be moved out of that file -->
@@ -102,7 +102,7 @@ $ uv venv
 
 !!! tip
 
-    Automatic Python downloads can be [easily disabled](../concepts/python-versions.md#disabling-automatic-python-downloads) if you want more control over when Python is downloaded.
+    Automatic Python downloads can be [easily disabled](/uv/concepts/python-versions.md#disabling-automatic-python-downloads) if you want more control over when Python is downloaded.
 
 <!-- TODO(zanieb): Restore when Python shim management is added
 Note that when an automatic Python installation occurs, the `python` command will not be added to the shell. Use `uv python install-shim` to ensure the `python` shim is installed.
@@ -112,16 +112,16 @@ Note that when an automatic Python installation occurs, the `python` command wil
 
 uv will use existing Python installations if present on your system. There is no configuration
 necessary for this behavior: uv will use the system Python if it satisfies the requirements of the
-command invocation. See the [Python discovery](../concepts/python-versions.md#discovery-order)
+command invocation. See the [Python discovery](/uv/concepts/python-versions.md#discovery-order)
 documentation for details.
 
 To force uv to use the system Python, provide the `--python-preference only-system` option. See the
-[Python version preference](../concepts/python-versions.md#adjusting-python-version-preferences)
+[Python version preference](/uv/concepts/python-versions.md#adjusting-python-version-preferences)
 documentation for more details.
 
 ## Next steps
 
-To learn more about `uv python`, see the [Python version concept](../concepts/python-versions.md)
-page and the [command reference](../reference/cli.md#uv-python).
+To learn more about `uv python`, see the [Python version concept](/uv/concepts/python-versions.md)
+page and the [command reference](/uv/reference/cli.md#uv-python).
 
-Or, read on to learn how to [run scripts](./scripts.md) and invoke Python with uv.
+Or, read on to learn how to [run scripts](/uv/guides/scripts.md) and invoke Python with uv.

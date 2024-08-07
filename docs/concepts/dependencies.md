@@ -191,7 +191,7 @@ $ uv add ~/projects/bar/
     $ uv add --editable ~/projects/bar/
     ```
 
-    However, it is recommended to use [_workspaces_](./workspaces.md) instead of manual path
+    However, it is recommended to use [_workspaces_](/uv/concepts/workspaces.md) instead of manual path
     dependencies.
 
 ### Workspace member
@@ -199,7 +199,7 @@ $ uv add ~/projects/bar/
 To declare a dependency on a workspace member, add the member name with `{ workspace = true }`. All
 workspace members must be explicitly stated. Workspace members are
 [editable](#editable-dependencies) by default; `editable = false` may be included to install them as
-regular dependencies. See the [workspace](./workspaces.md) documentation for more details on
+regular dependencies. See the [workspace](/uv/concepts/workspaces.md) documentation for more details on
 workspaces.
 
 ```toml title="pyproject.toml"
