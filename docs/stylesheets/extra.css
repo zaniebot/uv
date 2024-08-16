@@ -161,6 +161,9 @@ See https://github.com/astral-sh/uv/issues/5130 */
 .md-nav__item--section > .md-nav > .md-nav__list > .md-nav__item {
   font-size: 14px;
   font-weight: normal;
+
+  /* Indent nested nav items */
+  padding: 0 .6rem;
 }
 
 /* Bold the active nav link for accessibility */
