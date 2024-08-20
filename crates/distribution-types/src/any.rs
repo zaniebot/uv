@@ -5,7 +5,7 @@ use crate::installed::InstalledDist;
 use crate::{InstalledMetadata, InstalledVersion, Name};
 
 /// A distribution which is either installable, is a wheel in our cache or is already installed.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 #[allow(clippy::large_enum_variant)]
 pub enum LocalDist<'a> {
     Cached(&'a CachedDist),
@@ -39,5 +39,19 @@ impl<'a> From<&'a CachedDist> for LocalDist<'a> {
 impl<'a> From<&'a InstalledDist> for LocalDist<'a> {
     fn from(dist: &'a InstalledDist) -> Self {
         Self::Installed(dist)
+    }
+}
+
+impl Ord for LocalDist<'_> {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.name()
+            .cmp(other.name())
+            .then_with(|| self.installed_version().cmp(&other.installed_version()))
+    }
+}
+
+impl PartialOrd for LocalDist<'_> {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
     }
 }

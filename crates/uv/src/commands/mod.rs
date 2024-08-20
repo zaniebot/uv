@@ -115,8 +115,8 @@ pub(super) enum ChangeEventKind {
     Added,
 }
 
-#[derive(Debug)]
-pub(super) struct ChangeEvent<T: InstalledMetadata> {
+#[derive(Debug, Ord, Eq, PartialEq, PartialOrd)]
+pub(super) struct ChangeEvent<T: InstalledMetadata + Ord> {
     dist: T,
     kind: ChangeEventKind,
 }

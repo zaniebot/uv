@@ -3,13 +3,14 @@
 use anyhow::{anyhow, Context};
 use itertools::Itertools;
 use owo_colors::OwoColorize;
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashSet};
 use std::fmt::Write;
 use std::path::PathBuf;
 use tracing::debug;
 
 use distribution_types::{
-    CachedDist, Diagnostic, InstalledDist, ResolutionDiagnostic, UnresolvedRequirementSpecification,
+    CachedDist, Diagnostic, InstalledDist, LocalDist, ResolutionDiagnostic,
+    UnresolvedRequirementSpecification,
 };
 use distribution_types::{
     DistributionMetadata, IndexLocations, InstalledMetadata, Name, Resolution,
@@ -42,7 +43,7 @@ use uv_warnings::warn_user;
 
 use crate::commands::pip::loggers::{InstallLogger, ResolveLogger};
 use crate::commands::reporters::{InstallReporter, PrepareReporter, ResolverReporter};
-use crate::commands::{compile_bytecode, elapsed, ChangeEventKind, DryRunEvent};
+use crate::commands::{compile_bytecode, elapsed, ChangeEvent, ChangeEventKind, DryRunEvent};
 use crate::printer::Printer;
 
 /// Consolidate the requirements for an installation.
@@ -289,17 +290,43 @@ pub(crate) enum Modifications {
 #[derive(Debug, Clone, Default)]
 pub(crate) struct Changelog {
     /// The distributions that were installed.
-    pub(crate) installed: Vec<CachedDist>,
+    pub(crate) installed: BTreeSet<ChangeEvent>,
     /// The distributions that were uninstalled.
-    pub(crate) uninstalled: Vec<InstalledDist>,
+    pub(crate) uninstalled: BTreeSet<ChangeEvent>,
 }
 
 impl Changelog {
-    /// Create a [`Changelog`] from a list of installed distributions.
-    pub(crate) fn from_installed(installed: Vec<CachedDist>) -> Self {
+    /// Create a [`Changelog`].
+    pub(crate) fn new(installed: Vec<CachedDist>, uninstalled: Vec<InstalledDist>) -> Self {
+        let uninstalled = uninstalled
+            .into_iter()
+            .map(|distribution| ChangeEvent {
+                dist: LocalDist::from(distribution),
+                kind: ChangeEventKind::Removed,
+            })
+            .collect::<BTreeSet<_>>();
+
+        let installed = installed.into_iter().map(|distribution| ChangeEvent {
+            dist: LocalDist::from(distribution),
+            kind: ChangeEventKind::Added,
+        });
+
+        let reinstalls = installed
+            .intersection(&uninstalled_set)
+            .cloned()
+            .collect::<BTreeSet<_>>();
+
         Self {
             installed,
-            uninstalled: vec![],
+            uninstalled,
+        }
+    }
+
+    /// Create a [`Changelog`] from a list of installed distributions.
+    pub(crate) fn from_installed(installed: BTreeSet<CachedDist>) -> Self {
+        Self {
+            installed,
+            uninstalled: BTreeSet::new(),
         }
     }
 
