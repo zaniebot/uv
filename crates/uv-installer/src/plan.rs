@@ -67,6 +67,7 @@ impl<'a> Planner<'a> {
         let mut cached = vec![];
         let mut remote = vec![];
         let mut reinstalls = vec![];
+        let mut upgrades = vec![];
         let mut extraneous = vec![];
         let mut seen = FxHashMap::with_capacity_and_hasher(self.requirements.len(), FxBuildHasher);
 
@@ -123,12 +124,12 @@ impl<'a> Planner<'a> {
                                 debug!("Requirement installed, but not fresh: {distribution}");
                             }
                         }
-                        reinstalls.push(distribution.clone());
+                        upgrades.push(distribution.clone());
                     }
                     // We reinstall installed distributions with multiple versions because
                     // we do not want to keep multiple incompatible versions but removing
                     // one version is likely to break another.
-                    _ => reinstalls.extend(installed_dists),
+                    _ => upgrades.extend(installed_dists),
                 }
             }
 
@@ -429,6 +430,7 @@ impl<'a> Planner<'a> {
             cached,
             remote,
             reinstalls,
+            upgrades,
             extraneous,
         })
     }
@@ -444,9 +446,13 @@ pub struct Plan {
     /// not available in the local cache.
     pub remote: Vec<Requirement>,
 
-    /// Any distributions that are already installed in the current environment, but will be
-    /// re-installed (including upgraded) to satisfy the requirements.
+    /// Distributions that are already installed in the current environment, but will be
+    /// re-installed with the same version to satisfy the requirements.
     pub reinstalls: Vec<InstalledDist>,
+
+    /// Distributions that are already installed in the current environment, but will be
+    /// installed at a different version to satisfy the requirements.
+    pub upgrades: Vec<InstalledDist>,
 
     /// Any distributions that are already installed in the current environment, and are
     /// _not_ necessary to satisfy the requirements.

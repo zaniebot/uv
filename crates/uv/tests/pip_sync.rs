@@ -548,7 +548,6 @@ fn upgrade() -> Result<()> {
     Prepared 1 package in [TIME]
     Uninstalled 1 package in [TIME]
     Installed 1 package in [TIME]
-     - tomli==2.0.0
      + tomli==2.0.1
     "###
     );
@@ -1992,7 +1991,11 @@ fn reinstall() -> Result<()> {
     Prepared 2 packages in [TIME]
     Uninstalled 2 packages in [TIME]
     Installed 2 packages in [TIME]
+     - markupsafe==2.1.3
+     + markupsafe==2.1.3
      ~ markupsafe==2.1.3
+     - tomli==2.0.1
+     + tomli==2.0.1
      ~ tomli==2.0.1
     "###
     );
@@ -2098,6 +2101,8 @@ fn reinstall_git() -> Result<()> {
     Prepared 1 package in [TIME]
     Uninstalled 1 package in [TIME]
     Installed 1 package in [TIME]
+     - uv-public-pypackage==0.1.0 (from git+https://github.com/astral-test/uv-public-pypackage@b270df1a2fb5d012294e9aaf05e7e0bab1e6a389)
+     + uv-public-pypackage==0.1.0 (from git+https://github.com/astral-test/uv-public-pypackage@b270df1a2fb5d012294e9aaf05e7e0bab1e6a389)
      ~ uv-public-pypackage==0.1.0 (from git+https://github.com/astral-test/uv-public-pypackage@b270df1a2fb5d012294e9aaf05e7e0bab1e6a389)
     "###
     );

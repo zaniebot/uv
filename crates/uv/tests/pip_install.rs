@@ -540,6 +540,7 @@ fn respect_installed_and_reinstall() -> Result<()> {
     Installed [N] packages in [TIME]
      - flask==2.3.3
      + flask==3.0.2
+     ~ flask==2.3.3
     "###
     );
 
@@ -562,6 +563,8 @@ fn respect_installed_and_reinstall() -> Result<()> {
     Prepared [N] packages in [TIME]
     Uninstalled [N] packages in [TIME]
     Installed [N] packages in [TIME]
+     - flask==3.0.2
+     + flask==3.0.2
      ~ flask==3.0.2
     "###
     );
@@ -1818,6 +1821,8 @@ fn reinstall_no_binary() {
     Prepared [N] packages in [TIME]
     Uninstalled [N] packages in [TIME]
     Installed [N] packages in [TIME]
+     - anyio==4.3.0
+     + anyio==4.3.0
      ~ anyio==4.3.0
     "###
     );
@@ -2267,7 +2272,6 @@ fn install_upgrade() {
     Prepared 1 package in [TIME]
     Uninstalled 1 package in [TIME]
     Installed 1 package in [TIME]
-     - anyio==3.6.2
      + anyio==4.3.0
     "###
     );
@@ -2315,7 +2319,6 @@ fn install_upgrade() {
     Prepared 1 package in [TIME]
     Uninstalled 1 package in [TIME]
     Installed 1 package in [TIME]
-     - httpcore==0.16.3
      + httpcore==1.0.4
     "###
     );
@@ -2847,6 +2850,8 @@ fn reinstall_duplicate() -> Result<()> {
      - pip==21.3.1
      - pip==22.1.1
      + pip==24.0
+     ~ pip==21.3.1
+     ~ pip==22.1.1
     "###
     );
 

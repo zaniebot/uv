@@ -6,7 +6,7 @@ use owo_colors::OwoColorize;
 use std::collections::{BTreeSet, HashSet};
 use std::fmt::Write;
 use std::path::PathBuf;
-use tracing::debug;
+use tracing::{debug, warn};
 
 use distribution_types::{
     CachedDist, Diagnostic, InstalledDist, LocalDist, ResolutionDiagnostic,
@@ -295,24 +295,52 @@ pub(crate) struct Changelog {
     pub(crate) uninstalled: HashSet<LocalDist>,
     /// The distributions that were reinstalled.
     pub(crate) reinstalled: HashSet<LocalDist>,
+    /// The distributions that were upgraded from (old, new)
+    pub(crate) upgraded: Vec<(LocalDist, LocalDist)>,
 }
 
 impl Changelog {
-    /// Create a [`Changelog`] from a list of installed and uninstalled distributions.
-    pub(crate) fn new(installed: Vec<CachedDist>, uninstalled: Vec<InstalledDist>) -> Self {
-        let mut uninstalled: HashSet<_> = uninstalled.into_iter().map(LocalDist::from).collect();
-
-        let (reinstalled, installed): (HashSet<_>, HashSet<_>) = installed
+    /// Create a [`Changelog`] from lists of changed distributions.
+    pub(crate) fn new(
+        installed: Vec<CachedDist>,
+        // The following were all _removed_ from the environment
+        uninstalled: Vec<InstalledDist>,
+        reinstalled: Vec<InstalledDist>,
+        upgraded: Vec<InstalledDist>,
+    ) -> Self {
+        let mut installed: HashSet<_> = installed.into_iter().map(LocalDist::from).collect();
+        let reinstalled: HashSet<_> = reinstalled.into_iter().map(LocalDist::from).collect();
+        let upgraded: HashSet<_> = upgraded.into_iter().map(LocalDist::from).collect();
+        let uninstalled: HashSet<_> = uninstalled
             .into_iter()
             .map(LocalDist::from)
-            .partition(|dist| uninstalled.contains(dist));
+            .filter(|dist| !reinstalled.contains(dist) && !upgraded.contains(dist))
+            .collect();
 
-        uninstalled.retain(|dist| !reinstalled.contains(dist));
+        // Collect the upgraded set, removing them from the installed set
+        let upgraded = upgraded
+            .into_iter()
+            .filter_map(|dist| {
+                if let Some(new) = installed.take(&dist) {
+                    Some((dist, new))
+                } else {
+                    warn!(
+                        "Upgraded distribution {} not found in installed distributions",
+                        dist.name()
+                    );
+                    None
+                }
+            })
+            .collect::<Vec<_>>();
+
+        // Remove any reinstalled distributions from the installed set
+        installed.retain(|dist| !reinstalled.contains(dist));
 
         Self {
             installed,
             uninstalled,
             reinstalled,
+            upgraded,
         }
     }
 
@@ -322,14 +350,19 @@ impl Changelog {
             installed: installed.into_iter().map(LocalDist::from).collect(),
             uninstalled: HashSet::default(),
             reinstalled: HashSet::default(),
+            upgraded: vec![],
         }
     }
 
-    /// Returns `true` if the changelog includes a distribution with the given name, either via
-    /// an installation or uninstallation.
+    /// Returns `true` if the changelog includes a distribution with the given name.
     pub(crate) fn includes(&self, name: &PackageName) -> bool {
         self.installed.iter().any(|dist| dist.name() == name)
             || self.uninstalled.iter().any(|dist| dist.name() == name)
+            || self.reinstalled.iter().any(|dist| dist.name() == name)
+            || self
+                .upgraded
+                .iter()
+                .any(|(old, new)| old.name() == name || new.name() == name)
     }
 
     /// Returns `true` if the changelog is empty.
@@ -392,6 +425,7 @@ pub(crate) async fn install(
         cached,
         remote,
         reinstalls,
+        upgrades,
         extraneous,
     } = plan;
 
@@ -402,7 +436,12 @@ pub(crate) async fn install(
     };
 
     // Nothing to do.
-    if remote.is_empty() && cached.is_empty() && reinstalls.is_empty() && extraneous.is_empty() {
+    if remote.is_empty()
+        && cached.is_empty()
+        && reinstalls.is_empty()
+        && upgrades.is_empty()
+        && extraneous.is_empty()
+    {
         logger.on_audit(resolution.len(), start, printer)?;
         return Ok(Changelog::default());
     }
@@ -444,7 +483,11 @@ pub(crate) async fn install(
     };
 
     // Remove any upgraded or extraneous installations.
-    let uninstalls = extraneous.into_iter().chain(reinstalls).collect::<Vec<_>>();
+    let uninstalls = extraneous
+        .iter()
+        .chain(&reinstalls)
+        .chain(&upgrades)
+        .collect::<Vec<_>>();
     if !uninstalls.is_empty() {
         let start = std::time::Instant::now();
 
@@ -496,7 +539,12 @@ pub(crate) async fn install(
     }
 
     // Construct a summary of the changes made to the environment.
-    let changelog = Changelog::new(installs, uninstalls);
+    let changelog = Changelog::new(
+        installs,
+        uninstalls.into_iter().cloned().collect::<Vec<_>>(),
+        reinstalls,
+        upgrades,
+    );
 
     // Notify the user of any environment modifications.
     logger.on_complete(&changelog, printer)?;
@@ -516,6 +564,7 @@ fn report_dry_run(
         cached,
         remote,
         reinstalls,
+        upgrades,
         extraneous,
     } = plan;
 
@@ -526,7 +575,12 @@ fn report_dry_run(
     };
 
     // Nothing to do.
-    if remote.is_empty() && cached.is_empty() && reinstalls.is_empty() && extraneous.is_empty() {
+    if remote.is_empty()
+        && cached.is_empty()
+        && reinstalls.is_empty()
+        && extraneous.is_empty()
+        && upgrades.is_empty()
+    {
         let s = if resolution.len() == 1 { "" } else { "s" };
         writeln!(
             printer.stderr(),
@@ -571,7 +625,7 @@ fn report_dry_run(
     };
 
     // Remove any upgraded or extraneous installations.
-    let uninstalls = extraneous.len() + reinstalls.len();
+    let uninstalls = extraneous.len() + reinstalls.len() + upgrades.len();
 
     if uninstalls > 0 {
         let s = if uninstalls == 1 { "" } else { "s" };
@@ -602,6 +656,7 @@ fn report_dry_run(
     for event in reinstalls
         .into_iter()
         .chain(extraneous.into_iter())
+        .chain(upgrades.into_iter())
         .map(|distribution| DryRunEvent {
             name: distribution.name().clone(),
             version: distribution.installed_version().to_string(),
@@ -634,15 +689,6 @@ fn report_dry_run(
                     printer.stderr(),
                     " {} {}{}",
                     "-".red(),
-                    event.name.bold(),
-                    event.version.dimmed()
-                )?;
-            }
-            ChangeEventKind::Reinstalled => {
-                writeln!(
-                    printer.stderr(),
-                    " {} {}{}",
-                    "~".yellow(),
                     event.name.bold(),
                     event.version.dimmed()
                 )?;

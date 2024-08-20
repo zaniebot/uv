@@ -11,7 +11,7 @@ use pep440_rs::Version;
 use uv_normalize::PackageName;
 
 use crate::commands::pip::operations::Changelog;
-use crate::commands::{elapsed, ChangeEvent, ChangeEventKind};
+use crate::commands::{elapsed, ChangeEvent};
 use crate::printer::Printer;
 
 /// A trait to handle logging during install operations.
@@ -107,57 +107,63 @@ impl InstallLogger for DefaultInstallLogger {
         for event in changelog
             .uninstalled
             .iter()
-            .map(|distribution| ChangeEvent {
-                dist: distribution,
-                kind: ChangeEventKind::Removed,
-            })
-            .chain(changelog.installed.iter().map(|distribution| ChangeEvent {
-                dist: distribution,
-                kind: ChangeEventKind::Added,
-            }))
+            .map(ChangeEvent::Removed)
+            .chain(changelog.installed.iter().map(ChangeEvent::Added))
+            .chain(changelog.reinstalled.iter().map(ChangeEvent::Reinstalled))
             .chain(
                 changelog
-                    .reinstalled
+                    .upgraded
                     .iter()
-                    .map(|distribution| ChangeEvent {
-                        dist: distribution,
-                        kind: ChangeEventKind::Reinstalled,
-                    }),
+                    .map(|(a, b)| ChangeEvent::Upgraded(a, b)),
             )
             .sorted_unstable_by(|a, b| {
-                a.dist
+                a.dist()
                     .name()
-                    .cmp(b.dist.name())
-                    .then_with(|| a.kind.cmp(&b.kind))
-                    .then_with(|| a.dist.installed_version().cmp(&b.dist.installed_version()))
+                    .cmp(b.dist().name())
+                    .then_with(|| a.kind_order().cmp(&b.kind_order()))
+                    .then_with(|| {
+                        a.dist()
+                            .installed_version()
+                            .cmp(&b.dist().installed_version())
+                    })
             })
         {
-            match event.kind {
-                ChangeEventKind::Added => {
+            match event {
+                ChangeEvent::Added(dist) => {
                     writeln!(
                         printer.stderr(),
                         " {} {}{}",
                         "+".green(),
-                        event.dist.name().bold(),
-                        event.dist.installed_version().dimmed()
+                        dist.name().bold(),
+                        dist.installed_version().dimmed()
                     )?;
                 }
-                ChangeEventKind::Removed => {
+                ChangeEvent::Removed(dist) => {
                     writeln!(
                         printer.stderr(),
                         " {} {}{}",
                         "-".red(),
-                        event.dist.name().bold(),
-                        event.dist.installed_version().dimmed()
+                        dist.name().bold(),
+                        dist.installed_version().dimmed()
                     )?;
                 }
-                ChangeEventKind::Reinstalled => {
+                ChangeEvent::Reinstalled(dist) => {
                     writeln!(
                         printer.stderr(),
                         " {} {}{}",
                         "~".yellow(),
-                        event.dist.name().bold(),
-                        event.dist.installed_version().dimmed()
+                        dist.name().bold(),
+                        dist.installed_version().dimmed()
+                    )?;
+                }
+                ChangeEvent::Upgraded(old, new) => {
+                    writeln!(
+                        printer.stderr(),
+                        " {} {}{} -> {}",
+                        "^".yellow(),
+                        old.name().bold(),
+                        old.installed_version().dimmed(),
+                        new.installed_version().dimmed()
                     )?;
                 }
             }

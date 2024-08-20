@@ -211,6 +211,7 @@ impl<'a> BuildContext for BuildDispatch<'a> {
             cached,
             remote,
             reinstalls,
+            upgrades,
             extraneous: _,
         } = Planner::new(&requirements).build(
             site_packages,
@@ -224,7 +225,7 @@ impl<'a> BuildContext for BuildDispatch<'a> {
         )?;
 
         // Nothing to do.
-        if remote.is_empty() && cached.is_empty() && reinstalls.is_empty() {
+        if remote.is_empty() && cached.is_empty() && reinstalls.is_empty() && upgrades.is_empty() {
             debug!("No build requirements to install for build");
             return Ok(vec![]);
         }
@@ -271,8 +272,8 @@ impl<'a> BuildContext for BuildDispatch<'a> {
         };
 
         // Remove any unnecessary packages.
-        if !reinstalls.is_empty() {
-            for dist_info in &reinstalls {
+        if !reinstalls.is_empty() && upgrades.is_empty() {
+            for dist_info in reinstalls.iter().chain(upgrades.iter()) {
                 let summary = uv_installer::uninstall(dist_info)
                     .await
                     .context("Failed to uninstall build dependencies")?;

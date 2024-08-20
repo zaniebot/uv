@@ -108,19 +108,44 @@ pub(super) fn elapsed(duration: Duration) -> String {
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
-pub(super) enum ChangeEventKind {
+pub(super) enum ChangeEvent<'a, T: InstalledMetadata> {
     /// The package was removed from the environment.
-    Removed,
-    /// The package was added to the environment.
-    Added,
+    Removed(&'a T),
     /// The package was reinstalled without changing versions.
-    Reinstalled,
+    Reinstalled(&'a T),
+    /// The package was reinstalled at a different version.
+    Upgraded(&'a T, &'a T),
+    /// The package was added to the environment.
+    Added(&'a T),
 }
 
-#[derive(Debug)]
-pub(super) struct ChangeEvent<'a, T: InstalledMetadata> {
-    dist: &'a T,
-    kind: ChangeEventKind,
+impl<'a, T: InstalledMetadata> ChangeEvent<'a, T> {
+    fn dist(&self) -> &'a T {
+        match self {
+            Self::Removed(dist) => dist,
+            Self::Added(dist) => dist,
+            Self::Reinstalled(dist) => dist,
+            Self::Upgraded(dist, _) => dist,
+        }
+    }
+
+    fn kind_order(&self) -> u8 {
+        match self {
+            Self::Removed(_) => 0,
+            Self::Added(_) => 1,
+            Self::Reinstalled(_) => 2,
+            Self::Upgraded(_, _) => 3,
+        }
+    }
+}
+
+// TODO(zanieb): Unify with [`ChangeEvent`]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
+pub(super) enum ChangeEventKind {
+    /// The Python version was uninstalled.
+    Removed,
+    /// The Python version was installed.
+    Added,
 }
 
 #[derive(Debug)]
