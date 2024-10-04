@@ -13,7 +13,7 @@ mod common;
 
 #[test]
 fn no_arguments() {
-    let context = TestContext::new_with_versions(&[]).with_ignore_cache_dir();
+    let context = TestContext::new_with_versions(&[]).with_filtered_cache_dir_env();
 
     uv_snapshot!(context.filters(), context.pip_uninstall(), @r###"
     success: false
@@ -24,7 +24,7 @@ fn no_arguments() {
     error: the following required arguments were not provided:
       <PACKAGE|--requirement <REQUIREMENT>>
 
-    Usage: uv pip uninstall <PACKAGE|--requirement <REQUIREMENT>>
+    Usage: uv pip uninstall --cache-dir [CACHE_DIR] <PACKAGE|--requirement <REQUIREMENT>>
 
     For more information, try '--help'.
     "###
