@@ -178,6 +178,34 @@ jobs:
         run: uv run pytest tests
 ```
 
+If using multiple Python versions in a matrix, it's good practice to set the Python version to use:
+
+```yaml title="example.yml" hl_lines="14 15"
+name: Example
+
+jobs:
+  uv-example:
+    strategy:
+    matrix:
+      python-version:
+        - "3.10"
+        - "3.11"
+        - "3.12"
+        
+    name: python
+    runs-on: ubuntu-latest
+
+    env:
+      UV_PYTHON: ${{ }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Install the project
+        run: uv sync --all-extras --dev
+```
 !!! tip
 
     The
