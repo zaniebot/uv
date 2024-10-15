@@ -171,11 +171,11 @@ class CPythonFinder(Finder):
         r"""(?x)
         ^
             cpython-
-            (?P<ver>\d+\.\d+\.\d+(?:(?:a|b|rc)\d+)?)(?:\+\d+)?\+
-            (?P<date>\d+)-
-            (?P<triple>[a-z\d_]+-[a-z\d]+(?>-[a-z\d]+)?-[a-z\d]+)-
+            (?P<ver>\d+\.\d+\.\d+(?:(?:a|b|rc)\d+)?)(?:\+\d+)?(?>\+
+            (?P<date>\d+))?-(?P<triple>[a-z\d_]+-[a-z\d]+(?>-[a-z\d]+)?-[a-z\d]+)-
             (?>(?P<build_options>.+)-)?
-            (?P<flavor>.+)
+            (?P<flavor>[a-z_]+)?
+            (?P<legacydate>[a-zA-z\d]+)?
             \.tar\.(?:gz|zst)
         $
     """
@@ -301,7 +301,7 @@ class CPythonFinder(Finder):
             logging.debug("Skipping %s: no regex match", filename)
             return None
 
-        version, _date, triple, build_options, flavor = match.groups()
+        version, _date, triple, build_options, flavor, _legacydate = match.groups()
 
         build_options = build_options.split("+") if build_options else []
         variant: Variant | None
