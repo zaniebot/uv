@@ -539,7 +539,7 @@ impl ExternallyManaged {
 pub enum Error {
     #[error("Failed to query Python interpreter")]
     Io(#[from] io::Error),
-    #[error("Python interpreter not found at `{0}`")]
+    #[error("File not found at `{0}`")]
     NotFound(PathBuf),
     #[error("Failed to query Python interpreter at `{path}`")]
     SpawnFailed {

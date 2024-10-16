@@ -199,7 +199,7 @@ pub enum Error {
     Io(#[from] io::Error),
 
     /// An error was encountering when retrieving interpreter information.
-    #[error("Failed to inspect Python interpreter from {2} at `{}` ", .1.user_display())]
+    #[error("Failed to inspect Python interpreter from {2} at `{}`", .1.user_display())]
     Query(
         #[source] Box<crate::interpreter::Error>,
         PathBuf,
@@ -597,8 +597,13 @@ fn python_interpreters_from_executables<'a>(
                     path.display()
                 );
             })
-            .map_err(|err| Error::Query(Box::new(err), path, source))
-            .inspect_err(|err| debug!("{err}")),
+            .map_err(|err| {
+                debug!(
+                    "Skipping Python executable at `{}` from {source}: {err}",
+                    path.display()
+                );
+                Error::Query(Box::new(err), path, source)
+            }),
         Err(err) => Err(err),
     })
 }
