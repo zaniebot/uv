@@ -30,7 +30,7 @@ pub enum IncompatibleTag {
     /// The ABI tag is incompatible.
     Abi,
     /// The Python version component of the ABI tag is incompatible with `requires-python`.
-    AbiPythonVersion,
+    AbiPythonVersion(PythonVersionTagIncompatibility),
     /// The platform tag is incompatible.
     Platform,
 }
@@ -64,6 +64,47 @@ impl TagCompatibility {
     }
 }
 
+/// Whether a Python version component of an ABI tag is compatible with the Python requirement.
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+pub enum PythonVersionTagCompatibility {
+    Compatible,
+    Incompatible(PythonVersionTagIncompatibility),
+}
+
+impl PythonVersionTagCompatibility {
+    /// Returns `true` if this is [`PythonVersionTagCompatibility::Compatible`].
+    pub fn is_compatible(&self) -> bool {
+        matches!(self, Self::Compatible)
+    }
+}
+
+/// The reason why a Python version component of an ABI tag is incompatible with the Python requirement.
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
+pub enum PythonVersionTagIncompatibility {
+    Py2,
+    AboveRequirement(String),
+    BelowRequirement(String),
+}
+
+impl std::fmt::Display for PythonVersionTagIncompatibility {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Py2 => write!(f, "only Python 2 wheels are available"),
+            Self::AboveRequirement(tag) => {
+                write!(
+                    f,
+                    "only wheels for newer Python versions are available (e.g., {tag})"
+                )
+            }
+            Self::BelowRequirement(tag) => {
+                write!(
+                    f,
+                    "only wheels for older Python versions are available (e.g., {tag})"
+                )
+            }
+        }
+    }
+}
 /// A set of compatible tags for a given Python version and platform.
 ///
 /// Its principle function is to determine whether the tags for a particular

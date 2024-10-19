@@ -12,7 +12,7 @@ use uv_distribution_types::{
 };
 use uv_normalize::PackageName;
 use uv_pep440::Version;
-use uv_platform_tags::{IncompatibleTag, TagCompatibility, Tags};
+use uv_platform_tags::{IncompatibleTag, PythonVersionTagCompatibility, TagCompatibility, Tags};
 use uv_pypi_types::{HashDigest, Yanked};
 use uv_types::HashStrategy;
 use uv_warnings::warn_user_once;
@@ -562,9 +562,11 @@ impl VersionMapLazy {
 
         // Check if the wheel is compatible with the `requires-python` (i.e., the Python ABI tag
         // is not less than the `requires-python` minimum version).
-        if !self.requires_python.matches_wheel_tag(filename) {
+        if let PythonVersionTagCompatibility::Incompatible(incompatibility) =
+            self.requires_python.wheel_tag_compatibility(filename)
+        {
             return WheelCompatibility::Incompatible(IncompatibleWheel::Tag(
-                IncompatibleTag::AbiPythonVersion,
+                IncompatibleTag::AbiPythonVersion(incompatibility),
             ));
         }
 

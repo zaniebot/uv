@@ -35,7 +35,7 @@ fn packse_add_remove_one_package() {
         assert_snapshot!(diff, @r###"
         --- old
         +++ new
-        @@ -306,20 +306,21 @@
+        @@ -303,20 +303,21 @@
          name = "packse"
          version = "0.0.0"
          source = { editable = "." }
@@ -57,7 +57,7 @@ fn packse_add_remove_one_package() {
              { name = "pypiserver" },
              { name = "watchfiles" },
          ]
-        @@ -334,20 +335,21 @@
+        @@ -331,20 +332,21 @@
          [package.metadata]
          requires-dist = [
              { name = "chevron-blue", specifier = ">=0.2.1" },
@@ -79,7 +79,7 @@ fn packse_add_remove_one_package() {
              { name = "syrupy", specifier = ">=4.6.0" },
          ]
 
-        @@ -599,20 +601,29 @@
+        @@ -584,20 +586,26 @@
              { name = "rfc3986" },
              { name = "rich" },
              { name = "urllib3" },
@@ -94,9 +94,6 @@ fn packse_add_remove_one_package() {
         +version = "2024.1"
         +source = { registry = "https://pypi.org/simple" }
         +sdist = { url = "https://files.pythonhosted.org/packages/74/5b/e025d02cb3b66b7b76093404392d4b44343c69101cc85f4d180dd5784717/tzdata-2024.1.tar.gz", hash = "sha256:2674120f8d891909751c38abcdfd386ac0a5a1127954fbc332af6b5ceae07efd", size = 190559 }
-        +wheels = [
-        +    { url = "https://files.pythonhosted.org/packages/65/58/f9c9e6be752e9fcb8b6a0ee9fb87e6e7a1f6bcab2cdc73f02bb7ba91ada0/tzdata-2024.1-py2.py3-none-any.whl", hash = "sha256:9068bc196136463f5245e51efda838afa15aaeca9903f49050dfa2679db4d252", size = 345370 },
-        +]
         +
         +[[package]]
          name = "urllib3"
@@ -123,7 +120,7 @@ fn packse_add_remove_one_package() {
         assert_snapshot!(diff, @r###"
         --- old
         +++ new
-        @@ -306,21 +306,20 @@
+        @@ -303,21 +303,20 @@
          name = "packse"
          version = "0.0.0"
          source = { editable = "." }
@@ -145,7 +142,7 @@ fn packse_add_remove_one_package() {
              { name = "pypiserver" },
              { name = "watchfiles" },
          ]
-        @@ -335,21 +334,20 @@
+        @@ -332,21 +331,20 @@
          [package.metadata]
          requires-dist = [
              { name = "chevron-blue", specifier = ">=0.2.1" },
@@ -167,8 +164,7 @@ fn packse_add_remove_one_package() {
              { name = "syrupy", specifier = ">=4.6.0" },
          ]
 
-        @@ -598,29 +596,20 @@
-             { name = "readme-renderer" },
+        @@ -584,26 +582,20 @@
              { name = "requests" },
              { name = "requests-toolbelt" },
              { name = "rfc3986" },
@@ -178,16 +174,13 @@ fn packse_add_remove_one_package() {
          sdist = { url = "https://files.pythonhosted.org/packages/d3/cc/8025ad5102a5c754023092143b8b511e184ec087dfbfb357d7d88fb82bff/twine-5.0.0.tar.gz", hash = "sha256:89b0cc7d370a4b66421cc6102f269aa910fe0f1861c124f573cf2ddedbc10cf4", size = 222119 }
          wheels = [
              { url = "https://files.pythonhosted.org/packages/9a/d4/4db90c4a2b8c1006ea3e6291f36b50b66e45887cf17b3b958b5d646fb837/twine-5.0.0-py3-none-any.whl", hash = "sha256:a262933de0b484c53408f9edae2e7821c1c45a3314ff2df9bdd343aa7ab8edc0", size = 37138 },
-        -]
+         ]
         -
         -[[package]]
         -name = "tzdata"
         -version = "2024.1"
         -source = { registry = "https://pypi.org/simple" }
         -sdist = { url = "https://files.pythonhosted.org/packages/74/5b/e025d02cb3b66b7b76093404392d4b44343c69101cc85f4d180dd5784717/tzdata-2024.1.tar.gz", hash = "sha256:2674120f8d891909751c38abcdfd386ac0a5a1127954fbc332af6b5ceae07efd", size = 190559 }
-        -wheels = [
-        -    { url = "https://files.pythonhosted.org/packages/65/58/f9c9e6be752e9fcb8b6a0ee9fb87e6e7a1f6bcab2cdc73f02bb7ba91ada0/tzdata-2024.1-py2.py3-none-any.whl", hash = "sha256:9068bc196136463f5245e51efda838afa15aaeca9903f49050dfa2679db4d252", size = 345370 },
-         ]
 
          [[package]]
          name = "urllib3"
@@ -277,7 +270,7 @@ fn packse_promote_transitive_to_direct_then_remove() {
         assert_snapshot!(diff, @r###"
         --- old
         +++ new
-        @@ -305,20 +305,21 @@
+        @@ -302,20 +302,21 @@
          [[package]]
          name = "packse"
          version = "0.0.0"
@@ -299,7 +292,7 @@ fn packse_promote_transitive_to_direct_then_remove() {
          serve = [
              { name = "pypiserver" },
              { name = "watchfiles" },
-        @@ -333,20 +334,21 @@
+        @@ -330,20 +331,21 @@
 
          [package.metadata]
          requires-dist = [
@@ -335,7 +328,7 @@ fn packse_promote_transitive_to_direct_then_remove() {
         assert_snapshot!(diff, @r###"
         --- old
         +++ new
-        @@ -305,21 +305,20 @@
+        @@ -302,21 +302,20 @@
          [[package]]
          name = "packse"
          version = "0.0.0"
@@ -357,7 +350,7 @@ fn packse_promote_transitive_to_direct_then_remove() {
          serve = [
              { name = "pypiserver" },
              { name = "watchfiles" },
-        @@ -334,21 +333,20 @@
+        @@ -331,21 +330,20 @@
 
          [package.metadata]
          requires-dist = [
@@ -457,7 +450,7 @@ fn jax_instability() -> Result<()> {
          name = "jax"
          version = "0.4.17"
          source = { registry = "https://pypi.org/simple" }
-        @@ -149,28 +149,41 @@
+        @@ -149,28 +149,38 @@
              { url = "https://files.pythonhosted.org/packages/f3/31/91a2a3c5eb85d2bfa86d7c98f2df5d77dcdefb3d80ca9f9037ad04393acf/scipy-1.12.0-cp312-cp312-win_amd64.whl", hash = "sha256:e646d8571804a304e1da01040d21577685ce8e2db08ac58e543eaca063453e1c", size = 45816713 },
              { url = "https://files.pythonhosted.org/packages/ed/be/49a3f999dc91f1a653847f38c34763dcdeaa8a327f3665bdfe9bf5555109/scipy-1.12.0-cp39-cp39-macosx_10_9_x86_64.whl", hash = "sha256:913d6e7956c3a671de3b05ccb66b11bc293f56bfdef040583a7221d9e22a2e35", size = 38929252 },
              { url = "https://files.pythonhosted.org/packages/32/48/f605bad3e610efe05a51b56698578f7a98f900513a4bad2c9f12df845cd6/scipy-1.12.0-cp39-cp39-macosx_12_0_arm64.whl", hash = "sha256:bba1b0c7256ad75401c73e4b3cf09d1f176e9bd4248f0d3112170fb2ec4db067", size = 31356374 },
@@ -472,9 +465,6 @@ fn jax_instability() -> Result<()> {
         +version = "2024.1"
         +source = { registry = "https://pypi.org/simple" }
         +sdist = { url = "https://files.pythonhosted.org/packages/74/5b/e025d02cb3b66b7b76093404392d4b44343c69101cc85f4d180dd5784717/tzdata-2024.1.tar.gz", hash = "sha256:2674120f8d891909751c38abcdfd386ac0a5a1127954fbc332af6b5ceae07efd", size = 190559 }
-        +wheels = [
-        +    { url = "https://files.pythonhosted.org/packages/65/58/f9c9e6be752e9fcb8b6a0ee9fb87e6e7a1f6bcab2cdc73f02bb7ba91ada0/tzdata-2024.1-py2.py3-none-any.whl", hash = "sha256:9068bc196136463f5245e51efda838afa15aaeca9903f49050dfa2679db4d252", size = 345370 },
-        +]
         +
         +[[package]]
          name = "uv-lock-instability"
@@ -514,7 +504,7 @@ fn jax_instability() -> Result<()> {
         assert_snapshot!(diff, @r###"
         --- old
         +++ new
-        @@ -149,41 +149,28 @@
+        @@ -149,38 +149,28 @@
              { url = "https://files.pythonhosted.org/packages/f3/31/91a2a3c5eb85d2bfa86d7c98f2df5d77dcdefb3d80ca9f9037ad04393acf/scipy-1.12.0-cp312-cp312-win_amd64.whl", hash = "sha256:e646d8571804a304e1da01040d21577685ce8e2db08ac58e543eaca063453e1c", size = 45816713 },
              { url = "https://files.pythonhosted.org/packages/ed/be/49a3f999dc91f1a653847f38c34763dcdeaa8a327f3665bdfe9bf5555109/scipy-1.12.0-cp39-cp39-macosx_10_9_x86_64.whl", hash = "sha256:913d6e7956c3a671de3b05ccb66b11bc293f56bfdef040583a7221d9e22a2e35", size = 38929252 },
              { url = "https://files.pythonhosted.org/packages/32/48/f605bad3e610efe05a51b56698578f7a98f900513a4bad2c9f12df845cd6/scipy-1.12.0-cp39-cp39-macosx_12_0_arm64.whl", hash = "sha256:bba1b0c7256ad75401c73e4b3cf09d1f176e9bd4248f0d3112170fb2ec4db067", size = 31356374 },
@@ -529,9 +519,6 @@ fn jax_instability() -> Result<()> {
         -version = "2024.1"
         -source = { registry = "https://pypi.org/simple" }
         -sdist = { url = "https://files.pythonhosted.org/packages/74/5b/e025d02cb3b66b7b76093404392d4b44343c69101cc85f4d180dd5784717/tzdata-2024.1.tar.gz", hash = "sha256:2674120f8d891909751c38abcdfd386ac0a5a1127954fbc332af6b5ceae07efd", size = 190559 }
-        -wheels = [
-        -    { url = "https://files.pythonhosted.org/packages/65/58/f9c9e6be752e9fcb8b6a0ee9fb87e6e7a1f6bcab2cdc73f02bb7ba91ada0/tzdata-2024.1-py2.py3-none-any.whl", hash = "sha256:9068bc196136463f5245e51efda838afa15aaeca9903f49050dfa2679db4d252", size = 345370 },
-        -]
         -
         -[[package]]
          name = "uv-lock-instability"

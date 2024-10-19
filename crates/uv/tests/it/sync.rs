@@ -3102,15 +3102,16 @@ fn sync_explicit() -> Result<()> {
     )?;
 
     uv_snapshot!(context.filters(), context.sync(), @r###"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 1
     ----- stdout -----
 
     ----- stderr -----
-    Resolved 2 packages in [TIME]
-    Prepared 1 package in [TIME]
-    Installed 1 package in [TIME]
-     + idna==2.7
+      × No solution found when resolving dependencies:
+      ╰─▶ Because only idna==2.7 is available and idna==2.7 has no wheels with a matching Python version tag, we can conclude that all versions of idna cannot be used.
+          And because your project depends on idna, we can conclude that your project's requirements are unsatisfiable.
+
+          hint: The dependency (idna==2.7) does not publish wheels that fulfill the `requires-python` value (>=3.12), only Python 2 wheels are available.
     "###);
 
     // Clear the environment.
@@ -3118,16 +3119,18 @@ fn sync_explicit() -> Result<()> {
 
     // The package should be drawn from the cache.
     uv_snapshot!(context.filters(), context.sync(), @r###"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 1
     ----- stdout -----
 
     ----- stderr -----
     Using CPython 3.12.[X] interpreter at: [PYTHON-3.12]
     Creating virtual environment at: .venv
-    Resolved 2 packages in [TIME]
-    Installed 1 package in [TIME]
-     + idna==2.7
+      × No solution found when resolving dependencies:
+      ╰─▶ Because only idna==2.7 is available and idna==2.7 has no wheels with a matching Python version tag, we can conclude that all versions of idna cannot be used.
+          And because your project depends on idna, we can conclude that your project's requirements are unsatisfiable.
+
+          hint: The dependency (idna==2.7) does not publish wheels that fulfill the `requires-python` value (>=3.12), only Python 2 wheels are available.
     "###);
 
     Ok(())

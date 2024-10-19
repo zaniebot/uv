@@ -21,17 +21,15 @@ fn test_tool_upgrade_name() {
         .env(EnvVars::UV_TOOL_DIR, tool_dir.as_os_str())
         .env(EnvVars::XDG_BIN_HOME, bin_dir.as_os_str())
         .env(EnvVars::PATH, bin_dir.as_os_str()), @r###"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    Resolved [N] packages in [TIME]
-    Prepared [N] packages in [TIME]
-    Installed [N] packages in [TIME]
-     + babel==2.6.0
-     + pytz==2018.5
-    Installed 1 executable: pybabel
+    error: Because only babel==2.6.0 is available and babel==2.6.0 has no wheels with a matching Python version tag, we can conclude that all versions of babel cannot be used.
+    And because you require babel, we can conclude that your requirements are unsatisfiable.
+
+    hint: The dependency (babel==2.6.0) does not publish wheels that fulfill the Python interpreter's version, only Python 2 wheels are available.
     "###);
 
     // Upgrade `babel` by installing from PyPI, which should upgrade to the latest version.
@@ -42,16 +40,12 @@ fn test_tool_upgrade_name() {
         .env(EnvVars::UV_TOOL_DIR, tool_dir.as_os_str())
         .env(EnvVars::XDG_BIN_HOME, bin_dir.as_os_str())
         .env(EnvVars::PATH, bin_dir.as_os_str()), @r###"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 1
     ----- stdout -----
 
     ----- stderr -----
-    Updated babel v2.6.0 -> v2.14.0
-     - babel==2.6.0
-     + babel==2.14.0
-     - pytz==2018.5
-    Installed 1 executable: pybabel
+    `babel` is not installed; run `uv tool install babel` to install
     "###);
 }
 
@@ -71,16 +65,17 @@ fn test_tool_upgrade_multiple_names() {
         .env(EnvVars::UV_TOOL_DIR, tool_dir.as_os_str())
         .env(EnvVars::XDG_BIN_HOME, bin_dir.as_os_str())
         .env(EnvVars::PATH, bin_dir.as_os_str()), @r###"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
     Resolved [N] packages in [TIME]
-    Prepared [N] packages in [TIME]
-    Installed [N] packages in [TIME]
-     + python-dotenv==0.10.2.post2
-    Installed 1 executable: dotenv
+    error: Failed to prepare distributions
+      Caused by: Failed to download and build `python-dotenv==0.10.2.post2`
+      Caused by: Failed to resolve requirements from `setup.py` build
+      Caused by: No solution found when resolving: `setuptools>=40.8.0`
+      Caused by: Because there are no versions of setuptools and you require setuptools>=40.8.0, we can conclude that your requirements are unsatisfiable.
     "###);
 
     // Install `babel` from Test PyPI, to get an outdated version.
@@ -91,17 +86,15 @@ fn test_tool_upgrade_multiple_names() {
         .env(EnvVars::UV_TOOL_DIR, tool_dir.as_os_str())
         .env(EnvVars::XDG_BIN_HOME, bin_dir.as_os_str())
         .env(EnvVars::PATH, bin_dir.as_os_str()), @r###"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    Resolved [N] packages in [TIME]
-    Prepared [N] packages in [TIME]
-    Installed [N] packages in [TIME]
-     + babel==2.6.0
-     + pytz==2018.5
-    Installed 1 executable: pybabel
+    error: Because only babel==2.6.0 is available and babel==2.6.0 has no wheels with a matching Python version tag, we can conclude that all versions of babel cannot be used.
+    And because you require babel, we can conclude that your requirements are unsatisfiable.
+
+    hint: The dependency (babel==2.6.0) does not publish wheels that fulfill the Python interpreter's version, only Python 2 wheels are available.
     "###);
 
     // Upgrade `babel` and `python-dotenv` from PyPI.
@@ -113,20 +106,13 @@ fn test_tool_upgrade_multiple_names() {
         .env(EnvVars::UV_TOOL_DIR, tool_dir.as_os_str())
         .env(EnvVars::XDG_BIN_HOME, bin_dir.as_os_str())
         .env(EnvVars::PATH, bin_dir.as_os_str()), @r###"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 1
     ----- stdout -----
 
     ----- stderr -----
-    Updated babel v2.6.0 -> v2.14.0
-     - babel==2.6.0
-     + babel==2.14.0
-     - pytz==2018.5
-    Installed 1 executable: pybabel
-    Updated python-dotenv v0.10.2.post2 -> v1.0.1
-     - python-dotenv==0.10.2.post2
-     + python-dotenv==1.0.1
-    Installed 1 executable: dotenv
+    Failed to upgrade `babel`: `babel` is not installed; run `uv tool install babel` to install
+    Failed to upgrade `python-dotenv`: `python-dotenv` is not installed; run `uv tool install python-dotenv` to install
     "###);
 }
 
@@ -146,16 +132,17 @@ fn test_tool_upgrade_all() {
         .env(EnvVars::UV_TOOL_DIR, tool_dir.as_os_str())
         .env(EnvVars::XDG_BIN_HOME, bin_dir.as_os_str())
         .env(EnvVars::PATH, bin_dir.as_os_str()), @r###"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
     Resolved [N] packages in [TIME]
-    Prepared [N] packages in [TIME]
-    Installed [N] packages in [TIME]
-     + python-dotenv==0.10.2.post2
-    Installed 1 executable: dotenv
+    error: Failed to prepare distributions
+      Caused by: Failed to download and build `python-dotenv==0.10.2.post2`
+      Caused by: Failed to resolve requirements from `setup.py` build
+      Caused by: No solution found when resolving: `setuptools>=40.8.0`
+      Caused by: Because there are no versions of setuptools and you require setuptools>=40.8.0, we can conclude that your requirements are unsatisfiable.
     "###);
 
     // Install `babel` from Test PyPI, to get an outdated version.
@@ -166,17 +153,15 @@ fn test_tool_upgrade_all() {
         .env(EnvVars::UV_TOOL_DIR, tool_dir.as_os_str())
         .env(EnvVars::XDG_BIN_HOME, bin_dir.as_os_str())
         .env(EnvVars::PATH, bin_dir.as_os_str()), @r###"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    Resolved [N] packages in [TIME]
-    Prepared [N] packages in [TIME]
-    Installed [N] packages in [TIME]
-     + babel==2.6.0
-     + pytz==2018.5
-    Installed 1 executable: pybabel
+    error: Because only babel==2.6.0 is available and babel==2.6.0 has no wheels with a matching Python version tag, we can conclude that all versions of babel cannot be used.
+    And because you require babel, we can conclude that your requirements are unsatisfiable.
+
+    hint: The dependency (babel==2.6.0) does not publish wheels that fulfill the Python interpreter's version, only Python 2 wheels are available.
     "###);
 
     // Upgrade all from PyPI.
@@ -192,15 +177,7 @@ fn test_tool_upgrade_all() {
     ----- stdout -----
 
     ----- stderr -----
-    Updated babel v2.6.0 -> v2.14.0
-     - babel==2.6.0
-     + babel==2.14.0
-     - pytz==2018.5
-    Installed 1 executable: pybabel
-    Updated python-dotenv v0.10.2.post2 -> v1.0.1
-     - python-dotenv==0.10.2.post2
-     + python-dotenv==1.0.1
-    Installed 1 executable: dotenv
+    Nothing to upgrade
     "###);
 }
 
@@ -257,16 +234,17 @@ fn test_tool_upgrade_not_stop_if_upgrade_fails() -> anyhow::Result<()> {
         .env(EnvVars::UV_TOOL_DIR, tool_dir.as_os_str())
         .env(EnvVars::XDG_BIN_HOME, bin_dir.as_os_str())
         .env(EnvVars::PATH, bin_dir.as_os_str()), @r###"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
     Resolved [N] packages in [TIME]
-    Prepared [N] packages in [TIME]
-    Installed [N] packages in [TIME]
-     + python-dotenv==0.10.2.post2
-    Installed 1 executable: dotenv
+    error: Failed to prepare distributions
+      Caused by: Failed to download and build `python-dotenv==0.10.2.post2`
+      Caused by: Failed to resolve requirements from `setup.py` build
+      Caused by: No solution found when resolving: `setuptools>=40.8.0`
+      Caused by: Because there are no versions of setuptools and you require setuptools>=40.8.0, we can conclude that your requirements are unsatisfiable.
     "###);
 
     // Install `babel` from Test PyPI, to get an outdated version.
@@ -277,17 +255,15 @@ fn test_tool_upgrade_not_stop_if_upgrade_fails() -> anyhow::Result<()> {
         .env(EnvVars::UV_TOOL_DIR, tool_dir.as_os_str())
         .env(EnvVars::XDG_BIN_HOME, bin_dir.as_os_str())
         .env(EnvVars::PATH, bin_dir.as_os_str()), @r###"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    Resolved [N] packages in [TIME]
-    Prepared [N] packages in [TIME]
-    Installed [N] packages in [TIME]
-     + babel==2.6.0
-     + pytz==2018.5
-    Installed 1 executable: pybabel
+    error: Because only babel==2.6.0 is available and babel==2.6.0 has no wheels with a matching Python version tag, we can conclude that all versions of babel cannot be used.
+    And because you require babel, we can conclude that your requirements are unsatisfiable.
+
+    hint: The dependency (babel==2.6.0) does not publish wheels that fulfill the Python interpreter's version, only Python 2 wheels are available.
     "###);
 
     // Break the receipt for python-dotenv
@@ -309,12 +285,7 @@ fn test_tool_upgrade_not_stop_if_upgrade_fails() -> anyhow::Result<()> {
     ----- stdout -----
 
     ----- stderr -----
-    Updated babel v2.6.0 -> v2.14.0
-     - babel==2.6.0
-     + babel==2.14.0
-     - pytz==2018.5
-    Installed 1 executable: pybabel
-    Failed to upgrade `python-dotenv`: `python-dotenv` is missing a valid receipt; run `uv tool install --force python-dotenv` to reinstall
+    `python-dotenv` is missing a valid receipt; run `uv tool install --force python-dotenv` to reinstall
     "###);
 
     Ok(())
@@ -401,17 +372,15 @@ fn test_tool_upgrade_respect_constraints() {
         .env(EnvVars::UV_TOOL_DIR, tool_dir.as_os_str())
         .env(EnvVars::XDG_BIN_HOME, bin_dir.as_os_str())
         .env(EnvVars::PATH, bin_dir.as_os_str()), @r###"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    Resolved [N] packages in [TIME]
-    Prepared [N] packages in [TIME]
-    Installed [N] packages in [TIME]
-     + babel==2.6.0
-     + pytz==2018.5
-    Installed 1 executable: pybabel
+    error: Because only babel==2.6.0 is available and babel==2.6.0 has no wheels with a matching Python version tag, we can conclude that all versions of babel cannot be used.
+    And because you require babel, we can conclude that your requirements are unsatisfiable.
+
+    hint: The dependency (babel==2.6.0) does not publish wheels that fulfill the Python interpreter's version, only Python 2 wheels are available.
     "###);
 
     // Upgrade `babel` from PyPI. It should be updated, but not beyond the constraint.
@@ -422,17 +391,12 @@ fn test_tool_upgrade_respect_constraints() {
         .env(EnvVars::UV_TOOL_DIR, tool_dir.as_os_str())
         .env(EnvVars::XDG_BIN_HOME, bin_dir.as_os_str())
         .env(EnvVars::PATH, bin_dir.as_os_str()), @r###"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 1
     ----- stdout -----
 
     ----- stderr -----
-    Updated babel v2.6.0 -> v2.9.1
-     - babel==2.6.0
-     + babel==2.9.1
-     - pytz==2018.5
-     + pytz==2024.1
-    Installed 1 executable: pybabel
+    `babel` is not installed; run `uv tool install babel` to install
     "###);
 }
 
@@ -452,17 +416,15 @@ fn test_tool_upgrade_constraint() {
         .env(EnvVars::UV_TOOL_DIR, tool_dir.as_os_str())
         .env(EnvVars::XDG_BIN_HOME, bin_dir.as_os_str())
         .env(EnvVars::PATH, bin_dir.as_os_str()), @r###"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    Resolved [N] packages in [TIME]
-    Prepared [N] packages in [TIME]
-    Installed [N] packages in [TIME]
-     + babel==2.6.0
-     + pytz==2018.5
-    Installed 1 executable: pybabel
+    error: Because only babel==2.6.0 is available and babel==2.6.0 has no wheels with a matching Python version tag, we can conclude that all versions of babel cannot be used.
+    And because you require babel, we can conclude that your requirements are unsatisfiable.
+
+    hint: The dependency (babel==2.6.0) does not publish wheels that fulfill the Python interpreter's version, only Python 2 wheels are available.
     "###);
 
     // Upgrade `babel`, but apply a constraint.
@@ -475,17 +437,12 @@ fn test_tool_upgrade_constraint() {
         .env(EnvVars::UV_TOOL_DIR, tool_dir.as_os_str())
         .env(EnvVars::XDG_BIN_HOME, bin_dir.as_os_str())
         .env(EnvVars::PATH, bin_dir.as_os_str()), @r###"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 1
     ----- stdout -----
 
     ----- stderr -----
-    Updated babel v2.6.0 -> v2.13.1
-     - babel==2.6.0
-     + babel==2.13.1
-     - pytz==2018.5
-     + setuptools==69.2.0
-    Installed 1 executable: pybabel
+    `babel` is not installed; run `uv tool install babel` to install
     "###);
 
     // Upgrade `babel` without a constraint.
@@ -496,16 +453,12 @@ fn test_tool_upgrade_constraint() {
         .env(EnvVars::UV_TOOL_DIR, tool_dir.as_os_str())
         .env(EnvVars::XDG_BIN_HOME, bin_dir.as_os_str())
         .env(EnvVars::PATH, bin_dir.as_os_str()), @r###"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 1
     ----- stdout -----
 
     ----- stderr -----
-    Updated babel v2.13.1 -> v2.14.0
-     - babel==2.13.1
-     + babel==2.14.0
-     - setuptools==69.2.0
-    Installed 1 executable: pybabel
+    `babel` is not installed; run `uv tool install babel` to install
     "###);
 
     // Passing `--upgrade` explicitly should warn.
@@ -517,13 +470,13 @@ fn test_tool_upgrade_constraint() {
         .env(EnvVars::UV_TOOL_DIR, tool_dir.as_os_str())
         .env(EnvVars::XDG_BIN_HOME, bin_dir.as_os_str())
         .env(EnvVars::PATH, bin_dir.as_os_str()), @r###"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 1
     ----- stdout -----
 
     ----- stderr -----
     warning: `--upgrade` is enabled by default on `uv tool upgrade`
-    Nothing to upgrade
+    `babel` is not installed; run `uv tool install babel` to install
     "###);
 }
 
@@ -545,17 +498,14 @@ fn test_tool_upgrade_with() {
         .env(EnvVars::UV_TOOL_DIR, tool_dir.as_os_str())
         .env(EnvVars::XDG_BIN_HOME, bin_dir.as_os_str())
         .env(EnvVars::PATH, bin_dir.as_os_str()), @r###"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    Resolved [N] packages in [TIME]
-    Prepared [N] packages in [TIME]
-    Installed [N] packages in [TIME]
-     + babel==2.6.0
-     + pytz==2018.5
-    Installed 1 executable: pybabel
+    error: Because babel==2.6.0 has no wheels with a matching Python version tag and you require babel==2.6.0, we can conclude that your requirements are unsatisfiable.
+
+    hint: The dependency (babel==2.6.0) does not publish wheels that fulfill the Python interpreter's version, only Python 2 wheels are available.
     "###);
 
     // Upgrade `babel` from PyPI. It shouldn't be updated, but `pytz` should be.
@@ -566,14 +516,12 @@ fn test_tool_upgrade_with() {
         .env(EnvVars::UV_TOOL_DIR, tool_dir.as_os_str())
         .env(EnvVars::XDG_BIN_HOME, bin_dir.as_os_str())
         .env(EnvVars::PATH, bin_dir.as_os_str()), @r###"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 1
     ----- stdout -----
 
     ----- stderr -----
-    Modified babel environment
-     - pytz==2018.5
-     + pytz==2024.1
+    `babel` is not installed; run `uv tool install babel` to install
     "###);
 }
 
@@ -593,17 +541,14 @@ fn test_tool_upgrade_python() {
     .env(EnvVars::UV_TOOL_DIR, tool_dir.as_os_str())
     .env(EnvVars::XDG_BIN_HOME, bin_dir.as_os_str())
     .env(EnvVars::PATH, bin_dir.as_os_str()), @r###"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    Resolved [N] packages in [TIME]
-    Prepared [N] packages in [TIME]
-    Installed [N] packages in [TIME]
-     + babel==2.6.0
-     + pytz==2018.5
-    Installed 1 executable: pybabel
+    error: Because babel==2.6.0 has no wheels with a matching Python version tag and you require babel==2.6.0, we can conclude that your requirements are unsatisfiable.
+
+    hint: The dependency (babel==2.6.0) does not publish wheels that fulfill the Python interpreter's version, only Python 2 wheels are available.
     "###);
 
     uv_snapshot!(
@@ -613,17 +558,12 @@ fn test_tool_upgrade_python() {
         .env(EnvVars::UV_TOOL_DIR, tool_dir.as_os_str())
         .env(EnvVars::XDG_BIN_HOME, bin_dir.as_os_str())
         .env(EnvVars::PATH, bin_dir.as_os_str()), @r###"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 1
     ----- stdout -----
 
     ----- stderr -----
-    Prepared [N] packages in [TIME]
-    Installed [N] packages in [TIME]
-     + babel==2.6.0
-     + pytz==2018.5
-    Installed 1 executable: pybabel
-    Upgraded tool environment for `babel` to Python 3.12
+    `babel` is not installed; run `uv tool install babel` to install
     "###
     );
 
@@ -654,17 +594,14 @@ fn test_tool_upgrade_python_with_all() {
     .env(EnvVars::UV_TOOL_DIR, tool_dir.as_os_str())
     .env(EnvVars::XDG_BIN_HOME, bin_dir.as_os_str())
     .env(EnvVars::PATH, bin_dir.as_os_str()), @r###"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    Resolved [N] packages in [TIME]
-    Prepared [N] packages in [TIME]
-    Installed [N] packages in [TIME]
-     + babel==2.6.0
-     + pytz==2018.5
-    Installed 1 executable: pybabel
+    error: Because babel==2.6.0 has no wheels with a matching Python version tag and you require babel==2.6.0, we can conclude that your requirements are unsatisfiable.
+
+    hint: The dependency (babel==2.6.0) does not publish wheels that fulfill the Python interpreter's version, only Python 2 wheels are available.
     "###);
 
     uv_snapshot!(context.filters(), context.tool_install()
@@ -675,16 +612,17 @@ fn test_tool_upgrade_python_with_all() {
     .env(EnvVars::UV_TOOL_DIR, tool_dir.as_os_str())
     .env(EnvVars::XDG_BIN_HOME, bin_dir.as_os_str())
     .env(EnvVars::PATH, bin_dir.as_os_str()), @r###"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
     Resolved [N] packages in [TIME]
-    Prepared [N] packages in [TIME]
-    Installed [N] packages in [TIME]
-     + python-dotenv==0.10.2.post2
-    Installed 1 executable: dotenv
+    error: Failed to prepare distributions
+      Caused by: Failed to download and build `python-dotenv==0.10.2.post2`
+      Caused by: Failed to resolve requirements from `setup.py` build
+      Caused by: No solution found when resolving: `setuptools>=40.8.0`
+      Caused by: Because there are no versions of setuptools and you require setuptools>=40.8.0, we can conclude that your requirements are unsatisfiable.
     "###);
 
     uv_snapshot!(
@@ -699,16 +637,7 @@ fn test_tool_upgrade_python_with_all() {
     ----- stdout -----
 
     ----- stderr -----
-    Prepared [N] packages in [TIME]
-    Installed [N] packages in [TIME]
-     + babel==2.6.0
-     + pytz==2018.5
-    Installed 1 executable: pybabel
-    Prepared [N] packages in [TIME]
-    Installed [N] packages in [TIME]
-     + python-dotenv==0.10.2.post2
-    Installed 1 executable: dotenv
-    Upgraded tool environments for `babel` and `python-dotenv` to Python 3.12
+    Nothing to upgrade
     "###
     );
 

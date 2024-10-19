@@ -1021,16 +1021,31 @@ fn warn_on_yanked() -> Result<()> {
     uv_snapshot!(context.filters(), windows_filters=false, context.pip_sync()
         .arg("requirements.txt")
         .arg("--strict"), @r###"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
     Resolved 1 package in [TIME]
-    Prepared 1 package in [TIME]
-    Installed 1 package in [TIME]
-     + colorama==0.4.2
-    warning: `colorama==0.4.2` is yanked (reason: "Bad build, missing files, will not install")
+    error: Failed to prepare distributions
+      Caused by: Failed to download and build `colorama==0.4.2`
+      Caused by: Build backend failed to determine requirements with `build_wheel()` (exit status: 1)
+
+    [stderr]
+    Traceback (most recent call last):
+      File "<string>", line 14, in <module>
+      File "[CACHE_DIR]/builds-v0/[TMP]/build_meta.py", line 325, in get_requires_for_build_wheel
+        return self._get_build_requires(config_settings, requirements=['wheel'])
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+      File "[CACHE_DIR]/builds-v0/[TMP]/build_meta.py", line 295, in _get_build_requires
+        self.run_setup()
+      File "[CACHE_DIR]/builds-v0/[TMP]/build_meta.py", line 487, in run_setup
+        super().run_setup(setup_script=setup_script)
+      File "[CACHE_DIR]/builds-v0/[TMP]/build_meta.py", line 311, in run_setup
+        exec(code, locals())
+      File "<string>", line 36, in <module>
+      File "<string>", line 18, in read_file
+    FileNotFoundError: [Errno 2] No such file or directory: '[CACHE_DIR]/sdists-v4/pypi/colorama/0.4.2/ieAqjRDuh_5Bky0sel4Dw/colorama-0.4.2.tar.gz/README.rst'
     "###
     );
 

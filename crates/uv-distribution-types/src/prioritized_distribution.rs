@@ -139,7 +139,7 @@ impl Display for IncompatibleDist {
                         f.write_str("no wheels with a matching Python implementation tag")
                     }
                     IncompatibleTag::Abi => f.write_str("no wheels with a matching Python ABI tag"),
-                    IncompatibleTag::AbiPythonVersion => {
+                    IncompatibleTag::AbiPythonVersion(_) => {
                         f.write_str("no wheels with a matching Python version tag")
                     }
                     IncompatibleTag::Platform => {

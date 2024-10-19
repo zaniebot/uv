@@ -14,7 +14,7 @@ use uv_distribution_types::{
 };
 use uv_normalize::PackageName;
 use uv_pep440::Version;
-use uv_platform_tags::IncompatibleTag;
+use uv_platform_tags::{IncompatibleTag, PythonVersionTagIncompatibility};
 
 use crate::candidate_selector::CandidateSelector;
 use crate::error::ErrorTree;
@@ -527,7 +527,7 @@ impl PubGrubReportFormatter<'_> {
                 set,
                 UnavailableReason::Version(UnavailableVersion::IncompatibleDist(
                     IncompatibleDist::Wheel(IncompatibleWheel::Tag(
-                        IncompatibleTag::AbiPythonVersion,
+                        IncompatibleTag::AbiPythonVersion(wheel_tag),
                     )),
                 )),
             )) => {
@@ -536,6 +536,7 @@ impl PubGrubReportFormatter<'_> {
                     requires_python: self.python_requirement.target().clone(),
                     package: package.clone(),
                     package_set: self.simplify_set(set, package).into_owned(),
+                    wheel_tag: wheel_tag.clone(),
                 });
             }
             DerivationTree::External(
@@ -901,6 +902,7 @@ pub(crate) enum PubGrubHint {
         requires_python: RequiresPython,
         package: PubGrubPackage,
         package_set: Range<Version>,
+        wheel_tag: PythonVersionTagIncompatibility,
     },
     /// A non-workspace package depends on a workspace package, which is likely shadowing a
     /// transitive dependency.
@@ -1252,14 +1254,16 @@ impl std::fmt::Display for PubGrubHint {
                 requires_python,
                 package,
                 package_set,
+                wheel_tag,
             } => {
                 write!(
                     f,
-                    "{}{} The dependency ({}) does not publish wheels that fulfill the `requires-python` value ({}).",
+                    "{}{} The dependency ({}) does not publish wheels that fulfill the `requires-python` value ({}), {}.",
                     "hint".bold().cyan(),
                     ":".bold(),
                     PackageRange::compatibility(package, package_set, None).bold(),
                     requires_python.bold(),
+                    wheel_tag,
                 )
             }
             Self::RequiresPythonAbiTag {
@@ -1267,14 +1271,16 @@ impl std::fmt::Display for PubGrubHint {
                 requires_python,
                 package,
                 package_set,
+                wheel_tag,
             } => {
                 write!(
                     f,
-                    "{}{} The dependency ({}) does not publish wheels that fulfill the `--python-version` value ({}).",
+                    "{}{} The dependency ({}) does not publish wheels that fulfill the `--python-version` value ({}), {}.",
                     "hint".bold().cyan(),
                     ":".bold(),
                     PackageRange::compatibility(package, package_set, None).bold(),
                     requires_python.bold(),
+                    wheel_tag,
                 )
             }
             Self::RequiresPythonAbiTag {
@@ -1282,13 +1288,15 @@ impl std::fmt::Display for PubGrubHint {
                 requires_python: _,
                 package,
                 package_set,
+                wheel_tag,
             } => {
                 write!(
                     f,
-                    "{}{} The dependency ({}) does not publish wheels that fulfill the Python interpreter's version.",
+                    "{}{} The dependency ({}) does not publish wheels that fulfill the Python interpreter's version, {}.",
                     "hint".bold().cyan(),
                     ":".bold(),
                     PackageRange::compatibility(package, package_set, None).bold(),
+                    wheel_tag,
                 )
             }
             Self::DependsOnWorkspacePackage {

@@ -226,9 +226,11 @@ impl Lock {
         locked_dist: &mut Package,
     ) {
         // Remove wheels that don't match `requires-python` and can't be selected for installation.
-        locked_dist
-            .wheels
-            .retain(|wheel| requires_python.matches_wheel_tag(&wheel.filename));
+        locked_dist.wheels.retain(|wheel| {
+            requires_python
+                .wheel_tag_compatibility(&wheel.filename)
+                .is_compatible()
+        });
 
         // Filter by platform tags.
 

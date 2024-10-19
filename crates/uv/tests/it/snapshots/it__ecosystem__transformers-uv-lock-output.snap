@@ -1,10 +1,399 @@
 ---
-source: crates/uv/tests/ecosystem.rs
+source: crates/uv/tests/it/ecosystem.rs
 expression: snapshot
 ---
-success: true
-exit_code: 0
+success: false
+exit_code: 1
 ----- stdout -----
 
 ----- stderr -----
-Resolved 296 packages in [TIME]
+  × No solution found when resolving dependencies for split (python_full_version == '3.9.*' and platform_machine == 'arm64' and platform_system == 'Darwin'):
+  ╰─▶ Because only the following versions of jax are available:
+          jax<=0.4.1
+          jax==0.4.2
+          jax==0.4.3
+          jax==0.4.4
+          jax==0.4.5
+          jax==0.4.6
+          jax==0.4.7
+          jax==0.4.8
+          jax==0.4.9
+          jax==0.4.10
+          jax==0.4.11
+          jax==0.4.12
+          jax>=0.4.13
+      and jax>=0.4.1,<=0.4.6 depends on numpy>=1.20, we can conclude that jax>=0.4.1,<0.4.7 depends on numpy>=1.20.
+      And because jax>=0.4.7,<=0.4.13 depends on numpy>=1.21, we can conclude that jax>=0.4.1,<=0.4.13 depends on numpy>=1.20. (1)
+
+      Because tensorflow>=2.6.0,<=2.6.5 depends on numpy>=1.19.2,<1.20.dev0 and only the following versions of tensorflow are available:
+          tensorflow<=2.6.5
+          tensorflow>=2.7.0,<=2.7.4
+          tensorflow>=2.8.0,<=2.8.4
+          tensorflow>=2.9.0,<=2.9.3
+          tensorflow>=2.10.0,<=2.10.1
+          tensorflow>=2.11.0,<=2.11.1
+          tensorflow>=2.12.0,<=2.12.1
+          tensorflow>=2.13.0,<=2.13.1
+          tensorflow>=2.14.0,<=2.14.1
+          tensorflow>=2.15.0
+      we can conclude that all of:
+          tensorflow>=2.6.0,<2.7.0
+          tensorflow>2.7.4,<2.8.0
+          tensorflow>2.8.4,<2.9.0
+          tensorflow>2.9.3,<2.10.0
+          tensorflow>2.10.1,<2.11.0
+          tensorflow>2.11.1,<2.12.0
+          tensorflow>2.12.1,<2.13.0
+          tensorflow>2.13.1,<2.14.0
+          tensorflow>2.14.1,<2.15.0
+      depend on numpy>=1.19.2,<1.20.dev0.
+      And because we know from (1) that jax>=0.4.1,<=0.4.13 depends on numpy>=1.20, we can conclude that jax>=0.4.1,<=0.4.13 and all of:
+          tensorflow>=2.6.0,<2.7.0
+          tensorflow>2.7.0,<2.7.1
+          tensorflow>2.7.1,<2.7.2
+          tensorflow>2.7.2,<2.7.3
+          tensorflow>2.7.3,<2.7.4
+          tensorflow>2.7.4,<2.8.0
+          tensorflow>2.8.0,<2.8.1
+          tensorflow>2.8.1,<2.8.2
+          tensorflow>2.8.2,<2.8.3
+          tensorflow>2.8.3,<2.8.4
+          tensorflow>2.8.4,<2.9.0
+          tensorflow>2.9.0,<2.9.1
+          tensorflow>2.9.1,<2.9.2
+          tensorflow>2.9.2,<2.9.3
+          tensorflow>2.9.3,<2.10.0
+          tensorflow>2.10.0,<2.10.1
+          tensorflow>2.10.1,<2.11.0
+          tensorflow>2.11.0,<2.11.1
+          tensorflow>2.11.1,<2.12.0
+          tensorflow>2.12.0,<2.12.1
+          tensorflow>2.12.1,<2.13.0
+          tensorflow>2.13.0,<2.13.1
+          tensorflow>2.13.1,<2.14.0
+          tensorflow>2.14.0,<2.14.1
+          tensorflow>2.14.1,<2.15.0
+          tensorflow>2.15.0,<2.15.0.post1
+          tensorflow>2.15.0.post1,<2.15.1
+          tensorflow>2.15.1,<2.16
+       are incompatible. (2)
+
+      Because tensorflow-estimator==2.15.0 has no wheels with a matching Python version tag and only tensorflow-estimator<=2.15.0 is available, we can conclude that tensorflow-estimator>=2.15.0 cannot be used.
+      And because tensorflow>=2.15.0,<=2.15.1 depends on tensorflow-estimator>=2.15.0, we can conclude that tensorflow>=2.15.0,<=2.15.1 cannot be used.
+      And because we know from (2) that jax>=0.4.1,<=0.4.13 and all of:
+          tensorflow>=2.6.0,<2.7.0
+          tensorflow>2.7.0,<2.7.1
+          tensorflow>2.7.1,<2.7.2
+          tensorflow>2.7.2,<2.7.3
+          tensorflow>2.7.3,<2.7.4
+          tensorflow>2.7.4,<2.8.0
+          tensorflow>2.8.0,<2.8.1
+          tensorflow>2.8.1,<2.8.2
+          tensorflow>2.8.2,<2.8.3
+          tensorflow>2.8.3,<2.8.4
+          tensorflow>2.8.4,<2.9.0
+          tensorflow>2.9.0,<2.9.1
+          tensorflow>2.9.1,<2.9.2
+          tensorflow>2.9.2,<2.9.3
+          tensorflow>2.9.3,<2.10.0
+          tensorflow>2.10.0,<2.10.1
+          tensorflow>2.10.1,<2.11.0
+          tensorflow>2.11.0,<2.11.1
+          tensorflow>2.11.1,<2.12.0
+          tensorflow>2.12.0,<2.12.1
+          tensorflow>2.12.1,<2.13.0
+          tensorflow>2.13.0,<2.13.1
+          tensorflow>2.13.1,<2.14.0
+          tensorflow>2.14.0,<2.14.1
+          tensorflow>2.14.1,<2.15.0
+          tensorflow>2.15.0,<2.15.0.post1
+          tensorflow>2.15.0.post1,<2.15.1
+          tensorflow>2.15.1,<2.16
+       are incompatible, we can conclude that jax>=0.4.1,<=0.4.13 and all of:
+          tensorflow>=2.6.0,<2.7.0
+          tensorflow>2.7.0,<2.7.1
+          tensorflow>2.7.1,<2.7.2
+          tensorflow>2.7.2,<2.7.3
+          tensorflow>2.7.3,<2.7.4
+          tensorflow>2.7.4,<2.8.0
+          tensorflow>2.8.0,<2.8.1
+          tensorflow>2.8.1,<2.8.2
+          tensorflow>2.8.2,<2.8.3
+          tensorflow>2.8.3,<2.8.4
+          tensorflow>2.8.4,<2.9.0
+          tensorflow>2.9.0,<2.9.1
+          tensorflow>2.9.1,<2.9.2
+          tensorflow>2.9.2,<2.9.3
+          tensorflow>2.9.3,<2.10.0
+          tensorflow>2.10.0,<2.10.1
+          tensorflow>2.10.1,<2.11.0
+          tensorflow>2.11.0,<2.11.1
+          tensorflow>2.11.1,<2.12.0
+          tensorflow>2.12.0,<2.12.1
+          tensorflow>2.12.1,<2.13.0
+          tensorflow>2.13.0,<2.13.1
+          tensorflow>2.13.1,<2.14.0
+          tensorflow>2.14.0,<2.14.1
+          tensorflow>2.14.1,<2.16
+       are incompatible. (3)
+
+      Because tensorflow-estimator==2.14.0 has no wheels with a matching Python version tag and only the following versions of tensorflow-estimator are available:
+          tensorflow-estimator<=2.14.0
+          tensorflow-estimator>2.15
+      we can conclude that tensorflow-estimator>=2.14.0,<2.15 cannot be used.
+      And because tensorflow>=2.14.0,<=2.14.1 depends on tensorflow-estimator>=2.14.0,<2.15, we can conclude that tensorflow>=2.14.0,<=2.14.1 cannot be used.
+      And because we know from (3) that jax>=0.4.1,<=0.4.13 and all of:
+          tensorflow>=2.6.0,<2.7.0
+          tensorflow>2.7.0,<2.7.1
+          tensorflow>2.7.1,<2.7.2
+          tensorflow>2.7.2,<2.7.3
+          tensorflow>2.7.3,<2.7.4
+          tensorflow>2.7.4,<2.8.0
+          tensorflow>2.8.0,<2.8.1
+          tensorflow>2.8.1,<2.8.2
+          tensorflow>2.8.2,<2.8.3
+          tensorflow>2.8.3,<2.8.4
+          tensorflow>2.8.4,<2.9.0
+          tensorflow>2.9.0,<2.9.1
+          tensorflow>2.9.1,<2.9.2
+          tensorflow>2.9.2,<2.9.3
+          tensorflow>2.9.3,<2.10.0
+          tensorflow>2.10.0,<2.10.1
+          tensorflow>2.10.1,<2.11.0
+          tensorflow>2.11.0,<2.11.1
+          tensorflow>2.11.1,<2.12.0
+          tensorflow>2.12.0,<2.12.1
+          tensorflow>2.12.1,<2.13.0
+          tensorflow>2.13.0,<2.13.1
+          tensorflow>2.13.1,<2.14.0
+          tensorflow>2.14.0,<2.14.1
+          tensorflow>2.14.1,<2.16
+       are incompatible, we can conclude that jax>=0.4.1,<=0.4.13 and all of:
+          tensorflow>=2.6.0,<2.7.0
+          tensorflow>2.7.0,<2.7.1
+          tensorflow>2.7.1,<2.7.2
+          tensorflow>2.7.2,<2.7.3
+          tensorflow>2.7.3,<2.7.4
+          tensorflow>2.7.4,<2.8.0
+          tensorflow>2.8.0,<2.8.1
+          tensorflow>2.8.1,<2.8.2
+          tensorflow>2.8.2,<2.8.3
+          tensorflow>2.8.3,<2.8.4
+          tensorflow>2.8.4,<2.9.0
+          tensorflow>2.9.0,<2.9.1
+          tensorflow>2.9.1,<2.9.2
+          tensorflow>2.9.2,<2.9.3
+          tensorflow>2.9.3,<2.10.0
+          tensorflow>2.10.0,<2.10.1
+          tensorflow>2.10.1,<2.11.0
+          tensorflow>2.11.0,<2.11.1
+          tensorflow>2.11.1,<2.12.0
+          tensorflow>2.12.0,<2.12.1
+          tensorflow>2.12.1,<2.13.0
+          tensorflow>2.13.0,<2.13.1
+          tensorflow>2.13.1,<2.16
+       are incompatible. (4)
+
+      Because keras==2.9.0 has no wheels with a matching Python version tag and only the following versions of keras are available:
+          keras<2.9.0rc0
+          keras>=2.9.0
+      we can conclude that keras>=2.9.0rc0,<2.10.0 cannot be used.
+      And because tensorflow>=2.9.0,<=2.9.3 depends on keras>=2.9.0rc0,<2.10.0, we can conclude that tensorflow>=2.9.0,<=2.9.3 cannot be used.
+      And because we know from (4) that jax>=0.4.1,<=0.4.13 and all of:
+          tensorflow>=2.6.0,<2.7.0
+          tensorflow>2.7.0,<2.7.1
+          tensorflow>2.7.1,<2.7.2
+          tensorflow>2.7.2,<2.7.3
+          tensorflow>2.7.3,<2.7.4
+          tensorflow>2.7.4,<2.8.0
+          tensorflow>2.8.0,<2.8.1
+          tensorflow>2.8.1,<2.8.2
+          tensorflow>2.8.2,<2.8.3
+          tensorflow>2.8.3,<2.8.4
+          tensorflow>2.8.4,<2.9.0
+          tensorflow>2.9.0,<2.9.1
+          tensorflow>2.9.1,<2.9.2
+          tensorflow>2.9.2,<2.9.3
+          tensorflow>2.9.3,<2.10.0
+          tensorflow>2.10.0,<2.10.1
+          tensorflow>2.10.1,<2.11.0
+          tensorflow>2.11.0,<2.11.1
+          tensorflow>2.11.1,<2.12.0
+          tensorflow>2.12.0,<2.12.1
+          tensorflow>2.12.1,<2.13.0
+          tensorflow>2.13.0,<2.13.1
+          tensorflow>2.13.1,<2.16
+       are incompatible, we can conclude that jax>=0.4.1,<=0.4.13 and all of:
+          tensorflow>=2.6.0,<2.7.0
+          tensorflow>2.7.0,<2.7.1
+          tensorflow>2.7.1,<2.7.2
+          tensorflow>2.7.2,<2.7.3
+          tensorflow>2.7.3,<2.7.4
+          tensorflow>2.7.4,<2.8.0
+          tensorflow>2.8.0,<2.8.1
+          tensorflow>2.8.1,<2.8.2
+          tensorflow>2.8.2,<2.8.3
+          tensorflow>2.8.3,<2.8.4
+          tensorflow>2.8.4,<2.10.0
+          tensorflow>2.10.0,<2.10.1
+          tensorflow>2.10.1,<2.11.0
+          tensorflow>2.11.0,<2.11.1
+          tensorflow>2.11.1,<2.12.0
+          tensorflow>2.12.0,<2.12.1
+          tensorflow>2.12.1,<2.13.0
+          tensorflow>2.13.0,<2.13.1
+          tensorflow>2.13.1,<2.16
+       are incompatible. (5)
+
+      Because keras==2.8.0 has no wheels with a matching Python version tag and only the following versions of keras are available:
+          keras<2.8.0rc0
+          keras>=2.8.0
+      we can conclude that keras>=2.8.0rc0,<2.9 cannot be used.
+      And because tensorflow>=2.8.0,<=2.8.4 depends on keras>=2.8.0rc0,<2.9, we can conclude that tensorflow>=2.8.0,<=2.8.4 cannot be used.
+      And because we know from (5) that jax>=0.4.1,<=0.4.13 and all of:
+          tensorflow>=2.6.0,<2.7.0
+          tensorflow>2.7.0,<2.7.1
+          tensorflow>2.7.1,<2.7.2
+          tensorflow>2.7.2,<2.7.3
+          tensorflow>2.7.3,<2.7.4
+          tensorflow>2.7.4,<2.8.0
+          tensorflow>2.8.0,<2.8.1
+          tensorflow>2.8.1,<2.8.2
+          tensorflow>2.8.2,<2.8.3
+          tensorflow>2.8.3,<2.8.4
+          tensorflow>2.8.4,<2.10.0
+          tensorflow>2.10.0,<2.10.1
+          tensorflow>2.10.1,<2.11.0
+          tensorflow>2.11.0,<2.11.1
+          tensorflow>2.11.1,<2.12.0
+          tensorflow>2.12.0,<2.12.1
+          tensorflow>2.12.1,<2.13.0
+          tensorflow>2.13.0,<2.13.1
+          tensorflow>2.13.1,<2.16
+       are incompatible, we can conclude that jax>=0.4.1,<=0.4.13 and all of:
+          tensorflow>=2.6.0,<2.7.0
+          tensorflow>2.7.0,<2.7.1
+          tensorflow>2.7.1,<2.7.2
+          tensorflow>2.7.2,<2.7.3
+          tensorflow>2.7.3,<2.7.4
+          tensorflow>2.7.4,<2.10.0
+          tensorflow>2.10.0,<2.10.1
+          tensorflow>2.10.1,<2.11.0
+          tensorflow>2.11.0,<2.11.1
+          tensorflow>2.11.1,<2.12.0
+          tensorflow>2.12.0,<2.12.1
+          tensorflow>2.12.1,<2.13.0
+          tensorflow>2.13.0,<2.13.1
+          tensorflow>2.13.1,<2.16
+       are incompatible. (6)
+
+      Because keras==2.7.0 has no wheels with a matching Python version tag and only the following versions of keras are available:
+          keras<2.7.0rc0
+          keras>=2.7.0
+      we can conclude that keras>=2.7.0rc0,<2.8 cannot be used.
+      And because tensorflow>=2.7.0,<=2.7.4 depends on keras>=2.7.0rc0,<2.8, we can conclude that tensorflow>=2.7.0,<=2.7.4 cannot be used.
+      And because we know from (6) that jax>=0.4.1,<=0.4.13 and all of:
+          tensorflow>=2.6.0,<2.7.0
+          tensorflow>2.7.0,<2.7.1
+          tensorflow>2.7.1,<2.7.2
+          tensorflow>2.7.2,<2.7.3
+          tensorflow>2.7.3,<2.7.4
+          tensorflow>2.7.4,<2.10.0
+          tensorflow>2.10.0,<2.10.1
+          tensorflow>2.10.1,<2.11.0
+          tensorflow>2.11.0,<2.11.1
+          tensorflow>2.11.1,<2.12.0
+          tensorflow>2.12.0,<2.12.1
+          tensorflow>2.12.1,<2.13.0
+          tensorflow>2.13.0,<2.13.1
+          tensorflow>2.13.1,<2.16
+       are incompatible, we can conclude that jax>=0.4.1,<=0.4.13 and all of:
+          tensorflow>=2.6.0,<2.10.0
+          tensorflow>2.10.0,<2.10.1
+          tensorflow>2.10.1,<2.11.0
+          tensorflow>2.11.0,<2.11.1
+          tensorflow>2.11.1,<2.12.0
+          tensorflow>2.12.0,<2.12.1
+          tensorflow>2.12.1,<2.13.0
+          tensorflow>2.13.0,<2.13.1
+          tensorflow>2.13.1,<2.16
+       are incompatible. (7)
+
+      Because keras==2.11.0 has no wheels with a matching Python version tag and only the following versions of keras are available:
+          keras<=2.11.0
+          keras>2.12
+      we can conclude that keras>=2.11.0,<2.12 cannot be used.
+      And because tensorflow>=2.11.0,<=2.11.1 depends on keras>=2.11.0,<2.12, we can conclude that tensorflow>=2.11.0,<=2.11.1 cannot be used.
+      And because we know from (7) that jax>=0.4.1,<=0.4.13 and all of:
+          tensorflow>=2.6.0,<2.10.0
+          tensorflow>2.10.0,<2.10.1
+          tensorflow>2.10.1,<2.11.0
+          tensorflow>2.11.0,<2.11.1
+          tensorflow>2.11.1,<2.12.0
+          tensorflow>2.12.0,<2.12.1
+          tensorflow>2.12.1,<2.13.0
+          tensorflow>2.13.0,<2.13.1
+          tensorflow>2.13.1,<2.16
+       are incompatible, we can conclude that jax>=0.4.1,<=0.4.13 and all of:
+          tensorflow>=2.6.0,<2.10.0
+          tensorflow>2.10.0,<2.10.1
+          tensorflow>2.10.1,<2.12.0
+          tensorflow>2.12.0,<2.12.1
+          tensorflow>2.12.1,<2.13.0
+          tensorflow>2.13.0,<2.13.1
+          tensorflow>2.13.1,<2.16
+       are incompatible. (8)
+
+      Because tensorflow-estimator==2.13.0 has no wheels with a matching Python version tag and only the following versions of tensorflow-estimator are available:
+          tensorflow-estimator<=2.13.0
+          tensorflow-estimator>2.14
+      we can conclude that tensorflow-estimator>=2.13.0,<2.14 cannot be used.
+      And because tensorflow>=2.13.0,<=2.13.1 depends on tensorflow-estimator>=2.13.0,<2.14, we can conclude that tensorflow>=2.13.0,<=2.13.1 cannot be used.
+      And because we know from (8) that jax>=0.4.1,<=0.4.13 and all of:
+          tensorflow>=2.6.0,<2.10.0
+          tensorflow>2.10.0,<2.10.1
+          tensorflow>2.10.1,<2.12.0
+          tensorflow>2.12.0,<2.12.1
+          tensorflow>2.12.1,<2.13.0
+          tensorflow>2.13.0,<2.13.1
+          tensorflow>2.13.1,<2.16
+       are incompatible, we can conclude that jax>=0.4.1,<=0.4.13 and all of:
+          tensorflow>=2.6.0,<2.10.0
+          tensorflow>2.10.0,<2.10.1
+          tensorflow>2.10.1,<2.12.0
+          tensorflow>2.12.0,<2.12.1
+          tensorflow>2.12.1,<2.16
+       are incompatible. (9)
+
+      Because keras==2.10.0 has no wheels with a matching Python version tag and only the following versions of keras are available:
+          keras<=2.10.0
+          keras>2.11
+      we can conclude that keras>=2.10.0,<2.11 cannot be used.
+      And because tensorflow>=2.10.0,<=2.10.1 depends on keras>=2.10.0,<2.11, we can conclude that tensorflow>=2.10.0,<=2.10.1 cannot be used. (10)
+
+      Because keras==2.12.0 has no wheels with a matching Python version tag and only the following versions of keras are available:
+          keras<=2.12.0
+          keras>2.13
+      we can conclude that keras>=2.12.0,<2.13 cannot be used.
+      And because tensorflow>=2.12.0,<=2.12.1 depends on keras>=2.12.0,<2.13, we can conclude that tensorflow>=2.12.0,<=2.12.1 cannot be used.
+      And because we know from (10) that tensorflow>=2.10.0,<=2.10.1 cannot be used, we can conclude that all of:
+          tensorflow>=2.10.0,<=2.10.1
+          tensorflow>=2.12.0,<=2.12.1
+       cannot be used.
+      And because we know from (9) that jax>=0.4.1,<=0.4.13 and all of:
+          tensorflow>=2.6.0,<2.10.0
+          tensorflow>2.10.0,<2.10.1
+          tensorflow>2.10.1,<2.12.0
+          tensorflow>2.12.0,<2.12.1
+          tensorflow>2.12.1,<2.16
+       are incompatible, we can conclude that jax>=0.4.1,<=0.4.13 and tensorflow>=2.6.0,<2.16 are incompatible.
+      And because transformers[all] depends on jax>=0.4.1,<=0.4.13, we can conclude that tensorflow>=2.6.0,<2.16 and transformers[all] are incompatible.
+      And because transformers[all] depends on tensorflow>=2.6,<2.16 and your project requires transformers[all], we can conclude that your projects's requirements are unsatisfiable.
+
+      hint: Pre-releases are available for tensorflow in the requested range (e.g., 2.15.0rc1), but pre-releases weren't enabled (try: `--prerelease=allow`)
+
+      hint: The dependency (tensorflow-estimator==2.15.0) does not publish wheels that fulfill the `requires-python` value (>=3.9.0), only Python 2 wheels are available.
+
+      hint: The dependency (keras==2.9.0) does not publish wheels that fulfill the `requires-python` value (>=3.9.0), only Python 2 wheels are available.
+
+      hint: keras was requested with a pre-release marker (e.g., keras>=2.9.0rc0,<2.9.0), but pre-releases weren't enabled (try: `--prerelease=allow`)

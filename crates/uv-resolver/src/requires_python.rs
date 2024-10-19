@@ -3,6 +3,7 @@ use pubgrub::Range;
 use std::cmp::Ordering;
 use std::collections::Bound;
 use std::ops::Deref;
+use uv_platform_tags::{PythonVersionTagCompatibility, PythonVersionTagIncompatibility};
 
 use uv_distribution_filename::WheelFilename;
 use uv_pep440::{Version, VersionSpecifier, VersionSpecifiers};
@@ -335,40 +336,48 @@ impl RequiresPython {
         marker.complexify_python_versions(lower.0.as_ref(), upper.0.as_ref())
     }
 
-    /// Returns `false` if the wheel's tags state it can't be used in the given Python version
+    /// Returns a [`PythonVersionTagCompatibility`] for the wheel tags and the given Python version
     /// range.
+    ///
+    /// Returns [`PythonVersionTagCompatibility::Incompatible`] if the wheel cannot be used.
     ///
     /// It is meant to filter out clearly unusable wheels with perfect specificity and acceptable
     /// sensitivity, we return `true` if the tags are unknown.
-    pub fn matches_wheel_tag(&self, wheel: &WheelFilename) -> bool {
-        wheel.abi_tag.iter().any(|abi_tag| {
+    pub fn wheel_tag_compatibility(&self, wheel: &WheelFilename) -> PythonVersionTagCompatibility {
+        for abi_tag in &wheel.abi_tag {
             if abi_tag == "abi3" {
                 // Universal tags are allowed.
-                true
+                return PythonVersionTagCompatibility::Compatible;
             } else if abi_tag == "none" {
-                wheel.python_tag.iter().any(|python_tag| {
+                for python_tag in &wheel.python_tag {
                     // Remove `py2-none-any` and `py27-none-any` and analogous `cp` and `pp` tags.
                     if python_tag.starts_with("py2")
                         || python_tag.starts_with("cp2")
                         || python_tag.starts_with("pp2")
                     {
-                        return false;
+                        return PythonVersionTagCompatibility::Incompatible(
+                            PythonVersionTagIncompatibility::Py2,
+                        );
                     }
 
                     // Remove (e.g.) `py312-none-any` if the specifier is `==3.10.*`. However,
                     // `py37-none-any` would be fine, since the `3.7` represents a lower bound.
                     if let Some(minor) = python_tag.strip_prefix("py3") {
                         let Ok(minor) = minor.parse::<u64>() else {
-                            return true;
+                            return PythonVersionTagCompatibility::Compatible;
                         };
 
                         // Ex) If the wheel bound is `3.12`, then it doesn't match `<=3.10.`.
                         let wheel_bound = UpperBound(Bound::Included(Version::new([3, minor])));
                         if wheel_bound > self.range.upper().major_minor() {
-                            return false;
+                            return PythonVersionTagCompatibility::Incompatible(
+                                PythonVersionTagIncompatibility::AboveRequirement(
+                                    python_tag.clone(),
+                                ),
+                            );
                         }
 
-                        return true;
+                        return PythonVersionTagCompatibility::Compatible;
                     };
 
                     // Remove (e.g.) `cp36-none-any` or `cp312-none-any` if the specifier is
@@ -378,81 +387,98 @@ impl RequiresPython {
                         .or_else(|| python_tag.strip_prefix("pp3"))
                     {
                         let Ok(minor) = minor.parse::<u64>() else {
-                            return true;
+                            return PythonVersionTagCompatibility::Compatible;
                         };
 
                         // Ex) If the wheel bound is `3.6`, then it doesn't match `>=3.10`.
                         let wheel_bound = LowerBound(Bound::Included(Version::new([3, minor])));
                         if wheel_bound < self.range.lower().major_minor() {
-                            return false;
+                            return PythonVersionTagCompatibility::Incompatible(
+                                PythonVersionTagIncompatibility::BelowRequirement(
+                                    python_tag.clone(),
+                                ),
+                            );
                         }
 
                         // Ex) If the wheel bound is `3.12`, then it doesn't match `<=3.10.`.
                         let wheel_bound = UpperBound(Bound::Included(Version::new([3, minor])));
                         if wheel_bound > self.range.upper().major_minor() {
-                            return false;
+                            return PythonVersionTagCompatibility::Incompatible(
+                                PythonVersionTagIncompatibility::AboveRequirement(
+                                    python_tag.clone(),
+                                ),
+                            );
                         }
 
-                        return true;
+                        return PythonVersionTagCompatibility::Compatible;
                     }
-
-                    // Unknown tags are allowed.
-                    true
-                })
+                }
             } else if abi_tag.starts_with("cp2") || abi_tag.starts_with("pypy2") {
                 // Python 2 is never allowed.
-                false
+                return PythonVersionTagCompatibility::Incompatible(
+                    PythonVersionTagIncompatibility::Py2,
+                );
             } else if let Some(minor_no_dot_abi) = abi_tag.strip_prefix("cp3") {
                 // Remove ABI tags, both old (dmu) and future (t, and all other letters).
                 let minor_not_dot = minor_no_dot_abi.trim_matches(char::is_alphabetic);
                 let Ok(minor) = minor_not_dot.parse::<u64>() else {
                     // Unknown version pattern are allowed.
-                    return true;
+                    return PythonVersionTagCompatibility::Compatible;
                 };
 
                 // Ex) If the wheel bound is `3.6`, then it doesn't match `>=3.10`.
                 let wheel_bound = LowerBound(Bound::Included(Version::new([3, minor])));
                 if wheel_bound < self.range.lower().major_minor() {
-                    return false;
+                    return PythonVersionTagCompatibility::Incompatible(
+                        PythonVersionTagIncompatibility::BelowRequirement(abi_tag.clone()),
+                    );
                 }
 
                 // Ex) If the wheel bound is `3.12`, then it doesn't match `<=3.10.`.
                 let wheel_bound = UpperBound(Bound::Included(Version::new([3, minor])));
                 if wheel_bound > self.range.upper().major_minor() {
-                    return false;
+                    return PythonVersionTagCompatibility::Incompatible(
+                        PythonVersionTagIncompatibility::AboveRequirement(abi_tag.clone()),
+                    );
                 }
 
-                true
+                return PythonVersionTagCompatibility::Compatible;
             } else if let Some(minor_no_dot_abi) = abi_tag.strip_prefix("pypy3") {
                 // Given  `pypy39_pp73`, we just removed `pypy3`, now we remove `_pp73` ...
                 let Some((minor_not_dot, _)) = minor_no_dot_abi.split_once('_') else {
                     // Unknown version pattern are allowed.
-                    return true;
+                    return PythonVersionTagCompatibility::Compatible;
                 };
                 // ... and get `9`.
                 let Ok(minor) = minor_not_dot.parse::<u64>() else {
                     // Unknown version pattern are allowed.
-                    return true;
+                    return PythonVersionTagCompatibility::Compatible;
                 };
 
                 // Ex) If the wheel bound is `3.6`, then it doesn't match `>=3.10`.
                 let wheel_bound = LowerBound(Bound::Included(Version::new([3, minor])));
                 if wheel_bound < self.range.lower().major_minor() {
-                    return false;
+                    return PythonVersionTagCompatibility::Incompatible(
+                        PythonVersionTagIncompatibility::BelowRequirement(abi_tag.clone()),
+                    );
                 }
 
                 // Ex) If the wheel bound is `3.12`, then it doesn't match `<=3.10.`.
                 let wheel_bound = UpperBound(Bound::Included(Version::new([3, minor])));
                 if wheel_bound > self.range.upper().major_minor() {
-                    return false;
+                    return PythonVersionTagCompatibility::Incompatible(
+                        PythonVersionTagIncompatibility::AboveRequirement(abi_tag.clone()),
+                    );
                 }
 
-                true
+                return PythonVersionTagCompatibility::Compatible;
             } else {
                 // Unknown tags are allowed.
-                true
+                return PythonVersionTagCompatibility::Compatible;
             }
-        })
+        }
+
+        PythonVersionTagCompatibility::Compatible
     }
 }
 

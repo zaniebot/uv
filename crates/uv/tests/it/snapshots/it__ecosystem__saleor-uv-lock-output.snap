@@ -1,10 +1,14 @@
 ---
-source: crates/uv/tests/ecosystem.rs
+source: crates/uv/tests/it/ecosystem.rs
 expression: snapshot
 ---
-success: true
-exit_code: 0
+success: false
+exit_code: 1
 ----- stdout -----
 
 ----- stderr -----
-Resolved 170 packages in [TIME]
+  × No solution found when resolving dependencies:
+  ╰─▶ Because python-magic-bin{sys_platform == 'win32'}==0.4.14 has no wheels with a matching Python version tag and only python-magic-bin{sys_platform == 'win32'}<=0.4.14 is available, we can conclude that python-magic-bin{sys_platform == 'win32'}>=0.4.14,<0.5.0 is incompatible.
+      And because your project depends on python-magic-bin{sys_platform == 'win32'}>=0.4.14, we can conclude that your project's requirements are unsatisfiable.
+
+      hint: The dependency (python-magic-bin{sys_platform == 'win32'}==0.4.14) does not publish wheels that fulfill the `requires-python` value (>=3.12), only Python 2 wheels are available.

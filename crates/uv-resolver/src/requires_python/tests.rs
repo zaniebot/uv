@@ -24,7 +24,9 @@ fn requires_python_included() {
     ];
     for wheel_name in wheel_names {
         assert!(
-            requires_python.matches_wheel_tag(&WheelFilename::from_str(wheel_name).unwrap()),
+            requires_python
+                .wheel_tag_compatibility(&WheelFilename::from_str(wheel_name).unwrap())
+                .is_compatible(),
             "{wheel_name}"
         );
     }
@@ -34,7 +36,9 @@ fn requires_python_included() {
     let wheel_names = &["dearpygui-1.11.1-cp312-cp312-win_amd64.whl"];
     for wheel_name in wheel_names {
         assert!(
-            requires_python.matches_wheel_tag(&WheelFilename::from_str(wheel_name).unwrap()),
+            requires_python
+                .wheel_tag_compatibility(&WheelFilename::from_str(wheel_name).unwrap())
+                .is_compatible(),
             "{wheel_name}"
         );
     }
@@ -44,7 +48,9 @@ fn requires_python_included() {
     let wheel_names = &["lxml-5.3.0-cp312-cp312-musllinux_1_2_aarch64.whl"];
     for wheel_name in wheel_names {
         assert!(
-            requires_python.matches_wheel_tag(&WheelFilename::from_str(wheel_name).unwrap()),
+            requires_python
+                .wheel_tag_compatibility(&WheelFilename::from_str(wheel_name).unwrap())
+                .is_compatible(),
             "{wheel_name}"
         );
     }
@@ -54,7 +60,9 @@ fn requires_python_included() {
     let wheel_names = &["lxml-5.3.0-cp312-cp312-musllinux_1_2_x86_64.whl"];
     for wheel_name in wheel_names {
         assert!(
-            requires_python.matches_wheel_tag(&WheelFilename::from_str(wheel_name).unwrap()),
+            requires_python
+                .wheel_tag_compatibility(&WheelFilename::from_str(wheel_name).unwrap())
+                .is_compatible(),
             "{wheel_name}"
         );
     }
@@ -77,7 +85,9 @@ fn requires_python_dropped() {
     ];
     for wheel_name in wheel_names {
         assert!(
-            !requires_python.matches_wheel_tag(&WheelFilename::from_str(wheel_name).unwrap()),
+            !requires_python
+                .wheel_tag_compatibility(&WheelFilename::from_str(wheel_name).unwrap())
+                .is_compatible(),
             "{wheel_name}"
         );
     }
@@ -87,7 +97,9 @@ fn requires_python_dropped() {
     let wheel_names = &["dearpygui-1.11.1-cp310-cp310-win_amd64.whl"];
     for wheel_name in wheel_names {
         assert!(
-            !requires_python.matches_wheel_tag(&WheelFilename::from_str(wheel_name).unwrap()),
+            !requires_python
+                .wheel_tag_compatibility(&WheelFilename::from_str(wheel_name).unwrap())
+                .is_compatible(),
             "{wheel_name}"
         );
     }

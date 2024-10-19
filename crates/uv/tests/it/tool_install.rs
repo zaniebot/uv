@@ -1950,23 +1950,15 @@ fn tool_install_requirements_txt_arguments() {
         .env(EnvVars::UV_TOOL_DIR, tool_dir.as_os_str())
         .env(EnvVars::XDG_BIN_HOME, bin_dir.as_os_str())
         .env(EnvVars::PATH, bin_dir.as_os_str()), @r###"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    Resolved 8 packages in [TIME]
-    Prepared 8 packages in [TIME]
-    Installed 8 packages in [TIME]
-     + blinker==1.7.0
-     + click==8.1.7
-     + flask==3.0.2
-     + idna==2.7
-     + itsdangerous==2.1.2
-     + jinja2==3.1.3
-     + markupsafe==2.1.5
-     + werkzeug==3.0.1
-    Installed 1 executable: flask
+    error: Because idna==2.7 has no wheels with a matching Python version tag and only idna==2.7 is available, we can conclude that all versions of idna cannot be used.
+    And because you require idna, we can conclude that your requirements are unsatisfiable.
+
+    hint: The dependency (idna==2.7) does not publish wheels that fulfill the Python interpreter's version, only Python 2 wheels are available.
     "###);
 }
 
