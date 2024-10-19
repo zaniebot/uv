@@ -9,16 +9,21 @@ use pubgrub::{DerivationTree, Derived, External, Map, Range, ReportFormatter, Te
 use rustc_hash::FxHashMap;
 
 use uv_configuration::IndexStrategy;
-use uv_distribution_types::{Index, IndexCapabilities, IndexLocations, IndexUrl};
+use uv_distribution_types::{
+    IncompatibleDist, IncompatibleWheel, Index, IndexCapabilities, IndexLocations, IndexUrl,
+};
 use uv_normalize::PackageName;
 use uv_pep440::Version;
+use uv_platform_tags::IncompatibleTag;
 
 use crate::candidate_selector::CandidateSelector;
 use crate::error::ErrorTree;
 use crate::fork_urls::ForkUrls;
 use crate::prerelease::AllowPrerelease;
 use crate::python_requirement::{PythonRequirement, PythonRequirementSource};
-use crate::resolver::{IncompletePackage, UnavailablePackage, UnavailableReason};
+use crate::resolver::{
+    IncompletePackage, UnavailablePackage, UnavailableReason, UnavailableVersion,
+};
 use crate::{Flexibility, Options, RequiresPython, ResolverMarkers};
 
 use super::{PubGrubPackage, PubGrubPackageInner, PubGrubPython};
@@ -516,6 +521,23 @@ impl PubGrubReportFormatter<'_> {
         output_hints: &mut IndexSet<PubGrubHint>,
     ) {
         match derivation_tree {
+            // Check for unusable versions due to Python version ABI tags
+            DerivationTree::External(External::Custom(
+                package,
+                set,
+                UnavailableReason::Version(UnavailableVersion::IncompatibleDist(
+                    IncompatibleDist::Wheel(IncompatibleWheel::Tag(
+                        IncompatibleTag::AbiPythonVersion,
+                    )),
+                )),
+            )) => {
+                output_hints.insert(PubGrubHint::RequiresPythonAbiTag {
+                    source: self.python_requirement.source(),
+                    requires_python: self.python_requirement.target().clone(),
+                    package: package.clone(),
+                    package_set: self.simplify_set(set, package).into_owned(),
+                });
+            }
             DerivationTree::External(
                 External::Custom(package, set, _) | External::NoVersions(package, set),
             ) => {
@@ -873,6 +895,13 @@ pub(crate) enum PubGrubHint {
         // excluded from `PartialEq` and `Hash`
         package_requires_python: Range<Version>,
     },
+    /// The `Requires-Python` requirement excluded a package because of Python version ABI tags.
+    RequiresPythonAbiTag {
+        source: PythonRequirementSource,
+        requires_python: RequiresPython,
+        package: PubGrubPackage,
+        package_set: Range<Version>,
+    },
     /// A non-workspace package depends on a workspace package, which is likely shadowing a
     /// transitive dependency.
     DependsOnWorkspacePackage {
@@ -936,6 +965,11 @@ enum PubGrubHintCore {
         source: PythonRequirementSource,
         requires_python: RequiresPython,
     },
+    RequiresPythonAbiTag {
+        source: PythonRequirementSource,
+        requires_python: RequiresPython,
+        package: PubGrubPackage,
+    },
     DependsOnWorkspacePackage {
         package: PubGrubPackage,
         dependency: PubGrubPackage,
@@ -992,6 +1026,16 @@ impl From<PubGrubHint> for PubGrubHintCore {
             } => Self::RequiresPython {
                 source,
                 requires_python,
+            },
+            PubGrubHint::RequiresPythonAbiTag {
+                source,
+                requires_python,
+                package,
+                ..
+            } => Self::RequiresPythonAbiTag {
+                source,
+                requires_python,
+                package,
             },
             PubGrubHint::DependsOnWorkspacePackage {
                 package,
@@ -1201,6 +1245,50 @@ impl std::fmt::Display for PubGrubHint {
                     ":".bold(),
                     PackageRange::compatibility(package, package_set, None).bold(),
                     package_requires_python.bold(),
+                )
+            }
+            Self::RequiresPythonAbiTag {
+                source: PythonRequirementSource::RequiresPython,
+                requires_python,
+                package,
+                package_set,
+            } => {
+                write!(
+                    f,
+                    "{}{} The dependency ({}) does not publish wheels that fulfill the `requires-python` value ({}).",
+                    "hint".bold().cyan(),
+                    ":".bold(),
+                    PackageRange::compatibility(package, package_set, None).bold(),
+                    requires_python.bold(),
+                )
+            }
+            Self::RequiresPythonAbiTag {
+                source: PythonRequirementSource::PythonVersion,
+                requires_python,
+                package,
+                package_set,
+            } => {
+                write!(
+                    f,
+                    "{}{} The dependency ({}) does not publish wheels that fulfill the `--python-version` value ({}).",
+                    "hint".bold().cyan(),
+                    ":".bold(),
+                    PackageRange::compatibility(package, package_set, None).bold(),
+                    requires_python.bold(),
+                )
+            }
+            Self::RequiresPythonAbiTag {
+                source: PythonRequirementSource::Interpreter,
+                requires_python: _,
+                package,
+                package_set,
+            } => {
+                write!(
+                    f,
+                    "{}{} The dependency ({}) does not publish wheels that fulfill the Python interpreter's version.",
+                    "hint".bold().cyan(),
+                    ":".bold(),
+                    PackageRange::compatibility(package, package_set, None).bold(),
                 )
             }
             Self::DependsOnWorkspacePackage {
