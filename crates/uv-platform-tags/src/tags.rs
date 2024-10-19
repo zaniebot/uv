@@ -25,7 +25,7 @@ pub enum TagsError {
 pub enum IncompatibleTag {
     Invalid,
     Python,
-    Abi,
+    Abi(String),
     Platform,
 }
 
@@ -246,8 +246,9 @@ impl Tags {
             };
             for wheel_abi in wheel_abi_tags {
                 let Some(platforms) = abis.get(wheel_abi) else {
-                    max_compatibility =
-                        max_compatibility.max(TagCompatibility::Incompatible(IncompatibleTag::Abi));
+                    max_compatibility = max_compatibility.max(TagCompatibility::Incompatible(
+                        IncompatibleTag::Abi(wheel_abi.clone()),
+                    ));
                     continue;
                 };
                 for wheel_platform in wheel_platform_tags {

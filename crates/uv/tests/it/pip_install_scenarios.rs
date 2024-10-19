@@ -4267,16 +4267,16 @@ fn no_sdist_no_wheels_with_matching_abi() {
 
     uv_snapshot!(filters, command(&context)
         .arg("no-sdist-no-wheels-with-matching-abi-a")
-        , @r#"
+        , @r###"
     success: false
     exit_code: 1
     ----- stdout -----
 
     ----- stderr -----
       × No solution found when resolving dependencies:
-      ╰─▶ Because only package-a==1.0.0 is available and package-a==1.0.0 has no wheels with a matching Python ABI tag, we can conclude that all versions of package-a cannot be used.
+      ╰─▶ Because only package-a==1.0.0 is available and package-a==1.0.0 has no wheels with a matching Python ABI tag (MMMMMM), we can conclude that all versions of package-a cannot be used.
           And because you require package-a, we can conclude that your requirements are unsatisfiable.
-    "#);
+    "###);
 
     assert_not_installed(
         &context.venv,
