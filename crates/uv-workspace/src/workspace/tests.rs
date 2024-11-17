@@ -208,7 +208,8 @@ async fn albatross_root_workspace() {
               "bird-feeder": [
                 {
                   "workspace": true,
-                  "extra": null
+                  "extra": null,
+                  "group": null
                 }
               ]
             },
@@ -230,7 +231,8 @@ async fn albatross_root_workspace() {
                     "bird-feeder": [
                       {
                         "workspace": true,
-                        "extra": null
+                        "extra": null,
+                        "group": null
                       }
                     ]
                   },
