@@ -185,7 +185,7 @@ When searching for a Python version, the following locations are checked:
 In some cases, uv allows using a Python version from a virtual environment. In this case, the
 virtual environment's interpreter will be checked for compatibility with the request before
 searching for an installation as described above. See the
-[pip-compatible virtual environment discovery](../pip/environments.md#discovery-of-python-environments)
+[pip-compatible virtual environment discovery](./virtualenv//environments.md#discovery-of-python-environments)
 documentation for details.
 
 When performing discovery, non-executable files will be ignored. Each discovered executable is

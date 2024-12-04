@@ -1,11 +1,6 @@
-# Python environments
+# Using environments
 
-Each Python installation has an environment that is active when Python is used. Packages can be
-installed into an environment to make their modules available from your Python scripts. Generally,
-it is considered best practice not to modify a Python installation's environment. This is especially
-important for Python installations that come with the operating system which often manage the
-packages themselves. A virtual environment is a lightweight way to isolate packages from a Python
-installation's environment. Unlike `pip`, uv requires using a virtual environment by default.
+Unlike `pip`, uv requires using a virtual environment by default.
 
 ## Creating a virtual environment
 
@@ -29,7 +24,7 @@ $ uv venv --python 3.11
 
 Note this requires the requested Python version to be available on the system. However, if
 unavailable, uv will download Python for you. See the
-[Python version](../concepts/python-versions.md) documentation for more details.
+[Python version](../python-versions.md) documentation for more details.
 
 ## Using a virtual environment
 
@@ -115,5 +110,5 @@ If the `--system` flag is included, uv will skip virtual environments search for
 version. Similarly, when running a command that does not mutate the environment such as
 `uv pip compile`, uv does not _require_ a virtual environment — however, a Python interpreter is
 still required. See the documentation on
-[Python discovery](../concepts/python-versions.md#discovery-of-python-versions) for details on the
+[Python discovery](../python-versions.md#discovery-of-python-versions) for details on the
 discovery of installed Python versions.

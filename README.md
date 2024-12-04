@@ -261,7 +261,7 @@ Installed 43 packages in 208ms
  ...
 ```
 
-See the [pip interface documentation](https://docs.astral.sh/uv/pip/index/) to get started.
+See the [pip interface documentation](https://docs.astral.sh/uv/concepts/virtualenv/) to get started.
 
 ## Platform support
 

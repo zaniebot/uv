@@ -89,7 +89,7 @@ operating system, architecture, and Python version. The uv lockfile is created a
 [project](../concepts/projects/index.md) commands such as `uv lock`, `uv sync`, and `uv add`.
 
 universal resolution is also available in uv's pip interface, i.e.,
-[`uv pip compile`](../pip/compile.md), with the `--universal` flag. The resulting requirements file
+[`uv pip compile`](./virtualenv/compile.md), with the `--universal` flag. The resulting requirements file
 will contain markers to indicate which platform each dependency is relevant for.
 
 During universal resolution, a package may be listed multiple times with different versions or URLs
@@ -115,7 +115,7 @@ ignores upper bounds entirely. For example, `>=3.8, <4` is treated as `>=3.8`.
 
 ## Platform-specific resolution
 
-By default, uv's pip interface, i.e., [`uv pip compile`](../pip/compile.md), produces a resolution
+By default, uv's pip interface, i.e., [`uv pip compile`](./virtualenv/compile.md), produces a resolution
 that is platform-specific, like `pip-tools`. There is no way to use platform-specific resolution in
 the uv's project interface.
 
@@ -227,7 +227,7 @@ model, and are a frequent source of bugs in other packaging tools. uv's pre-rele
 _intentionally_ limited and requires user opt-in for pre-releases to ensure correctness.
 
 For more details, see
-[Pre-release compatibility](../pip/compatibility.md#pre-release-compatibility).
+[Pre-release compatibility](./virtualenv/compatibility.md#pre-release-compatibility).
 
 ## Dependency constraints
 

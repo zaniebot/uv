@@ -6,7 +6,7 @@ some initial setup.
 
 !!! important
 
-    Please read the documentation on [using multiple indexes](../../pip/compatibility.md#packages-that-exist-on-multiple-indexes)
+    Please read the documentation on [using multiple indexes](.././virtualenv/compatibility.md#packages-that-exist-on-multiple-indexes)
     in uv — the default behavior is different from pip to prevent dependency confusion attacks, but
     this means that uv may not find the versions of a package as you'd expect.
 

@@ -44,7 +44,7 @@ Once Python is installed, it will be used by `uv` commands automatically.
     When Python is installed by uv, it will not be available globally (i.e. via the `python` command).
     Support for this feature is planned for a future release. In the meantime, use
     [`uv run`](../guides/scripts.md#using-different-python-versions) or
-    [create and activate a virtual environment](../pip/environments.md) to use `python` directly.
+    [create and activate a virtual environment](./virtualenv/environments.md) to use `python` directly.
 
 ## Installing a specific version
 

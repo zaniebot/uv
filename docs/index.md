@@ -231,7 +231,7 @@ Installed 43 packages in 208ms
  ...
 ```
 
-See the [pip interface documentation](./pip/index.md) to get started.
+See the [pip interface documentation](./concepts/virtualenv/index.md) to get started.
 
 ## Learn more
 

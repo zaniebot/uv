@@ -126,6 +126,13 @@ nav:
           - Using workspaces: concepts/projects/workspaces.md
       - Tools: concepts/tools.md
       - Python versions: concepts/python-versions.md
+      - Virtual environments:
+          - concepts/virtualenv/index.md
+          - Using environments: concepts/virtualenv/environments.md
+          - Managing packages: concepts/virtualenv/packages.md
+          - Inspecting packages: concepts/virtualenv/inspection.md
+          - Declaring dependencies: concepts/virtualenv/dependencies.md
+          - Locking environments: concepts/virtualenv/compile.md
       - Resolution: concepts/resolution.md
       - Caching: concepts/cache.md
   - Configuration:
@@ -135,18 +142,11 @@ nav:
       - Authentication: configuration/authentication.md
       - Package indexes: configuration/indexes.md
       - Installer: configuration/installer.md
-  - The pip interface:
-      - pip/index.md
-      - Using environments: pip/environments.md
-      - Managing packages: pip/packages.md
-      - Inspecting packages: pip/inspection.md
-      - Declaring dependencies: pip/dependencies.md
-      - Locking environments: pip/compile.md
-      - Compatibility with pip: pip/compatibility.md
   - Reference:
       - reference/index.md
       - Commands: reference/cli.md
       - Settings: reference/settings.md
+      - Compatibility with pip: reference/pip-compatibility.md
       - Build failures: reference/build_failures.md
       - Resolver: reference/resolver-internals.md
       - Benchmarks: reference/benchmarks.md

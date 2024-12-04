@@ -55,7 +55,7 @@ Authentication may be used for hosts specified in the following contexts:
 - `find-links`
 - `package @ https://...`
 
-See the [`pip` compatibility guide](../pip/compatibility.md#registry-authentication) for details on
+See the [`pip` compatibility guide](./virtualenv/compatibility.md#registry-authentication) for details on
 differences from `pip`.
 
 ## Custom CA certificates
