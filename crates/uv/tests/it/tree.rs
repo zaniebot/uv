@@ -1,8 +1,10 @@
-use crate::common::{uv_snapshot, TestContext};
 use anyhow::Result;
+use assert_cmd::assert::OutputAssertExt;
 use assert_fs::prelude::*;
 use indoc::formatdoc;
 use url::Url;
+
+use crate::common::{uv_snapshot, TestContext};
 
 #[test]
 fn nested_dependencies() -> Result<()> {
@@ -35,6 +37,73 @@ fn nested_dependencies() -> Result<()> {
 
     ----- stderr -----
     Resolved 6 packages in [TIME]
+    "###
+    );
+
+    // `uv tree` should update the lockfile
+    let lock = context.read("uv.lock");
+    assert!(!lock.is_empty());
+
+    Ok(())
+}
+
+#[test]
+fn nested_platform_dependencies() -> Result<()> {
+    let context = TestContext::new("3.12");
+
+    let pyproject_toml = context.temp_dir.child("pyproject.toml");
+    pyproject_toml.write_str(
+        r#"
+        [project]
+        name = "project"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        dependencies = [
+            "jupyter-client"
+        ]
+    "#,
+    )?;
+
+    uv_snapshot!(context.filters(), context.tree().arg("--python-platform").arg("linux"), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    project v0.1.0
+    └── jupyter-client v8.6.1
+        ├── jupyter-core v5.7.2
+        │   ├── platformdirs v4.2.0
+        │   └── traitlets v5.14.2
+        ├── python-dateutil v2.9.0.post0
+        │   └── six v1.16.0
+        ├── pyzmq v25.1.2
+        ├── tornado v6.4
+        └── traitlets v5.14.2
+
+    ----- stderr -----
+    Resolved 12 packages in [TIME]
+    "###
+    );
+
+    uv_snapshot!(context.filters(), context.tree().arg("--universal"), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    project v0.1.0
+    └── jupyter-client v8.6.1
+        ├── jupyter-core v5.7.2
+        │   ├── platformdirs v4.2.0
+        │   ├── pywin32 v306
+        │   └── traitlets v5.14.2
+        ├── python-dateutil v2.9.0.post0
+        │   └── six v1.16.0
+        ├── pyzmq v25.1.2
+        │   └── cffi v1.16.0
+        │       └── pycparser v2.21
+        ├── tornado v6.4
+        └── traitlets v5.14.2
+
+    ----- stderr -----
+    Resolved 12 packages in [TIME]
     "###
     );
 
@@ -170,6 +239,38 @@ fn frozen() -> Result<()> {
 }
 
 #[test]
+fn outdated() -> Result<()> {
+    let context = TestContext::new("3.12");
+
+    let pyproject_toml = context.temp_dir.child("pyproject.toml");
+    pyproject_toml.write_str(
+        r#"
+        [project]
+        name = "project"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        dependencies = ["anyio==3.0.0"]
+    "#,
+    )?;
+
+    uv_snapshot!(context.filters(), context.tree().arg("--outdated").arg("--universal"), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    project v0.1.0
+    └── anyio v3.0.0 (latest: v4.3.0)
+        ├── idna v3.6
+        └── sniffio v1.3.1
+
+    ----- stderr -----
+    Resolved 4 packages in [TIME]
+    "###
+    );
+
+    Ok(())
+}
+
+#[test]
 fn platform_dependencies() -> Result<()> {
     let context = TestContext::new("3.12");
 
@@ -267,8 +368,7 @@ fn platform_dependencies_inverted() -> Result<()> {
     )?;
 
     // When `--universal` is _not_ provided, `colorama` should _not_ be included.
-    #[cfg(not(windows))]
-    uv_snapshot!(context.filters(), context.tree().arg("--invert"), @r###"
+    uv_snapshot!(context.filters(), context.tree().arg("--invert").arg("--python-platform").arg("linux"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -680,6 +780,279 @@ fn package() -> Result<()> {
 
     ----- stderr -----
     Resolved 11 packages in [TIME]
+    "###
+    );
+
+    // `uv tree` should update the lockfile
+    let lock = context.read("uv.lock");
+    assert!(!lock.is_empty());
+
+    Ok(())
+}
+
+#[test]
+fn group() -> Result<()> {
+    let context = TestContext::new("3.12");
+
+    let pyproject_toml = context.temp_dir.child("pyproject.toml");
+    pyproject_toml.write_str(
+        r#"
+        [project]
+        name = "project"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        dependencies = ["typing-extensions"]
+
+        [dependency-groups]
+        foo = ["anyio"]
+        bar = ["iniconfig"]
+        dev = ["sniffio"]
+        "#,
+    )?;
+
+    context.lock().assert().success();
+
+    uv_snapshot!(context.filters(), context.tree(), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    project v0.1.0
+    ├── typing-extensions v4.10.0
+    └── sniffio v1.3.1 (group: dev)
+
+    ----- stderr -----
+    Resolved 6 packages in [TIME]
+    "###);
+
+    uv_snapshot!(context.filters(), context.tree().arg("--only-group").arg("bar"), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    project v0.1.0
+    └── iniconfig v2.0.0 (group: bar)
+
+    ----- stderr -----
+    Resolved 6 packages in [TIME]
+    "###);
+
+    uv_snapshot!(context.filters(), context.tree().arg("--group").arg("foo"), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    project v0.1.0
+    ├── typing-extensions v4.10.0
+    ├── sniffio v1.3.1 (group: dev)
+    └── anyio v4.3.0 (group: foo)
+        ├── idna v3.6
+        └── sniffio v1.3.1
+
+    ----- stderr -----
+    Resolved 6 packages in [TIME]
+    "###);
+
+    uv_snapshot!(context.filters(), context.tree().arg("--group").arg("foo").arg("--group").arg("bar"), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    project v0.1.0
+    ├── typing-extensions v4.10.0
+    ├── iniconfig v2.0.0 (group: bar)
+    ├── sniffio v1.3.1 (group: dev)
+    └── anyio v4.3.0 (group: foo)
+        ├── idna v3.6
+        └── sniffio v1.3.1
+
+    ----- stderr -----
+    Resolved 6 packages in [TIME]
+    "###);
+
+    uv_snapshot!(context.filters(), context.tree().arg("--all-groups"), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    project v0.1.0
+    ├── typing-extensions v4.10.0
+    ├── iniconfig v2.0.0 (group: bar)
+    ├── sniffio v1.3.1 (group: dev)
+    └── anyio v4.3.0 (group: foo)
+        ├── idna v3.6
+        └── sniffio v1.3.1
+
+    ----- stderr -----
+    Resolved 6 packages in [TIME]
+    "###);
+
+    uv_snapshot!(context.filters(), context.tree().arg("--all-groups").arg("--no-group").arg("bar"), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    project v0.1.0
+    ├── typing-extensions v4.10.0
+    ├── sniffio v1.3.1 (group: dev)
+    └── anyio v4.3.0 (group: foo)
+        ├── idna v3.6
+        └── sniffio v1.3.1
+
+    ----- stderr -----
+    Resolved 6 packages in [TIME]
+    "###);
+
+    Ok(())
+}
+
+#[test]
+fn cycle() -> Result<()> {
+    let context = TestContext::new("3.12");
+
+    let pyproject_toml = context.temp_dir.child("pyproject.toml");
+    pyproject_toml.write_str(
+        r#"
+        [project]
+        name = "project"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        dependencies = ["testtools==2.3.0", "fixtures==3.0.0"]
+    "#,
+    )?;
+
+    uv_snapshot!(context.filters(), context.tree().arg("--universal"), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    project v0.1.0
+    ├── fixtures v3.0.0
+    │   ├── pbr v6.0.0
+    │   ├── six v1.16.0
+    │   └── testtools v2.3.0
+    │       ├── extras v1.0.0
+    │       ├── fixtures v3.0.0 (*)
+    │       ├── pbr v6.0.0
+    │       ├── python-mimeparse v1.6.0
+    │       ├── six v1.16.0
+    │       ├── traceback2 v1.4.0
+    │       │   └── linecache2 v1.0.0
+    │       └── unittest2 v1.1.0
+    │           ├── argparse v1.4.0
+    │           ├── six v1.16.0
+    │           └── traceback2 v1.4.0 (*)
+    └── testtools v2.3.0 (*)
+    (*) Package tree already displayed
+
+    ----- stderr -----
+    Resolved 11 packages in [TIME]
+    "###
+    );
+
+    uv_snapshot!(context.filters(), context.tree().arg("--package").arg("traceback2").arg("--package").arg("six"), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    six v1.16.0
+    traceback2 v1.4.0
+    └── linecache2 v1.0.0
+
+    ----- stderr -----
+    Resolved 11 packages in [TIME]
+    "###
+    );
+
+    uv_snapshot!(context.filters(), context.tree().arg("--package").arg("traceback2").arg("--package").arg("six").arg("--invert"), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    six v1.16.0
+    ├── fixtures v3.0.0
+    │   ├── project v0.1.0
+    │   └── testtools v2.3.0
+    │       ├── fixtures v3.0.0 (*)
+    │       └── project v0.1.0
+    ├── testtools v2.3.0 (*)
+    └── unittest2 v1.1.0
+        └── testtools v2.3.0 (*)
+    traceback2 v1.4.0
+    ├── testtools v2.3.0 (*)
+    └── unittest2 v1.1.0 (*)
+    (*) Package tree already displayed
+
+    ----- stderr -----
+    Resolved 11 packages in [TIME]
+    "###
+    );
+
+    // `uv tree` should update the lockfile
+    let lock = context.read("uv.lock");
+    assert!(!lock.is_empty());
+
+    Ok(())
+}
+
+#[test]
+fn workspace_dev() -> Result<()> {
+    let context = TestContext::new("3.12");
+
+    let pyproject_toml = context.temp_dir.child("pyproject.toml");
+    pyproject_toml.write_str(
+        r#"
+        [project]
+        name = "project"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        dependencies = ["anyio"]
+
+        [dependency-groups]
+        dev = ["child"]
+
+        [tool.uv.workspace]
+        members = ["child"]
+
+        [tool.uv.sources]
+        child = { workspace = true }
+    "#,
+    )?;
+
+    let child = context.temp_dir.child("child");
+    let pyproject_toml = child.child("pyproject.toml");
+    pyproject_toml.write_str(
+        r#"
+        [project]
+        name = "child"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        dependencies = ["iniconfig"]
+    "#,
+    )?;
+
+    uv_snapshot!(context.filters(), context.tree().arg("--universal"), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    project v0.1.0
+    ├── anyio v4.3.0
+    │   ├── idna v3.6
+    │   └── sniffio v1.3.1
+    └── child v0.1.0 (group: dev)
+        └── iniconfig v2.0.0
+
+    ----- stderr -----
+    Resolved 6 packages in [TIME]
+    "###
+    );
+
+    // Under `--no-dev`, the member should still be included, since we show the entire workspace.
+    // But it shouldn't be considered a dependency of the root.
+    uv_snapshot!(context.filters(), context.tree().arg("--universal").arg("--no-dev"), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    child v0.1.0
+    └── iniconfig v2.0.0
+    project v0.1.0
+    └── anyio v4.3.0
+        ├── idna v3.6
+        └── sniffio v1.3.1
+
+    ----- stderr -----
+    Resolved 6 packages in [TIME]
     "###
     );
 
