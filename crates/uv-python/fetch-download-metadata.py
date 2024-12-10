@@ -50,7 +50,7 @@ import json
 import logging
 import os
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, asdict
 from enum import StrEnum
 from pathlib import Path
 from typing import Generator, Iterable, NamedTuple, Self
@@ -72,22 +72,24 @@ def batched(iterable: Iterable, n: int) -> Generator[tuple, None, None]:
         yield batch
 
 
-class Arch(NamedTuple):
+@dataclass(frozen=True)
+class Arch:
     # The architecture family, e.g. "x86_64", "aarch64".
     family: str
-    # The architecture variant, e.g. "x86_64_v2".
-    # Only used for internal download selection, not part of the key.
-    variant: str = ""
+    # The architecture variant, e.g., "v2" in "x86_64_v2"
+    variant: str | None = None
 
     def key(self) -> str:
-        return self.family
+        return str(self)
 
-    def priority(self) -> int:
-        """Return the priority of the architecture, a lower score is higher priority."""
-        # For x86_64, prefer the x86_64_v2 variant (with SSE4 support).
-        if self.family == "x86_64" and self.variant == "v2":
-            return -1
-        return 0
+    def __str__(self) -> str:
+        return (self.family + "_" + self.variant) if self.variant else self.family
+
+    def __gt__(self, other) -> bool:
+        return (self.family, self.variant or "") > (other.family, other.variant or "")
+
+    def __lt__(self, other) -> bool:
+        return (self.family, self.variant or "") < (other.family, other.variant or "")
 
 
 type PlatformTripleKey = tuple[str, str, str]
@@ -152,9 +154,9 @@ class PythonDownload:
 
     def key(self) -> str:
         if self.variant:
-            return f"{self.implementation}-{self.version}+{self.variant}-{self.triple.platform}-{self.triple.arch.family}-{self.triple.libc}"
+            return f"{self.implementation}-{self.version}+{self.variant}-{self.triple.platform}-{self.triple.arch}-{self.triple.libc}"
         else:
-            return f"{self.implementation}-{self.version}-{self.triple.platform}-{self.triple.arch.family}-{self.triple.libc}"
+            return f"{self.implementation}-{self.version}-{self.triple.platform}-{self.triple.arch}-{self.triple.libc}"
 
 
 class Finder:
@@ -399,7 +401,7 @@ class CPythonFinder(Finder):
         arch = self.ARCH_MAP.get(arch, arch)
         pieces = arch.split("_")
         family = "_".join(pieces[:2])
-        variant = pieces[2] if len(pieces) > 2 else ""
+        variant = pieces[2] if len(pieces) > 2 else None
         return Arch(family, variant)
 
     def _normalize_os(self, os: str) -> str:
@@ -409,10 +411,9 @@ class CPythonFinder(Finder):
         """
         Returns the priority of a download, a lower score is better.
         """
-        arch_priority = download.triple.arch.priority()
         flavor_priority = self._flavor_priority(download.flavor)
         build_option_priority = self._build_option_priority(download.build_options)
-        return (arch_priority, flavor_priority, build_option_priority)
+        return (flavor_priority, build_option_priority)
 
     def _flavor_priority(self, flavor: str) -> int:
         try:
@@ -502,7 +503,7 @@ class PyPyFinder(Finder):
         return list(results.values())
 
     def _normalize_arch(self, arch: str) -> Arch:
-        return Arch(self.ARCH_MAPPING.get(arch, arch), "")
+        return Arch(self.ARCH_MAPPING.get(arch, arch), None)
 
     def _normalize_os(self, os: str) -> str:
         return self.PLATFORM_MAPPING.get(os, os)
@@ -568,7 +569,7 @@ def render(downloads: list[PythonDownload]) -> None:
         )
         results[key] = {
             "name": download.implementation,
-            "arch": download.triple.arch.family,
+            "arch": asdict(download.triple.arch),
             "os": download.triple.platform,
             "libc": download.triple.libc,
             "major": download.version.major,
