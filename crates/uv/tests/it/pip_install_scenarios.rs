@@ -333,30 +333,17 @@ fn dependency_excludes_non_contiguous_range_of_compatible_versions() {
     ----- stdout -----
 
     ----- stderr -----
-    Resolver derivation tree before reduction
-      root==0a0.dev0 depends on package-c*
-        root==0a0.dev0 depends on package-b>=2.0.0, <3.0.0
-          package-a==3.0.0 depends on package-b==3.0.0
-                package-c==1.0.0 depends on package-a<2.0.0
-                no versions of package-c<1.0.0 | >1.0.0, <2.0.0 | >2.0.0
-              package-c==2.0.0 depends on package-a>=3.0.0
-              package-a==1.0.0 depends on package-b==1.0.0
-              no versions of package-a<1.0.0 | >1.0.0, <2.0.0 | >3.0.0
-    Resolver derivation tree after reduction
-      root==0a0.dev0 depends on package-c*
-        root==0a0.dev0 depends on package-b>=2.0.0, <3.0.0
-          package-a==3.0.0 depends on package-b==3.0.0
-              package-c==1.0.0 depends on package-a<2.0.0
-              package-c==2.0.0 depends on package-a>=3.0.0
-              package-a==1.0.0 depends on package-b==1.0.0
-              no versions of package-a<1.0.0 | >1.0.0, <2.0.0 | >3.0.0
       × No solution found when resolving dependencies:
       ╰─▶ Because only the following versions of package-a are available:
               package-a==1.0.0
               package-a>2.0.0,<=3.0.0
           and package-a==1.0.0 depends on package-b==1.0.0, we can conclude that package-a<2.0.0 depends on package-b==1.0.0. (1)
 
-          Because package-c==2.0.0 depends on package-a>=3.0.0 and package-a<2.0.0, we can conclude that all versions of package-c depend on one of:
+          Because only the following versions of package-c are available:
+              package-c==1.0.0
+              package-c==2.0.0
+          and package-c==1.0.0 depends on package-a<2.0.0, we can conclude that package-c<2.0.0 depends on package-a<2.0.0.
+          And because package-c==2.0.0 depends on package-a>=3.0.0, we can conclude that all versions of package-c depend on one of:
               package-a<2.0.0
               package-a>=3.0.0
 
@@ -463,7 +450,11 @@ fn dependency_excludes_range_of_compatible_versions() {
               package-a>2.0.0,<=3.0.0
           and package-a==1.0.0 depends on package-b==1.0.0, we can conclude that package-a<2.0.0 depends on package-b==1.0.0. (1)
 
-          Because package-c==2.0.0 depends on package-a>=3.0.0 and package-a<2.0.0, we can conclude that all versions of package-c depend on one of:
+          Because only the following versions of package-c are available:
+              package-c==1.0.0
+              package-c==2.0.0
+          and package-c==1.0.0 depends on package-a<2.0.0, we can conclude that package-c<2.0.0 depends on package-a<2.0.0.
+          And because package-c==2.0.0 depends on package-a>=3.0.0, we can conclude that all versions of package-c depend on one of:
               package-a<2.0.0
               package-a>=3.0.0
 
@@ -538,7 +529,12 @@ fn excluded_only_compatible_version() {
 
     ----- stderr -----
       × No solution found when resolving dependencies:
-      ╰─▶ Because package-a==1.0.0 depends on package-b==1.0.0 and package-b==3.0.0, we can conclude that all of:
+      ╰─▶ Because only the following versions of package-a are available:
+              package-a==1.0.0
+              package-a==2.0.0
+              package-a==3.0.0
+          and package-a==1.0.0 depends on package-b==1.0.0, we can conclude that package-a<2.0.0 depends on package-b==1.0.0.
+          And because package-a==3.0.0 depends on package-b==3.0.0, we can conclude that all of:
               package-a<2.0.0
               package-a>2.0.0
           depend on one of:
@@ -3252,7 +3248,7 @@ fn transitive_package_only_prereleases_in_range() {
     ----- stderr -----
       × No solution found when resolving dependencies:
       ╰─▶ Because only package-b<0.1 is available and package-a==0.1.0 depends on package-b>0.1, we can conclude that package-a==0.1.0 cannot be used.
-          And because only package-a==0.1.0 is available and you require package-a, we can conclude that your requirements are unsatisfiable.
+          And because you require package-a, we can conclude that your requirements are unsatisfiable.
 
           hint: Pre-releases are available for `package-b` in the requested range (e.g., 1.0.0a1), but pre-releases weren't enabled (try: `--prerelease=allow`)
     "###);
@@ -3390,7 +3386,7 @@ fn transitive_prerelease_and_stable_dependency_many_versions_holes() {
               package-c>2.0.0a7,<2.0.0b1
               package-c>2.0.0b1,<2.0.0b5
           we can conclude that package-a==1.0.0 cannot be used.
-          And because only package-a==1.0.0 is available and you require package-a, we can conclude that your requirements are unsatisfiable.
+          And because you require package-a, we can conclude that your requirements are unsatisfiable.
 
           hint: `package-c` was requested with a pre-release marker (e.g., all of:
               package-c>1.0.0,<2.0.0a5
@@ -3620,7 +3616,7 @@ fn transitive_prerelease_and_stable_dependency() {
     ----- stderr -----
       × No solution found when resolving dependencies:
       ╰─▶ Because there is no version of package-c==2.0.0b1 and package-a==1.0.0 depends on package-c==2.0.0b1, we can conclude that package-a==1.0.0 cannot be used.
-          And because only package-a==1.0.0 is available and you require package-a, we can conclude that your requirements are unsatisfiable.
+          And because you require package-a, we can conclude that your requirements are unsatisfiable.
 
           hint: `package-c` was requested with a pre-release marker (e.g., package-c==2.0.0b1), but pre-releases weren't enabled (try: `--prerelease=allow`)
     "###);

@@ -580,9 +580,8 @@ fn collapse_redundant_depends_on_no_versions_inner(
 use rustc_hash::FxBuildHasher;
 use std::collections::HashMap;
 
-/// Remove any NoVersions nodes where the complement of their ranges exactly matches
-/// the set of available versions for that package, but only if there is more than
-/// one version available.
+/// Remove any NoVersions nodes that come after we've proven all versions of a package
+/// will fail due to unsatisfied dependencies.
 fn collapse_available_versions(
     tree: &mut DerivationTree<PubGrubPackage, Range<Version>, UnavailableReason>,
     available_versions: &HashMap<PackageName, BTreeSet<Version>, FxBuildHasher>,
@@ -594,14 +593,14 @@ fn collapse_available_versions(
             collapse_available_versions(Arc::make_mut(&mut derived.cause1), available_versions);
             collapse_available_versions(Arc::make_mut(&mut derived.cause2), available_versions);
 
-            // Then check if we should replace this node
             match (
                 Arc::make_mut(&mut derived.cause1),
                 Arc::make_mut(&mut derived.cause2),
             ) {
+                // If we have a NoVersions node...
                 (DerivationTree::External(External::NoVersions(package, ranges)), other)
                 | (other, DerivationTree::External(External::NoVersions(package, ranges))) => {
-                    // Get the package name
+                    // Get the package name from the NoVersions node
                     let name = match &**package {
                         PubGrubPackageInner::Package { name, .. }
                         | PubGrubPackageInner::Extra { name, .. }
@@ -609,28 +608,28 @@ fn collapse_available_versions(
                         _ => return,
                     };
 
-                    // Check if we should remove this node
-                    if let Some(versions) = available_versions.get(name) {
-                        // Only collapse if there's more than one version available
-                        if versions.len() > 1 {
-                            let complement = ranges.complement();
+                    // Check if the other side shows all versions failing
+                    if let DerivationTree::Derived(Derived { cause1, cause2, .. }) = other {
+                        // Look for pattern: "package depends on incompatible dependency"
+                        let all_versions_fail = matches!(
+                            (&**cause1, &**cause2),
+                            (
+                                DerivationTree::External(External::FromDependencyOf(pkg1, versions1, dep1, _)),
+                                DerivationTree::External(External::NoVersions(dep2, _))
+                            ) | (
+                                DerivationTree::External(External::NoVersions(dep2, _)),
+                                DerivationTree::External(External::FromDependencyOf(pkg1, versions1, dep1, _))
+                            )
+                            if pkg1.name() == Some(name)  // Same package
+                            && dep1 == dep2  // Same dependency
+                            // And available versions match the versions in FromDependencyOf
+                            && available_versions.get(name).map_or(false, |versions| {
+                                versions.iter().all(|v| versions1.contains(v))
+                            })
+                        );
 
-                            // Check that complement exactly equals available versions
-                            let complement_equals_available = versions
-                                .iter()
-                                .all(|v| complement.contains(v))
-                                && complement
-                                    .iter()
-                                    .all(|(lower, upper)| match (lower, upper) {
-                                        (Bound::Included(v1), Bound::Included(v2)) if v1 == v2 => {
-                                            versions.contains(v1)
-                                        }
-                                        _ => false,
-                                    });
-
-                            if complement_equals_available {
-                                *tree = other.clone();
-                            }
+                        if all_versions_fail {
+                            *tree = other.clone();
                         }
                     }
                 }
@@ -639,6 +638,7 @@ fn collapse_available_versions(
         }
     }
 }
+
 /// Simplifies the markers on pubgrub packages in the given derivation tree
 /// according to the given Python requirement.
 ///
