@@ -337,6 +337,7 @@ impl std::fmt::Display for NoSolutionError {
 
         collapse_unavailable_versions(&mut tree);
         collapse_redundant_depends_on_no_versions(&mut tree);
+        collapse_available_versions(&mut tree, &self.available_versions);
 
         if should_display_tree {
             display_tree(&tree, "Resolver derivation tree after reduction");
@@ -576,6 +577,68 @@ fn collapse_redundant_depends_on_no_versions_inner(
     }
 }
 
+use rustc_hash::FxBuildHasher;
+use std::collections::HashMap;
+
+/// Remove any NoVersions nodes where the complement of their ranges exactly matches
+/// the set of available versions for that package, but only if there is more than
+/// one version available.
+fn collapse_available_versions(
+    tree: &mut DerivationTree<PubGrubPackage, Range<Version>, UnavailableReason>,
+    available_versions: &HashMap<PackageName, BTreeSet<Version>, FxBuildHasher>,
+) {
+    match tree {
+        DerivationTree::External(_) => {}
+        DerivationTree::Derived(derived) => {
+            // Always recurse first
+            collapse_available_versions(Arc::make_mut(&mut derived.cause1), available_versions);
+            collapse_available_versions(Arc::make_mut(&mut derived.cause2), available_versions);
+
+            // Then check if we should replace this node
+            match (
+                Arc::make_mut(&mut derived.cause1),
+                Arc::make_mut(&mut derived.cause2),
+            ) {
+                (DerivationTree::External(External::NoVersions(package, ranges)), other)
+                | (other, DerivationTree::External(External::NoVersions(package, ranges))) => {
+                    // Get the package name
+                    let name = match &**package {
+                        PubGrubPackageInner::Package { name, .. }
+                        | PubGrubPackageInner::Extra { name, .. }
+                        | PubGrubPackageInner::Dev { name, .. } => name,
+                        _ => return,
+                    };
+
+                    // Check if we should remove this node
+                    if let Some(versions) = available_versions.get(name) {
+                        // Only collapse if there's more than one version available
+                        if versions.len() > 1 {
+                            let complement = ranges.complement();
+
+                            // Check that complement exactly equals available versions
+                            let complement_equals_available = versions
+                                .iter()
+                                .all(|v| complement.contains(v))
+                                && complement
+                                    .iter()
+                                    .all(|(lower, upper)| match (lower, upper) {
+                                        (Bound::Included(v1), Bound::Included(v2)) if v1 == v2 => {
+                                            versions.contains(v1)
+                                        }
+                                        _ => false,
+                                    });
+
+                            if complement_equals_available {
+                                *tree = other.clone();
+                            }
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+}
 /// Simplifies the markers on pubgrub packages in the given derivation tree
 /// according to the given Python requirement.
 ///
