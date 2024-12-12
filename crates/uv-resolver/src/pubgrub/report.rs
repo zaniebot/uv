@@ -82,6 +82,7 @@ impl ReportFormatter<PubGrubPackage, Range<Version>, UnavailableReason>
                         // when a package is from a non-registry source. In that case, we cannot
                         // perform further simplification of the range.
                         if let Some(available_versions) = package.name().and_then(|name| self.available_versions.get(name)) {
+                            dbg!(package.name());
                             update_availability_range(&complement, available_versions)
                         } else {
                             complement
@@ -1496,16 +1497,93 @@ impl PackageRange<'_> {
     }
 }
 
-/// Create a range with improved segments for reporting the available versions for a package.
-fn update_availability_range(
+fn collapse_version_ranges(
     range: &Range<Version>,
     available_versions: &BTreeSet<Version>,
 ) -> Range<Version> {
     let mut new_range = Range::empty();
+    let mut current_segment: Option<(Bound<Version>, Bound<Version>)> = None;
 
-    // Construct an available range to help guide simplification. Note this is not strictly correct,
-    // as the available range should have many holes in it. However, for this use-case it should be
-    // okay — we just may avoid simplifying some segments _inside_ the available range.
+    // Helper function to check if ranges can be merged
+    let can_merge = |upper: &Bound<Version>, lower: &Bound<Version>| -> bool {
+        match (upper, lower) {
+            (Bound::Included(v1), Bound::Included(v2))
+            | (Bound::Included(v1), Bound::Excluded(v2))
+            | (Bound::Excluded(v1), Bound::Included(v2))
+            | (Bound::Excluded(v1), Bound::Excluded(v2)) => {
+                let between: Range<Version> = Range::from_range_bounds((
+                    Bound::Excluded(v1.clone()),
+                    Bound::Excluded(v2.clone()),
+                ));
+                !available_versions.iter().any(|v| between.contains(v))
+            }
+            _ => true,
+        }
+    };
+
+    for segment in range.iter() {
+        let (lower, upper) = segment;
+
+        match &current_segment {
+            None => {
+                current_segment = Some((lower.clone(), upper.clone()));
+            }
+            Some((curr_lower, curr_upper)) => {
+                if can_merge(curr_upper, lower) {
+                    // Merge the segments
+                    current_segment = Some((curr_lower.clone(), upper.clone()));
+                } else {
+                    // Add current segment and start new one
+                    new_range = new_range.union(&Range::from_range_bounds((
+                        curr_lower.clone(),
+                        curr_upper.clone(),
+                    )));
+                    current_segment = Some((lower.clone(), upper.clone()));
+                }
+            }
+        }
+    }
+
+    // Add the final segment
+    if let Some((lower, upper)) = current_segment {
+        // If upper is unbounded and we have available versions, bound it
+        let final_upper = match upper {
+            Bound::Unbounded => {
+                if let Some(last) = available_versions.last() {
+                    Bound::Included(last.clone())
+                } else {
+                    upper
+                }
+            }
+            _ => upper,
+        };
+        new_range = new_range.union(&Range::from_range_bounds((lower, final_upper)));
+    }
+
+    new_range
+}
+
+fn update_availability_range(
+    range: &Range<Version>,
+    available_versions: &BTreeSet<Version>,
+) -> Range<Version> {
+    dbg!(range, available_versions);
+    // Special case: if there's only one version available, return it directly
+    if available_versions.len() == 1 {
+        if let Some(version) = available_versions.first() {
+            return Range::from_range_bounds((
+                Bound::Included(version.clone()),
+                Bound::Included(version.clone()),
+            ));
+        }
+    }
+
+    // First collapse the version ranges
+    let collapsed = collapse_version_ranges(range, available_versions);
+
+    let mut new_range = Range::empty();
+
+    // Construct an available range to help guide simplification
     let (available_range, first_available, last_available) =
         match (available_versions.first(), available_versions.last()) {
             // At least one version is available
@@ -1527,9 +1605,10 @@ fn update_availability_range(
             (None, None) => return Range::empty(),
         };
 
-    for segment in range.iter() {
+    for (_i, segment) in collapsed.iter().enumerate() {
         let (lower, upper) = segment;
-        let segment_range = Range::from_range_bounds((lower.clone(), upper.clone()));
+        let segment_range: Range<Version> =
+            Range::from_range_bounds((lower.clone(), upper.clone()));
 
         // Drop the segment if it's disjoint with the available range, e.g., if the segment is
         // `foo>999`, and the the available versions are all `<10` it's useless to show.
@@ -1793,6 +1872,8 @@ mod tests {
     ///           ctranslate2==4.5.0
     ///       and ctranslate2>=4.0.0 ...
     /// ```
+    ///
+    /// The message should be "only ctanslate2<=4.0.0 ... and ctranslate2>=4.0.0" are available.
     #[test]
     fn test_update_availability_range_ctranslate2() {
         let ranges = Ranges::from_iter([
@@ -1823,16 +1904,12 @@ mod tests {
             update_availability_range(&ranges, &available_versions),
             Ranges::from_iter([
                 (Bound::Unbounded, Bound::Included(v!("4.0.0"))),
-                (Bound::Included(v!("4.1.0")), Bound::Included(v!("4.1.0"))),
-                (Bound::Included(v!("4.2.1")), Bound::Included(v!("4.2.1"))),
-                (Bound::Included(v!("4.3.1")), Bound::Included(v!("4.3.1"))),
-                (Bound::Included(v!("4.4.0")), Bound::Included(v!("4.4.0"))),
-                (Bound::Included(v!("4.5.0")), Bound::Included(v!("4.5.0"))),
+                (Bound::Included(v!("4.1.0")), Bound::Included(v!("4.5.0"))),
             ])
         );
     }
 
-    /// A minimized test case for the following scenario
+    /// A minimized test case for the following scenario:
     ///
     /// ```console
     /// $ echo "rooster-blue" | uv pip compile - -p 3.10 --exclude-newer 2024-12-01
@@ -1850,6 +1927,8 @@ mod tests {
     ///           rooster-blue==0.0.8
     ///       and you require rooster-blue, we can conclude that your requirements are unsatisfiable.
     /// ```
+    ///
+    /// This should not enumerate all these versions, we should display the range instead.
     #[test]
     fn test_update_availability_range_rooster_blue() {
         let ranges = Ranges::from_iter([
@@ -1873,15 +1952,71 @@ mod tests {
 
         assert_eq!(
             update_availability_range(&ranges, &available_versions),
+            Ranges::from_iter([(Bound::Included(v!("0.0.1")), Bound::Included(v!("0.0.8"))),])
+        );
+    }
+
+    /// A minimized test case for the following scenario:
+    ///
+    /// ```console
+    /// $ uv tool install open-webui --with 'requests[socks]' --exclude-newer 2024-12-01
+    /// × No solution found when resolving dependencies:
+    /// ╰─▶ Because only ctranslate2<=4.5.0 is available and ctranslate2>=4.0.0 has no wheels with a matching Python ABI tag,
+    /// we can conclude that ctranslate2>=4.0.0,<4.1.0 cannot be used.
+    /// And because faster-whisper>=1.0.1,<=1.0.3 depends on ctranslate2>=4.0, we can conclude that faster-whisper>=1.0.1,<=1.0.3 cannot be used.
+    /// And because open-webui<=0.1.125 depends on faster-whisper==1.0.1 and only the following versions of open-webui are available:
+    ///     open-webui<=0.1.125
+    ///     open-webui>=0.2.0,<=0.3.16
+    ///     open-webui>=0.3.17,<=0.3.26
+    ///     open-webui>=0.3.27,<=0.3.29
+    ///     open-webui==0.3.30
+    ///     open-webui>=0.3.31,<=0.3.32
+    ///     open-webui>=0.3.33,<=0.3.35
+    ///     open-webui>=0.4.0,<=0.4.5
+    ///     open-webui>=0.4.6
+    /// we can conclude that all versions of open-webui cannot be used.
+    ///
+    /// hint: Pre-releases are available for `open-webui` in the requested range (e.g., 0.4.6.dev1), but pre-releases weren't enabled (try: `--prerelease=allow`)
+    /// ```
+    ///
+    #[test]
+    fn test_update_availability_range_open_webui() {
+        let ranges = Ranges::from_iter([
+            (Bound::Unbounded, Bound::Included(v!("0.1.125"))),
+            (Bound::Included(v!("0.2.0")), Bound::Included(v!("0.3.16"))),
+            (Bound::Included(v!("0.3.17")), Bound::Included(v!("0.3.26"))),
+            (Bound::Included(v!("0.3.27")), Bound::Included(v!("0.3.29"))),
+            (Bound::Included(v!("0.3.30")), Bound::Included(v!("0.3.30"))),
+            (Bound::Included(v!("0.3.31")), Bound::Included(v!("0.3.32"))),
+            (Bound::Included(v!("0.3.33")), Bound::Included(v!("0.3.35"))),
+            (Bound::Included(v!("0.4.0")), Bound::Included(v!("0.4.5"))),
+            (Bound::Included(v!("0.4.6")), Bound::Unbounded),
+        ]);
+        let available_versions = BTreeSet::from_iter(
+            [
+                "0.1.124", "0.1.125", "0.2.0", "0.2.1", "0.2.2", "0.2.3", "0.2.4", "0.2.5",
+                "0.3.0", "0.3.1", "0.3.2", "0.3.3", "0.3.4", "0.3.5", "0.3.6", "0.3.7", "0.3.8",
+                "0.3.9", "0.3.10", "0.3.12", "0.3.13", "0.3.14", "0.3.15", "0.3.16", "0.3.17",
+                "0.3.18", "0.3.19", "0.3.20", "0.3.21", "0.3.22", "0.3.23", "0.3.24", "0.3.25",
+                "0.3.26", "0.3.27", "0.3.28", "0.3.29", "0.3.30", "0.3.31", "0.3.32", "0.3.33",
+                "0.3.34", "0.3.35", "0.4.0", "0.4.1", "0.4.2", "0.4.3", "0.4.4", "0.4.5", "0.4.6",
+                "0.4.7",
+            ]
+            .map(Version::from_str)
+            .map(Result::unwrap),
+        );
+        assert_eq!(
+            update_availability_range(&ranges, &available_versions),
             Ranges::from_iter([
-                (Bound::Included(v!("0.0.1")), Bound::Included(v!("0.0.1"))),
-                (Bound::Included(v!("0.0.2")), Bound::Included(v!("0.0.2"))),
-                (Bound::Included(v!("0.0.3")), Bound::Included(v!("0.0.3"))),
-                (Bound::Included(v!("0.0.4")), Bound::Included(v!("0.0.4"))),
-                (Bound::Included(v!("0.0.5")), Bound::Included(v!("0.0.5"))),
-                (Bound::Included(v!("0.0.6")), Bound::Included(v!("0.0.6"))),
-                (Bound::Included(v!("0.0.7")), Bound::Included(v!("0.0.7"))),
-                (Bound::Included(v!("0.0.8")), Bound::Included(v!("0.0.8"))),
+                (Bound::Unbounded, Bound::Included(v!("0.1.125"))),
+                (Bound::Included(v!("0.2.0")), Bound::Included(v!("0.3.16"))),
+                (Bound::Included(v!("0.3.17")), Bound::Included(v!("0.3.26"))),
+                (Bound::Included(v!("0.3.27")), Bound::Included(v!("0.3.29"))),
+                (Bound::Included(v!("0.3.30")), Bound::Included(v!("0.3.30"))),
+                (Bound::Included(v!("0.3.31")), Bound::Included(v!("0.3.32"))),
+                (Bound::Included(v!("0.3.33")), Bound::Included(v!("0.3.35"))),
+                (Bound::Included(v!("0.4.0")), Bound::Included(v!("0.4.5"))),
+                (Bound::Included(v!("0.4.6")), Bound::Included(v!("0.4.7"))),
             ])
         );
     }
