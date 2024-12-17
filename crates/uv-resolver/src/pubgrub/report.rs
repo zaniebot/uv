@@ -58,7 +58,7 @@ impl ReportFormatter<PubGrubPackage, Range<Version>, UnavailableReason>
                 ) {
                     let target = self.python_requirement.target();
                     return format!(
-                        "the requested {package} version ({target}) does not satisfy {}",
+                        "you require {package}{target} but it is not a subset of {}",
                         self.compatible_range(package, set)
                     );
                 }
@@ -68,7 +68,7 @@ impl ReportFormatter<PubGrubPackage, Range<Version>, UnavailableReason>
                 ) {
                     let installed = self.python_requirement.exact();
                     return format!(
-                        "the current {package} version ({installed}) does not satisfy {}",
+                        "you are using {package}=={installed} which does not satisfy {}",
                         self.compatible_range(package, set)
                     );
                 }
