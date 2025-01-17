@@ -56,12 +56,18 @@ fn missing_venv() -> Result<()> {
     requirements.write_str("anyio")?;
     fs::remove_dir_all(&context.venv)?;
 
-    uv_snapshot!(context.filters(), context.pip_sync().arg("requirements.txt"), @r###"
+    uv_snapshot!(context.filters(), context.pip_sync().arg("requirements.txt").arg("-v"), @r###"
     success: false
     exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
+    DEBUG uv [VERSION] ([COMMIT] DATE)
+    DEBUG Searching for default Python interpreter in virtual environments
+    DEBUG Failed to inspect Python interpreter from active virtual environment at `.venv/bin/python3`
+    DEBUG Found `cpython-3.12.[X]-macos-aarch64-none` at `[PYTHON-3.12]` (search path)
+    DEBUG Ignoring Python interpreter at `[PYTHON-3.12]`: system interpreter not explicitly requested
+    DEBUG Ignoring active virtual environment at [VENV]/bin/python3
     error: No virtual environment found; run `uv venv` to create an environment, or pass `--system` to install into a non-virtual environment
     "###);
 

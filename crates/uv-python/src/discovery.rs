@@ -723,26 +723,32 @@ impl Error {
                 InterpreterError::QueryScript { path, .. }
                 | InterpreterError::UnexpectedResponse { path, .. }
                 | InterpreterError::StatusCode { path, .. } => {
-                    debug!(
-                        "Skipping bad interpreter at {} from {source}: {err}",
-                        path.display()
-                    );
-                    false
+                    // If the interpreter is from an active, valid virtual environment, we should
+                    // fail because it's broken
+                    if let Some(true) = matches!(source, PythonSource::ActiveEnvironment)
+                        .then(|| interpreter_is_in_valid_virtualenv(path))
+                    {
+                        true
+                    } else {
+                        debug!(
+                            "Skipping bad interpreter at {} from {source}: {err}",
+                            path.display()
+                        );
+                        false
+                    }
                 }
                 InterpreterError::NotFound(path) => {
                     // If the interpreter is from an active, valid virtual environment, we should
                     // fail because it's broken
-                    if let Some(Ok(true)) = matches!(source, PythonSource::ActiveEnvironment)
-                        .then(|| {
-                            path.parent()
-                                .and_then(Path::parent)
-                                .map(|path| path.join("pyvenv.cfg").try_exists())
-                        })
-                        .flatten()
+                    if let Some(true) = matches!(source, PythonSource::ActiveEnvironment)
+                        .then(|| interpreter_is_in_valid_virtualenv(path))
                     {
                         true
                     } else {
-                        trace!("Skipping missing interpreter at {}", path.display());
+                        trace!(
+                            "Skipping missing interpreter at {} from {source}",
+                            path.display()
+                        );
                         false
                     }
                 }
@@ -977,7 +983,9 @@ pub(crate) fn find_python_installation(
         if !result.as_ref().err().map_or(true, Error::is_critical) {
             // Track the first non-critical error
             if first_error.is_none() {
-                first_error = Some(result);
+                if let Err(err) = result {
+                    first_error = Some(err);
+                }
             }
             continue;
         }
@@ -1033,8 +1041,20 @@ pub(crate) fn find_python_installation(
 
     // If we found a Python, but it was unusable for some reason, report that instead of saying we
     // couldn't find any Python interpreters.
-    if let Some(result) = first_error {
-        return result;
+    if let Some(err) = first_error {
+        // If there's a missing interpreter in an active virtual environment, we only return this
+        // error if the active virtual environment is "valid"; we ignore virtual environments that
+        // do not exist.
+        let Error::Query(ref inner, ref path, PythonSource::ActiveEnvironment) = err else {
+            return Err(err);
+        };
+        if !matches!(**inner, InterpreterError::NotFound(_)) {
+            return Err(err);
+        }
+        if interpreter_is_in_valid_virtualenv(path) {
+            return Err(err);
+        }
+        debug!("Ignoring active virtual environment at {}", path.display());
     }
 
     Ok(Err(PythonNotFound {
@@ -1118,6 +1138,16 @@ fn warn_on_unsupported_python(interpreter: &Interpreter) {
             interpreter.python_version()
         );
     }
+}
+
+/// Whether the given interpreter is in a valid virtual environment, as defined by the definite
+/// presence of a `pyvenv.cfg` file.
+fn interpreter_is_in_valid_virtualenv(path: &Path) -> bool {
+    let Some(root) = path.parent().and_then(Path::parent) else {
+        return false;
+    };
+
+    root.join("pyvenv.cfg").try_exists().unwrap_or(false)
 }
 
 /// On Windows we might encounter the Windows Store proxy shim (enabled in:
