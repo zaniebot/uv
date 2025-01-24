@@ -658,26 +658,19 @@ jobs:
             commands:
               - "uv venv"
               - "uv pip install -e '.[dev]'"
-            python: "3.9"
           - repo: "pallets/flask"
             commands:
               - "uv venv"
               - "uv pip install -r requirements/dev.txt"
-            python: "3.12"
           - repo: "pydantic/pydantic-core"
             commands:
               - "uv sync --group all"
               - "uv lock --upgrade"
-            python: "3.12"
       fail-fast: false
     steps:
       - uses: actions/checkout@v4
         with:
           repository: ${{ matrix.repo }}
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python }}
 
       - name: "Download binary"
         uses: actions/download-artifact@v4
