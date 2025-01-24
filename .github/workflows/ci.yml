@@ -703,10 +703,10 @@ jobs:
           chmod +x ./uvx
 
       - name: "Smoke test"
+        run: ./scripts/ci-smoke-test.sh
+      
+      - name: "Test completions"
         run: |
-          ./uv venv -v
-          ./uv pip install ruff -v
-          ./uvx -v ruff --version
           eval "$(./uv generate-shell-completion bash)"
           eval "$(./uvx --generate-shell-completion bash)"
 
@@ -727,10 +727,10 @@ jobs:
           chmod +x ./uvx
 
       - name: "Smoke test"
+        run: ./scripts/ci-smoke-test.sh
+      
+      - name: "Test completions"
         run: |
-          ./uv venv -v
-          ./uv pip install ruff -v
-          ./uvx -v ruff --version
           eval "$(./uv generate-shell-completion bash)"
           eval "$(./uvx --generate-shell-completion bash)"
 
@@ -747,10 +747,13 @@ jobs:
 
       - name: "Smoke test"
         working-directory: ${{ env.UV_WORKSPACE }}
+        run: ./scripts/ci-smoke-test.sh
+      
+      - name: "Test completions"
+        working-directory: ${{ env.UV_WORKSPACE }}
         run: |
-          ./uv venv -v
-          ./uv pip install ruff -v
-          ./uvx -v ruff --version
+          $ErrorActionPreference = "Stop"
+          $PSNativeCommandUseErrorActionPreference = $true
           (& ./uv generate-shell-completion powershell) | Out-String | Invoke-Expression
           (& ./uvx --generate-shell-completion powershell) | Out-String | Invoke-Expression
 
@@ -767,13 +770,13 @@ jobs:
 
       - name: "Smoke test"
         working-directory: ${{ env.UV_WORKSPACE }}
+        run: ./scripts/ci-smoke-test.sh
+
+      - name: "Test completions"
+        working-directory: ${{ env.UV_WORKSPACE }}
         run: |
           $ErrorActionPreference = "Stop"
           $PSNativeCommandUseErrorActionPreference = $true
-
-          ./uv venv -v
-          ./uv pip install ruff -v
-          ./uvx -v ruff --version
           (& ./uv generate-shell-completion powershell) | Out-String | Invoke-Expression
           (& ./uvx --generate-shell-completion powershell) | Out-String | Invoke-Expression
 
