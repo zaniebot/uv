@@ -28,10 +28,6 @@ pub(crate) enum Target<'a> {
     FromVersion(&'a str, &'a str, Version),
     /// e.g., `ruff --from ruff@latest`
     FromLatest(&'a str, &'a str),
-    /// e.g., `python`
-    Python,
-    /// e.g., `python@3.13.0`
-    FromPythonVersion(Version),
 }
 
 impl<'a> Target<'a> {
@@ -71,11 +67,7 @@ impl<'a> Target<'a> {
             return Self::From(target, from);
         }
 
-        if let Some(target) = Target::handle_interpreter_request(target) {
-            return target;
-        }
-
-        // e.g. `ruff` or `python`, no special handling
+        // e.g. `ruff`, no special handling
         let Some((name, version)) = target.split_once('@') else {
             return Self::Unspecified(target);
         };
@@ -117,32 +109,11 @@ impl<'a> Target<'a> {
             Self::FromVersion(name, _, _) => name,
             Self::FromLatest(name, _) => name,
             Self::From(name, _) => name,
-            Self::Python | Self::FromPythonVersion(_) => "python",
         }
     }
 
     /// Returns `true` if the target is `latest`.
     fn is_latest(&self) -> bool {
         matches!(self, Self::Latest(_) | Self::FromLatest(_, _))
-    }
-
-    /// `uvx python` or `uvx python@3.13.0`
-    fn handle_interpreter_request(target: &'a str) -> Option<Self> {
-        let Some((name, version)) = target.split_once('@') else {
-            match target {
-                "python" => return Some(Self::Python),
-                _ => return None,
-            }
-        };
-        match name {
-            "python" => {
-                if let Ok(version) = Version::from_str(version) {
-                    Some(Self::FromPythonVersion(version))
-                } else {
-                    None
-                }
-            }
-            _ => None,
-        }
     }
 }
