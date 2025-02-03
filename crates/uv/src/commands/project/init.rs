@@ -43,13 +43,17 @@ pub(crate) async fn init(
     init_kind: InitKind,
     description: Option<String>,
     vcs: Option<VersionControlSystem>,
+    no_vcs: bool,
     build_backend: Option<ProjectBuildBackend>,
-    no_readme: bool,
+    readme: bool,
     author_from: Option<AuthorFrom>,
+    no_author: bool,
     no_pin_python: bool,
     python: Option<String>,
     install_mirrors: PythonInstallMirrors,
     no_workspace: bool,
+    requires_python: Option<RequiresPython>,
+    no_requires_python: bool,
     python_preference: PythonPreference,
     python_downloads: PythonDownloads,
     connectivity: Connectivity,
@@ -79,9 +83,10 @@ pub(crate) async fn init(
                 cache,
                 printer,
                 no_workspace,
-                no_readme,
                 author_from,
                 no_pin_python,
+                requires_python,
+                no_requires_python,
                 package,
                 native_tls,
                 allow_insecure_host,
@@ -135,10 +140,14 @@ pub(crate) async fn init(
                 project_kind,
                 description,
                 vcs,
+                no_vcs,
                 build_backend,
-                no_readme,
+                readme,
                 author_from,
+                no_author,
                 no_pin_python,
+                requires_python,
+                no_requires_python,
                 python,
                 install_mirrors,
                 no_workspace,
@@ -154,7 +163,7 @@ pub(crate) async fn init(
             .await?;
 
             // Create the `README.md` if it does not already exist.
-            if !no_readme {
+            if readme {
                 let readme = path.join("README.md");
                 if !readme.exists() {
                     fs_err::write(readme, String::new())?;
@@ -195,19 +204,18 @@ async fn init_script(
     cache: &Cache,
     printer: Printer,
     no_workspace: bool,
-    no_readme: bool,
     author_from: Option<AuthorFrom>,
     no_pin_python: bool,
+    requires_python: Option<RequiresPython>,
+    no_requires_python: bool,
     package: bool,
     native_tls: bool,
     allow_insecure_host: &[TrustedHost],
     no_config: bool,
 ) -> Result<()> {
+    // TODO(zanieb): Consider dropping the warnings for `--no` options
     if no_workspace {
         warn_user_once!("`--no-workspace` is a no-op for Python scripts, which are standalone");
-    }
-    if no_readme {
-        warn_user_once!("`--no-readme` is a no-op for Python scripts, which are standalone");
     }
     if author_from.is_some() {
         warn_user_once!("`--author-from` is a no-op for Python scripts, which are standalone");
@@ -245,25 +253,40 @@ async fn init_script(
         }
     };
 
-    let requires_python = init_script_python_requirement(
-        python.as_deref(),
-        &install_mirrors,
-        &CWD,
-        no_pin_python,
-        python_preference,
-        python_downloads,
-        no_config,
-        &client_builder,
-        cache,
-        &reporter,
-    )
-    .await?;
+    let requires_python = if no_requires_python {
+        None
+    } else {
+        if requires_python.is_some() {
+            requires_python
+        } else {
+            Some(
+                init_script_python_requirement(
+                    python.as_deref(),
+                    &install_mirrors,
+                    &CWD,
+                    no_pin_python,
+                    python_preference,
+                    python_downloads,
+                    no_config,
+                    &client_builder,
+                    cache,
+                    &reporter,
+                )
+                .await?,
+            )
+        }
+    };
 
     if let Some(parent) = script_path.parent() {
         fs_err::tokio::create_dir_all(parent).await?;
     }
 
-    Pep723Script::create(script_path, requires_python.specifiers(), content).await?;
+    Pep723Script::create(
+        script_path,
+        requires_python.as_ref().map(RequiresPython::specifiers),
+        content,
+    )
+    .await?;
 
     Ok(())
 }
@@ -277,10 +300,14 @@ async fn init_project(
     project_kind: InitProjectKind,
     description: Option<String>,
     vcs: Option<VersionControlSystem>,
+    no_vcs: bool,
     build_backend: Option<ProjectBuildBackend>,
-    no_readme: bool,
+    readme: bool,
     author_from: Option<AuthorFrom>,
+    no_author: bool,
     no_pin_python: bool,
+    requires_python: Option<RequiresPython>,
+    no_requires_python: bool,
     python: Option<String>,
     install_mirrors: PythonInstallMirrors,
     no_workspace: bool,
@@ -365,221 +392,33 @@ async fn init_project(
         None
     };
 
-    // Add a `requires-python` field to the `pyproject.toml` and return the corresponding interpreter.
-    let (requires_python, python_request) = if let Some(python_request) = python_request {
-        // (1) A request from the user or `.python-version` file
-        // This can be arbitrary, i.e., not a version — in which case we may need to resolve the
-        // interpreter
-        match python_request {
-            PythonRequest::Version(VersionRequest::MajorMinor(
-                major,
-                minor,
-                PythonVariant::Default,
-            )) => {
-                let requires_python = RequiresPython::greater_than_equal_version(&Version::new([
-                    u64::from(major),
-                    u64::from(minor),
-                ]));
-
-                let python_request = if no_pin_python {
-                    None
-                } else {
-                    Some(PythonRequest::Version(VersionRequest::MajorMinor(
-                        major,
-                        minor,
-                        PythonVariant::Default,
-                    )))
-                };
-
-                (requires_python, python_request)
-            }
-            PythonRequest::Version(VersionRequest::MajorMinorPatch(
-                major,
-                minor,
-                patch,
-                PythonVariant::Default,
-            )) => {
-                let requires_python = RequiresPython::greater_than_equal_version(&Version::new([
-                    u64::from(major),
-                    u64::from(minor),
-                    u64::from(patch),
-                ]));
-
-                let python_request = if no_pin_python {
-                    None
-                } else {
-                    Some(PythonRequest::Version(VersionRequest::MajorMinorPatch(
-                        major,
-                        minor,
-                        patch,
-                        PythonVariant::Default,
-                    )))
-                };
-
-                (requires_python, python_request)
-            }
-            ref
-            python_request @ PythonRequest::Version(VersionRequest::Range(ref specifiers, _)) => {
-                let requires_python = RequiresPython::from_specifiers(specifiers);
-
-                let python_request = if no_pin_python {
-                    None
-                } else {
-                    let interpreter = PythonInstallation::find_or_download(
-                        Some(python_request),
-                        EnvironmentPreference::OnlySystem,
-                        python_preference,
-                        python_downloads,
-                        &client_builder,
-                        cache,
-                        Some(&reporter),
-                        install_mirrors.python_install_mirror.as_deref(),
-                        install_mirrors.pypy_install_mirror.as_deref(),
-                    )
-                    .await?
-                    .into_interpreter();
-
-                    Some(PythonRequest::Version(VersionRequest::MajorMinor(
-                        interpreter.python_major(),
-                        interpreter.python_minor(),
-                        PythonVariant::Default,
-                    )))
-                };
-
-                (requires_python, python_request)
-            }
-            python_request => {
-                let interpreter = PythonInstallation::find_or_download(
-                    Some(&python_request),
-                    EnvironmentPreference::OnlySystem,
-                    python_preference,
-                    python_downloads,
-                    &client_builder,
-                    cache,
-                    Some(&reporter),
-                    install_mirrors.python_install_mirror.as_deref(),
-                    install_mirrors.pypy_install_mirror.as_deref(),
-                )
-                .await?
-                .into_interpreter();
-
-                let requires_python =
-                    RequiresPython::greater_than_equal_version(&interpreter.python_minor_version());
-
-                let python_request = if no_pin_python {
-                    None
-                } else {
-                    Some(PythonRequest::Version(VersionRequest::MajorMinor(
-                        interpreter.python_major(),
-                        interpreter.python_minor(),
-                        PythonVariant::Default,
-                    )))
-                };
-
-                (requires_python, python_request)
-            }
-        }
-    } else if let Ok(virtualenv) = PythonEnvironment::from_root(path.join(".venv"), cache) {
-        // (2) An existing Python environment in the target directory
-        debug!("Using Python version from existing virtual environment in project");
-        let interpreter = virtualenv.into_interpreter();
-
-        let requires_python =
-            RequiresPython::greater_than_equal_version(&interpreter.python_minor_version());
-
-        // Pin to the minor version.
-        let python_request = if no_pin_python {
-            None
-        } else {
-            Some(PythonRequest::Version(VersionRequest::MajorMinor(
-                interpreter.python_major(),
-                interpreter.python_minor(),
-                PythonVariant::Default,
-            )))
-        };
-
-        (requires_python, python_request)
-    } else if let Some(requires_python) = workspace
-        .as_ref()
-        .map(find_requires_python)
-        .transpose()?
-        .flatten()
-    {
-        // (3) `requires-python` from the workspace
-        debug!("Using Python version from project workspace");
-        let python_request = PythonRequest::Version(VersionRequest::Range(
-            requires_python.specifiers().clone(),
-            PythonVariant::Default,
-        ));
-
-        // Pin to the minor version.
-        let python_request = if no_pin_python {
-            None
-        } else {
-            let interpreter = PythonInstallation::find_or_download(
-                Some(&python_request),
-                EnvironmentPreference::OnlySystem,
-                python_preference,
-                python_downloads,
-                &client_builder,
-                cache,
-                Some(&reporter),
-                install_mirrors.python_install_mirror.as_deref(),
-                install_mirrors.pypy_install_mirror.as_deref(),
-            )
-            .await?
-            .into_interpreter();
-
-            Some(PythonRequest::Version(VersionRequest::MajorMinor(
-                interpreter.python_major(),
-                interpreter.python_minor(),
-                PythonVariant::Default,
-            )))
-        };
-
-        (requires_python, python_request)
-    } else {
-        // (4) Default to the system Python
-        let interpreter = PythonInstallation::find_or_download(
-            None,
-            EnvironmentPreference::OnlySystem,
-            python_preference,
-            python_downloads,
-            &client_builder,
-            cache,
-            Some(&reporter),
-            install_mirrors.python_install_mirror.as_deref(),
-            install_mirrors.pypy_install_mirror.as_deref(),
-        )
-        .await?
-        .into_interpreter();
-
-        let requires_python =
-            RequiresPython::greater_than_equal_version(&interpreter.python_minor_version());
-
-        // Pin to the minor version.
-        let python_request = if no_pin_python {
-            None
-        } else {
-            Some(PythonRequest::Version(VersionRequest::MajorMinor(
-                interpreter.python_major(),
-                interpreter.python_minor(),
-                PythonVariant::Default,
-            )))
-        };
-
-        (requires_python, python_request)
-    };
+    let (requires_python, python_request) = init_project_python_requirement(
+        requires_python,
+        python_request,
+        no_pin_python,
+        no_requires_python,
+        python_preference,
+        python_downloads,
+        &client_builder,
+        cache,
+        &reporter,
+        install_mirrors,
+        path,
+        workspace.as_ref(),
+    )
+    .await?;
 
     project_kind.init(
         name,
         path,
-        &requires_python,
+        requires_python.as_ref(),
         description.as_deref(),
         vcs,
+        no_vcs,
         build_backend,
         author_from,
-        no_readme,
+        no_author,
+        readme,
         package,
     )?;
 
@@ -694,16 +533,19 @@ impl InitKind {
 
 impl InitProjectKind {
     /// Initialize this project kind at the target path.
+    #[allow(clippy::fn_params_excessive_bools)]
     fn init(
         self,
         name: &PackageName,
         path: &Path,
-        requires_python: &RequiresPython,
+        requires_python: Option<&RequiresPython>,
         description: Option<&str>,
         vcs: Option<VersionControlSystem>,
+        no_vcs: bool,
         build_backend: Option<ProjectBuildBackend>,
         author_from: Option<AuthorFrom>,
-        no_readme: bool,
+        no_author: bool,
+        readme: bool,
         package: bool,
     ) -> Result<()> {
         match self {
@@ -713,9 +555,11 @@ impl InitProjectKind {
                 requires_python,
                 description,
                 vcs,
+                no_vcs,
                 build_backend,
                 author_from,
-                no_readme,
+                no_author,
+                readme,
                 package,
             ),
             InitProjectKind::Library => InitProjectKind::init_library(
@@ -724,24 +568,29 @@ impl InitProjectKind {
                 requires_python,
                 description,
                 vcs,
+                no_vcs,
                 build_backend,
                 author_from,
-                no_readme,
+                no_author,
+                readme,
                 package,
             ),
         }
     }
 
     /// Initialize a Python application at the target path.
+    #[allow(clippy::fn_params_excessive_bools)]
     fn init_application(
         name: &PackageName,
         path: &Path,
-        requires_python: &RequiresPython,
+        requires_python: Option<&RequiresPython>,
         description: Option<&str>,
         vcs: Option<VersionControlSystem>,
+        no_vcs: bool,
         build_backend: Option<ProjectBuildBackend>,
         author_from: Option<AuthorFrom>,
-        no_readme: bool,
+        no_author: bool,
+        readme: bool,
         package: bool,
     ) -> Result<()> {
         fs_err::create_dir_all(path)?;
@@ -754,16 +603,15 @@ impl InitProjectKind {
                 AuthorFrom::None
             }
         });
-        let author = get_author_info(path, author_from);
+        let author = if no_author {
+            None
+        } else {
+            get_author_info(path, author_from)
+        };
 
         // Create the `pyproject.toml`
-        let mut pyproject = pyproject_project(
-            name,
-            requires_python,
-            author.as_ref(),
-            description,
-            no_readme,
-        );
+        let mut pyproject =
+            pyproject_project(name, requires_python, author.as_ref(), description, readme);
 
         // Include additional project configuration for packaged applications
         if package {
@@ -800,21 +648,26 @@ impl InitProjectKind {
         fs_err::write(path.join("pyproject.toml"), pyproject)?;
 
         // Initialize the version control system.
-        init_vcs(path, vcs)?;
+        if !no_vcs {
+            init_vcs(path, vcs)?;
+        }
 
         Ok(())
     }
 
     /// Initialize a library project at the target path.
+    #[allow(clippy::fn_params_excessive_bools)]
     fn init_library(
         name: &PackageName,
         path: &Path,
-        requires_python: &RequiresPython,
+        requires_python: Option<&RequiresPython>,
         description: Option<&str>,
         vcs: Option<VersionControlSystem>,
+        no_vcs: bool,
         build_backend: Option<ProjectBuildBackend>,
         author_from: Option<AuthorFrom>,
-        no_readme: bool,
+        no_author: bool,
+        readme: bool,
         package: bool,
     ) -> Result<()> {
         if !package {
@@ -823,16 +676,15 @@ impl InitProjectKind {
 
         fs_err::create_dir_all(path)?;
 
-        let author = get_author_info(path, author_from.unwrap_or_default());
+        let author = if no_author {
+            None
+        } else {
+            get_author_info(path, author_from.unwrap_or_default())
+        };
 
         // Create the `pyproject.toml`
-        let mut pyproject = pyproject_project(
-            name,
-            requires_python,
-            author.as_ref(),
-            description,
-            no_readme,
-        );
+        let mut pyproject =
+            pyproject_project(name, requires_python, author.as_ref(), description, readme);
 
         // Always include a build system if the project is packaged.
         let build_backend = build_backend.unwrap_or_default();
@@ -846,7 +698,9 @@ impl InitProjectKind {
         generate_package_scripts(name, path, build_backend, true)?;
 
         // Initialize the version control system.
-        init_vcs(path, vcs)?;
+        if !no_vcs {
+            init_vcs(path, vcs)?;
+        }
 
         Ok(())
     }
@@ -874,22 +728,21 @@ impl Author {
 /// Generate the `[project]` section of a `pyproject.toml`.
 fn pyproject_project(
     name: &PackageName,
-    requires_python: &RequiresPython,
+    requires_python: Option<&RequiresPython>,
     author: Option<&Author>,
     description: Option<&str>,
-    no_readme: bool,
+    readme: bool,
 ) -> String {
     indoc::formatdoc! {r#"
         [project]
         name = "{name}"
         version = "0.1.0"
-        description = "{description}"{readme}{authors}
-        requires-python = "{requires_python}"
+        description = "{description}"{readme}{authors}{requires_python}
         dependencies = []
     "#,
-        readme = if no_readme { "" } else { "\nreadme = \"README.md\"" },
+        readme = if readme { "\nreadme = \"README.md\"" } else { "" },
         authors = author.map_or_else(String::new, |author| format!("\nauthors = [\n    {}\n]", author.to_toml_string())),
-        requires_python = requires_python.specifiers(),
+        requires_python = requires_python.map_or_else(String::new, |requires_python| format!("\nrequires-python = \"{}\"", requires_python.specifiers())),
         description = description.unwrap_or("Add your description here"),
     }
 }
@@ -1270,4 +1123,296 @@ fn get_author_from_git(path: &Path) -> Result<Author> {
     };
 
     Ok(author)
+}
+
+/// Determine the [`RequiresPython`] and [`PythonRequest`] to use for a project's
+/// `requires-python` and `.python-version` files respectively.
+async fn init_project_python_requirement(
+    requires_python: Option<RequiresPython>,
+    python_request: Option<PythonRequest>,
+    no_pin_python: bool,
+    no_requires_python: bool,
+    python_preference: PythonPreference,
+    python_downloads: PythonDownloads,
+    client_builder: &BaseClientBuilder<'_>,
+    cache: &Cache,
+    reporter: &PythonDownloadReporter,
+    install_mirrors: PythonInstallMirrors,
+    path: &Path,
+    workspace: Option<&Workspace>,
+) -> Result<(Option<RequiresPython>, Option<PythonRequest>)> {
+    // Exit early to avoid querying any interpreters if the user has disabled both
+    if no_requires_python && no_pin_python {
+        return Ok((None, None));
+    }
+
+    let (requires_python, python_request) = if let Some(python_request) = python_request {
+        // (1) A request from the user or `.python-version` file
+        // This can be arbitrary, i.e., not a version — in which case we may need to resolve the
+        // interpreter
+        match python_request {
+            PythonRequest::Version(VersionRequest::MajorMinor(
+                major,
+                minor,
+                PythonVariant::Default,
+            )) => {
+                let requires_python = if no_requires_python {
+                    None
+                } else {
+                    if requires_python.is_some() {
+                        requires_python
+                    } else {
+                        Some(RequiresPython::greater_than_equal_version(&Version::new([
+                            u64::from(major),
+                            u64::from(minor),
+                        ])))
+                    }
+                };
+
+                let python_request = if no_pin_python {
+                    None
+                } else {
+                    Some(PythonRequest::Version(VersionRequest::MajorMinor(
+                        major,
+                        minor,
+                        PythonVariant::Default,
+                    )))
+                };
+
+                (requires_python, python_request)
+            }
+            PythonRequest::Version(VersionRequest::MajorMinorPatch(
+                major,
+                minor,
+                patch,
+                PythonVariant::Default,
+            )) => {
+                let requires_python = if no_requires_python {
+                    None
+                } else {
+                    if requires_python.is_some() {
+                        requires_python
+                    } else {
+                        Some(RequiresPython::greater_than_equal_version(&Version::new([
+                            u64::from(major),
+                            u64::from(minor),
+                            u64::from(patch),
+                        ])))
+                    }
+                };
+
+                let python_request = if no_pin_python {
+                    None
+                } else {
+                    Some(PythonRequest::Version(VersionRequest::MajorMinorPatch(
+                        major,
+                        minor,
+                        patch,
+                        PythonVariant::Default,
+                    )))
+                };
+
+                (requires_python, python_request)
+            }
+            ref
+            python_request @ PythonRequest::Version(VersionRequest::Range(ref specifiers, _)) => {
+                let requires_python = if no_requires_python {
+                    None
+                } else {
+                    if requires_python.is_some() {
+                        requires_python
+                    } else {
+                        Some(RequiresPython::from_specifiers(specifiers))
+                    }
+                };
+
+                let python_request = if no_pin_python {
+                    None
+                } else {
+                    let interpreter = PythonInstallation::find_or_download(
+                        Some(python_request),
+                        EnvironmentPreference::OnlySystem,
+                        python_preference,
+                        python_downloads,
+                        client_builder,
+                        cache,
+                        Some(reporter),
+                        install_mirrors.python_install_mirror.as_deref(),
+                        install_mirrors.pypy_install_mirror.as_deref(),
+                    )
+                    .await?
+                    .into_interpreter();
+
+                    Some(PythonRequest::Version(VersionRequest::MajorMinor(
+                        interpreter.python_major(),
+                        interpreter.python_minor(),
+                        PythonVariant::Default,
+                    )))
+                };
+
+                (requires_python, python_request)
+            }
+            python_request => {
+                let interpreter = PythonInstallation::find_or_download(
+                    Some(&python_request),
+                    EnvironmentPreference::OnlySystem,
+                    python_preference,
+                    python_downloads,
+                    client_builder,
+                    cache,
+                    Some(reporter),
+                    install_mirrors.python_install_mirror.as_deref(),
+                    install_mirrors.pypy_install_mirror.as_deref(),
+                )
+                .await?
+                .into_interpreter();
+
+                let requires_python = if no_requires_python {
+                    None
+                } else {
+                    if requires_python.is_some() {
+                        requires_python
+                    } else {
+                        Some(RequiresPython::greater_than_equal_version(
+                            &interpreter.python_minor_version(),
+                        ))
+                    }
+                };
+
+                let python_request = if no_pin_python {
+                    None
+                } else {
+                    Some(PythonRequest::Version(VersionRequest::MajorMinor(
+                        interpreter.python_major(),
+                        interpreter.python_minor(),
+                        PythonVariant::Default,
+                    )))
+                };
+
+                (requires_python, python_request)
+            }
+        }
+    } else if let Ok(virtualenv) = PythonEnvironment::from_root(path.join(".venv"), cache) {
+        // (2) An existing Python environment in the target directory
+        debug!("Using Python version from existing virtual environment in project");
+        let interpreter = virtualenv.into_interpreter();
+
+        let requires_python = if no_requires_python {
+            None
+        } else {
+            if requires_python.is_some() {
+                requires_python
+            } else {
+                Some(RequiresPython::greater_than_equal_version(
+                    &interpreter.python_minor_version(),
+                ))
+            }
+        };
+
+        // Pin to the minor version.
+        let python_request = if no_pin_python {
+            None
+        } else {
+            Some(PythonRequest::Version(VersionRequest::MajorMinor(
+                interpreter.python_major(),
+                interpreter.python_minor(),
+                PythonVariant::Default,
+            )))
+        };
+
+        (requires_python, python_request)
+    } else if let Some(workspace_requires_python) =
+        workspace.map(find_requires_python).transpose()?.flatten()
+    {
+        // (3) `requires-python` from the workspace
+        debug!("Using Python version from project workspace");
+
+        let requires_python = if no_requires_python {
+            None
+        } else {
+            if requires_python.is_some() {
+                requires_python
+            } else {
+                Some(workspace_requires_python.clone())
+            }
+        };
+
+        let python_request = PythonRequest::Version(VersionRequest::Range(
+            requires_python
+                .as_ref()
+                .unwrap_or(&workspace_requires_python)
+                .specifiers()
+                .clone(),
+            PythonVariant::Default,
+        ));
+
+        // Pin to the minor version.
+        let python_request = if no_pin_python {
+            None
+        } else {
+            let interpreter = PythonInstallation::find_or_download(
+                Some(&python_request),
+                EnvironmentPreference::OnlySystem,
+                python_preference,
+                python_downloads,
+                client_builder,
+                cache,
+                Some(reporter),
+                install_mirrors.python_install_mirror.as_deref(),
+                install_mirrors.pypy_install_mirror.as_deref(),
+            )
+            .await?
+            .into_interpreter();
+
+            Some(PythonRequest::Version(VersionRequest::MajorMinor(
+                interpreter.python_major(),
+                interpreter.python_minor(),
+                PythonVariant::Default,
+            )))
+        };
+
+        (requires_python, python_request)
+    } else {
+        // (4) Default to the system Python
+        let interpreter = PythonInstallation::find_or_download(
+            None,
+            EnvironmentPreference::OnlySystem,
+            python_preference,
+            python_downloads,
+            client_builder,
+            cache,
+            Some(reporter),
+            install_mirrors.python_install_mirror.as_deref(),
+            install_mirrors.pypy_install_mirror.as_deref(),
+        )
+        .await?
+        .into_interpreter();
+
+        let requires_python = if no_requires_python {
+            None
+        } else {
+            if requires_python.is_some() {
+                requires_python
+            } else {
+                Some(RequiresPython::greater_than_equal_version(
+                    &interpreter.python_minor_version(),
+                ))
+            }
+        };
+
+        // Pin to the minor version.
+        let python_request = if no_pin_python {
+            None
+        } else {
+            Some(PythonRequest::Version(VersionRequest::MajorMinor(
+                interpreter.python_major(),
+                interpreter.python_minor(),
+                PythonVariant::Default,
+            )))
+        };
+
+        (requires_python, python_request)
+    };
+
+    Ok((requires_python, python_request))
 }

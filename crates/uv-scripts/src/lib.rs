@@ -185,7 +185,7 @@ impl Pep723Script {
     /// Create a PEP 723 script at the given path.
     pub async fn create(
         file: impl AsRef<Path>,
-        requires_python: &VersionSpecifiers,
+        requires_python: Option<&VersionSpecifiers>,
         existing_contents: Option<Vec<u8>>,
     ) -> Result<(), Pep723Error> {
         let file = file.as_ref();
@@ -195,10 +195,10 @@ impl Pep723Script {
             .and_then(|name| name.to_str())
             .ok_or_else(|| Pep723Error::InvalidFilename(file.to_string_lossy().to_string()))?;
 
-        let default_metadata = indoc::formatdoc! {r#"
-            requires-python = "{requires_python}"
-            dependencies = []
-            "#,
+        let default_metadata = indoc::formatdoc! {"
+            {requires_python}dependencies = []
+            ",
+            requires_python = requires_python.map_or_else(String::new, |requires_python| format!("requires-python = \"{requires_python}\"\n")),
         };
         let metadata = serialize_metadata(&default_metadata);
 

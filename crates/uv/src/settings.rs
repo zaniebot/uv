@@ -34,7 +34,8 @@ use uv_pep508::{ExtraName, RequirementOrigin};
 use uv_pypi_types::{Requirement, SupportedEnvironments};
 use uv_python::{Prefix, PythonDownloads, PythonPreference, PythonVersion, Target};
 use uv_resolver::{
-    AnnotationStyle, DependencyMode, ExcludeNewer, ForkStrategy, PrereleaseMode, ResolutionMode,
+    AnnotationStyle, DependencyMode, ExcludeNewer, ForkStrategy, PrereleaseMode, RequiresPython,
+    ResolutionMode,
 };
 use uv_settings::{
     Combine, FilesystemOptions, Options, PipOptions, PublishOptions, PythonInstallMirrors,
@@ -197,8 +198,12 @@ pub(crate) struct InitSettings {
     pub(crate) kind: InitKind,
     pub(crate) description: Option<String>,
     pub(crate) vcs: Option<VersionControlSystem>,
+    pub(crate) no_vcs: bool,
     pub(crate) build_backend: Option<ProjectBuildBackend>,
-    pub(crate) no_readme: bool,
+    pub(crate) readme: bool,
+    pub(crate) no_author: bool,
+    pub(crate) requires_python: Option<RequiresPython>,
+    pub(crate) no_requires_python: bool,
     pub(crate) author_from: Option<AuthorFrom>,
     pub(crate) no_pin_python: bool,
     pub(crate) no_workspace: bool,
@@ -221,13 +226,18 @@ impl InitSettings {
             script,
             description,
             vcs,
+            no_vcs,
             build_backend,
+            readme,
             no_readme,
             author_from,
+            no_author,
+            requires_python,
+            no_requires_python,
             no_pin_python,
             no_workspace,
             python,
-            ..
+            backend: _,
         } = args;
 
         let kind = match (app, lib, script) {
@@ -252,9 +262,13 @@ impl InitSettings {
             kind,
             description,
             vcs,
+            no_vcs,
             build_backend,
-            no_readme,
+            readme: flag(readme, no_readme).unwrap_or(true),
             author_from,
+            no_author,
+            requires_python,
+            no_requires_python,
             no_pin_python,
             no_workspace,
             python: python.and_then(Maybe::into_option),

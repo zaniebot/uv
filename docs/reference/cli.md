@@ -540,7 +540,7 @@ uv init [OPTIONS] [PATH]
 
 </dd><dt><code>--author-from</code> <i>author-from</i></dt><dd><p>Fill in the <code>authors</code> field in the <code>pyproject.toml</code>.</p>
 
-<p>By default, uv will attempt to infer the author information from some sources (e.g., Git) (<code>auto</code>). Use <code>--author-from git</code> to only infer from Git configuration. Use <code>--author-from none</code> to avoid inferring the author information.</p>
+<p>By default, uv will attempt to infer the author information from some sources (e.g., Git) (<code>auto</code>). Use <code>--author-from git</code> to only infer from Git configuration. Use <code>--no-author</code> to avoid writing an author.</p>
 
 <p>Possible values:</p>
 
@@ -620,6 +620,8 @@ uv init [OPTIONS] [PATH]
 <p>However, in some cases, you may want to use the platform&#8217;s native certificate store, especially if you&#8217;re relying on a corporate trust root (e.g., for a mandatory proxy) that&#8217;s included in your system&#8217;s certificate store.</p>
 
 <p>May also be set with the <code>UV_NATIVE_TLS</code> environment variable.</p>
+</dd><dt><code>--no-author</code></dt><dd><p>Do not fill in the <code>authors</code> field in the <code>pyproject.toml</code></p>
+
 </dd><dt><code>--no-cache</code>, <code>-n</code></dt><dd><p>Avoid reading from or writing to the cache, instead using a temporary directory for the duration of the operation</p>
 
 <p>May also be set with the <code>UV_NO_CACHE</code> environment variable.</p>
@@ -646,6 +648,10 @@ uv init [OPTIONS] [PATH]
 </dd><dt><code>--no-python-downloads</code></dt><dd><p>Disable automatic downloads of Python.</p>
 
 </dd><dt><code>--no-readme</code></dt><dd><p>Do not create a <code>README.md</code> file</p>
+
+</dd><dt><code>--no-requires-python</code></dt><dd><p>Do not set a Python requirement for the project</p>
+
+</dd><dt><code>--no-vcs</code></dt><dd><p>Disable initialization of a version control system</p>
 
 </dd><dt><code>--no-workspace</code></dt><dd><p>Avoid discovering a workspace and create a standalone project.</p>
 
@@ -697,6 +703,10 @@ uv init [OPTIONS] [PATH]
 </ul>
 </dd><dt><code>--quiet</code>, <code>-q</code></dt><dd><p>Do not print any output</p>
 
+</dd><dt><code>--requires-python</code> <i>requires-python</i></dt><dd><p>The Python requirement to use for the project.</p>
+
+<p>Defaults to <code>&gt;=</code> the minor version of the current Python interpreter.</p>
+
 </dd><dt><code>--script</code></dt><dd><p>Create a script.</p>
 
 <p>A script is a standalone file with embedded metadata enumerating its dependencies, along with any Python version requirements, as defined in the PEP 723 specification.</p>
@@ -707,7 +717,7 @@ uv init [OPTIONS] [PATH]
 
 </dd><dt><code>--vcs</code> <i>vcs</i></dt><dd><p>Initialize a version control system for the project.</p>
 
-<p>By default, uv will initialize a Git repository (<code>git</code>). Use <code>--vcs none</code> to explicitly avoid initializing a version control system.</p>
+<p>By default, uv will initialize a Git repository (<code>git</code>). Use <code>--no-vcs</code> to disable initialization of a version control system.</p>
 
 <p>Possible values:</p>
 

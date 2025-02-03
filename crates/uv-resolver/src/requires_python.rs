@@ -1,6 +1,6 @@
-use std::cmp::Ordering;
 use std::collections::Bound;
 use std::ops::Deref;
+use std::{cmp::Ordering, str::FromStr};
 
 use pubgrub::Range;
 
@@ -532,6 +532,17 @@ impl serde::Serialize for RequiresPython {
 impl<'de> serde::Deserialize<'de> for RequiresPython {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let specifiers = VersionSpecifiers::deserialize(deserializer)?;
+        let range = release_specifiers_to_ranges(specifiers.clone());
+        let range = RequiresPythonRange::from_range(&range);
+        Ok(Self { specifiers, range })
+    }
+}
+
+impl FromStr for RequiresPython {
+    type Err = uv_pep440::VersionSpecifiersParseError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let specifiers = VersionSpecifiers::from_str(s)?;
         let range = release_specifiers_to_ranges(specifiers.clone());
         let range = RequiresPythonRange::from_range(&range);
         Ok(Self { specifiers, range })

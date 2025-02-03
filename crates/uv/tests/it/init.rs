@@ -696,9 +696,46 @@ fn init_no_readme() {
         name = "foo"
         version = "0.1.0"
         description = "Add your description here"
-        requires-python = ">=3.12"
+        requires-python = >=3.12
         dependencies = []
         "###
+        );
+    });
+
+    // overrrides with `--readme`
+    uv_snapshot!(context.filters(), context.init().arg("bar").arg("--no-readme").arg("--readme"), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Initialized project `bar` at `[TEMP_DIR]/bar`
+    "###);
+
+    let pyproject = context.read("bar/pyproject.toml");
+    let readme = context.read("bar/README.md");
+
+    insta::with_settings!({
+        filters => context.filters(),
+    }, {
+        assert_snapshot!(
+            pyproject, @r###"
+        [project]
+        name = "bar"
+        version = "0.1.0"
+        description = "Add your description here"
+        readme = "README.md"
+        requires-python = >=3.12
+        dependencies = []
+        "###
+        );
+    });
+
+    insta::with_settings!({
+        filters => context.filters(),
+    }, {
+        assert_snapshot!(
+            readme, @""
         );
     });
 }
@@ -1900,6 +1937,82 @@ fn init_requires_python_workspace() -> Result<()> {
         );
     });
 
+    // Override `requires-python`
+    let child = context.temp_dir.join("bar");
+    uv_snapshot!(context.filters(), context.init().current_dir(&context.temp_dir).arg(&child)
+        .arg("--requires-python").arg(">=3.11"), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Adding `bar` as member of workspace `[TEMP_DIR]/`
+    Initialized project `bar` at `[TEMP_DIR]/bar`
+    "###);
+
+    let pyproject_toml = fs_err::read_to_string(child.join("pyproject.toml"))?;
+    insta::with_settings!({
+        filters => context.filters(),
+    }, {
+        assert_snapshot!(
+            pyproject_toml, @r###"
+        [project]
+        name = "bar"
+        version = "0.1.0"
+        description = "Add your description here"
+        readme = "README.md"
+        requires-python = ">=3.11"
+        dependencies = []
+        "###
+        );
+    });
+
+    let python_version = fs_err::read_to_string(child.join(".python-version"))?;
+    insta::with_settings!({
+        filters => context.filters(),
+    }, {
+        assert_snapshot!(
+            python_version, @"3.12"
+        );
+    });
+
+    // Disable `requires-python`
+    let child = context.temp_dir.join("foobar");
+    uv_snapshot!(context.filters(), context.init().current_dir(&context.temp_dir).arg(&child)
+        .arg("--no-requires-python"), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Adding `foobar` as member of workspace `[TEMP_DIR]/`
+    Initialized project `foobar` at `[TEMP_DIR]/foobar`
+    "###);
+
+    let pyproject_toml = fs_err::read_to_string(child.join("pyproject.toml"))?;
+    insta::with_settings!({
+        filters => context.filters(),
+    }, {
+        assert_snapshot!(
+            pyproject_toml, @r###"
+        [project]
+        name = "foobar"
+        version = "0.1.0"
+        description = "Add your description here"
+        readme = "README.md"
+        dependencies = []
+        "###
+        );
+    });
+
+    let python_version = fs_err::read_to_string(child.join(".python-version"))?;
+    insta::with_settings!({
+        filters => context.filters(),
+    }, {
+        assert_snapshot!(
+            python_version, @"3.12"
+        );
+    });
     Ok(())
 }
 
@@ -2326,6 +2439,7 @@ fn init_git() -> Result<()> {
     Ok(())
 }
 
+/// Disable VCS with `--vcs none`
 #[test]
 fn init_vcs_none() {
     let context = TestContext::new("3.12");
@@ -2339,6 +2453,41 @@ fn init_vcs_none() {
 
     ----- stderr -----
     Initialized project `foo` at `[TEMP_DIR]/foo`
+    "###);
+
+    child.child(".gitignore").assert(predicate::path::missing());
+    child.child(".git").assert(predicate::path::missing());
+}
+
+/// Disable VCS with `--no-vcs`
+#[test]
+fn init_no_vcs() {
+    let context = TestContext::new("3.12");
+
+    let child = context.temp_dir.child("foo");
+
+    uv_snapshot!(context.filters(), context.init().arg(child.as_ref()).arg("--no-vcs"), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Initialized project `foo` at `[TEMP_DIR]/foo`
+    "###);
+
+    child.child(".gitignore").assert(predicate::path::missing());
+    child.child(".git").assert(predicate::path::missing());
+
+    // Overrides `--vcs`
+    let child = context.temp_dir.child("bar");
+
+    uv_snapshot!(context.filters(), context.init().arg(child.as_ref()).arg("--vcs").arg("git").arg("--no-vcs"), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Initialized project `bar` at `[TEMP_DIR]/bar`
     "###);
 
     child.child(".gitignore").assert(predicate::path::missing());
@@ -2446,15 +2595,15 @@ fn init_with_author() {
         filters => context.filters(),
     }, {
         assert_snapshot!(
-            pyproject, @r#"
+            pyproject, @r###"
         [project]
         name = "foo"
         version = "0.1.0"
         description = "Add your description here"
         readme = "README.md"
-        requires-python = ">=3.12"
+        requires-python = >=3.12
         dependencies = []
-        "#
+        "###
         );
     });
 
@@ -2471,7 +2620,7 @@ fn init_with_author() {
         filters => context.filters(),
     }, {
         assert_snapshot!(
-            pyproject, @r#"
+            pyproject, @r###"
         [project]
         name = "bar"
         version = "0.1.0"
@@ -2480,9 +2629,9 @@ fn init_with_author() {
         authors = [
             { name = "Alice", email = "alice@example.com" }
         ]
-        requires-python = ">=3.12"
+        requires-python = >=3.12
         dependencies = []
-        "#
+        "###
         );
     });
 
@@ -2493,7 +2642,7 @@ fn init_with_author() {
         filters => context.filters(),
     }, {
         assert_snapshot!(
-            pyproject, @r#"
+            pyproject, @r###"
         [project]
         name = "baz"
         version = "0.1.0"
@@ -2502,17 +2651,17 @@ fn init_with_author() {
         authors = [
             { name = "Alice", email = "alice@example.com" }
         ]
-        requires-python = ">=3.12"
+        requires-python = >=3.12
         dependencies = []
 
         [build-system]
         requires = ["hatchling"]
         build-backend = "hatchling.build"
-        "#
+        "###
         );
     });
 
-    // use `--authors-from none` to prevent it.
+    // use `--authors-from none` to disable it
     context
         .init()
         .arg("qux")
@@ -2526,19 +2675,79 @@ fn init_with_author() {
         filters => context.filters(),
     }, {
         assert_snapshot!(
-            pyproject, @r#"
+            pyproject, @r###"
         [project]
         name = "qux"
         version = "0.1.0"
         description = "Add your description here"
         readme = "README.md"
-        requires-python = ">=3.12"
+        requires-python = >=3.12
         dependencies = []
 
         [build-system]
         requires = ["hatchling"]
         build-backend = "hatchling.build"
-        "#
+        "###
+        );
+    });
+
+    // use `--no-authors` to disable it
+    context
+        .init()
+        .arg("dux")
+        .arg("--lib")
+        .arg("--no-author")
+        .assert()
+        .success();
+    let pyproject = context.read("dux/pyproject.toml");
+    insta::with_settings!({
+        filters => context.filters(),
+    }, {
+        assert_snapshot!(
+            pyproject, @r###"
+        [project]
+        name = "dux"
+        version = "0.1.0"
+        description = "Add your description here"
+        readme = "README.md"
+        requires-python = >=3.12
+        dependencies = []
+
+        [build-system]
+        requires = ["hatchling"]
+        build-backend = "hatchling.build"
+        "###
+        );
+    });
+
+    // `--no-authors` overrides `--author-from`
+    context
+        .init()
+        .arg("lox")
+        .arg("--lib")
+        .arg("--author-from")
+        .arg("git")
+        .arg("--no-author")
+        .assert()
+        .success();
+    let pyproject = context.read("lox/pyproject.toml");
+    insta::with_settings!({
+        filters => context.filters(),
+    }, {
+        assert_snapshot!(
+            pyproject, @r###"
+        [project]
+        name = "lox"
+        version = "0.1.0"
+        description = "Add your description here"
+        readme = "README.md"
+        requires-python = >=3.12
+        dependencies = []
+
+        [build-system]
+        requires = ["hatchling"]
+        build-backend = "hatchling.build"
+        "###
         );
     });
 }

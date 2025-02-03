@@ -19,7 +19,9 @@ use uv_normalize::{ExtraName, GroupName, PackageName};
 use uv_pep508::Requirement;
 use uv_pypi_types::VerbatimParsedUrl;
 use uv_python::{PythonDownloads, PythonPreference, PythonVersion};
-use uv_resolver::{AnnotationStyle, ExcludeNewer, ForkStrategy, PrereleaseMode, ResolutionMode};
+use uv_resolver::{
+    AnnotationStyle, ExcludeNewer, ForkStrategy, PrereleaseMode, RequiresPython, ResolutionMode,
+};
 use uv_static::EnvVars;
 
 pub mod comma;
@@ -2579,10 +2581,14 @@ pub struct InitArgs {
 
     /// Initialize a version control system for the project.
     ///
-    /// By default, uv will initialize a Git repository (`git`). Use `--vcs none` to explicitly
-    /// avoid initializing a version control system.
-    #[arg(long, value_enum, conflicts_with = "script")]
+    /// By default, uv will initialize a Git repository (`git`). Use `--no-vcs` to disable
+    /// initialization of a version control system.
+    #[arg(long, value_enum, conflicts_with = "script", overrides_with = "no_vcs")]
     pub vcs: Option<VersionControlSystem>,
+
+    /// Disable initialization of a version control system.
+    #[arg(long, overrides_with = "vcs")]
+    pub no_vcs: bool,
 
     /// Initialize a build-backend of choice for the project.
     ///
@@ -2598,19 +2604,29 @@ pub struct InitArgs {
         value_parser=clap::builder::UnknownArgumentValueParser::suggest_arg("--build-backend"),
         hide(true)
     )]
-    backend: Option<String>,
+    pub backend: Option<String>,
 
     /// Do not create a `README.md` file.
-    #[arg(long)]
+    #[arg(long, overrides_with = "readme")]
     pub no_readme: bool,
+
+    /// Create a `README.md` file.
+    ///
+    /// This is the default behavior.
+    #[arg(long, overrides_with = "no_readme", hide = true)]
+    pub readme: bool,
 
     /// Fill in the `authors` field in the `pyproject.toml`.
     ///
     /// By default, uv will attempt to infer the author information from some sources (e.g., Git)
-    /// (`auto`). Use `--author-from git` to only infer from Git configuration. Use `--author-from
-    /// none` to avoid inferring the author information.
-    #[arg(long, value_enum)]
+    /// (`auto`). Use `--author-from git` to only infer from Git configuration. Use `--no-author`
+    /// to avoid writing an author.
+    #[arg(long, value_enum, overrides_with = "no_author")]
     pub author_from: Option<AuthorFrom>,
+
+    /// Do not fill in the `authors` field in the `pyproject.toml`.
+    #[arg(long, overrides_with = "author_from")]
+    pub no_author: bool,
 
     /// Do not create a `.python-version` file for the project.
     ///
@@ -2624,6 +2640,16 @@ pub struct InitArgs {
     /// By default, uv searches for workspaces in the current directory or any parent directory.
     #[arg(long, alias = "no-project")]
     pub no_workspace: bool,
+
+    /// The Python requirement to use for the project.
+    ///
+    /// Defaults to `>=` the minor version of the current Python interpreter.
+    #[arg(long, overrides_with = "no_requires_python")]
+    pub requires_python: Option<RequiresPython>,
+
+    /// Do not set a Python requirement for the project.
+    #[arg(long, overrides_with = "requires_python")]
+    pub no_requires_python: bool,
 
     /// The Python interpreter to use to determine the minimum supported Python version.
     ///
@@ -2703,7 +2729,7 @@ pub struct RunArgs {
     /// Exclude dependencies from default groups.
     ///
     /// `--group` can be used to include specific groups.
-    #[arg(long, conflicts_with_all = ["no_group", "only_group"])]
+    #[arg(long, conflicts_with_all =["no_group", "only_group"])]
     pub no_default_groups: bool,
 
     /// Only include dependencies from the specified dependency group.
@@ -2717,13 +2743,13 @@ pub struct RunArgs {
     /// Include dependencies from all dependency groups.
     ///
     /// `--no-group` can be used to exclude specific groups.
-    #[arg(long, conflicts_with_all = [ "group", "only_group" ])]
+    #[arg(long, conflicts_with_all =[ "group", "only_group" ])]
     pub all_groups: bool,
 
     /// Run a Python module.
     ///
     /// Equivalent to `python -m <module>`.
-    #[arg(short, long, conflicts_with_all = ["script", "gui_script"])]
+    #[arg(short, long, conflicts_with_all =["script", "gui_script"])]
     pub module: bool,
 
     /// Only include the development dependency group.
