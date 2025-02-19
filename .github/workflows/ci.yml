@@ -769,10 +769,17 @@ jobs:
 
       - name: "Smoke test"
         working-directory: ${{ env.UV_WORKSPACE }}
+        shell: bash
         run: |
           ./uv venv -v
           ./uv pip install ruff -v
           ./uvx -v ruff --version
+
+      - name: "Smoke test completions"
+        working-directory: ${{ env.UV_WORKSPACE }}
+        run: $ErrorActionPreference = "Stop"
+          $PSNativeCommandUseErrorActionPreference = $true
+
           (& ./uv generate-shell-completion powershell) | Out-String | Invoke-Expression
           (& ./uvx --generate-shell-completion powershell) | Out-String | Invoke-Expression
 
@@ -789,13 +796,17 @@ jobs:
 
       - name: "Smoke test"
         working-directory: ${{ env.UV_WORKSPACE }}
+        shell: bash
         run: |
-          $ErrorActionPreference = "Stop"
-          $PSNativeCommandUseErrorActionPreference = $true
-
           ./uv venv -v
           ./uv pip install ruff -v
           ./uvx -v ruff --version
+
+      - name: "Smoke test completions"
+        working-directory: ${{ env.UV_WORKSPACE }}
+        run: $ErrorActionPreference = "Stop"
+          $PSNativeCommandUseErrorActionPreference = $true
+
           (& ./uv generate-shell-completion powershell) | Out-String | Invoke-Expression
           (& ./uvx --generate-shell-completion powershell) | Out-String | Invoke-Expression
 
