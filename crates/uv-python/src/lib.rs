@@ -2104,6 +2104,273 @@ mod tests {
     }
 
     #[test]
+    fn find_python_all_majors_prerelease() -> Result<()> {
+        let mut context = TestContext::new()?;
+        context.add_python_interpreters(&[
+            (true, ImplementationName::CPython, "python3.11", "3.11.0b0"),
+            (true, ImplementationName::CPython, "python3.10", "3.10.0"),
+        ])?;
+
+        let python = context.run(|| {
+            find_python_installation(
+                &PythonRequest::parse(">= 3"),
+                EnvironmentPreference::Any,
+                PythonPreference::OnlySystem,
+                &context.cache,
+            )
+        })??;
+        assert_eq!(
+            python.interpreter().python_full_version().to_string(),
+            "3.10.0",
+            "We should prefer 3.10 over the 3.11 pre-release"
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn find_python_all_majors_prerelease_default_name() -> Result<()> {
+        let mut context = TestContext::new()?;
+        context.add_python_interpreters(&[
+            // A Python executable at the front of the search path opts-in to pre-releases,
+            // so we place an unmatched version at the front.
+            (true, ImplementationName::CPython, "python3.10", "3.10.0"),
+            (true, ImplementationName::CPython, "python3", "3.11.0b0"),
+            (true, ImplementationName::CPython, "python3", "3.10.0"),
+        ])?;
+
+        let python = context.run(|| {
+            find_python_installation(
+                &PythonRequest::parse(">= 3"),
+                EnvironmentPreference::Any,
+                PythonPreference::OnlySystem,
+                &context.cache,
+            )
+        })??;
+        assert_eq!(
+            python.interpreter().python_full_version().to_string(),
+            "3.11.0b0",
+            "Since `python3` is a default executable name, it is opt-in to a pre-release"
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn find_python_all_majors_only_prerelease() -> Result<()> {
+        let mut context = TestContext::new()?;
+        context.add_python_interpreters(&[(
+            true,
+            ImplementationName::CPython,
+            "python3.11",
+            "3.11.0b0",
+        )])?;
+
+        let python = context.run(|| {
+            find_python_installation(
+                &PythonRequest::parse(">= 3"),
+                EnvironmentPreference::Any,
+                PythonPreference::OnlySystem,
+                &context.cache,
+            )
+        })??;
+        assert_eq!(
+            python.interpreter().python_full_version().to_string(),
+            "3.11.0b0",
+            "We should accept the pre-release as it's the only version we can find"
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn find_python_patch_only_prerelease() -> Result<()> {
+        let mut context = TestContext::new()?;
+        context.add_python_interpreters(&[
+            (true, ImplementationName::CPython, "python3.11", "3.11.0b0"),
+            (true, ImplementationName::CPython, "python3.12", "3.12.0"),
+        ])?;
+
+        let python = context.run(|| {
+            find_python_installation(
+                &PythonRequest::parse("3.11.0"),
+                EnvironmentPreference::Any,
+                PythonPreference::OnlySystem,
+                &context.cache,
+            )
+        })??;
+        assert_eq!(
+            python.interpreter().python_full_version().to_string(),
+            "3.11.0b0",
+            "We should accept the pre-release version, it's the only match"
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn find_python_minor_only_prerelease() -> Result<()> {
+        let mut context = TestContext::new()?;
+        context.add_python_interpreters(&[(
+            true,
+            ImplementationName::CPython,
+            "python3.11",
+            "3.11.0b0",
+        )])?;
+
+        let python = context.run(|| {
+            find_python_installation(
+                &PythonRequest::parse("3.11"),
+                EnvironmentPreference::Any,
+                PythonPreference::OnlySystem,
+                &context.cache,
+            )
+        })??;
+        assert_eq!(
+            python.interpreter().python_full_version().to_string(),
+            "3.11.0b0",
+            "We should accept the pre-release as it's the only version we can find"
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn find_python_major_only_prerelease() -> Result<()> {
+        let mut context = TestContext::new()?;
+        context.add_python_interpreters(&[(
+            true,
+            ImplementationName::CPython,
+            "python3.11",
+            "3.11.0b0",
+        )])?;
+
+        let python = context.run(|| {
+            find_python_installation(
+                &PythonRequest::parse("3"),
+                EnvironmentPreference::Any,
+                PythonPreference::OnlySystem,
+                &context.cache,
+            )
+        })??;
+        assert_eq!(
+            python.interpreter().python_full_version().to_string(),
+            "3.11.0b0",
+            "We should accept the pre-release as it's the only version we can find"
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn find_python_minor_prerelease_front_of_path() -> Result<()> {
+        let mut context = TestContext::new()?;
+        context.add_python_interpreters(&[
+            (true, ImplementationName::CPython, "python3.11", "3.11.0b0"),
+            (true, ImplementationName::CPython, "python3.11", "3.11.1"),
+        ])?;
+
+        let python = context.run(|| {
+            find_python_installation(
+                &PythonRequest::parse("3.11"),
+                EnvironmentPreference::Any,
+                PythonPreference::OnlySystem,
+                &context.cache,
+            )
+        })??;
+        assert_eq!(
+            python.interpreter().python_full_version().to_string(),
+            "3.11.0b0",
+            "We should prefer the pre-release version because its at the front of the `PATH`"
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn find_python_patch_prerelease() -> Result<()> {
+        let mut context = TestContext::new()?;
+        context.add_python_interpreters(&[
+            // A Python executable at the front of the search path opts-in to pre-releases,
+            // so we place an unmatched version at the front.
+            (true, ImplementationName::CPython, "python3.10", "3.10.0"),
+            (true, ImplementationName::CPython, "python3.11", "3.11.0b0"),
+            (true, ImplementationName::CPython, "python3.11", "3.11.0"),
+        ])?;
+
+        let python = context.run(|| {
+            find_python_installation(
+                &PythonRequest::parse("3.11.0"),
+                EnvironmentPreference::Any,
+                PythonPreference::OnlySystem,
+                &context.cache,
+            )
+        })??;
+        assert_eq!(
+            python.interpreter().python_full_version().to_string(),
+            "3.11.0",
+            "We should prefer the non-pre-release version"
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn find_python_minor_prerelease() -> Result<()> {
+        let mut context = TestContext::new()?;
+        context.add_python_interpreters(&[
+            // A Python executable at the front of the search path opts-in to pre-releases,
+            // so we place an unmatched version at the front.
+            (true, ImplementationName::CPython, "python3.10", "3.10.0"),
+            (true, ImplementationName::CPython, "python3.11", "3.11.0b0"),
+            (true, ImplementationName::CPython, "python3.11", "3.11.1"),
+        ])?;
+
+        let python = context.run(|| {
+            find_python_installation(
+                &PythonRequest::parse("3.11"),
+                EnvironmentPreference::Any,
+                PythonPreference::OnlySystem,
+                &context.cache,
+            )
+        })??;
+        assert_eq!(
+            python.interpreter().python_full_version().to_string(),
+            "3.11.1",
+            "We should prefer the non-pre-release version"
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn find_python_major_prerelease() -> Result<()> {
+        let mut context = TestContext::new()?;
+        context.add_python_interpreters(&[
+            // A Python executable at the front of the search path opts-in to pre-releases,
+            // so we place an unmatched version at the front.
+            (true, ImplementationName::CPython, "python3.10", "3.10.0"),
+            (true, ImplementationName::CPython, "python3.11", "3.11.0b0"),
+            (true, ImplementationName::CPython, "python3.10", "3.10.0"),
+        ])?;
+
+        let python = context.run(|| {
+            find_python_installation(
+                &PythonRequest::parse("3"),
+                EnvironmentPreference::Any,
+                PythonPreference::OnlySystem,
+                &context.cache,
+            )
+        })??;
+        assert_eq!(
+            python.interpreter().python_full_version().to_string(),
+            "3.10.0",
+            "We should prefer the non-prerelease version"
+        );
+
+        Ok(())
+    }
+    #[test]
     fn find_python_graalpy() -> Result<()> {
         let mut context = TestContext::new()?;
 
