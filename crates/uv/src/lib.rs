@@ -1466,6 +1466,11 @@ async fn run(mut cli: Cli) -> Result<ExitStatus> {
             )
             .await
         }
+        Commands::Format(args) => {
+            show_settings!(args);
+
+            commands::format(args.args, &cache, printer).await
+        }
         Commands::BuildBackend { command } => spawn_blocking(move || match command {
             BuildBackendCommand::BuildSdist { sdist_directory } => {
                 commands::build_backend::build_sdist(&sdist_directory)

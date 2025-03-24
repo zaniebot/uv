@@ -491,6 +491,12 @@ pub enum Commands {
     /// Clear the cache, removing all entries or those linked to specific packages.
     #[command(hide = true)]
     Clean(CleanArgs),
+    /// Format the code good.
+    #[command(
+        after_help = "Use `uv help format` for more details.",
+        after_long_help = ""
+    )]
+    Format(FormatArgs),
     /// Display uv's version
     Version {
         #[arg(long, value_enum, default_value = "text")]
@@ -5717,6 +5723,14 @@ pub struct PublishArgs {
 
     #[arg(long, hide = true)]
     pub skip_existing: bool,
+}
+
+#[derive(Args, Debug)]
+#[allow(clippy::struct_excessive_bools)]
+pub struct FormatArgs {
+    /// Arguments to the formatter.
+    #[command(subcommand)]
+    pub args: Option<ExternalCommand>,
 }
 
 /// See [PEP 517](https://peps.python.org/pep-0517/) and
