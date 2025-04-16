@@ -105,13 +105,18 @@ pub struct ManagedPythonDownload {
     sha256: Option<&'static str>,
 }
 
+enum DownloadRequestPart<T> {
+    Any,
+    Value(Option<T>),
+}
+
 #[derive(Debug, Clone, Default, Eq, PartialEq)]
 pub struct PythonDownloadRequest {
-    version: Option<VersionRequest>,
-    implementation: Option<ImplementationName>,
-    arch: Option<Arch>,
-    os: Option<Os>,
-    libc: Option<Libc>,
+    version: DownloadRequestPart<VersionRequest>,
+    implementation: DownloadRequestPart<ImplementationName>,
+    arch: DownloadRequestPart<Arch>,
+    os: DownloadRequestPart<Os>,
+    libc: DownloadRequestPart<Libc>,
 
     /// Whether to allow pre-releases or not. If not set, defaults to true if [`Self::version`] is
     /// not None, and false otherwise.
@@ -120,11 +125,11 @@ pub struct PythonDownloadRequest {
 
 impl PythonDownloadRequest {
     pub fn new(
-        version: Option<VersionRequest>,
-        implementation: Option<ImplementationName>,
-        arch: Option<Arch>,
-        os: Option<Os>,
-        libc: Option<Libc>,
+        version: DownloadRequestPart<VersionRequest>,
+        implementation: DownloadRequestPart<ImplementationName>,
+        arch: DownloadRequestPart<Arch>,
+        os: DownloadRequestPart<Os>,
+        libc: DownloadRequestPart<Libc>,
         prereleases: Option<bool>,
     ) -> Self {
         Self {
@@ -157,7 +162,7 @@ impl PythonDownloadRequest {
 
     #[must_use]
     pub fn with_any_arch(mut self) -> Self {
-        self.arch = None;
+        self.arch = DownloadRequestPart::Any;
         self
     }
 
