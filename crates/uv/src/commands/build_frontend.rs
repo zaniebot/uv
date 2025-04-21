@@ -17,7 +17,7 @@ use crate::commands::project::{find_requires_python, ProjectError};
 use crate::commands::reporters::PythonDownloadReporter;
 use crate::commands::ExitStatus;
 use crate::printer::Printer;
-use crate::settings::{NetworkSettings, ResolverSettings};
+use crate::settings::{NetworkSettings, PythonSettings, ResolverSettings};
 use uv_build_backend::check_direct_build;
 use uv_cache::{Cache, CacheBucket};
 use uv_client::{BaseClientBuilder, FlatIndexClient, RegistryClientBuilder};
@@ -110,8 +110,7 @@ pub(crate) async fn build_frontend(
     settings: &ResolverSettings,
     network_settings: &NetworkSettings,
     no_config: bool,
-    python_preference: PythonPreference,
-    python_downloads: PythonDownloads,
+    python_settings: PythonSettings,
     concurrency: Concurrency,
     cache: &Cache,
     printer: Printer,
@@ -178,8 +177,7 @@ async fn build_impl(
     settings: &ResolverSettings,
     network_settings: &NetworkSettings,
     no_config: bool,
-    python_preference: PythonPreference,
-    python_downloads: PythonDownloads,
+    python_settings: PythonSettings,
     concurrency: Concurrency,
     cache: &Cache,
     printer: Printer,
@@ -406,8 +404,7 @@ async fn build_package(
     install_mirrors: PythonInstallMirrors,
     no_config: bool,
     workspace: Result<&Workspace, &WorkspaceError>,
-    python_preference: PythonPreference,
-    python_downloads: PythonDownloads,
+    python_settings: PythonSettings,
     cache: &Cache,
     printer: Printer,
     index_locations: &IndexLocations,

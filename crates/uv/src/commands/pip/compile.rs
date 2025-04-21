@@ -103,7 +103,7 @@ pub(crate) async fn pip_compile(
     link_mode: LinkMode,
     mut python: Option<String>,
     system: bool,
-    python_preference: PythonPreference,
+    python_settings: PythonSettings,
     concurrency: Concurrency,
     quiet: bool,
     cache: Cache,

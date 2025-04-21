@@ -90,7 +90,7 @@ pub(crate) async fn pip_install(
     break_system_packages: bool,
     target: Option<Target>,
     prefix: Option<Prefix>,
-    python_preference: PythonPreference,
+    python_settings: PythonSettings,
     concurrency: Concurrency,
     cache: Cache,
     dry_run: DryRun,

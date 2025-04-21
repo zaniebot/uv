@@ -29,7 +29,7 @@ use crate::commands::project::{
 use crate::commands::reporters::LatestVersionReporter;
 use crate::commands::{diagnostics, ExitStatus};
 use crate::printer::Printer;
-use crate::settings::{NetworkSettings, ResolverSettings};
+use crate::settings::{NetworkSettings, PythonSettings, ResolverSettings};
 
 /// Run a command.
 #[allow(clippy::fn_params_excessive_bools)]
@@ -52,8 +52,7 @@ pub(crate) async fn tree(
     settings: ResolverSettings,
     network_settings: &NetworkSettings,
     script: Option<Pep723Script>,
-    python_preference: PythonPreference,
-    python_downloads: PythonDownloads,
+    python_settings: PythonSettings,
     concurrency: Concurrency,
     no_config: bool,
     cache: &Cache,

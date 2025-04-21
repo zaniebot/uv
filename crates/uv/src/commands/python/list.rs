@@ -59,8 +59,7 @@ pub(crate) async fn list(
     all_arches: bool,
     show_urls: bool,
     output_format: PythonListFormat,
-    python_preference: PythonPreference,
-    python_downloads: PythonDownloads,
+    python_settings: PythonSettings,
     cache: &Cache,
     printer: Printer,
 ) -> Result<ExitStatus> {

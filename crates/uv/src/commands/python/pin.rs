@@ -18,18 +18,21 @@ use uv_workspace::{DiscoveryOptions, VirtualProject, WorkspaceCache};
 
 use crate::commands::{project::find_requires_python, ExitStatus};
 use crate::printer::Printer;
+use crate::settings::PythonSettings;
 
 /// Pin to a specific Python version.
 pub(crate) async fn pin(
     project_dir: &Path,
     request: Option<String>,
     resolved: bool,
-    python_preference: PythonPreference,
+    python_settings: PythonSettings,
     no_project: bool,
     global: bool,
     cache: &Cache,
     printer: Printer,
 ) -> Result<ExitStatus> {
+    let python_preference = python_settings.preference;
+
     let workspace_cache = WorkspaceCache::default();
     let virtual_project = if no_project {
         None

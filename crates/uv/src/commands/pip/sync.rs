@@ -75,7 +75,7 @@ pub(crate) async fn pip_sync(
     target: Option<Target>,
     prefix: Option<Prefix>,
     sources: SourceStrategy,
-    python_preference: PythonPreference,
+    python_settings: PythonSettings,
     concurrency: Concurrency,
     cache: Cache,
     dry_run: DryRun,

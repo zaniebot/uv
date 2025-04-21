@@ -88,6 +88,16 @@ pub enum PythonPreference {
     OnlySystem,
 }
 
+impl From<bool> for PythonPreference {
+    fn from(value: bool) -> Self {
+        if value {
+            PythonPreference::OnlyManaged
+        } else {
+            PythonPreference::OnlySystem
+        }
+    }
+}
+
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, serde::Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "clap", derive(clap::ValueEnum))]

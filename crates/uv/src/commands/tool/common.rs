@@ -77,8 +77,7 @@ pub(crate) async fn refine_interpreter(
     client_builder: &BaseClientBuilder<'_>,
     reporter: &PythonDownloadReporter,
     install_mirrors: &PythonInstallMirrors,
-    python_preference: PythonPreference,
-    python_downloads: PythonDownloads,
+    python_settings: PythonSettings,
     cache: &Cache,
 ) -> anyhow::Result<Option<Interpreter>, ProjectError> {
     let pip::operations::Error::Resolve(uv_resolver::ResolveError::NoSolution(ref no_solution_err)) =

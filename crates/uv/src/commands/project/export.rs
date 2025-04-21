@@ -29,7 +29,7 @@ use crate::commands::project::{
 };
 use crate::commands::{diagnostics, ExitStatus, OutputWriter};
 use crate::printer::Printer;
-use crate::settings::{NetworkSettings, ResolverSettings};
+use crate::settings::{NetworkSettings, PythonSettings, ResolverSettings};
 
 #[derive(Debug, Clone)]
 enum ExportTarget {
@@ -72,8 +72,7 @@ pub(crate) async fn export(
     install_mirrors: PythonInstallMirrors,
     settings: ResolverSettings,
     network_settings: NetworkSettings,
-    python_preference: PythonPreference,
-    python_downloads: PythonDownloads,
+    python_settings: PythonSettings,
     concurrency: Concurrency,
     no_config: bool,
     quiet: bool,

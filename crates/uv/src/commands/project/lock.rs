@@ -47,7 +47,7 @@ use crate::commands::project::{
 use crate::commands::reporters::{PythonDownloadReporter, ResolverReporter};
 use crate::commands::{diagnostics, pip, ExitStatus, ScriptPath};
 use crate::printer::Printer;
-use crate::settings::{NetworkSettings, ResolverSettings};
+use crate::settings::{NetworkSettings, PythonSettings, ResolverSettings};
 
 /// The result of running a lock operation.
 #[derive(Debug, Clone)]
@@ -86,8 +86,7 @@ pub(crate) async fn lock(
     settings: ResolverSettings,
     network_settings: NetworkSettings,
     script: Option<ScriptPath>,
-    python_preference: PythonPreference,
-    python_downloads: PythonDownloads,
+    python_settings: PythonSettings,
     concurrency: Concurrency,
     no_config: bool,
     cache: &Cache,
