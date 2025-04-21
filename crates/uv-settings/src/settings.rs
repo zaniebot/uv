@@ -263,6 +263,15 @@ pub struct GlobalOptions {
         possible_values = true
     )]
     pub python_downloads: Option<PythonDownloads>,
+    /// Whether to use Python distributions optimized for the CPU microarchitecture.
+    #[option(
+        default = "true",
+        value_type = "bool",
+        example = r#"
+            python-microarchitecture = "false"
+        "#
+    )]
+    pub python_microarchitecture: Option<bool>,
     /// The maximum number of in-flight concurrent downloads that uv will perform at any given
     /// time.
     #[option(
@@ -1775,6 +1784,7 @@ pub struct OptionsWire {
     cache_dir: Option<PathBuf>,
     preview: Option<bool>,
     python_preference: Option<PythonPreference>,
+    python_microarchitecture: Option<bool>,
     python_downloads: Option<PythonDownloads>,
     concurrent_downloads: Option<NonZeroUsize>,
     concurrent_builds: Option<NonZeroUsize>,
@@ -1859,6 +1869,7 @@ impl From<OptionsWire> for Options {
             preview,
             python_preference,
             python_downloads,
+            python_microarchitecture,
             python_install_mirror,
             pypy_install_mirror,
             concurrent_downloads,
@@ -1922,6 +1933,7 @@ impl From<OptionsWire> for Options {
                 preview,
                 python_preference,
                 python_downloads,
+                python_microarchitecture,
                 concurrent_downloads,
                 concurrent_builds,
                 concurrent_installs,
