@@ -227,7 +227,6 @@ async fn do_uninstall(
                 minor_versions.insert(key.version().python_version());
                 minor_versions
             });
-    let installations = ManagedPythonInstallations::from_settings(None)?.init()?;
     let remaining_installations: Vec<_> = installations.find_all()?.collect();
     let mut remaining_minor_versions = FxHashMap::default();
     for installation in remaining_installations {
