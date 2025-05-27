@@ -56,7 +56,8 @@ fn python_discovery_starts_at_project_root() -> Result<()> {
     // resolved.
     uv_snapshot!(context
         .pip_compile()
-        .arg("project/pyproject.toml"), @r###"
+        .arg("project/pyproject.toml")
+        .env_remove("VIRTUAL_ENV"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -78,7 +79,8 @@ fn python_discovery_starts_at_project_root() -> Result<()> {
         .pip_compile()
         .arg("project/pyproject.toml")
         .arg("--project")
-        .arg("project"), @r###"
+        .arg("project")
+        .env_remove("VIRTUAL_ENV"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----

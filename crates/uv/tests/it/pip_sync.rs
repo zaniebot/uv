@@ -50,43 +50,73 @@ fn missing_requirements_txt() {
 }
 
 #[test]
-fn venv_discovery_starts_at_project_root() -> Result<()> {
-    let context = TestContext::new("3.12");
+fn python_discovery_starts_at_project_root() -> Result<()> {
+    let context = TestContext::new_with_versions(&["3.11", "3.12"]);
 
-    // Remove parent venv
-    fs::remove_dir_all(&context.venv)?;
+    let project = context.temp_dir.child("project");
+    let pyproject_toml = project.child("pyproject.toml");
 
-    // Create a child project with a virtual environment
-    let project1 = context.temp_dir.child("project1");
-    let requirements_txt1 = project1.child("requirements.txt");
-    requirements_txt1.write_str("requests==2.30.0")?;
+    // Toggle the `anyio` version to test the Python version used
+    pyproject_toml.write_str(
+        r#"
+        [project]
+        name = "project"
+        version = "0.1.0"
+        requires-python = ">=3.11"
+        dependencies = [
+            "anyio==4.0.0; python_version >= '3.12'",
+            "anyio==3.0.0; python_version < '3.12'"
+        ]
+        "#,
+    )?;
+
+    // Create a Python 3.11 virtual environment in the working directory
+    context.venv().arg("-p").arg("3.11").assert().success();
+
+    // Create a Python 3.12 virtual environment in the project directory
     context
         .venv()
+        .arg("-p")
+        .arg("3.12")
         .arg("--directory")
-        .arg("project1")
+        .arg(project.as_os_str())
         .assert()
         .success();
 
-    let filters = std::iter::once((
-        r"Using Python 3.12.[X] environment at: project1.*",
-        "[USING_PYTHON]",
-    ))
-    .collect::<Vec<_>>();
-
-    // This would try to use system Python (or another venv outside the test context) and include
-    // additional log info if project wasn't being respected
-    uv_snapshot!(filters, context.pip_sync().arg("--project").arg("project1").arg("project1/requirements.txt"), @r###"
+    // When the project is not specified, we expect 3.11 to be used
+    uv_snapshot!(context.filters(), context
+        .pip_sync()
+        .arg("project/pyproject.toml")
+        .env_remove("VIRTUAL_ENV"), @r"
     success: true
     exit_code: 0
     ----- stdout -----
 
     ----- stderr -----
-    [USING_PYTHON]
     Resolved 1 package in [TIME]
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
-     + requests==2.30.0
-    "###);
+     + anyio==3.0.0
+    ");
+
+    // When the project is specified, we expect 3.12 to be used instead of 3.11
+    uv_snapshot!(context.filters(), context
+        .pip_sync()
+        .arg("project/pyproject.toml")
+        .arg("--project")
+        .arg(project.as_os_str())
+        .env_remove("VIRTUAL_ENV"), @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Using Python 3.12.[X] environment at: project/.venv
+    Resolved 1 package in [TIME]
+    Prepared 1 package in [TIME]
+    Installed 1 package in [TIME]
+     + anyio==4.0.0
+    ");
 
     Ok(())
 }

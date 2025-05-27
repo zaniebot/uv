@@ -43,10 +43,6 @@ fn python_discovery_starts_at_project_root() -> Result<()> {
             "anyio==4.0.0; python_version >= '3.12'",
             "anyio==3.0.0; python_version < '3.12'"
         ]
-
-        [build-system]
-        requires = ["hatchling"]
-        build-backend = "hatchling.build"
         "#,
     )?;
 
@@ -67,7 +63,8 @@ fn python_discovery_starts_at_project_root() -> Result<()> {
     uv_snapshot!(context.filters(), context
         .pip_install()
         .arg("-r")
-        .arg("project/pyproject.toml"), @r"
+        .arg("project/pyproject.toml")
+        .env_remove("VIRTUAL_ENV"), @r"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -87,14 +84,20 @@ fn python_discovery_starts_at_project_root() -> Result<()> {
         .arg("-r")
         .arg("project/pyproject.toml")
         .arg("--project")
-        .arg(project.as_os_str()), @r"
+        .arg(project.as_os_str())
+        .env_remove("VIRTUAL_ENV"), @r"
     success: true
     exit_code: 0
     ----- stdout -----
 
     ----- stderr -----
+    Using Python 3.12.[X] environment at: project/.venv
     Resolved 3 packages in [TIME]
-    Audited 3 packages in [TIME]
+    Prepared 1 package in [TIME]
+    Installed 3 packages in [TIME]
+     + anyio==4.0.0
+     + idna==3.6
+     + sniffio==1.3.1
     ");
 
     Ok(())
