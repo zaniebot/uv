@@ -8,44 +8,42 @@ use crate::common::{TestContext, uv_snapshot};
 #[test]
 fn python_discovery_starts_at_project_root() -> Result<()> {
     let context = TestContext::new_with_versions(&["3.12"]);
-    let filters = std::iter::once((r"Using Python.*", "[USING_PYTHON]"))
-        .chain(context.filters())
-        .collect::<Vec<_>>();
 
-    // Create 2 separate projects, with separate virtual environments
+    // Create two projects with separate virtual environments
     let project1 = context.temp_dir.child("project1");
     let requirements_txt1 = project1.child("requirements.txt");
     requirements_txt1.write_str("requests==2.30.0")?;
     context
         .venv()
         .arg("--directory")
-        .arg("project1")
+        .arg(project1.as_os_str())
         .assert()
         .success();
 
     let project2 = context.temp_dir.child("project2");
-    let requirements_txt1 = project2.child("requirements.txt");
-    requirements_txt1.write_str("requests==2.31.0")?;
+    let requirements_txt2 = project2.child("requirements.txt");
+    requirements_txt2.write_str("requests==2.31.0")?;
     context
         .venv()
         .arg("--directory")
-        .arg("project2")
+        .arg(project2.as_os_str())
         .assert()
         .success();
 
-    uv_snapshot!(filters, context
+    // Install distinct versions of `requests` into the two environments
+    uv_snapshot!(context.filters(), context
         .pip_install()
         .arg("--project")
-        .arg("project1")
+        .arg(project1.as_os_str())
         .arg("-r")
-        .arg("project1/requirements.txt")
-        .arg("--strict"), @r###"
+        .arg(requirements_txt1.as_os_str())
+        .arg("--strict"), @r"
     success: true
     exit_code: 0
     ----- stdout -----
 
     ----- stderr -----
-    [USING_PYTHON]
+    Using Python 3.12.[X] environment at: project1/.venv
     Resolved 5 packages in [TIME]
     Prepared 5 packages in [TIME]
     Installed 5 packages in [TIME]
@@ -54,22 +52,22 @@ fn python_discovery_starts_at_project_root() -> Result<()> {
      + idna==3.6
      + requests==2.30.0
      + urllib3==2.2.1
-    "###
+    "
     );
 
-    uv_snapshot!(filters, context
+    uv_snapshot!(context.filters(), context
         .pip_install()
         .arg("--project")
-        .arg("project2")
+        .arg(project2.as_os_str())
         .arg("-r")
-        .arg("project2/requirements.txt")
-        .arg("--strict"), @r###"
+        .arg(requirements_txt2.as_os_str())
+        .arg("--strict"), @r"
     success: true
     exit_code: 0
     ----- stdout -----
 
     ----- stderr -----
-    [USING_PYTHON]
+    Using Python 3.12.[X] environment at: project2/.venv
     Resolved 5 packages in [TIME]
     Prepared 1 package in [TIME]
     Installed 5 packages in [TIME]
@@ -78,10 +76,10 @@ fn python_discovery_starts_at_project_root() -> Result<()> {
      + idna==3.6
      + requests==2.31.0
      + urllib3==2.2.1
-    "###
+    "
     );
 
-    uv_snapshot!(filters, context.pip_freeze().arg("--project").arg("project1"), @r###"
+    uv_snapshot!(context.filters(), context.pip_freeze().arg("--project").arg(project1.as_os_str()), @r"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -92,11 +90,11 @@ fn python_discovery_starts_at_project_root() -> Result<()> {
     urllib3==2.2.1
 
     ----- stderr -----
-    [USING_PYTHON]
-    "###
+    Using Python 3.12.[X] environment at: project1/.venv
+    "
     );
 
-    uv_snapshot!(filters, context.pip_freeze().arg("--project").arg("project2"), @r###"
+    uv_snapshot!(context.filters(), context.pip_freeze().arg("--project").arg(project2.as_os_str()), @r"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -107,8 +105,8 @@ fn python_discovery_starts_at_project_root() -> Result<()> {
     urllib3==2.2.1
 
     ----- stderr -----
-    [USING_PYTHON]
-    "###
+    Using Python 3.12.[X] environment at: project2/.venv
+    "
     );
 
     Ok(())

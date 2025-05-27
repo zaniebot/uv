@@ -9,78 +9,77 @@ use crate::common::uv_snapshot;
 #[test]
 fn python_discovery_starts_at_project_root() -> Result<()> {
     let context = TestContext::new_with_versions(&["3.12"]);
-    let filters = std::iter::once((r"Using Python.*", "[USING_PYTHON]"))
-        .chain(context.filters())
-        .collect::<Vec<_>>();
 
-    // Create 2 separate projects, with separate virtual environments
+    // Create two projects with separate virtual environments
     let project1 = context.temp_dir.child("project1");
     let requirements_txt1 = project1.child("requirements.txt");
     requirements_txt1.write_str("requests==2.30.0")?;
     context
         .venv()
         .arg("--directory")
-        .arg("project1")
+        .arg(project1.as_os_str())
         .assert()
         .success();
 
     let project2 = context.temp_dir.child("project2");
-    let requirements_txt1 = project2.child("requirements.txt");
-    requirements_txt1.write_str("requests==2.31.0")?;
+    let requirements_txt2 = project2.child("requirements.txt");
+    requirements_txt2.write_str("requests==2.31.0")?;
     context
         .venv()
         .arg("--directory")
-        .arg("project2")
+        .arg(project2.as_os_str())
         .assert()
         .success();
 
-    uv_snapshot!(filters, context
+    // Install the requirements into the first project environment
+    uv_snapshot!(context.filters(), context
         .pip_install()
         .arg("--project")
-        .arg("project1")
+        .arg(project1.as_os_str())
         .arg("-r")
-        .arg("project1/requirements.txt")
-        .arg("--strict"), @r###"
+        .arg(requirements_txt1.as_os_str())
+        .arg("--strict"), @r"
     success: true
     exit_code: 0
     ----- stdout -----
 
     ----- stderr -----
-    [USING_PYTHON]
+    Using Python 3.12.[X] environment at: project1/.venv
     Resolved 5 packages in [TIME]
     Prepared 5 packages in [TIME]
     Installed 5 packages in [TIME]
      + certifi==2024.2.2
      + charset-normalizer==3.3.2
      + idna==3.6
-     + requests==2.31.0
+     + requests==2.30.0
      + urllib3==2.2.1
-    "###
+    "
     );
 
-    // We pip installed into project1, so expect this to pass
-    uv_snapshot!(filters, context.pip_check().arg("--project").arg("project1"), @r###"
+    // We should see the installed packages in the first project
+    uv_snapshot!(context.filters(), context.pip_check().arg("--project").arg(project1.as_os_str()), @r"
     success: true
     exit_code: 0
     ----- stdout -----
 
     ----- stderr -----
-    [USING_PYTHON]
+    Using Python 3.12.[X] environment at: project1/.venv
     Checked 5 packages in [TIME]
     All installed packages are compatible
-    "###
+    "
     );
-    // We did not pip install in project2
-    uv_snapshot!(filters, context.pip_check().arg("--project").arg("project2"), @r###"
+
+    // But the second project should be empty
+    uv_snapshot!(context.filters(), context.pip_check().arg("--project").arg(project2.as_os_str()), @r"
     success: true
     exit_code: 0
     ----- stdout -----
 
     ----- stderr -----
-    [USING_PYTHON]
+    Using Python 3.12.[X] environment at: project2/.venv
     Checked 0 packages in [TIME]
     All installed packages are compatible
-    "###
+    "
     );
 
     Ok(())

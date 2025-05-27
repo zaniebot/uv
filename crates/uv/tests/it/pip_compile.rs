@@ -42,17 +42,18 @@ fn python_discovery_starts_at_project_root() -> Result<()> {
         "#,
     )?;
 
-    // Create venv in project subdirectory, requesting 3.12
+    // Create the project virtual environment with Python 3.12
     context
         .venv()
         .arg("-p")
         .arg("3.12")
         .arg("--directory")
-        .arg("project")
+        .arg(project.as_os_str())
         .assert()
         .success();
 
-    // Baseline - when the project is not specified, but we're outside the directory, we would expect 3.11 to be used (first in path)
+    // Without `--project`, Python 3.11 is used because it's the first available and anyio v3.0.0 is
+    // resolved.
     uv_snapshot!(context
         .pip_compile()
         .arg("project/pyproject.toml"), @r###"
@@ -72,7 +73,7 @@ fn python_discovery_starts_at_project_root() -> Result<()> {
     Resolved 3 packages in [TIME]
     "###);
 
-    // When the project is specified, we expect 3.12 in the venv to be used
+    // With `--project`, Python 3.12 is discovered and anyio v4.0.0 is resolved.
     uv_snapshot!(context
         .pip_compile()
         .arg("project/pyproject.toml")

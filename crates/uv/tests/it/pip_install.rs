@@ -28,12 +28,11 @@ use uv_static::EnvVars;
 #[test]
 fn python_discovery_starts_at_project_root() -> Result<()> {
     let context = TestContext::new_with_versions(&["3.11", "3.12"]);
-    // Using anyio version to test the python version discovery
-    let filters = std::iter::once((r"Using Python.*", "[USING_PYTHON]"))
-        .chain(context.filters())
-        .collect::<Vec<_>>();
+
     let project = context.temp_dir.child("project");
     let pyproject_toml = project.child("pyproject.toml");
+
+    // Toggle the `anyio` version to test the Python version used
     pyproject_toml.write_str(
         r#"
         [project]
@@ -51,36 +50,52 @@ fn python_discovery_starts_at_project_root() -> Result<()> {
         "#,
     )?;
 
-    // Create venv in project subdirectory, requesting 3.12
+    // Create a Python 3.11 virtual environment in the working directory
+    context.venv().arg("-p").arg("3.11").assert().success();
+
+    // Create a Python 3.12 virtual environment in the project directory
     context
         .venv()
         .arg("-p")
         .arg("3.12")
         .arg("--directory")
-        .arg("project")
+        .arg(project.as_os_str())
         .assert()
         .success();
 
-    // When the project is specified, we expect 3.12 in the child venv to be used
-    uv_snapshot!(filters, context
+    // When the project is not specified, we expect 3.11 to be used
+    uv_snapshot!(context.filters(), context
         .pip_install()
         .arg("-r")
-        .arg("project/pyproject.toml")
-        .arg("--project")
-        .arg("project"), @r###"
+        .arg("project/pyproject.toml"), @r"
     success: true
     exit_code: 0
     ----- stdout -----
 
     ----- stderr -----
-    [USING_PYTHON]
     Resolved 3 packages in [TIME]
     Prepared 3 packages in [TIME]
     Installed 3 packages in [TIME]
-     + anyio==4.0.0
+     + anyio==3.0.0
      + idna==3.6
      + sniffio==1.3.1
-    "###);
+    ");
+
+    // When the project is specified, we expect 3.12 to be used instead of 3.11
+    uv_snapshot!(context.filters(), context
+        .pip_install()
+        .arg("-r")
+        .arg("project/pyproject.toml")
+        .arg("--project")
+        .arg(project.as_os_str()), @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Resolved 3 packages in [TIME]
+    Audited 3 packages in [TIME]
+    ");
 
     Ok(())
 }
