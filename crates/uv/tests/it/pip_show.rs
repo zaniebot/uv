@@ -84,7 +84,13 @@ fn python_discovery_starts_at_project_root() -> Result<()> {
     "
     );
 
-    uv_snapshot!(context.filters(), context.pip_show().arg("requests").arg("--project").arg(project1.as_os_str()), @r"
+    let filters = context
+        .filters()
+        .into_iter()
+        .chain([(r"project(1|2)\\", "project$1/")])
+        .collect::<Vec<_>>();
+
+    uv_snapshot!(filters, context.pip_show().arg("requests").arg("--project").arg(project1.as_os_str()), @r"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -99,7 +105,7 @@ fn python_discovery_starts_at_project_root() -> Result<()> {
     "
     );
 
-    uv_snapshot!(context.filters(), context.pip_show().arg("requests").arg("--project").arg(project2.as_os_str()), @r"
+    uv_snapshot!(filters, context.pip_show().arg("requests").arg("--project").arg(project2.as_os_str()), @r"
     success: true
     exit_code: 0
     ----- stdout -----
