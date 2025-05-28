@@ -4738,7 +4738,7 @@ pub enum PythonCommand {
     ///
     /// If no target version is provided, then uv will upgrade all managed CPython versions.
     ///
-    /// Upgrades will not remove lower installed patch versions.
+    /// During an upgrade, uv will not uninstall outdated patch versions.
     ///
     /// When an upgrade is performed, virtual environments created by uv will automatically
     /// use the new version. However, if the virtual environment was created before the
@@ -4938,7 +4938,7 @@ pub struct PythonInstallArgs {
 #[derive(Args)]
 #[allow(clippy::struct_excessive_bools)]
 pub struct PythonUpgradeArgs {
-    /// The directory to store the Python installation in.
+    /// The directory Python installations are stored in.
     ///
     /// If provided, `UV_PYTHON_INSTALL_DIR` will need to be set for subsequent operations for uv to
     /// discover the Python installation.

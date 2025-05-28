@@ -2760,7 +2760,7 @@ A target Python minor version to upgrade may be provided, e.g., `3.13`. Multiple
 
 If no target version is provided, then uv will upgrade all managed CPython versions.
 
-Upgrades will not remove lower installed patch versions.
+During an upgrade, uv will not uninstall outdated patch versions.
 
 When an upgrade is performed, virtual environments created by uv will automatically use the new version. However, if the virtual environment was created before the upgrade functionality was added, it will continue to use the old Python version; to enable upgrades, the environment must be recreated.
 
@@ -2800,7 +2800,7 @@ uv python upgrade [OPTIONS] [TARGETS]...
 <p>Relative paths are resolved with the given directory as the base.</p>
 <p>See <code>--project</code> to only change the project root directory.</p>
 </dd><dt id="uv-python-upgrade--help"><a href="#uv-python-upgrade--help"><code>--help</code></a>, <code>-h</code></dt><dd><p>Display the concise help for this command</p>
-</dd><dt id="uv-python-upgrade--install-dir"><a href="#uv-python-upgrade--install-dir"><code>--install-dir</code></a>, <code>-i</code> <i>install-dir</i></dt><dd><p>The directory to store the Python installation in.</p>
+</dd><dt id="uv-python-upgrade--install-dir"><a href="#uv-python-upgrade--install-dir"><code>--install-dir</code></a>, <code>-i</code> <i>install-dir</i></dt><dd><p>The directory Python installations are stored in.</p>
 <p>If provided, <code>UV_PYTHON_INSTALL_DIR</code> will need to be set for subsequent operations for uv to discover the Python installation.</p>
 <p>See <code>uv python dir</code> to view the current Python installation directory. Defaults to <code>~/.local/share/uv/python</code>.</p>
 <p>May also be set with the <code>UV_PYTHON_INSTALL_DIR</code> environment variable.</p></dd><dt id="uv-python-upgrade--managed-python"><a href="#uv-python-upgrade--managed-python"><code>--managed-python</code></a></dt><dd><p>Require use of uv-managed Python versions.</p>

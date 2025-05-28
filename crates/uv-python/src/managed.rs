@@ -744,6 +744,15 @@ impl DirectorySymlink {
         })
     }
 
+    pub fn from_installation(installation: &ManagedPythonInstallation) -> Option<Self> {
+        DirectorySymlink::from_executable(
+            installation.key().version().major(),
+            installation.key().version().minor(),
+            installation.executable(false).as_path(),
+            installation.key().implementation(),
+        )
+    }
+
     pub fn from_interpreter(interpreter: &Interpreter) -> Option<Self> {
         DirectorySymlink::from_executable(
             interpreter.python_major(),
@@ -783,25 +792,23 @@ impl DirectorySymlink {
     }
 
     pub fn symlink_exists(&self) -> bool {
-        symlink_exists(self.symlink_directory.as_path())
-    }
-}
-
-pub fn symlink_exists(symlink: &Path) -> bool {
-    #[cfg(unix)]
-    {
-        symlink
-            .symlink_metadata()
-            .map(|metadata| metadata.file_type().is_symlink())
-            .unwrap_or(false)
-    }
-    #[cfg(windows)]
-    {
-        symlink.symlink_metadata().is_ok_and(|metadata| {
-            // Check that this is a reparse point, which indicates this
-            // is a symlink or junction.
-            (metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT) != 0
-        })
+        #[cfg(unix)]
+        {
+            self.symlink_directory
+                .symlink_metadata()
+                .map(|metadata| metadata.file_type().is_symlink())
+                .unwrap_or(false)
+        }
+        #[cfg(windows)]
+        {
+            self.symlink_directory
+                .symlink_metadata()
+                .is_ok_and(|metadata| {
+                    // Check that this is a reparse point, which indicates this
+                    // is a symlink or junction.
+                    (metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT) != 0
+                })
+        }
     }
 }
 

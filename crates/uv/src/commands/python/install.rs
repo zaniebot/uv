@@ -466,6 +466,11 @@ pub(crate) async fn install(
                 printer.stderr(),
                 "Python is already installed. Use `uv python install <request>` to install another version.",
             )?;
+        } else if upgrade && requests.is_empty() {
+            writeln!(
+                printer.stderr(),
+                "There are no installed versions to upgrade"
+            )?;
         } else if requests.len() > 1 {
             if upgrade {
                 writeln!(
