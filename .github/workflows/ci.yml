@@ -552,7 +552,7 @@ jobs:
     needs: determine_changes
     timeout-minutes: 10
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && (needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main') }}
-    runs-on: windows-latest
+    runs-on: depot-windows-2022-4
     name: "build binary | windows x86_64"
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
