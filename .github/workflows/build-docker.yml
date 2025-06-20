@@ -80,6 +80,7 @@ jobs:
       name: release
     outputs:
       image-tags: ${{ steps.meta.outputs.tags }}
+      image-labels: ${{ steps.meta.outputs.labels }}
       image-digest: ${{ steps.build.outputs.digest }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -292,18 +293,21 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Push tags
+      - name: Install oras
+        run: ./scripts/install-oras.sh
+
+      - name: Add annotations to images
         env:
           IMAGE: ${{ env.UV_GHCR_IMAGE }}
           DIGEST: ${{ needs.docker-publish-base.outputs.image-digest }}
           TAGS: ${{ needs.docker-publish-base.outputs.image-tags }}
+          LABELS: ${{ needs.docker-publish-base.outputs.image-labels }}
+        # The readarray part is used to make sure the quoting and special characters are preserved on expansion (e.g. spaces)
+        # The jq command expands the docker/metadata json "tags" array entry to `-t tag1 -t tag2 ...` for each tag in the array
+        # The printf will expand the base image with the `<UV_BASE_IMG>@sha256:<sha256> ...` for each sha256 in the directory
+        # The final command becomes `docker buildx imagetools create -t tag1 -t tag2 ... <UV_BASE_IMG>@sha256:<sha256_1> <UV_BASE_IMG>@sha256:<sha256_2> ...`
         run: |
-          docker pull "${IMAGE}@${DIGEST}"
-          for tag in $TAGS; do
-            # Skip re-tag for DockerHub
-            if [[ "$tag" == "${{ env.UV_DOCKERHUB_IMAGE }}"* ]]; then
-              continue
-            fi
-            docker tag "${IMAGE}@${DIGEST}" "${tag}"
-            docker push "${tag}"
-          done
+          readarray -t lines <<< "$LABELS"; annotations=(); for line in "${lines[@]}"; do annotations+=(--annotation "$line"); done
+          oras attach --artifact-type application/vnd.oci.image.manifest.v1+json \
+            "${annotations[@]}" \
+            ${IMAGE}@${DIGEST}
