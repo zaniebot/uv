@@ -16,7 +16,7 @@ use uv_python::{PythonDownloads, PythonPreference, PythonRequest};
 use uv_requirements::is_pylock_toml;
 use uv_resolver::{PylockToml, RequirementsTxtExport};
 use uv_scripts::{Pep723ItemRef, Pep723Script};
-use uv_settings::PythonInstallMirrors;
+use uv_settings::{PythonInstallMirrors, WarningIgnores};
 use uv_workspace::{DiscoveryOptions, MemberDiscovery, VirtualProject, Workspace, WorkspaceCache};
 
 use crate::commands::pip::loggers::DefaultResolveLogger;
@@ -196,6 +196,7 @@ pub(crate) async fn export(
         &workspace_cache,
         printer,
         preview,
+        &WarningIgnores::none(),
     )
     .execute((&target).into())
     .await

@@ -34,7 +34,7 @@ use uv_redacted::DisplaySafeUrl;
 use uv_requirements::{RequirementsSource, RequirementsSpecification};
 use uv_resolver::{Installable, Lock, Preference};
 use uv_scripts::Pep723Item;
-use uv_settings::PythonInstallMirrors;
+use uv_settings::{PythonInstallMirrors, WarningIgnores};
 use uv_shell::runnable::WindowsRunnable;
 use uv_static::EnvVars;
 use uv_warnings::warn_user;
@@ -273,6 +273,7 @@ hint: If you are running a script with `{}` in the shebang, you may need to incl
                 &workspace_cache,
                 printer,
                 preview,
+                &WarningIgnores::none(),
             )
             .execute(target)
             .await
@@ -743,6 +744,7 @@ hint: If you are running a script with `{}` in the shebang, you may need to incl
                     &workspace_cache,
                     printer,
                     preview,
+                    &WarningIgnores::none(),
                 )
                 .execute(project.workspace().into())
                 .await

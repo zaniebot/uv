@@ -1517,6 +1517,7 @@ async fn run(mut cli: Cli) -> Result<ExitStatus> {
                 &cache,
                 printer,
                 globals.preview,
+                &globals.warning_ignores,
             )
             .await
         }
@@ -1702,6 +1703,7 @@ async fn run_project(
                 &cache,
                 printer,
                 globals.preview,
+                &globals.warning_ignores,
             )
             .await
         }
@@ -1858,6 +1860,7 @@ async fn run_project(
                 &cache,
                 printer,
                 globals.preview,
+                &globals.warning_ignores,
             ))
             .await
         }

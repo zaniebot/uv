@@ -605,6 +605,20 @@ pub struct ToolUv {
     )]
     pub conflicts: Option<SchemaConflicts>,
 
+    /// Ignore warnings about ambiguous tilde (`~=`) specifiers in `requires-python` declarations.
+    ///
+    /// By default, uv will warn when a `requires-python` specifier uses the tilde operator (`~=`)
+    /// without a patch version (e.g., `~=3.13`), as this can be ambiguous and may not behave as
+    /// expected. This setting disables those warnings.
+    #[option(
+        default = "false",
+        value_type = "bool",
+        example = r#"
+            ignore-ambiguous-requires-python = true
+        "#
+    )]
+    pub ignore_ambiguous_requires_python: Option<bool>,
+
     // Only exists on this type for schema and docs generation, the build backend settings are
     // never merged in a workspace and read separately by the backend code.
     /// Configuration for the uv build backend.

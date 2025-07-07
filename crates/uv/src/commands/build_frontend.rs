@@ -36,7 +36,7 @@ use uv_python::{
 };
 use uv_requirements::RequirementsSource;
 use uv_resolver::{ExcludeNewer, FlatIndex};
-use uv_settings::PythonInstallMirrors;
+use uv_settings::{PythonInstallMirrors, WarningIgnores};
 use uv_types::{AnyErrorBuild, BuildContext, BuildIsolation, BuildStack, HashStrategy};
 use uv_workspace::{DiscoveryOptions, Workspace, WorkspaceCache, WorkspaceError};
 
@@ -465,15 +465,16 @@ async fn build_package(
     if interpreter_request.is_none() {
         if let Ok(workspace) = workspace {
             let groups = DependencyGroupsWithDefaults::none();
-            interpreter_request = find_requires_python(workspace, &groups)?
-                .as_ref()
-                .map(RequiresPython::specifiers)
-                .map(|specifiers| {
-                    PythonRequest::Version(VersionRequest::Range(
-                        specifiers.clone(),
-                        PythonVariant::Default,
-                    ))
-                });
+            interpreter_request =
+                find_requires_python(workspace, &groups, &WarningIgnores::none())?
+                    .as_ref()
+                    .map(RequiresPython::specifiers)
+                    .map(|specifiers| {
+                        PythonRequest::Version(VersionRequest::Range(
+                            specifiers.clone(),
+                            PythonVariant::Default,
+                        ))
+                    });
         }
     }
 

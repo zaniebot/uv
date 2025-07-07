@@ -18,7 +18,7 @@ use uv_normalize::DefaultExtras;
 use uv_pep440::Version;
 use uv_pep508::PackageName;
 use uv_python::{PythonDownloads, PythonPreference, PythonRequest};
-use uv_settings::PythonInstallMirrors;
+use uv_settings::{PythonInstallMirrors, WarningIgnores};
 use uv_warnings::warn_user;
 use uv_workspace::pyproject_mut::Error;
 use uv_workspace::{
@@ -318,6 +318,7 @@ async fn print_frozen_version(
         &WorkspaceCache::default(),
         printer,
         preview,
+        &WarningIgnores::none(),
     )
     .execute((&target).into())
     .await
@@ -458,6 +459,7 @@ async fn lock_and_sync(
         &workspace_cache,
         printer,
         preview,
+        &WarningIgnores::none(),
     )
     .execute((&target).into())
     .await

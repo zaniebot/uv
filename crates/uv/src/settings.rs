@@ -39,7 +39,7 @@ use uv_resolver::{
 };
 use uv_settings::{
     Combine, FilesystemOptions, Options, PipOptions, PublishOptions, PythonInstallMirrors,
-    ResolverInstallerOptions, ResolverOptions,
+    ResolverInstallerOptions, ResolverOptions, WarningIgnores,
 };
 use uv_static::EnvVars;
 use uv_torch::TorchMode;
@@ -68,6 +68,7 @@ pub(crate) struct GlobalSettings {
     pub(crate) python_downloads: PythonDownloads,
     pub(crate) no_progress: bool,
     pub(crate) installer_metadata: bool,
+    pub(crate) warning_ignores: WarningIgnores,
 }
 
 impl GlobalSettings {
@@ -136,6 +137,16 @@ impl GlobalSettings {
             // with log messages.
             no_progress: args.no_progress || std::env::var_os(EnvVars::RUST_LOG).is_some(),
             installer_metadata: !args.no_installer_metadata,
+            warning_ignores: {
+                let mut ignores = WarningIgnores::none();
+                if workspace
+                    .and_then(|workspace| workspace.globals.ignore_ambiguous_requires_python)
+                    .unwrap_or(false)
+                {
+                    ignores = ignores.with_ambiguous_requires_python_ignored();
+                }
+                ignores
+            },
         }
     }
 }

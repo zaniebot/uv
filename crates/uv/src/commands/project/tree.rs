@@ -14,7 +14,7 @@ use uv_pep508::PackageName;
 use uv_python::{PythonDownloads, PythonPreference, PythonRequest, PythonVersion};
 use uv_resolver::{PackageMap, TreeDisplay};
 use uv_scripts::{Pep723ItemRef, Pep723Script};
-use uv_settings::PythonInstallMirrors;
+use uv_settings::{PythonInstallMirrors, WarningIgnores};
 use uv_workspace::{DiscoveryOptions, Workspace, WorkspaceCache};
 
 use crate::commands::pip::latest::LatestClient;
@@ -149,6 +149,7 @@ pub(crate) async fn tree(
         &WorkspaceCache::default(),
         printer,
         preview,
+        &WarningIgnores::none(),
     )
     .execute(target)
     .await

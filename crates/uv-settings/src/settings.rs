@@ -22,6 +22,27 @@ use uv_static::EnvVars;
 use uv_torch::TorchMode;
 use uv_workspace::pyproject_mut::AddBoundsKind;
 
+/// Settings for ignoring specific warnings.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct WarningIgnores {
+    /// Ignore warnings about ambiguous tilde (`~=`) specifiers in `requires-python` declarations.
+    pub ambiguous_requires_python: bool,
+}
+
+impl WarningIgnores {
+    /// Create a new `WarningIgnores` with all warnings enabled (nothing ignored).
+    pub fn none() -> Self {
+        Self::default()
+    }
+
+    /// Create a new `WarningIgnores` with ambiguous requires-python warnings disabled.
+    #[must_use]
+    pub fn with_ambiguous_requires_python_ignored(mut self) -> Self {
+        self.ambiguous_requires_python = true;
+        self
+    }
+}
+
 /// A `pyproject.toml` with an (optional) `[tool.uv]` section.
 #[allow(dead_code)]
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -320,6 +341,19 @@ pub struct GlobalOptions {
         "#
     )]
     pub allow_insecure_host: Option<Vec<TrustedHost>>,
+    /// Ignore warnings about ambiguous tilde (`~=`) specifiers in `requires-python` declarations.
+    ///
+    /// By default, uv will warn when a `requires-python` specifier uses the tilde operator (`~=`)
+    /// without a patch version (e.g., `~=3.13`), as this can be ambiguous and may not behave as
+    /// expected. This setting disables those warnings.
+    #[option(
+        default = "false",
+        value_type = "bool",
+        example = r#"
+            ignore-ambiguous-requires-python = true
+        "#
+    )]
+    pub ignore_ambiguous_requires_python: Option<bool>,
 }
 
 /// Settings relevant to all installer operations.
@@ -1817,6 +1851,7 @@ pub struct OptionsWire {
     index_strategy: Option<IndexStrategy>,
     keyring_provider: Option<KeyringProviderType>,
     allow_insecure_host: Option<Vec<TrustedHost>>,
+    ignore_ambiguous_requires_python: Option<bool>,
     resolution: Option<ResolutionMode>,
     prerelease: Option<PrereleaseMode>,
     fork_strategy: Option<ForkStrategy>,
@@ -1906,6 +1941,7 @@ impl From<OptionsWire> for Options {
             index_strategy,
             keyring_provider,
             allow_insecure_host,
+            ignore_ambiguous_requires_python,
             resolution,
             prerelease,
             fork_strategy,
@@ -1963,6 +1999,7 @@ impl From<OptionsWire> for Options {
                 concurrent_installs,
                 // Used twice for backwards compatibility
                 allow_insecure_host: allow_insecure_host.clone(),
+                ignore_ambiguous_requires_python,
             },
             top_level: ResolverInstallerOptions {
                 index,

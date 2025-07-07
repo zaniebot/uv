@@ -17,7 +17,7 @@ use uv_normalize::{DEV_DEPENDENCIES, DefaultExtras, DefaultGroups};
 use uv_pep508::PackageName;
 use uv_python::{PythonDownloads, PythonPreference, PythonRequest};
 use uv_scripts::{Pep723ItemRef, Pep723Metadata, Pep723Script};
-use uv_settings::PythonInstallMirrors;
+use uv_settings::{PythonInstallMirrors, WarningIgnores};
 use uv_warnings::warn_user_once;
 use uv_workspace::pyproject::DependencyType;
 use uv_workspace::pyproject_mut::{DependencyTarget, PyProjectTomlMut};
@@ -311,6 +311,7 @@ pub(crate) async fn remove(
         &WorkspaceCache::default(),
         printer,
         preview,
+        &WarningIgnores::none(),
     )
     .execute((&target).into())
     .await

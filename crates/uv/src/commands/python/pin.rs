@@ -15,7 +15,7 @@ use uv_python::{
     EnvironmentPreference, PYTHON_VERSION_FILENAME, PythonDownloads, PythonInstallation,
     PythonPreference, PythonRequest, PythonVersionFile, VersionFileDiscoveryOptions,
 };
-use uv_settings::PythonInstallMirrors;
+use uv_settings::{PythonInstallMirrors, WarningIgnores};
 use uv_warnings::warn_user_once;
 use uv_workspace::{DiscoveryOptions, VirtualProject, WorkspaceCache};
 
@@ -41,6 +41,7 @@ pub(crate) async fn pin(
     cache: &Cache,
     printer: Printer,
     preview: PreviewMode,
+    _warning_ignores: &WarningIgnores,
 ) -> Result<ExitStatus> {
     let workspace_cache = WorkspaceCache::default();
     let virtual_project = if no_project {
@@ -336,7 +337,11 @@ fn assert_pin_compatible_with_project(pin: &Pin, virtual_project: &VirtualProjec
                 project_workspace.workspace().install_path().display()
             );
 
-            let requires_python = find_requires_python(project_workspace.workspace(), &groups)?;
+            let requires_python = find_requires_python(
+                project_workspace.workspace(),
+                &groups,
+                &WarningIgnores::none(),
+            )?;
             (requires_python, "project")
         }
         VirtualProject::NonProject(workspace) => {
@@ -344,7 +349,8 @@ fn assert_pin_compatible_with_project(pin: &Pin, virtual_project: &VirtualProjec
                 "Discovered virtual workspace at: {}",
                 workspace.install_path().display()
             );
-            let requires_python = find_requires_python(workspace, &groups)?;
+            let requires_python =
+                find_requires_python(workspace, &groups, &WarningIgnores::none())?;
             (requires_python, "workspace")
         }
     };

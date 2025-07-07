@@ -4599,6 +4599,35 @@ fn lock_requires_python_compatible_specifier() -> Result<()> {
     Ok(())
 }
 
+#[test]
+fn lock_requires_python_ignore_ambiguous_warning() -> Result<()> {
+    let context = TestContext::new("3.13.0");
+
+    let pyproject_toml = context.temp_dir.child("pyproject.toml");
+    pyproject_toml.write_str(
+        r#"
+        [project]
+        name = "warehouse"
+        version = "1.0.0"
+        requires-python = "~=3.13"
+
+        [tool.uv]
+        ignore-ambiguous-requires-python = true
+        "#,
+    )?;
+
+    uv_snapshot!(context.filters(), context.lock(), @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Resolved 1 package in [TIME]
+    ");
+
+    Ok(())
+}
+
 /// Fork, even with a single dependency, if the minimum Python version is increased.
 #[test]
 fn lock_requires_python_fork() -> Result<()> {

@@ -40,7 +40,7 @@ use uv_resolver::{
     ResolverOutput,
 };
 use uv_scripts::Pep723ItemRef;
-use uv_settings::PythonInstallMirrors;
+use uv_settings::{PythonInstallMirrors, WarningIgnores};
 use uv_static::EnvVars;
 use uv_types::{BuildIsolation, EmptyInstalledPackages, HashStrategy};
 use uv_warnings::{warn_user, warn_user_once};
@@ -415,6 +415,7 @@ impl PlatformState {
 pub(crate) fn find_requires_python(
     workspace: &Workspace,
     groups: &DependencyGroupsWithDefaults,
+    warning_ignores: &WarningIgnores,
 ) -> Result<Option<RequiresPython>, ProjectError> {
     let requires_python = workspace.requires_python(groups)?;
     // If there are no `Requires-Python` specifiers in the workspace, return `None`.
@@ -427,21 +428,33 @@ pub(crate) fn find_requires_python(
                 if spec.has_patch() {
                     continue;
                 }
-                let (lower, upper) = spec.bounding_specifiers();
-                let spec_0 = spec.with_patch_version(0);
-                let (lower_0, upper_0) = spec_0.bounding_specifiers();
-                warn_user_once!(
-                    "The `requires-python` specifier (`{spec}`) in `{package}{group}` \
-                    uses the tilde specifier (`~=`) without a patch version. This will be \
-                    interpreted as `{lower}, {upper}`. Did you mean `{spec_0}` to constrain the \
-                    version as `{lower_0}, {upper_0}`? We recommend only using \
-                    the tilde specifier with a patch version to avoid ambiguity.",
-                    group = if let Some(group) = group {
-                        format!(":{group}")
-                    } else {
-                        String::new()
-                    },
-                );
+                // Check if ambiguous requires-python warnings should be ignored, either from global settings or workspace tool.uv
+                let ignore_ambiguous = warning_ignores.ambiguous_requires_python
+                    || workspace
+                        .pyproject_toml()
+                        .tool
+                        .as_ref()
+                        .and_then(|tool| tool.uv.as_ref())
+                        .and_then(|uv| uv.ignore_ambiguous_requires_python)
+                        .unwrap_or(false);
+
+                if !ignore_ambiguous {
+                    let (lower, upper) = spec.bounding_specifiers();
+                    let spec_0 = spec.with_patch_version(0);
+                    let (lower_0, upper_0) = spec_0.bounding_specifiers();
+                    warn_user_once!(
+                        "The `requires-python` specifier (`{spec}`) in `{package}{group}` \
+                        uses the tilde specifier (`~=`) without a patch version. This will be \
+                        interpreted as `{lower}, {upper}`. Did you mean `{spec_0}` to constrain the \
+                        version as `{lower_0}, {upper_0}`? We recommend only using \
+                        the tilde specifier with a patch version to avoid ambiguity.",
+                        group = if let Some(group) = group {
+                            format!(":{group}")
+                        } else {
+                            String::new()
+                        },
+                    );
+                }
             }
         }
     }
@@ -1078,7 +1091,7 @@ impl WorkspacePython {
         no_config: bool,
     ) -> Result<Self, ProjectError> {
         let requires_python = workspace
-            .map(|workspace| find_requires_python(workspace, groups))
+            .map(|workspace| find_requires_python(workspace, groups, &WarningIgnores::none()))
             .transpose()?
             .flatten();
 

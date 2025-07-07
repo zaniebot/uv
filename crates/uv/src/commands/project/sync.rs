@@ -27,7 +27,7 @@ use uv_pypi_types::{ParsedArchiveUrl, ParsedGitUrl, ParsedUrl};
 use uv_python::{PythonDownloads, PythonEnvironment, PythonPreference, PythonRequest};
 use uv_resolver::{FlatIndex, Installable, Lock};
 use uv_scripts::{Pep723ItemRef, Pep723Script};
-use uv_settings::PythonInstallMirrors;
+use uv_settings::{PythonInstallMirrors, WarningIgnores};
 use uv_types::{BuildIsolation, HashStrategy};
 use uv_warnings::warn_user;
 use uv_workspace::pyproject::Source;
@@ -381,6 +381,7 @@ pub(crate) async fn sync(
         &workspace_cache,
         printer,
         preview,
+        &WarningIgnores::none(),
     )
     .execute(lock_target)
     .await

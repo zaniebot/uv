@@ -33,7 +33,7 @@ use uv_resolver::{
     ResolverEnvironment, ResolverManifest, SatisfiesResult, UniversalMarker,
 };
 use uv_scripts::{Pep723ItemRef, Pep723Script};
-use uv_settings::PythonInstallMirrors;
+use uv_settings::{PythonInstallMirrors, WarningIgnores};
 use uv_types::{BuildContext, BuildIsolation, EmptyInstalledPackages, HashStrategy};
 use uv_warnings::{warn_user, warn_user_once};
 use uv_workspace::{DiscoveryOptions, Workspace, WorkspaceCache, WorkspaceMember};
@@ -94,6 +94,7 @@ pub(crate) async fn lock(
     cache: &Cache,
     printer: Printer,
     preview: PreviewMode,
+    warning_ignores: &WarningIgnores,
 ) -> anyhow::Result<ExitStatus> {
     // If necessary, initialize the PEP 723 script.
     let script = match script {
@@ -202,6 +203,7 @@ pub(crate) async fn lock(
         &workspace_cache,
         printer,
         preview,
+        warning_ignores,
     )
     .execute(target)
     .await
@@ -267,6 +269,7 @@ pub(super) struct LockOperation<'env> {
     workspace_cache: &'env WorkspaceCache,
     printer: Printer,
     preview: PreviewMode,
+    warning_ignores: &'env WarningIgnores,
 }
 
 impl<'env> LockOperation<'env> {
@@ -282,6 +285,7 @@ impl<'env> LockOperation<'env> {
         workspace_cache: &'env WorkspaceCache,
         printer: Printer,
         preview: PreviewMode,
+        warning_ignores: &'env WarningIgnores,
     ) -> Self {
         Self {
             mode,
@@ -295,6 +299,7 @@ impl<'env> LockOperation<'env> {
             workspace_cache,
             printer,
             preview,
+            warning_ignores,
         }
     }
 
@@ -341,6 +346,7 @@ impl<'env> LockOperation<'env> {
                     self.workspace_cache,
                     self.printer,
                     self.preview,
+                    self.warning_ignores,
                 )
                 .await?;
 
@@ -380,6 +386,7 @@ impl<'env> LockOperation<'env> {
                     self.workspace_cache,
                     self.printer,
                     self.preview,
+                    self.warning_ignores,
                 )
                 .await?;
 
@@ -411,6 +418,7 @@ async fn do_lock(
     workspace_cache: &WorkspaceCache,
     printer: Printer,
     preview: PreviewMode,
+    warning_ignores: &WarningIgnores,
 ) -> Result<LockResult, ProjectError> {
     let start = std::time::Instant::now();
 
@@ -539,7 +547,7 @@ async fn do_lock(
 
     // Determine the supported Python range. If no range is defined, and warn and default to the
     // current minor version.
-    let requires_python = target.requires_python()?;
+    let requires_python = target.requires_python(warning_ignores)?;
 
     let requires_python = if let Some(requires_python) = requires_python {
         if requires_python.is_unbounded() {

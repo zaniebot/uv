@@ -24,7 +24,7 @@ use uv_python::{
     VersionRequest,
 };
 use uv_scripts::{Pep723Script, ScriptTag};
-use uv_settings::PythonInstallMirrors;
+use uv_settings::{PythonInstallMirrors, WarningIgnores};
 use uv_static::EnvVars;
 use uv_warnings::warn_user_once;
 use uv_workspace::pyproject_mut::{DependencyTarget, PyProjectTomlMut};
@@ -62,6 +62,7 @@ pub(crate) async fn init(
     cache: &Cache,
     printer: Printer,
     preview: PreviewMode,
+    warning_ignores: &WarningIgnores,
 ) -> Result<ExitStatus> {
     if build_backend == Some(ProjectBuildBackend::Uv) && preview.is_disabled() {
         warn_user_once!("The uv build backend is experimental and may change without warning");
@@ -153,6 +154,7 @@ pub(crate) async fn init(
                 cache,
                 printer,
                 preview,
+                warning_ignores,
             )
             .await?;
 
@@ -298,6 +300,7 @@ async fn init_project(
     cache: &Cache,
     printer: Printer,
     preview: PreviewMode,
+    warning_ignores: &WarningIgnores,
 ) -> Result<()> {
     // Discover the current workspace, if it exists.
     let workspace_cache = WorkspaceCache::default();
@@ -508,7 +511,13 @@ async fn init_project(
         (requires_python, python_request)
     } else if let Some(requires_python) = workspace
         .as_ref()
-        .map(|workspace| find_requires_python(workspace, &DependencyGroupsWithDefaults::none()))
+        .map(|workspace| {
+            find_requires_python(
+                workspace,
+                &DependencyGroupsWithDefaults::none(),
+                warning_ignores,
+            )
+        })
         .transpose()?
         .flatten()
     {

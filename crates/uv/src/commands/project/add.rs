@@ -38,7 +38,7 @@ use uv_redacted::DisplaySafeUrl;
 use uv_requirements::{NamedRequirementsResolver, RequirementsSource, RequirementsSpecification};
 use uv_resolver::FlatIndex;
 use uv_scripts::{Pep723ItemRef, Pep723Metadata, Pep723Script};
-use uv_settings::PythonInstallMirrors;
+use uv_settings::{PythonInstallMirrors, WarningIgnores};
 use uv_types::{BuildIsolation, HashStrategy};
 use uv_warnings::warn_user_once;
 use uv_workspace::pyproject::{DependencyType, Source, SourceError, Sources, ToolUvSources};
@@ -853,6 +853,7 @@ async fn lock_and_sync(
         &WorkspaceCache::default(),
         printer,
         preview,
+        &WarningIgnores::none(),
     )
     .with_constraints(constraints)
     .execute((&target).into())
@@ -975,6 +976,7 @@ async fn lock_and_sync(
                 &WorkspaceCache::default(),
                 printer,
                 preview,
+                &WarningIgnores::none(),
             )
             .execute((&target).into())
             .await?

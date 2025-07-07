@@ -11,6 +11,7 @@ use uv_pep508::RequirementOrigin;
 use uv_pypi_types::{Conflicts, SupportedEnvironments, VerbatimParsedUrl};
 use uv_resolver::{Lock, LockVersion, VERSION};
 use uv_scripts::Pep723Script;
+use uv_settings::WarningIgnores;
 use uv_workspace::dependency_groups::{DependencyGroupError, FlatDependencyGroup};
 use uv_workspace::{Workspace, WorkspaceMember};
 
@@ -214,12 +215,15 @@ impl<'lock> LockTarget<'lock> {
 
     /// Return the `Requires-Python` bound for the [`LockTarget`].
     #[allow(clippy::result_large_err)]
-    pub(crate) fn requires_python(self) -> Result<Option<RequiresPython>, ProjectError> {
+    pub(crate) fn requires_python(
+        self,
+        warning_ignores: &WarningIgnores,
+    ) -> Result<Option<RequiresPython>, ProjectError> {
         match self {
             Self::Workspace(workspace) => {
                 // When locking, don't try to enforce requires-python bounds that appear on groups
                 let groups = DependencyGroupsWithDefaults::none();
-                find_requires_python(workspace, &groups)
+                find_requires_python(workspace, &groups, warning_ignores)
             }
             Self::Script(script) => Ok(script
                 .metadata
