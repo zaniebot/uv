@@ -42,7 +42,7 @@ use std::sync::LazyLock;
 use either::Either;
 use url::Url;
 
-use uv_distribution_types::IndexUrl;
+use uv_distribution_types::{IndexUrl, IndexUrlParser};
 use uv_normalize::PackageName;
 use uv_pep440::Version;
 use uv_platform_tags::Os;
@@ -757,87 +757,213 @@ static LINUX_AMD_GPU_DRIVERS: LazyLock<[(TorchBackend, AmdGpuArchitecture); 44]>
         ]
     });
 
-static CPU_INDEX_URL: LazyLock<IndexUrl> =
-    LazyLock::new(|| IndexUrl::from_str("https://download.pytorch.org/whl/cpu").unwrap());
-static CU128_INDEX_URL: LazyLock<IndexUrl> =
-    LazyLock::new(|| IndexUrl::from_str("https://download.pytorch.org/whl/cu128").unwrap());
-static CU126_INDEX_URL: LazyLock<IndexUrl> =
-    LazyLock::new(|| IndexUrl::from_str("https://download.pytorch.org/whl/cu126").unwrap());
-static CU125_INDEX_URL: LazyLock<IndexUrl> =
-    LazyLock::new(|| IndexUrl::from_str("https://download.pytorch.org/whl/cu125").unwrap());
-static CU124_INDEX_URL: LazyLock<IndexUrl> =
-    LazyLock::new(|| IndexUrl::from_str("https://download.pytorch.org/whl/cu124").unwrap());
-static CU123_INDEX_URL: LazyLock<IndexUrl> =
-    LazyLock::new(|| IndexUrl::from_str("https://download.pytorch.org/whl/cu123").unwrap());
-static CU122_INDEX_URL: LazyLock<IndexUrl> =
-    LazyLock::new(|| IndexUrl::from_str("https://download.pytorch.org/whl/cu122").unwrap());
-static CU121_INDEX_URL: LazyLock<IndexUrl> =
-    LazyLock::new(|| IndexUrl::from_str("https://download.pytorch.org/whl/cu121").unwrap());
-static CU120_INDEX_URL: LazyLock<IndexUrl> =
-    LazyLock::new(|| IndexUrl::from_str("https://download.pytorch.org/whl/cu120").unwrap());
-static CU118_INDEX_URL: LazyLock<IndexUrl> =
-    LazyLock::new(|| IndexUrl::from_str("https://download.pytorch.org/whl/cu118").unwrap());
-static CU117_INDEX_URL: LazyLock<IndexUrl> =
-    LazyLock::new(|| IndexUrl::from_str("https://download.pytorch.org/whl/cu117").unwrap());
-static CU116_INDEX_URL: LazyLock<IndexUrl> =
-    LazyLock::new(|| IndexUrl::from_str("https://download.pytorch.org/whl/cu116").unwrap());
-static CU115_INDEX_URL: LazyLock<IndexUrl> =
-    LazyLock::new(|| IndexUrl::from_str("https://download.pytorch.org/whl/cu115").unwrap());
-static CU114_INDEX_URL: LazyLock<IndexUrl> =
-    LazyLock::new(|| IndexUrl::from_str("https://download.pytorch.org/whl/cu114").unwrap());
-static CU113_INDEX_URL: LazyLock<IndexUrl> =
-    LazyLock::new(|| IndexUrl::from_str("https://download.pytorch.org/whl/cu113").unwrap());
-static CU112_INDEX_URL: LazyLock<IndexUrl> =
-    LazyLock::new(|| IndexUrl::from_str("https://download.pytorch.org/whl/cu112").unwrap());
-static CU111_INDEX_URL: LazyLock<IndexUrl> =
-    LazyLock::new(|| IndexUrl::from_str("https://download.pytorch.org/whl/cu111").unwrap());
-static CU110_INDEX_URL: LazyLock<IndexUrl> =
-    LazyLock::new(|| IndexUrl::from_str("https://download.pytorch.org/whl/cu110").unwrap());
-static CU102_INDEX_URL: LazyLock<IndexUrl> =
-    LazyLock::new(|| IndexUrl::from_str("https://download.pytorch.org/whl/cu102").unwrap());
-static CU101_INDEX_URL: LazyLock<IndexUrl> =
-    LazyLock::new(|| IndexUrl::from_str("https://download.pytorch.org/whl/cu101").unwrap());
-static CU100_INDEX_URL: LazyLock<IndexUrl> =
-    LazyLock::new(|| IndexUrl::from_str("https://download.pytorch.org/whl/cu100").unwrap());
-static CU92_INDEX_URL: LazyLock<IndexUrl> =
-    LazyLock::new(|| IndexUrl::from_str("https://download.pytorch.org/whl/cu92").unwrap());
-static CU91_INDEX_URL: LazyLock<IndexUrl> =
-    LazyLock::new(|| IndexUrl::from_str("https://download.pytorch.org/whl/cu91").unwrap());
-static CU90_INDEX_URL: LazyLock<IndexUrl> =
-    LazyLock::new(|| IndexUrl::from_str("https://download.pytorch.org/whl/cu90").unwrap());
-static CU80_INDEX_URL: LazyLock<IndexUrl> =
-    LazyLock::new(|| IndexUrl::from_str("https://download.pytorch.org/whl/cu80").unwrap());
-static ROCM63_INDEX_URL: LazyLock<IndexUrl> =
-    LazyLock::new(|| IndexUrl::from_str("https://download.pytorch.org/whl/rocm6.3").unwrap());
-static ROCM624_INDEX_URL: LazyLock<IndexUrl> =
-    LazyLock::new(|| IndexUrl::from_str("https://download.pytorch.org/whl/rocm6.2.4").unwrap());
-static ROCM62_INDEX_URL: LazyLock<IndexUrl> =
-    LazyLock::new(|| IndexUrl::from_str("https://download.pytorch.org/whl/rocm6.2").unwrap());
-static ROCM61_INDEX_URL: LazyLock<IndexUrl> =
-    LazyLock::new(|| IndexUrl::from_str("https://download.pytorch.org/whl/rocm6.1").unwrap());
-static ROCM60_INDEX_URL: LazyLock<IndexUrl> =
-    LazyLock::new(|| IndexUrl::from_str("https://download.pytorch.org/whl/rocm6.0").unwrap());
-static ROCM57_INDEX_URL: LazyLock<IndexUrl> =
-    LazyLock::new(|| IndexUrl::from_str("https://download.pytorch.org/whl/rocm5.7").unwrap());
-static ROCM56_INDEX_URL: LazyLock<IndexUrl> =
-    LazyLock::new(|| IndexUrl::from_str("https://download.pytorch.org/whl/rocm5.6").unwrap());
-static ROCM55_INDEX_URL: LazyLock<IndexUrl> =
-    LazyLock::new(|| IndexUrl::from_str("https://download.pytorch.org/whl/rocm5.5").unwrap());
-static ROCM542_INDEX_URL: LazyLock<IndexUrl> =
-    LazyLock::new(|| IndexUrl::from_str("https://download.pytorch.org/whl/rocm5.4.2").unwrap());
-static ROCM54_INDEX_URL: LazyLock<IndexUrl> =
-    LazyLock::new(|| IndexUrl::from_str("https://download.pytorch.org/whl/rocm5.4").unwrap());
-static ROCM53_INDEX_URL: LazyLock<IndexUrl> =
-    LazyLock::new(|| IndexUrl::from_str("https://download.pytorch.org/whl/rocm5.3").unwrap());
-static ROCM52_INDEX_URL: LazyLock<IndexUrl> =
-    LazyLock::new(|| IndexUrl::from_str("https://download.pytorch.org/whl/rocm5.2").unwrap());
-static ROCM511_INDEX_URL: LazyLock<IndexUrl> =
-    LazyLock::new(|| IndexUrl::from_str("https://download.pytorch.org/whl/rocm5.1.1").unwrap());
-static ROCM42_INDEX_URL: LazyLock<IndexUrl> =
-    LazyLock::new(|| IndexUrl::from_str("https://download.pytorch.org/whl/rocm4.2").unwrap());
-static ROCM41_INDEX_URL: LazyLock<IndexUrl> =
-    LazyLock::new(|| IndexUrl::from_str("https://download.pytorch.org/whl/rocm4.1").unwrap());
-static ROCM401_INDEX_URL: LazyLock<IndexUrl> =
-    LazyLock::new(|| IndexUrl::from_str("https://download.pytorch.org/whl/rocm4.0.1").unwrap());
-static XPU_INDEX_URL: LazyLock<IndexUrl> =
-    LazyLock::new(|| IndexUrl::from_str("https://download.pytorch.org/whl/xpu").unwrap());
+static CPU_INDEX_URL: LazyLock<IndexUrl> = LazyLock::new(|| {
+    IndexUrlParser::simple("https://download.pytorch.org/whl/cpu")
+        .parse()
+        .unwrap()
+});
+static CU128_INDEX_URL: LazyLock<IndexUrl> = LazyLock::new(|| {
+    IndexUrlParser::simple("https://download.pytorch.org/whl/cu128")
+        .parse()
+        .unwrap()
+});
+static CU126_INDEX_URL: LazyLock<IndexUrl> = LazyLock::new(|| {
+    IndexUrlParser::simple("https://download.pytorch.org/whl/cu126")
+        .parse()
+        .unwrap()
+});
+static CU125_INDEX_URL: LazyLock<IndexUrl> = LazyLock::new(|| {
+    IndexUrlParser::simple("https://download.pytorch.org/whl/cu125")
+        .parse()
+        .unwrap()
+});
+static CU124_INDEX_URL: LazyLock<IndexUrl> = LazyLock::new(|| {
+    IndexUrlParser::simple("https://download.pytorch.org/whl/cu124")
+        .parse()
+        .unwrap()
+});
+static CU123_INDEX_URL: LazyLock<IndexUrl> = LazyLock::new(|| {
+    IndexUrlParser::simple("https://download.pytorch.org/whl/cu123")
+        .parse()
+        .unwrap()
+});
+static CU122_INDEX_URL: LazyLock<IndexUrl> = LazyLock::new(|| {
+    IndexUrlParser::simple("https://download.pytorch.org/whl/cu122")
+        .parse()
+        .unwrap()
+});
+static CU121_INDEX_URL: LazyLock<IndexUrl> = LazyLock::new(|| {
+    IndexUrlParser::simple("https://download.pytorch.org/whl/cu121")
+        .parse()
+        .unwrap()
+});
+static CU120_INDEX_URL: LazyLock<IndexUrl> = LazyLock::new(|| {
+    IndexUrlParser::simple("https://download.pytorch.org/whl/cu120")
+        .parse()
+        .unwrap()
+});
+static CU118_INDEX_URL: LazyLock<IndexUrl> = LazyLock::new(|| {
+    IndexUrlParser::simple("https://download.pytorch.org/whl/cu118")
+        .parse()
+        .unwrap()
+});
+static CU117_INDEX_URL: LazyLock<IndexUrl> = LazyLock::new(|| {
+    IndexUrlParser::simple("https://download.pytorch.org/whl/cu117")
+        .parse()
+        .unwrap()
+});
+static CU116_INDEX_URL: LazyLock<IndexUrl> = LazyLock::new(|| {
+    IndexUrlParser::simple("https://download.pytorch.org/whl/cu116")
+        .parse()
+        .unwrap()
+});
+static CU115_INDEX_URL: LazyLock<IndexUrl> = LazyLock::new(|| {
+    IndexUrlParser::simple("https://download.pytorch.org/whl/cu115")
+        .parse()
+        .unwrap()
+});
+static CU114_INDEX_URL: LazyLock<IndexUrl> = LazyLock::new(|| {
+    IndexUrlParser::simple("https://download.pytorch.org/whl/cu114")
+        .parse()
+        .unwrap()
+});
+static CU113_INDEX_URL: LazyLock<IndexUrl> = LazyLock::new(|| {
+    IndexUrlParser::simple("https://download.pytorch.org/whl/cu113")
+        .parse()
+        .unwrap()
+});
+static CU112_INDEX_URL: LazyLock<IndexUrl> = LazyLock::new(|| {
+    IndexUrlParser::simple("https://download.pytorch.org/whl/cu112")
+        .parse()
+        .unwrap()
+});
+static CU111_INDEX_URL: LazyLock<IndexUrl> = LazyLock::new(|| {
+    IndexUrlParser::simple("https://download.pytorch.org/whl/cu111")
+        .parse()
+        .unwrap()
+});
+static CU110_INDEX_URL: LazyLock<IndexUrl> = LazyLock::new(|| {
+    IndexUrlParser::simple("https://download.pytorch.org/whl/cu110")
+        .parse()
+        .unwrap()
+});
+static CU102_INDEX_URL: LazyLock<IndexUrl> = LazyLock::new(|| {
+    IndexUrlParser::simple("https://download.pytorch.org/whl/cu102")
+        .parse()
+        .unwrap()
+});
+static CU101_INDEX_URL: LazyLock<IndexUrl> = LazyLock::new(|| {
+    IndexUrlParser::simple("https://download.pytorch.org/whl/cu101")
+        .parse()
+        .unwrap()
+});
+static CU100_INDEX_URL: LazyLock<IndexUrl> = LazyLock::new(|| {
+    IndexUrlParser::simple("https://download.pytorch.org/whl/cu100")
+        .parse()
+        .unwrap()
+});
+static CU92_INDEX_URL: LazyLock<IndexUrl> = LazyLock::new(|| {
+    IndexUrlParser::simple("https://download.pytorch.org/whl/cu92")
+        .parse()
+        .unwrap()
+});
+static CU91_INDEX_URL: LazyLock<IndexUrl> = LazyLock::new(|| {
+    IndexUrlParser::simple("https://download.pytorch.org/whl/cu91")
+        .parse()
+        .unwrap()
+});
+static CU90_INDEX_URL: LazyLock<IndexUrl> = LazyLock::new(|| {
+    IndexUrlParser::simple("https://download.pytorch.org/whl/cu90")
+        .parse()
+        .unwrap()
+});
+static CU80_INDEX_URL: LazyLock<IndexUrl> = LazyLock::new(|| {
+    IndexUrlParser::simple("https://download.pytorch.org/whl/cu80")
+        .parse()
+        .unwrap()
+});
+static ROCM63_INDEX_URL: LazyLock<IndexUrl> = LazyLock::new(|| {
+    IndexUrlParser::simple("https://download.pytorch.org/whl/rocm6.3")
+        .parse()
+        .unwrap()
+});
+static ROCM624_INDEX_URL: LazyLock<IndexUrl> = LazyLock::new(|| {
+    IndexUrlParser::simple("https://download.pytorch.org/whl/rocm6.2.4")
+        .parse()
+        .unwrap()
+});
+static ROCM62_INDEX_URL: LazyLock<IndexUrl> = LazyLock::new(|| {
+    IndexUrlParser::simple("https://download.pytorch.org/whl/rocm6.2")
+        .parse()
+        .unwrap()
+});
+static ROCM61_INDEX_URL: LazyLock<IndexUrl> = LazyLock::new(|| {
+    IndexUrlParser::simple("https://download.pytorch.org/whl/rocm6.1")
+        .parse()
+        .unwrap()
+});
+static ROCM60_INDEX_URL: LazyLock<IndexUrl> = LazyLock::new(|| {
+    IndexUrlParser::simple("https://download.pytorch.org/whl/rocm6.0")
+        .parse()
+        .unwrap()
+});
+static ROCM57_INDEX_URL: LazyLock<IndexUrl> = LazyLock::new(|| {
+    IndexUrlParser::simple("https://download.pytorch.org/whl/rocm5.7")
+        .parse()
+        .unwrap()
+});
+static ROCM56_INDEX_URL: LazyLock<IndexUrl> = LazyLock::new(|| {
+    IndexUrlParser::simple("https://download.pytorch.org/whl/rocm5.6")
+        .parse()
+        .unwrap()
+});
+static ROCM55_INDEX_URL: LazyLock<IndexUrl> = LazyLock::new(|| {
+    IndexUrlParser::simple("https://download.pytorch.org/whl/rocm5.5")
+        .parse()
+        .unwrap()
+});
+static ROCM542_INDEX_URL: LazyLock<IndexUrl> = LazyLock::new(|| {
+    IndexUrlParser::simple("https://download.pytorch.org/whl/rocm5.4.2")
+        .parse()
+        .unwrap()
+});
+static ROCM54_INDEX_URL: LazyLock<IndexUrl> = LazyLock::new(|| {
+    IndexUrlParser::simple("https://download.pytorch.org/whl/rocm5.4")
+        .parse()
+        .unwrap()
+});
+static ROCM53_INDEX_URL: LazyLock<IndexUrl> = LazyLock::new(|| {
+    IndexUrlParser::simple("https://download.pytorch.org/whl/rocm5.3")
+        .parse()
+        .unwrap()
+});
+static ROCM52_INDEX_URL: LazyLock<IndexUrl> = LazyLock::new(|| {
+    IndexUrlParser::simple("https://download.pytorch.org/whl/rocm5.2")
+        .parse()
+        .unwrap()
+});
+static ROCM511_INDEX_URL: LazyLock<IndexUrl> = LazyLock::new(|| {
+    IndexUrlParser::simple("https://download.pytorch.org/whl/rocm5.1.1")
+        .parse()
+        .unwrap()
+});
+static ROCM42_INDEX_URL: LazyLock<IndexUrl> = LazyLock::new(|| {
+    IndexUrlParser::simple("https://download.pytorch.org/whl/rocm4.2")
+        .parse()
+        .unwrap()
+});
+static ROCM41_INDEX_URL: LazyLock<IndexUrl> = LazyLock::new(|| {
+    IndexUrlParser::simple("https://download.pytorch.org/whl/rocm4.1")
+        .parse()
+        .unwrap()
+});
+static ROCM401_INDEX_URL: LazyLock<IndexUrl> = LazyLock::new(|| {
+    IndexUrlParser::simple("https://download.pytorch.org/whl/rocm4.0.1")
+        .parse()
+        .unwrap()
+});
+static XPU_INDEX_URL: LazyLock<IndexUrl> = LazyLock::new(|| {
+    IndexUrlParser::simple("https://download.pytorch.org/whl/xpu")
+        .parse()
+        .unwrap()
+});

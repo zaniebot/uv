@@ -20,7 +20,7 @@ use rustc_hash::{FxBuildHasher, FxHashSet};
 use serde::{Deserialize, Deserializer, Serialize, de::IntoDeserializer, de::SeqAccess};
 use thiserror::Error;
 use uv_build_backend::BuildBackendSettings;
-use uv_distribution_types::{Index, IndexName, RequirementSource};
+use uv_distribution_types::{IndexEntry, IndexName, RequirementSource};
 use uv_fs::{PortablePathBuf, relative_to};
 use uv_git_types::GitReference;
 use uv_macros::OptionsMetadata;
@@ -225,11 +225,11 @@ pub struct Tool {
 ///
 /// This custom deserializer function checks for duplicate index names
 /// and returns an error if any duplicates are found.
-fn deserialize_index_vec<'de, D>(deserializer: D) -> Result<Option<Vec<Index>>, D::Error>
+fn deserialize_index_vec<'de, D>(deserializer: D) -> Result<Option<Vec<IndexEntry>>, D::Error>
 where
     D: Deserializer<'de>,
 {
-    let indexes = Option::<Vec<Index>>::deserialize(deserializer)?;
+    let indexes = Option::<Vec<IndexEntry>>::deserialize(deserializer)?;
     if let Some(indexes) = indexes.as_ref() {
         let mut seen_names = FxHashSet::with_capacity_and_hasher(indexes.len(), FxBuildHasher);
         for index in indexes {
@@ -308,7 +308,7 @@ pub struct ToolUv {
         "#
     )]
     #[serde(deserialize_with = "deserialize_index_vec", default)]
-    pub index: Option<Vec<Index>>,
+    pub index: Option<Vec<IndexEntry>>,
 
     /// The workspace definition for the project, if any.
     #[option_group]

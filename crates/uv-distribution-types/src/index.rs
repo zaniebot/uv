@@ -1,3 +1,5 @@
+#[cfg(feature = "schemars")]
+use std::borrow::Cow;
 use std::path::Path;
 use std::str::FromStr;
 
@@ -5,16 +7,42 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use uv_auth::{AuthPolicy, Credentials};
+use uv_pep508::VerbatimUrl;
 use uv_redacted::DisplaySafeUrl;
 
 use crate::index_name::{IndexName, IndexNameError};
 use crate::origin::Origin;
-use crate::{IndexStatusCodeStrategy, IndexUrl, IndexUrlError, SerializableStatusCode};
+use crate::{
+    IndexStatusCodeStrategy, IndexUrl, IndexUrlError, IndexUrlParser, SerializableStatusCode,
+};
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
+pub struct RawIndexUrl(VerbatimUrl);
+
+#[cfg(feature = "schemars")]
+impl schemars::JsonSchema for RawIndexUrl {
+    fn schema_name() -> Cow<'static, str> {
+        Cow::Borrowed("IndexUrl")
+    }
+
+    fn json_schema(_generator: &mut schemars::generate::SchemaGenerator) -> schemars::Schema {
+        schemars::json_schema!({
+            "type": "string",
+            "description": "The URL of an index to use for fetching packages (e.g., `https://pypi.org/simple`), or a local path."
+        })
+    }
+}
+
+impl RawIndexUrl {
+    fn into_verbatim_url(self) -> VerbatimUrl {
+        self.0
+    }
+}
+
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Ord, PartialOrd, Deserialize)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[serde(rename_all = "kebab-case")]
-pub struct Index {
+pub struct IndexEntry {
     /// The name of the index.
     ///
     /// Index names can be used to reference indexes elsewhere in the configuration. For example,
@@ -32,7 +60,7 @@ pub struct Index {
     /// The URL of the index.
     ///
     /// Expects to receive a URL (e.g., `https://pypi.org/simple`) or a local path.
-    pub url: IndexUrl,
+    pub url: RawIndexUrl,
     /// Mark the index as explicit.
     ///
     /// Explicit indexes will _only_ be used when explicitly requested via a `[tool.uv.sources]`
@@ -102,6 +130,46 @@ pub struct Index {
     /// url = "https://<omitted>/simple"
     /// ignore-error-codes = [401, 403]
     /// ```
+    #[serde(default)]
+    pub ignore_error_codes: Option<Vec<SerializableStatusCode>>,
+}
+
+impl IndexEntry {
+    /// Convert the [`IndexEntry`] into an [`Index`].
+    pub fn into_index(self) -> Index {
+        Index {
+            name: self.name,
+            url: match self.format {
+                IndexFormat::Simple => IndexUrl::from_simple_api_url(self.url.into_verbatim_url()),
+                IndexFormat::Flat => IndexUrl::from_find_links_url(self.url.into_verbatim_url()),
+            },
+            explicit: self.explicit,
+            default: self.default,
+            origin: self.origin,
+            format: self.format,
+            publish_url: self.publish_url,
+            authenticate: self.authenticate,
+            ignore_error_codes: self.ignore_error_codes,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct Index {
+    pub name: Option<IndexName>,
+    pub url: IndexUrl,
+    #[serde(default)]
+    pub explicit: bool,
+    #[serde(default)]
+    pub default: bool,
+    #[serde(skip)]
+    pub origin: Option<Origin>,
+    #[serde(default)]
+    pub format: IndexFormat,
+    pub publish_url: Option<DisplaySafeUrl>,
+    #[serde(default)]
+    pub authenticate: AuthPolicy,
     #[serde(default)]
     pub ignore_error_codes: Option<Vec<SerializableStatusCode>>,
 }
@@ -262,7 +330,7 @@ impl FromStr for Index {
         if let Some((name, url)) = s.split_once('=') {
             if !name.chars().any(|c| c == ':') {
                 let name = IndexName::from_str(name)?;
-                let url = IndexUrl::from_str(url)?;
+                let url = IndexUrlParser::simple(url).parse()?;
                 return Ok(Self {
                     name: Some(name),
                     url,
@@ -278,7 +346,7 @@ impl FromStr for Index {
         }
 
         // Otherwise, assume the source is a URL.
-        let url = IndexUrl::from_str(s)?;
+        let url = IndexUrlParser::simple(s).parse()?;
         Ok(Self {
             name: None,
             url,

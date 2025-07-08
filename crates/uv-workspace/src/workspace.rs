@@ -750,7 +750,10 @@ impl Workspace {
             install_path: workspace_root,
             packages: workspace_members,
             sources: workspace_sources,
-            indexes: workspace_indexes,
+            indexes: workspace_indexes
+                .into_iter()
+                .map(|entry| entry.into_index())
+                .collect(),
             pyproject_toml: workspace_pyproject_toml,
         })
     }

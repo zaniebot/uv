@@ -103,13 +103,17 @@ impl SourcedDependencyGroups {
 
         // Collect any `tool.uv.index` entries.
         let empty = vec![];
-        let project_indexes = project
+        let project_indexes: Vec<_> = project
             .pyproject_toml()
             .tool
             .as_ref()
             .and_then(|tool| tool.uv.as_ref())
             .and_then(|uv| uv.index.as_deref())
-            .unwrap_or(&empty);
+            .unwrap_or(&empty)
+            .iter()
+            .map(|entry| entry.clone().into_index())
+            .collect();
+        let project_indexes = &project_indexes;
 
         // Collect any `tool.uv.sources` and `tool.uv.dev_dependencies` from `pyproject.toml`.
         let empty = BTreeMap::default();

@@ -2,7 +2,6 @@ use std::borrow::Cow;
 use std::fmt::{Display, Formatter};
 use std::ops::Deref;
 use std::path::Path;
-use std::str::FromStr;
 use std::sync::{Arc, LazyLock, RwLock};
 
 use itertools::Either;
@@ -24,6 +23,55 @@ static DEFAULT_INDEX: LazyLock<Index> = LazyLock::new(|| {
         PYPI_URL.clone(),
     ))))
 });
+
+pub enum IndexKind {
+    Simple,
+    FindLinks,
+}
+
+pub struct IndexUrlParser<'a> {
+    path: &'a str,
+    root_dir: Option<&'a Path>,
+    kind: IndexKind,
+}
+
+impl<'a> IndexUrlParser<'a> {
+    ///
+    pub fn simple(path: &'a str) -> Self {
+        Self {
+            path,
+            root_dir: None,
+            kind: IndexKind::Simple,
+        }
+    }
+
+    pub fn find_links(path: &'a str) -> Self {
+        Self {
+            path,
+            root_dir: None,
+            kind: IndexKind::FindLinks,
+        }
+    }
+
+    #[must_use]
+    pub fn with_root_dir(self) -> Self {
+        Self {
+            root_dir: Some(Path::new(".")),
+            ..self
+        }
+    }
+
+    pub fn parse(self) -> Result<IndexUrl, IndexUrlError> {
+        match self.kind {
+            IndexKind::Simple => {
+                IndexUrl::parse(self.path, self.root_dir, TrailingSlashPolicy::Remove)
+            }
+            IndexKind::FindLinks => {
+                IndexUrl::parse(self.path, self.root_dir, TrailingSlashPolicy::Preserve)
+            }
+        }
+    }
+}
 
 /// The URL of an index to use for fetching packages (e.g., PyPI).
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Ord, PartialOrd)]
@@ -282,43 +330,12 @@ pub enum IndexUrlError {
     VerbatimUrl(#[from] VerbatimUrlError),
 }
 
-impl FromStr for IndexUrl {
-    type Err = IndexUrlError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Self::parse_simple_api(s, None)
-    }
-}
-
 impl serde::ser::Serialize for IndexUrl {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::ser::Serializer,
     {
         self.to_string().serialize(serializer)
-    }
-}
-
-impl<'de> serde::de::Deserialize<'de> for IndexUrl {
-    fn deserialize<D>(deserializer: D) -> Result<IndexUrl, D::Error>
-    where
-        D: serde::de::Deserializer<'de>,
-    {
-        struct Visitor;
-
-        impl serde::de::Visitor<'_> for Visitor {
-            type Value = IndexUrl;
-
-            fn expecting(&self, f: &mut Formatter) -> std::fmt::Result {
-                f.write_str("a string")
-            }
-
-            fn visit_str<E: serde::de::Error>(self, v: &str) -> Result<Self::Value, E> {
-                IndexUrl::from_str(v).map_err(serde::de::Error::custom)
-            }
-        }
-
-        deserializer.deserialize_str(Visitor)
     }
 }
 
@@ -344,11 +361,59 @@ impl Deref for IndexUrl {
     }
 }
 
+// impl<'de> IndexUrl {
+//     pub(crate) fn deserialize_find_links<D>(deserializer: D) -> Result<IndexUrl, D::Error>
+//     where
+//         D: serde::Deserializer<'de>,
+//     {
+//         struct Visitor;
+
+//         impl serde::de::Visitor<'_> for Visitor {
+//             type Value = IndexUrl;
+
+//             fn expecting(&self, f: &mut Formatter) -> std::fmt::Result {
+//                 f.write_str("a string")
+//             }
+
+//             fn visit_str<E: serde::de::Error>(self, v: &str) -> Result<Self::Value, E> {
+//                 IndexUrlParser::find_links(v)
+//                     .parse()
+//                     .map_err(serde::de::Error::custom)
+//             }
+//         }
+
+//         deserializer.deserialize_str(Visitor)
+//     }
+
+//     pub(crate) fn deserialize_simple_api<D>(deserializer: D) -> Result<IndexUrl, D::Error>
+//     where
+//         D: serde::Deserializer<'de>,
+//     {
+//         struct Visitor;
+
+//         impl serde::de::Visitor<'_> for Visitor {
+//             type Value = IndexUrl;
+
+//             fn expecting(&self, f: &mut Formatter) -> std::fmt::Result {
+//                 f.write_str("a string")
+//             }
+
+//             fn visit_str<E: serde::de::Error>(self, v: &str) -> Result<Self::Value, E> {
+//                 IndexUrlParser::simple(v)
+//                     .parse()
+//                     .map_err(serde::de::Error::custom)
+//             }
+//         }
+
+//         deserializer.deserialize_str(Visitor)
+//     }
+// }
+
 /// The index locations to use for fetching packages. By default, uses the PyPI index.
 ///
 /// This type merges the legacy `--index-url`, `--extra-index-url`, and `--find-links` options,
 /// along with the uv-specific `--index` and `--default-index`.
-#[derive(Default, Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, serde::Serialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct IndexLocations {
     indexes: Vec<Index>,

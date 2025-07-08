@@ -7,10 +7,10 @@ use serde::{Deserialize, Deserializer, Serialize};
 use std::borrow::Cow;
 use std::path::Path;
 
-use crate::{Index, IndexUrl};
+use crate::{Index, IndexUrl, IndexUrlParser};
 
 macro_rules! impl_index {
-    ($name:ident, $from:expr) => {
+    ($name:ident, $from:expr, $de:expr) => {
         #[derive(Debug, Clone, Eq, PartialEq)]
         pub struct $name(Index);
 
@@ -46,7 +46,21 @@ macro_rules! impl_index {
             where
                 D: Deserializer<'de>,
             {
-                IndexUrl::deserialize(deserializer).map($from).map(Self)
+                struct Visitor;
+
+                impl serde::de::Visitor<'_> for Visitor {
+                    type Value = IndexUrl;
+
+                    fn expecting(&self, f: &mut core::fmt::Formatter) -> std::fmt::Result {
+                        f.write_str("a string")
+                    }
+
+                    fn visit_str<E: serde::de::Error>(self, v: &str) -> Result<Self::Value, E> {
+                        $de(v).parse().map_err(serde::de::Error::custom)
+                    }
+                }
+
+                deserializer.deserialize_str(Visitor).map($from).map(Self)
             }
         }
 
@@ -65,6 +79,14 @@ macro_rules! impl_index {
     };
 }
 
-impl_index!(PipIndex, Index::from_index_url);
-impl_index!(PipExtraIndex, Index::from_extra_index_url);
-impl_index!(PipFindLinks, Index::from_find_links);
+impl_index!(PipIndex, Index::from_index_url, IndexUrlParser::simple);
+impl_index!(
+    PipExtraIndex,
+    Index::from_extra_index_url,
+    IndexUrlParser::simple
+);
+impl_index!(
+    PipFindLinks,
+    Index::from_find_links,
+    IndexUrlParser::find_links
+);

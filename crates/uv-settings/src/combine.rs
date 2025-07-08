@@ -7,7 +7,7 @@ use uv_configuration::{
     ConfigSettings, ExportFormat, IndexStrategy, KeyringProviderType, RequiredVersion,
     TargetTriple, TrustedPublishing,
 };
-use uv_distribution_types::{Index, IndexUrl, PipExtraIndex, PipFindLinks, PipIndex};
+use uv_distribution_types::{Index, IndexUrl, PipExtraIndex, PipFindLinks, PipIndex, RawIndexUrl};
 use uv_install_wheel::LinkMode;
 use uv_pypi_types::{SchemaConflicts, SupportedEnvironments};
 use uv_python::{PythonDownloads, PythonPreference, PythonVersion};
@@ -95,6 +95,7 @@ impl_combine_or!(PrereleaseMode);
 impl_combine_or!(PythonDownloads);
 impl_combine_or!(PythonPreference);
 impl_combine_or!(PythonVersion);
+impl_combine_or!(RawIndexUrl);
 impl_combine_or!(RequiredVersion);
 impl_combine_or!(ResolutionMode);
 impl_combine_or!(SchemaConflicts);

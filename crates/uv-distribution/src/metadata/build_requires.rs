@@ -66,7 +66,7 @@ impl BuildRequires {
     ) -> Result<Self, MetadataError> {
         // Collect any `tool.uv.index` entries.
         let empty = vec![];
-        let project_indexes = match source_strategy {
+        let project_indexes: Vec<_> = match source_strategy {
             SourceStrategy::Enabled => project_workspace
                 .current_project()
                 .pyproject_toml()
@@ -74,9 +74,13 @@ impl BuildRequires {
                 .as_ref()
                 .and_then(|tool| tool.uv.as_ref())
                 .and_then(|uv| uv.index.as_deref())
-                .unwrap_or(&empty),
-            SourceStrategy::Disabled => &empty,
+                .unwrap_or(&empty)
+                .iter()
+                .map(|entry| entry.clone().into_index())
+                .collect(),
+            SourceStrategy::Disabled => vec![],
         };
+        let project_indexes = &project_indexes;
 
         // Collect any `tool.uv.sources` and `tool.uv.dev_dependencies` from `pyproject.toml`.
         let empty = BTreeMap::default();
@@ -140,16 +144,20 @@ impl BuildRequires {
     ) -> Result<Self, MetadataError> {
         // Collect any `tool.uv.index` entries.
         let empty = vec![];
-        let project_indexes = match source_strategy {
+        let project_indexes: Vec<_> = match source_strategy {
             SourceStrategy::Enabled => workspace
                 .pyproject_toml()
                 .tool
                 .as_ref()
                 .and_then(|tool| tool.uv.as_ref())
                 .and_then(|uv| uv.index.as_deref())
-                .unwrap_or(&empty),
-            SourceStrategy::Disabled => &empty,
+                .unwrap_or(&empty)
+                .iter()
+                .map(|entry| entry.clone().into_index())
+                .collect(),
+            SourceStrategy::Disabled => vec![],
         };
+        let project_indexes = &project_indexes;
 
         // Collect any `tool.uv.sources` and `tool.uv.dev_dependencies` from `pyproject.toml`.
         let empty = BTreeMap::default();

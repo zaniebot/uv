@@ -8,7 +8,8 @@ use uv_configuration::{
     TargetTriple, TrustedHost, TrustedPublishing,
 };
 use uv_distribution_types::{
-    Index, IndexUrl, IndexUrlError, PipExtraIndex, PipFindLinks, PipIndex, StaticMetadata,
+    IndexEntry, IndexUrlError, PipExtraIndex, PipFindLinks, PipIndex, RawIndexUrl,
+    StaticMetadata,
 };
 use uv_install_wheel::LinkMode;
 use uv_macros::{CombineOptions, OptionsMetadata};
@@ -325,7 +326,7 @@ pub struct GlobalOptions {
 /// Settings relevant to all installer operations.
 #[derive(Debug, Clone, Default, CombineOptions)]
 pub struct InstallerOptions {
-    pub index: Option<Vec<Index>>,
+    pub index: Option<Vec<IndexEntry>>,
     pub index_url: Option<PipIndex>,
     pub extra_index_url: Option<Vec<PipExtraIndex>>,
     pub no_index: Option<bool>,
@@ -349,7 +350,7 @@ pub struct InstallerOptions {
 /// Settings relevant to all resolver operations.
 #[derive(Debug, Clone, Default, CombineOptions)]
 pub struct ResolverOptions {
-    pub index: Option<Vec<Index>>,
+    pub index: Option<Vec<IndexEntry>>,
     pub index_url: Option<PipIndex>,
     pub extra_index_url: Option<Vec<PipExtraIndex>>,
     pub no_index: Option<bool>,
@@ -416,7 +417,7 @@ pub struct ResolverInstallerOptions {
             url = "https://download.pytorch.org/whl/cu121"
         "#
     )]
-    pub index: Option<Vec<Index>>,
+    pub index: Option<Vec<IndexEntry>>,
     /// The URL of the Python package index (by default: <https://pypi.org/simple>).
     ///
     /// Accepts either a repository compliant with [PEP 503](https://peps.python.org/pep-0503/)
@@ -755,15 +756,7 @@ impl ResolverInstallerOptions {
     /// Resolve the [`ResolverInstallerOptions`] relative to the given root directory.
     pub fn relative_to(self, root_dir: &Path) -> Result<Self, IndexUrlError> {
         Ok(Self {
-            index: self
-                .index
-                .map(|index| {
-                    index
-                        .into_iter()
-                        .map(|index| index.relative_to(root_dir))
-                        .collect::<Result<Vec<_>, _>>()
-                })
-                .transpose()?,
+            index: self.index,
             index_url: self
                 .index_url
                 .map(|index_url| index_url.relative_to(root_dir))
@@ -950,7 +943,7 @@ pub struct PipOptions {
     pub prefix: Option<PathBuf>,
     #[serde(skip)]
     #[cfg_attr(feature = "schemars", schemars(skip))]
-    pub index: Option<Vec<Index>>,
+    pub index: Option<Vec<IndexEntry>>,
     /// The URL of the Python package index (by default: <https://pypi.org/simple>).
     ///
     /// Accepts either a repository compliant with [PEP 503](https://peps.python.org/pep-0503/)
@@ -1600,15 +1593,7 @@ impl PipOptions {
     /// Resolve the [`PipOptions`] relative to the given root directory.
     pub fn relative_to(self, root_dir: &Path) -> Result<Self, IndexUrlError> {
         Ok(Self {
-            index: self
-                .index
-                .map(|index| {
-                    index
-                        .into_iter()
-                        .map(|index| index.relative_to(root_dir))
-                        .collect::<Result<Vec<_>, _>>()
-                })
-                .transpose()?,
+            index: self.index,
             index_url: self
                 .index_url
                 .map(|index_url| index_url.relative_to(root_dir))
@@ -1702,7 +1687,7 @@ impl From<ResolverInstallerOptions> for InstallerOptions {
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct ToolOptions {
-    pub index: Option<Vec<Index>>,
+    pub index: Option<Vec<IndexEntry>>,
     pub index_url: Option<PipIndex>,
     pub extra_index_url: Option<Vec<PipExtraIndex>>,
     pub no_index: Option<bool>,
@@ -1809,7 +1794,7 @@ pub struct OptionsWire {
 
     // #[serde(flatten)]
     // top_level: ResolverInstallerOptions
-    index: Option<Vec<Index>>,
+    index: Option<Vec<IndexEntry>>,
     index_url: Option<PipIndex>,
     extra_index_url: Option<Vec<PipExtraIndex>>,
     no_index: Option<bool>,
@@ -1847,7 +1832,7 @@ pub struct OptionsWire {
     // publish: PublishOptions
     publish_url: Option<DisplaySafeUrl>,
     trusted_publishing: Option<TrustedPublishing>,
-    check_url: Option<IndexUrl>,
+    check_url: Option<RawIndexUrl>,
 
     // #[serde(flatten)]
     // add: AddOptions
@@ -2072,7 +2057,7 @@ pub struct PublishOptions {
             check-url = "https://test.pypi.org/simple"
         "#
     )]
-    pub check_url: Option<IndexUrl>,
+    pub check_url: Option<RawIndexUrl>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, CombineOptions, OptionsMetadata)]

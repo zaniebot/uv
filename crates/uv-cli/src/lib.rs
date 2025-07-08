@@ -956,7 +956,8 @@ fn parse_index_url(input: &str) -> Result<Maybe<PipIndex>, String> {
     if input.is_empty() {
         Ok(Maybe::None)
     } else {
-        IndexUrl::from_str(input)
+        IndexUrlParser::simple(input)
+            .parse()
             .map(Index::from_index_url)
             .map(|index| Index {
                 origin: Some(Origin::Cli),
@@ -973,7 +974,8 @@ fn parse_extra_index_url(input: &str) -> Result<Maybe<PipExtraIndex>, String> {
     if input.is_empty() {
         Ok(Maybe::None)
     } else {
-        IndexUrl::from_str(input)
+        IndexUrlParser::simple(input)
+            .parse()
             .map(Index::from_extra_index_url)
             .map(|index| Index {
                 origin: Some(Origin::Cli),
