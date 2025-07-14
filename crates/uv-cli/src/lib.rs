@@ -4941,6 +4941,13 @@ pub struct PythonInstallArgs {
     #[arg(long, short, env = EnvVars::UV_PYTHON_INSTALL_DIR)]
     pub install_dir: Option<PathBuf>,
 
+    /// The binary directory to install the Python executable into.
+    ///
+    /// See `uv python dir --bin` to view the current Python binary directory. Defaults to
+    /// `~/.local/bin`.
+    #[arg(long, short, env = EnvVars::UV_PYTHON_BIN_DIR)]
+    pub bin_dir: Option<PathBuf>,
+
     /// The Python version(s) to install.
     ///
     /// If not provided, the requested Python version(s) will be read from the `UV_PYTHON`
