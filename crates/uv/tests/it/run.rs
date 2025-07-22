@@ -5721,3 +5721,89 @@ fn run_python_preference_no_project() {
     ----- stderr -----
     ");
 }
+
+#[test]
+#[cfg(unix)]
+fn run_with_invalid_bin_files() -> Result<()> {
+    use std::fs::File;
+    use std::io::Write;
+
+    let context = TestContext::new("3.12");
+
+    let pyproject_toml = context.temp_dir.child("pyproject.toml");
+    pyproject_toml.write_str(
+        r#"
+        [project]
+        name = "test-project"
+        version = "0.1.0"
+        requires-python = ">=3.8"
+        dependencies = ["anyio"]
+        "#,
+    )?;
+
+    // Create the base virtual environment
+    uv_snapshot!(context.filters(), context.sync(), @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Resolved 6 packages in [TIME]
+    Prepared 3 packages in [TIME]
+    Installed 3 packages in [TIME]
+     + anyio==4.3.0
+     + idna==3.6
+     + sniffio==1.3.1
+    ");
+
+    let bin_dir = crate::common::venv_bin_path(&context.venv);
+
+    // Write problematic files to the bin directory that should be skipped by copy_entrypoint
+    
+    // File without shebang
+    let no_shebang = bin_dir.join("no_shebang.txt");
+    std::fs::write(&no_shebang, "This is just plain text without shebang")?;
+
+    // File with invalid UTF-8
+    let invalid_utf8 = bin_dir.join("invalid_utf8");
+    let mut file = File::create(&invalid_utf8)?;
+    file.write_all(&[0xff, 0xfe, 0xfd, 0x00])?;
+
+    // Empty file (less than 2 bytes)
+    let empty_file = bin_dir.join("empty_file");
+    std::fs::write(&empty_file, "")?;
+
+    // Single byte file (less than 2 bytes)
+    let one_byte = bin_dir.join("one_byte");
+    std::fs::write(&one_byte, "x")?;
+
+    // Valid script with shebang for comparison
+    let valid_script = bin_dir.join("valid_script");
+    std::fs::write(&valid_script, "#!/usr/bin/env python\nprint('valid')\n")?;
+
+    // Now create an overlay environment with --with, which will trigger entrypoint copying
+    // If the safety checks work, this should succeed despite the problematic files
+    uv_snapshot!(context.filters(), context.run().arg("--with").arg("iniconfig").arg("python").arg("-c").arg("print('success')"), @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    success
+
+    ----- stderr -----
+    Resolved 6 packages in [TIME]
+    Audited 3 packages in [TIME]
+    Resolved 1 package in [TIME]
+    Prepared 1 package in [TIME]
+    Installed 1 package in [TIME]
+     + iniconfig==2.0.0
+    ");
+
+    // Verify the problematic files still exist (weren't deleted/corrupted)
+    assert!(no_shebang.exists());
+    assert!(invalid_utf8.exists());
+    assert!(empty_file.exists());
+    assert!(one_byte.exists());
+    assert!(valid_script.exists());
+
+    Ok(())
+}
