@@ -3671,6 +3671,9 @@ impl Forks {
             }
             forks = new;
         }
+        for fork in &forks {
+            trace_resolver_environment(&fork.env);
+        }
         Forks {
             forks,
             diverging_packages,
@@ -3907,4 +3910,12 @@ struct ConflictTracker {
     ///
     /// Distilled from `culprit` for fast checking in the hot loop.
     deprioritize: Vec<Id<PubGrubPackage>>,
+}
+
+/// When trace level logging is enabled, we emit the resolution environment
+pub(crate) fn trace_resolver_environment(env: &ResolverEnvironment) {
+    if !tracing::enabled!(Level::TRACE) {
+        return;
+    }
+    trace!("Resolution environment: {:?}", env);
 }
