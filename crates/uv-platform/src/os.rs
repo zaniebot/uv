@@ -1,8 +1,8 @@
 use crate::platform::Error;
+use std::fmt;
 use std::fmt::Display;
 use std::ops::Deref;
 use std::str::FromStr;
-use std::fmt;
 
 #[derive(Debug, Eq, PartialEq, Clone, Copy, Hash)]
 pub struct Os(pub(crate) target_lexicon::OperatingSystem);
@@ -60,17 +60,25 @@ impl From<&uv_platform_tags::Os> for Os {
             uv_platform_tags::Os::Dragonfly { .. } => {
                 Os::new(target_lexicon::OperatingSystem::Dragonfly)
             }
-            uv_platform_tags::Os::FreeBsd { .. } => Os::new(target_lexicon::OperatingSystem::Freebsd),
+            uv_platform_tags::Os::FreeBsd { .. } => {
+                Os::new(target_lexicon::OperatingSystem::Freebsd)
+            }
             uv_platform_tags::Os::Haiku { .. } => Os::new(target_lexicon::OperatingSystem::Haiku),
-            uv_platform_tags::Os::Illumos { .. } => Os::new(target_lexicon::OperatingSystem::Illumos),
+            uv_platform_tags::Os::Illumos { .. } => {
+                Os::new(target_lexicon::OperatingSystem::Illumos)
+            }
             uv_platform_tags::Os::Macos { .. } => {
                 Os::new(target_lexicon::OperatingSystem::Darwin(None))
             }
             uv_platform_tags::Os::Manylinux { .. }
             | uv_platform_tags::Os::Musllinux { .. }
-            | uv_platform_tags::Os::Android { .. } => Os::new(target_lexicon::OperatingSystem::Linux),
+            | uv_platform_tags::Os::Android { .. } => {
+                Os::new(target_lexicon::OperatingSystem::Linux)
+            }
             uv_platform_tags::Os::NetBsd { .. } => Os::new(target_lexicon::OperatingSystem::Netbsd),
-            uv_platform_tags::Os::OpenBsd { .. } => Os::new(target_lexicon::OperatingSystem::Openbsd),
+            uv_platform_tags::Os::OpenBsd { .. } => {
+                Os::new(target_lexicon::OperatingSystem::Openbsd)
+            }
             uv_platform_tags::Os::Windows => Os::new(target_lexicon::OperatingSystem::Windows),
             uv_platform_tags::Os::Pyodide { .. } => {
                 Os::new(target_lexicon::OperatingSystem::Emscripten)

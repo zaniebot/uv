@@ -1,7 +1,7 @@
 use crate::platform::Error;
 use std::fmt::Display;
 use std::str::FromStr;
-use std::{fmt, cmp};
+use std::{cmp, fmt};
 
 /// Architecture variants, e.g., with support for different instruction sets
 #[derive(Debug, Eq, PartialEq, Clone, Copy, Hash, Ord, PartialOrd)]
@@ -206,9 +206,7 @@ impl From<&uv_platform_tags::Arch> for Arch {
     fn from(value: &uv_platform_tags::Arch) -> Self {
         match value {
             uv_platform_tags::Arch::Aarch64 => Arch::new(
-                target_lexicon::Architecture::Aarch64(
-                    target_lexicon::Aarch64Architecture::Aarch64,
-                ),
+                target_lexicon::Architecture::Aarch64(target_lexicon::Aarch64Architecture::Aarch64),
                 None,
             ),
             uv_platform_tags::Arch::Armv5TEL => Arch::new(
@@ -223,46 +221,29 @@ impl From<&uv_platform_tags::Arch> for Arch {
                 target_lexicon::Architecture::Arm(target_lexicon::ArmArchitecture::Armv7),
                 None,
             ),
-            uv_platform_tags::Arch::S390X => Arch::new(
-                target_lexicon::Architecture::S390x,
-                None,
-            ),
-            uv_platform_tags::Arch::Powerpc => Arch::new(
-                target_lexicon::Architecture::Powerpc,
-                None,
-            ),
-            uv_platform_tags::Arch::Powerpc64 => Arch::new(
-                target_lexicon::Architecture::Powerpc64,
-                None,
-            ),
-            uv_platform_tags::Arch::Powerpc64Le => Arch::new(
-                target_lexicon::Architecture::Powerpc64le,
-                None,
-            ),
+            uv_platform_tags::Arch::S390X => Arch::new(target_lexicon::Architecture::S390x, None),
+            uv_platform_tags::Arch::Powerpc => {
+                Arch::new(target_lexicon::Architecture::Powerpc, None)
+            }
+            uv_platform_tags::Arch::Powerpc64 => {
+                Arch::new(target_lexicon::Architecture::Powerpc64, None)
+            }
+            uv_platform_tags::Arch::Powerpc64Le => {
+                Arch::new(target_lexicon::Architecture::Powerpc64le, None)
+            }
             uv_platform_tags::Arch::X86 => Arch::new(
-                target_lexicon::Architecture::X86_32(
-                    target_lexicon::X86_32Architecture::I686,
-                ),
+                target_lexicon::Architecture::X86_32(target_lexicon::X86_32Architecture::I686),
                 None,
             ),
-            uv_platform_tags::Arch::X86_64 => Arch::new(
-                target_lexicon::Architecture::X86_64,
-                None,
-            ),
-            uv_platform_tags::Arch::LoongArch64 => Arch::new(
-                target_lexicon::Architecture::LoongArch64,
-                None,
-            ),
+            uv_platform_tags::Arch::X86_64 => Arch::new(target_lexicon::Architecture::X86_64, None),
+            uv_platform_tags::Arch::LoongArch64 => {
+                Arch::new(target_lexicon::Architecture::LoongArch64, None)
+            }
             uv_platform_tags::Arch::Riscv64 => Arch::new(
-                target_lexicon::Architecture::Riscv64(
-                    target_lexicon::Riscv64Architecture::Riscv64,
-                ),
+                target_lexicon::Architecture::Riscv64(target_lexicon::Riscv64Architecture::Riscv64),
                 None,
             ),
-            uv_platform_tags::Arch::Wasm32 => Arch::new(
-                target_lexicon::Architecture::Wasm32,
-                None,
-            ),
+            uv_platform_tags::Arch::Wasm32 => Arch::new(target_lexicon::Architecture::Wasm32, None),
         }
     }
 }

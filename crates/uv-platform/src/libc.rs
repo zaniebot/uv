@@ -14,7 +14,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::str::FromStr;
 use std::sync::LazyLock;
-use std::{fmt, env};
+use std::{env, fmt};
 use thiserror::Error;
 use tracing::trace;
 use uv_fs::Simplified;

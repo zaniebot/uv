@@ -1111,7 +1111,12 @@ impl CacheBucket {
                 let root = cache.bucket(self);
                 summary += rm_rf(root)?;
             }
-            Self::Git | Self::Interpreter | Self::Archive | Self::Builds | Self::Environments | Self::ToolBinaries => {
+            Self::Git
+            | Self::Interpreter
+            | Self::Archive
+            | Self::Builds
+            | Self::Environments
+            | Self::ToolBinaries => {
                 // Nothing to do.
             }
         }
