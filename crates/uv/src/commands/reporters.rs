@@ -10,8 +10,8 @@ use owo_colors::OwoColorize;
 use rustc_hash::FxHashMap;
 
 use crate::commands::human_readable_bytes;
-use crate::printer::Printer;
 use uv_cache::Removal;
+use uv_cli_common::printer::Printer;
 use uv_distribution_types::{
     BuildableSource, CachedDist, DistributionMetadata, Name, SourceDist, VersionOrUrlRef,
 };

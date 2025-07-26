@@ -32,8 +32,8 @@ use crate::commands::ExitStatus;
 use crate::commands::pip::latest::LatestClient;
 use crate::commands::pip::operations::report_target_environment;
 use crate::commands::reporters::LatestVersionReporter;
-use crate::printer::Printer;
 use crate::settings::NetworkSettings;
+use uv_cli_common::printer::Printer;
 
 /// Enumerate the installed packages in the current environment.
 #[allow(clippy::fn_params_excessive_bools)]

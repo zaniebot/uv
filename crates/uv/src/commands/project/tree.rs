@@ -27,8 +27,8 @@ use crate::commands::project::{
 };
 use crate::commands::reporters::LatestVersionReporter;
 use crate::commands::{ExitStatus, diagnostics};
-use crate::printer::Printer;
 use crate::settings::{NetworkSettings, ResolverSettings};
+use uv_cli_common::printer::Printer;
 
 /// Run a command.
 #[allow(clippy::fn_params_excessive_bools)]

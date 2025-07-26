@@ -12,7 +12,7 @@ use uv_pep440::Version;
 
 use crate::commands::pip::operations::Changelog;
 use crate::commands::{ChangeEvent, ChangeEventKind, elapsed};
-use crate::printer::Printer;
+use uv_cli_common::printer::Printer;
 
 /// A trait to handle logging during install operations.
 pub(crate) trait InstallLogger {

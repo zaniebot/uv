@@ -7,7 +7,7 @@ use uv_cache::{Cache, Removal};
 use uv_fs::Simplified;
 
 use crate::commands::{ExitStatus, human_readable_bytes};
-use crate::printer::Printer;
+use uv_cli_common::printer::Printer;
 
 /// Prune all unreachable objects from the cache.
 pub(crate) fn cache_prune(ci: bool, cache: &Cache, printer: Printer) -> Result<ExitStatus> {

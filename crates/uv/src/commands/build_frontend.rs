@@ -44,8 +44,8 @@ use crate::commands::ExitStatus;
 use crate::commands::pip::operations;
 use crate::commands::project::{ProjectError, find_requires_python};
 use crate::commands::reporters::PythonDownloadReporter;
-use crate::printer::Printer;
 use crate::settings::{NetworkSettings, ResolverSettings};
+use uv_cli_common::printer::Printer;
 
 #[derive(Debug, Error)]
 enum Error {

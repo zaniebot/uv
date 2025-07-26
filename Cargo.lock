@@ -4705,6 +4705,7 @@ dependencies = [
  "uv-cache-info",
  "uv-cache-key",
  "uv-cli",
+ "uv-cli-common",
  "uv-client",
  "uv-configuration",
  "uv-console",
@@ -4973,6 +4974,34 @@ dependencies = [
  "uv-version",
  "uv-warnings",
  "uv-workspace",
+]
+
+[[package]]
+name = "uv-cli-common"
+version = "0.0.1"
+dependencies = [
+ "anstream",
+ "anyhow",
+ "indicatif",
+ "nix 0.30.1",
+ "owo-colors",
+ "rustc-hash",
+ "serde_json",
+ "thiserror 2.0.12",
+ "tokio",
+ "tracing",
+ "uv-cache",
+ "uv-configuration",
+ "uv-distribution-types",
+ "uv-fs",
+ "uv-installer",
+ "uv-normalize",
+ "uv-pep440",
+ "uv-pep508",
+ "uv-python",
+ "uv-resolver",
+ "uv-types",
+ "version-ranges",
 ]
 
 [[package]]

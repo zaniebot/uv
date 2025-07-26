@@ -17,8 +17,8 @@ use crate::commands::{
     ExitStatus,
     project::{ScriptInterpreter, WorkspacePython, validate_project_requires_python},
 };
-use crate::printer::Printer;
 use crate::settings::NetworkSettings;
+use uv_cli_common::printer::Printer;
 
 /// Find a Python interpreter.
 #[allow(clippy::fn_params_excessive_bools)]

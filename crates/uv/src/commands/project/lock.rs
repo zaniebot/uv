@@ -46,8 +46,8 @@ use crate::commands::project::{
 };
 use crate::commands::reporters::{PythonDownloadReporter, ResolverReporter};
 use crate::commands::{ExitStatus, ScriptPath, diagnostics, pip};
-use crate::printer::Printer;
 use crate::settings::{NetworkSettings, ResolverSettings};
+use uv_cli_common::printer::Printer;
 
 /// The result of running a lock operation.
 #[derive(Debug, Clone)]

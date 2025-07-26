@@ -5,7 +5,7 @@ use std::borrow::Cow;
 use std::io::stdout;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
-use std::{fmt::Display, fmt::Write, process::ExitCode};
+use std::{fmt::Display, fmt::Write};
 
 pub(crate) use build_frontend::build_frontend;
 pub(crate) use cache_clean::cache_clean;
@@ -59,7 +59,7 @@ use uv_python::PythonEnvironment;
 use uv_scripts::Pep723Script;
 pub(crate) use venv::venv;
 
-use crate::printer::Printer;
+use uv_cli_common::printer::Printer;
 
 pub(crate) mod build_backend;
 mod build_frontend;
@@ -78,31 +78,7 @@ mod self_update;
 mod tool;
 mod venv;
 
-#[derive(Copy, Clone)]
-pub(crate) enum ExitStatus {
-    /// The command succeeded.
-    Success,
-
-    /// The command failed due to an error in the user input.
-    Failure,
-
-    /// The command failed with an unexpected error.
-    Error,
-
-    /// The command's exit status is propagated from an external command.
-    External(u8),
-}
-
-impl From<ExitStatus> for ExitCode {
-    fn from(status: ExitStatus) -> Self {
-        match status {
-            ExitStatus::Success => Self::from(0),
-            ExitStatus::Failure => Self::from(1),
-            ExitStatus::Error => Self::from(2),
-            ExitStatus::External(code) => Self::from(code),
-        }
-    }
-}
+pub(crate) use uv_cli_common::exit_status::ExitStatus;
 
 /// Format a duration as a human-readable string, Cargo-style.
 pub(super) fn elapsed(duration: Duration) -> String {
@@ -257,31 +233,7 @@ impl<'a> OutputWriter<'a> {
 }
 
 /// Given a list of names, return a conjunction of the names (e.g., "Alice, Bob, and Charlie").
-pub(super) fn conjunction(names: Vec<String>) -> String {
-    let mut names = names.into_iter();
-    let first = names.next();
-    let last = names.next_back();
-    match (first, last) {
-        (Some(first), Some(last)) => {
-            let mut result = first;
-            let mut comma = false;
-            for name in names {
-                result.push_str(", ");
-                result.push_str(&name);
-                comma = true;
-            }
-            if comma {
-                result.push_str(", and ");
-            } else {
-                result.push_str(" and ");
-            }
-            result.push_str(&last);
-            result
-        }
-        (Some(first), None) => first,
-        _ => String::new(),
-    }
-}
+pub(super) use uv_cli_common::conjunction;
 
 /// Capitalize the first letter of a string.
 pub(super) fn capitalize(s: &str) -> String {

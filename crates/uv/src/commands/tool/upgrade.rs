@@ -30,8 +30,8 @@ use crate::commands::project::{
 use crate::commands::reporters::PythonDownloadReporter;
 use crate::commands::tool::common::remove_entrypoints;
 use crate::commands::{ExitStatus, conjunction, tool::common::finalize_tool_install};
-use crate::printer::Printer;
 use crate::settings::{NetworkSettings, ResolverInstallerSettings};
+use uv_cli_common::printer::Printer;
 
 /// Upgrade a tool.
 pub(crate) async fn upgrade(

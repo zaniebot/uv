@@ -41,7 +41,6 @@ use uv_static::EnvVars;
 use uv_warnings::warn_user;
 use uv_workspace::{DiscoveryOptions, VirtualProject, Workspace, WorkspaceCache, WorkspaceError};
 
-use crate::child::run_to_completion;
 use crate::commands::pip::loggers::{
     DefaultInstallLogger, DefaultResolveLogger, SummaryInstallLogger, SummaryResolveLogger,
 };
@@ -58,8 +57,9 @@ use crate::commands::project::{
 };
 use crate::commands::reporters::PythonDownloadReporter;
 use crate::commands::{ExitStatus, diagnostics, project};
-use crate::printer::Printer;
 use crate::settings::{NetworkSettings, ResolverInstallerSettings};
+use uv_cli_common::child::run_to_completion;
+use uv_cli_common::printer::Printer;
 
 /// Run a command.
 #[allow(clippy::fn_params_excessive_bools)]

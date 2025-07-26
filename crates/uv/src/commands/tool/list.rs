@@ -10,7 +10,7 @@ use uv_tool::InstalledTools;
 use uv_warnings::warn_user;
 
 use crate::commands::ExitStatus;
-use crate::printer::Printer;
+use uv_cli_common::printer::Printer;
 
 /// List installed tools.
 #[allow(clippy::fn_params_excessive_bools)]

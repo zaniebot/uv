@@ -21,8 +21,8 @@ use uv_warnings::warn_user_once;
 
 use crate::commands::reporters::PublishReporter;
 use crate::commands::{ExitStatus, human_readable_bytes};
-use crate::printer::Printer;
 use crate::settings::NetworkSettings;
+use uv_cli_common::printer::Printer;
 
 pub(crate) async fn publish(
     paths: Vec<String>,

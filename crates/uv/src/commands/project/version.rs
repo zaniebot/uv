@@ -35,8 +35,8 @@ use crate::commands::project::{
     ProjectEnvironment, ProjectError, ProjectInterpreter, UniversalState, default_dependency_groups,
 };
 use crate::commands::{ExitStatus, diagnostics, project};
-use crate::printer::Printer;
 use crate::settings::{NetworkSettings, ResolverInstallerSettings};
+use uv_cli_common::printer::Printer;
 
 /// Display version information for uv itself (`uv self version`)
 pub(crate) fn self_version(

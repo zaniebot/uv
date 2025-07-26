@@ -21,8 +21,8 @@ use uv_workspace::{DiscoveryOptions, VirtualProject, WorkspaceCache};
 use crate::commands::{
     ExitStatus, project::find_requires_python, reporters::PythonDownloadReporter,
 };
-use crate::printer::Printer;
 use crate::settings::NetworkSettings;
+use uv_cli_common::printer::Printer;
 
 /// Pin to a specific Python version.
 #[allow(clippy::fn_params_excessive_bools)]

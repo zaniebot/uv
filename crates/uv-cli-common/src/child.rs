@@ -1,14 +1,14 @@
 use tokio::process::Child;
 use tracing::debug;
 
-use crate::commands::ExitStatus;
+use crate::exit_status::ExitStatus;
 
 /// Wait for the child process to complete, handling signals and error codes.
 ///
 /// Note that this registers handles to ignore some signals in the parent process. This is safe as
 /// long as the command is the last thing that runs in this process; otherwise, we'd need to restore
 /// the default signal handlers after the command completes.
-pub(crate) async fn run_to_completion(mut handle: Child) -> anyhow::Result<ExitStatus> {
+pub async fn run_to_completion(mut handle: Child) -> anyhow::Result<ExitStatus> {
     // On Unix, the terminal driver will send SIGINT to the active process group when a user presses
     // `Ctrl-C`. In general, this means that uv should ignore SIGINT, allowing the child process to
     // cleanly exit instead. If uv forwarded the SIGINT immediately, the child process would receive

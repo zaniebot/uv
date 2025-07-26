@@ -44,17 +44,15 @@ use uv_warnings::{warn_user, warn_user_once};
 use uv_workspace::{DiscoveryOptions, Workspace, WorkspaceCache};
 
 use crate::commands::{ExitStatus, RunCommand, ScriptPath, ToolRunCommand};
-use crate::printer::Printer;
 use crate::settings::{
     CacheSettings, GlobalSettings, PipCheckSettings, PipCompileSettings, PipFreezeSettings,
     PipInstallSettings, PipListSettings, PipShowSettings, PipSyncSettings, PipUninstallSettings,
     PublishSettings,
 };
+use uv_cli_common::printer::Printer;
 
-pub(crate) mod child;
 pub(crate) mod commands;
 pub(crate) mod logging;
-pub(crate) mod printer;
 pub(crate) mod settings;
 #[cfg(windows)]
 mod windows_exception;

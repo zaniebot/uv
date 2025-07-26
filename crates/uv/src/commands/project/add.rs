@@ -58,8 +58,8 @@ use crate::commands::project::{
 };
 use crate::commands::reporters::{PythonDownloadReporter, ResolverReporter};
 use crate::commands::{ExitStatus, ScriptPath, diagnostics, project};
-use crate::printer::Printer;
 use crate::settings::{NetworkSettings, ResolverInstallerSettings};
+use uv_cli_common::printer::Printer;
 
 /// Add one or more packages to the project requirements.
 #[allow(clippy::fn_params_excessive_bools)]

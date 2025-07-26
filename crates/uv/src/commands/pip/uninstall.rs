@@ -20,8 +20,8 @@ use uv_requirements::{RequirementsSource, RequirementsSpecification};
 
 use crate::commands::pip::operations::report_target_environment;
 use crate::commands::{ExitStatus, elapsed};
-use crate::printer::Printer;
 use crate::settings::NetworkSettings;
+use uv_cli_common::printer::Printer;
 
 /// Uninstall packages from the current environment.
 #[allow(clippy::fn_params_excessive_bools)]

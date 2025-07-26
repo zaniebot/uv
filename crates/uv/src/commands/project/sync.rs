@@ -46,8 +46,8 @@ use crate::commands::project::{
     default_dependency_groups, detect_conflicts, script_specification, update_environment,
 };
 use crate::commands::{ExitStatus, diagnostics};
-use crate::printer::Printer;
 use crate::settings::{InstallerSettingsRef, NetworkSettings, ResolverInstallerSettings};
+use uv_cli_common::printer::Printer;
 
 /// Sync the project environment.
 #[allow(clippy::fn_params_excessive_bools)]

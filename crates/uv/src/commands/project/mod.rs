@@ -53,10 +53,10 @@ use crate::commands::pip::loggers::{InstallLogger, ResolveLogger};
 use crate::commands::pip::operations::{Changelog, Modifications};
 use crate::commands::reporters::{PythonDownloadReporter, ResolverReporter};
 use crate::commands::{capitalize, conjunction, pip};
-use crate::printer::Printer;
 use crate::settings::{
     InstallerSettingsRef, NetworkSettings, ResolverInstallerSettings, ResolverSettings,
 };
+use uv_cli_common::printer::Printer;
 
 pub(crate) mod add;
 pub(crate) mod environment;

@@ -28,8 +28,8 @@ use crate::commands::project::{
     detect_conflicts,
 };
 use crate::commands::{ExitStatus, OutputWriter, diagnostics};
-use crate::printer::Printer;
 use crate::settings::{NetworkSettings, ResolverSettings};
+use uv_cli_common::printer::Printer;
 
 #[derive(Debug, Clone)]
 enum ExportTarget {

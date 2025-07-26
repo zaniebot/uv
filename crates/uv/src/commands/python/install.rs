@@ -35,8 +35,8 @@ use uv_warnings::warn_user;
 use crate::commands::python::{ChangeEvent, ChangeEventKind};
 use crate::commands::reporters::PythonDownloadReporter;
 use crate::commands::{ExitStatus, elapsed};
-use crate::printer::Printer;
 use crate::settings::NetworkSettings;
+use uv_cli_common::printer::Printer;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 struct InstallRequest {

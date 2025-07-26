@@ -28,7 +28,7 @@ use uv_warnings::warn_user;
 use crate::commands::project::ProjectError;
 use crate::commands::reporters::PythonDownloadReporter;
 use crate::commands::{ExitStatus, pip};
-use crate::printer::Printer;
+use uv_cli_common::printer::Printer;
 
 /// Return all packages which contain an executable with the given name.
 pub(super) fn matching_packages(name: &str, site_packages: &SitePackages) -> Vec<InstalledDist> {

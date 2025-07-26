@@ -9,7 +9,7 @@ use uv_normalize::PackageName;
 
 use crate::commands::reporters::{CleaningDirectoryReporter, CleaningPackageReporter};
 use crate::commands::{ExitStatus, human_readable_bytes};
-use crate::printer::Printer;
+use uv_cli_common::printer::Printer;
 
 /// Clear the cache, removing all entries or those linked to specific packages.
 pub(crate) fn cache_clean(

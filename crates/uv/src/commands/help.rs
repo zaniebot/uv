@@ -11,8 +11,8 @@ use owo_colors::OwoColorize;
 use which::which;
 
 use super::ExitStatus;
-use crate::printer::Printer;
 use uv_cli::Cli;
+use uv_cli_common::printer::Printer;
 use uv_static::EnvVars;
 
 // hidden subcommands to show in the help command

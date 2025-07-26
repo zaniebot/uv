@@ -37,8 +37,8 @@ use crate::commands::tool::common::{
 };
 use crate::commands::tool::{Target, ToolRequest};
 use crate::commands::{diagnostics, reporters::PythonDownloadReporter};
-use crate::printer::Printer;
 use crate::settings::{NetworkSettings, ResolverInstallerSettings, ResolverSettings};
+use uv_cli_common::printer::Printer;
 
 /// Install a tool.
 #[allow(clippy::fn_params_excessive_bools)]

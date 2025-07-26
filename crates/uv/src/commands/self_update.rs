@@ -9,8 +9,8 @@ use uv_client::WrappedReqwestError;
 use uv_fs::Simplified;
 
 use crate::commands::ExitStatus;
-use crate::printer::Printer;
 use crate::settings::NetworkSettings;
+use uv_cli_common::printer::Printer;
 
 /// Attempt to update the uv binary.
 pub(crate) async fn self_update(
