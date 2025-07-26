@@ -1,6 +1,6 @@
 //! Fetches CPU information.
 
-use anyhow::Error;
+use std::io::Error;
 
 #[cfg(target_os = "linux")]
 use procfs::{CpuInfo, Current};

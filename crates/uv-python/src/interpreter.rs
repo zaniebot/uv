@@ -27,7 +27,7 @@ use uv_pypi_types::{ResolverMarkerEnvironment, Scheme};
 
 use crate::implementation::LenientImplementationName;
 use crate::managed::ManagedPythonInstallations;
-use crate::platform::{Arch, Libc, Os};
+use uv_platform::{Arch, Libc, Os};
 use crate::pointer_size::PointerSize;
 use crate::{
     Prefix, PythonInstallationKey, PythonVariant, PythonVersion, Target, VersionRequest,

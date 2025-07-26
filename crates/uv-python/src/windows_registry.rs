@@ -1,7 +1,7 @@
 //! PEP 514 interactions with the Windows registry.
 
 use crate::managed::ManagedPythonInstallation;
-use crate::platform::Arch;
+use uv_platform::Arch;
 use crate::{COMPANY_DISPLAY_NAME, COMPANY_KEY, PythonInstallationKey, PythonVersion};
 use anyhow::anyhow;
 use std::cmp::Ordering;

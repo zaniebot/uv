@@ -7,8 +7,8 @@ use assert_fs::fixture::{FileWriteStr, PathChild, PathCreateDir};
 use insta::assert_snapshot;
 use uv_python::{
     PYTHON_VERSION_FILENAME, PYTHON_VERSIONS_FILENAME,
-    platform::{Arch, Os},
 };
+use uv_platform::{Arch, Os};
 
 #[test]
 fn python_pin() {

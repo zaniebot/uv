@@ -17,7 +17,7 @@ use crate::discovery::{
 use crate::downloads::{DownloadResult, ManagedPythonDownload, PythonDownloadRequest, Reporter};
 use crate::implementation::LenientImplementationName;
 use crate::managed::{ManagedPythonInstallation, ManagedPythonInstallations};
-use crate::platform::{Arch, Libc, Os};
+use uv_platform::{Arch, Libc, Os};
 use crate::{
     Error, ImplementationName, Interpreter, PythonDownloads, PythonPreference, PythonSource,
     PythonVariant, PythonVersion, downloads,
