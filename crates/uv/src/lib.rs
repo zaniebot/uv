@@ -2178,17 +2178,10 @@ async fn run_project(
                 args.diff,
                 args.files,
                 args.args,
-                args.python,
-                args.install_mirrors,
-                args.settings,
+                args.version,
                 globals.network_settings,
-                globals.python_preference,
-                globals.python_downloads,
-                false, // installer_metadata
-                globals.concurrency,
                 cache,
                 printer,
-                globals.preview,
             ))
             .await
         }
