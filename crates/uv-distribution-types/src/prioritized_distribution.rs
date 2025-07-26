@@ -5,7 +5,7 @@ use owo_colors::OwoColorize;
 use tracing::debug;
 
 use uv_distribution_filename::{BuildTag, WheelFilename};
-use uv_pep440::VersionSpecifiers;
+use uv_pep440::{Version, VersionSpecifier, VersionSpecifiers};
 use uv_pep508::{MarkerExpression, MarkerOperator, MarkerTree, MarkerValueString};
 use uv_platform_tags::{AbiTag, IncompatibleTag, LanguageTag, PlatformTag, TagPriority, Tags};
 use uv_pypi_types::{HashDigest, Yanked};
@@ -804,11 +804,19 @@ impl IncompatibleWheel {
     }
 }
 
+/// Given a wheel filename, determine the set of supported markers.
+pub fn implied_markers(filename: &WheelFilename) -> MarkerTree {
+    let mut marker = implied_platform_markers(filename);
+    marker.and(implied_python_markers(filename));
+
+    marker
+}
+
 /// Given a wheel filename, determine the set of supported platforms, in terms of their markers.
 ///
 /// This is roughly the inverse of platform tag generation: given a tag, we want to infer the
 /// supported platforms (rather than generating the supported tags from a given platform).
-pub fn implied_markers(filename: &WheelFilename) -> MarkerTree {
+fn implied_platform_markers(filename: &WheelFilename) -> MarkerTree {
     let mut marker = MarkerTree::FALSE;
     for platform_tag in filename.platform_tags() {
         match platform_tag {
@@ -904,6 +912,94 @@ pub fn implied_markers(filename: &WheelFilename) -> MarkerTree {
             }
         }
     }
+
+    marker
+}
+
+/// Given a wheel filename, determine the set of supported Python versions, in terms of their markers.
+///
+/// This is roughly the inverse of Python tag generation: given a tag, we want to infer the
+/// supported Python version (rather than generating the supported tags from a given Python version).
+fn implied_python_markers(filename: &WheelFilename) -> MarkerTree {
+    let mut marker = MarkerTree::FALSE;
+
+    for python_tag in filename.python_tags() {
+        // First, construct the version marker based on the tag
+        let mut tree = match python_tag {
+            LanguageTag::None => {
+                // No Python tag means no Python version requirement.
+                return MarkerTree::TRUE;
+            }
+            LanguageTag::Python { major, minor: None } => {
+                MarkerTree::expression(MarkerExpression::Version {
+                    key: uv_pep508::MarkerValueVersion::PythonVersion,
+                    specifier: VersionSpecifier::equals_star_version(Version::new([u64::from(
+                        *major,
+                    )])),
+                })
+            }
+            LanguageTag::Python {
+                major,
+                minor: Some(minor),
+            }
+            | LanguageTag::CPython {
+                python_version: (major, minor),
+            }
+            | LanguageTag::PyPy {
+                python_version: (major, minor),
+            }
+            | LanguageTag::GraalPy {
+                python_version: (major, minor),
+            }
+            | LanguageTag::Pyston {
+                python_version: (major, minor),
+            } => MarkerTree::expression(MarkerExpression::Version {
+                key: uv_pep508::MarkerValueVersion::PythonVersion,
+                specifier: VersionSpecifier::equals_star_version(Version::new([
+                    u64::from(*major),
+                    u64::from(*minor),
+                ])),
+            }),
+        };
+
+        // Then, add implementation markers for implementation-specific tags
+        match python_tag {
+            LanguageTag::None | LanguageTag::Python { .. } => {
+                // No implementation marker needed
+            }
+            LanguageTag::CPython { .. } => {
+                tree.and(MarkerTree::expression(MarkerExpression::String {
+                    key: MarkerValueString::PlatformPythonImplementation,
+                    operator: MarkerOperator::Equal,
+                    value: arcstr::literal!("CPython"),
+                }));
+            }
+            LanguageTag::PyPy { .. } => {
+                tree.and(MarkerTree::expression(MarkerExpression::String {
+                    key: MarkerValueString::PlatformPythonImplementation,
+                    operator: MarkerOperator::Equal,
+                    value: arcstr::literal!("PyPy"),
+                }));
+            }
+            LanguageTag::GraalPy { .. } => {
+                tree.and(MarkerTree::expression(MarkerExpression::String {
+                    key: MarkerValueString::PlatformPythonImplementation,
+                    operator: MarkerOperator::Equal,
+                    value: arcstr::literal!("GraalPy"),
+                }));
+            }
+            LanguageTag::Pyston { .. } => {
+                tree.and(MarkerTree::expression(MarkerExpression::String {
+                    key: MarkerValueString::PlatformPythonImplementation,
+                    operator: MarkerOperator::Equal,
+                    value: arcstr::literal!("Pyston"),
+                }));
+            }
+        }
+
+        marker.or(tree);
+    }
+
     marker
 }
 
