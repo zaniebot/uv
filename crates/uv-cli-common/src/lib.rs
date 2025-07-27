@@ -3,6 +3,9 @@
 pub mod child;
 pub mod exit_status;
 pub mod printer;
+pub mod reporters;
+pub mod settings;
+pub mod utils;
 
 /// Format a list of items with "and" conjunction.
 /// E.g., "foo", "bar", and "baz"

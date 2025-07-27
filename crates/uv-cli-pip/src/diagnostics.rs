@@ -12,7 +12,7 @@ use uv_normalize::PackageName;
 use uv_pep440::Version;
 use uv_resolver::SentinelRange;
 
-use crate::commands::pip;
+use crate::operations;
 
 static SUGGESTIONS: LazyLock<FxHashMap<PackageName, PackageName>> = LazyLock::new(|| {
     let suggestions: Vec<(String, String)> =
@@ -31,19 +31,19 @@ static SUGGESTIONS: LazyLock<FxHashMap<PackageName, PackageName>> = LazyLock::ne
 /// A rich reporter for operational diagnostics, i.e., errors that occur during resolution and
 /// installation.
 #[derive(Debug, Default)]
-pub(crate) struct OperationDiagnostic {
+pub struct OperationDiagnostic {
     /// The hint to display to the user upon resolution failure.
-    pub(crate) hint: Option<String>,
+    pub hint: Option<String>,
     /// Whether native TLS is enabled.
-    pub(crate) native_tls: bool,
+    pub native_tls: bool,
     /// The context to display to the user upon resolution failure.
-    pub(crate) context: Option<&'static str>,
+    pub context: Option<&'static str>,
 }
 
 impl OperationDiagnostic {
     /// Create an [`OperationDiagnostic`] with the given native TLS setting.
     #[must_use]
-    pub(crate) fn native_tls(native_tls: bool) -> Self {
+    pub fn native_tls(native_tls: bool) -> Self {
         Self {
             native_tls,
             ..Default::default()
@@ -71,9 +71,9 @@ impl OperationDiagnostic {
     /// Attempt to report an error with rich diagnostic context.
     ///
     /// Returns `Some` if the error was not handled.
-    pub(crate) fn report(self, err: pip::operations::Error) -> Option<pip::operations::Error> {
+    pub fn report(self, err: operations::Error) -> Option<operations::Error> {
         match err {
-            pip::operations::Error::Resolve(uv_resolver::ResolveError::NoSolution(err)) => {
+            operations::Error::Resolve(uv_resolver::ResolveError::NoSolution(err)) => {
                 if let Some(context) = self.context {
                     no_solution_context(&err, context);
                 } else if let Some(hint) = self.hint {
@@ -83,7 +83,7 @@ impl OperationDiagnostic {
                 }
                 None
             }
-            pip::operations::Error::Resolve(uv_resolver::ResolveError::Dist(
+            operations::Error::Resolve(uv_resolver::ResolveError::Dist(
                 kind,
                 dist,
                 chain,
@@ -92,7 +92,7 @@ impl OperationDiagnostic {
                 requested_dist_error(kind, dist, &chain, err, self.hint);
                 None
             }
-            pip::operations::Error::Resolve(uv_resolver::ResolveError::Dependencies(
+            operations::Error::Resolve(uv_resolver::ResolveError::Dependencies(
                 error,
                 name,
                 version,
@@ -101,7 +101,7 @@ impl OperationDiagnostic {
                 dependencies_error(error, &name, &version, &chain, self.hint.clone());
                 None
             }
-            pip::operations::Error::Requirements(uv_requirements::Error::Dist(kind, dist, err)) => {
+            operations::Error::Requirements(uv_requirements::Error::Dist(kind, dist, err)) => {
                 dist_error(
                     kind,
                     dist,
@@ -111,7 +111,7 @@ impl OperationDiagnostic {
                 );
                 None
             }
-            pip::operations::Error::Prepare(uv_installer::PrepareError::Dist(
+            operations::Error::Prepare(uv_installer::PrepareError::Dist(
                 kind,
                 dist,
                 chain,
@@ -120,7 +120,7 @@ impl OperationDiagnostic {
                 dist_error(kind, dist, &chain, Arc::new(err), self.hint);
                 None
             }
-            pip::operations::Error::Requirements(err) => {
+            operations::Error::Requirements(err) => {
                 if let Some(context) = self.context {
                     let err = miette::Report::msg(format!("{err}"))
                         .context(format!("Failed to resolve {context} requirement"));
@@ -130,13 +130,13 @@ impl OperationDiagnostic {
                     Some(pip::operations::Error::Requirements(err))
                 }
             }
-            pip::operations::Error::Resolve(uv_resolver::ResolveError::Client(err))
+            operations::Error::Resolve(uv_resolver::ResolveError::Client(err))
                 if !self.native_tls && err.is_ssl() =>
             {
                 native_tls_hint(err);
                 None
             }
-            pip::operations::Error::OutdatedEnvironment => {
+            operations::Error::OutdatedEnvironment => {
                 anstream::eprintln!("{}", err);
                 None
             }
