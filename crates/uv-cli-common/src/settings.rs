@@ -1,11 +1,10 @@
 use uv_client::Connectivity;
 use uv_configuration::{
-    BuildOptions, ConfigSettings, DependencyMetadata, ExcludeNewer, IndexStrategy,
+    BuildOptions, ConfigSettings, IndexStrategy,
     KeyringProviderType, PackageConfigSettings, Reinstall, SourceStrategy,
 };
-use uv_requirements::ExtrasResolver;
-use uv_resolver::{AnnotationStyle, DependencyMode, ExcludeNewer as ResolverExcludeNewer, FlatIndex, PrereleaseMode, ResolutionMode};
-use uv_distribution_types::{IndexLocations, IndexUrl};
+use uv_distribution_types::{DependencyMetadata, IndexLocations};
+use uv_resolver::{AnnotationStyle, DependencyMode, ExcludeNewer, FlatIndex, PrereleaseMode, ResolutionMode};
 
 /// Network-related settings shared across commands.
 #[derive(Debug)]
@@ -32,7 +31,8 @@ pub struct ResolverSettings {
     pub resolution_mode: ResolutionMode,
     pub annotation_style: AnnotationStyle,
     pub source_strategy: SourceStrategy,
-    pub extras_resolver: ExtrasResolver,
+    // TODO: ExtrasResolver requires a generic BuildContext parameter
+    // This needs to be handled differently in this crate
 }
 
 /// Combined resolver and installer settings.

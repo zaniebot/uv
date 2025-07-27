@@ -33,8 +33,10 @@ uv-pep440 = { workspace = true }
 uv-pep508 = { workspace = true }
 uv-publish = { workspace = true }
 uv-python = { workspace = true }
+uv-redacted = { workspace = true }
 uv-requirements = { workspace = true }
 uv-resolver = { workspace = true }
+uv-static = { workspace = true }
 uv-types = { workspace = true }
 
 [target.'cfg(unix)'.dependencies]

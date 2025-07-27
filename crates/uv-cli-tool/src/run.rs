@@ -41,20 +41,21 @@ use uv_warnings::warn_user;
 use uv_warnings::warn_user_once;
 use uv_workspace::WorkspaceCache;
 
-use crate::commands::ExitStatus;
-use crate::commands::pip::loggers::{
+use uv_cli_common::exit_status::ExitStatus;
+use uv_cli_pip::loggers::{
     DefaultInstallLogger, DefaultResolveLogger, SummaryInstallLogger, SummaryResolveLogger,
 };
-use crate::commands::pip::operations;
-use crate::commands::project::{
+use uv_cli_pip::operations;
+use uv_cli_project::{
     EnvironmentSpecification, PlatformState, ProjectError, resolve_names,
 };
-use crate::commands::reporters::PythonDownloadReporter;
-use crate::commands::tool::common::{matching_packages, refine_interpreter};
-use crate::commands::tool::{Target, ToolRequest};
-use crate::commands::{diagnostics, project::environment::CachedEnvironment};
-use crate::settings::NetworkSettings;
-use crate::settings::ResolverInstallerSettings;
+use uv_cli_common::reporters::PythonDownloadReporter;
+use crate::common::{matching_packages, refine_interpreter};
+use crate::{Target, ToolRequest};
+use uv_cli_pip::diagnostics;
+use uv_cli_project::environment::CachedEnvironment;
+
+use uv_cli_common::settings::{NetworkSettings, ResolverInstallerSettings};
 use uv_cli_common::child::run_to_completion;
 use uv_cli_common::printer::Printer;
 

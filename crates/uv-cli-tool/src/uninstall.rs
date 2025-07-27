@@ -9,7 +9,7 @@ use uv_fs::Simplified;
 use uv_normalize::PackageName;
 use uv_tool::{InstalledTools, Tool, ToolEntrypoint};
 
-use crate::commands::ExitStatus;
+use uv_cli_common::exit_status::ExitStatus;
 use uv_cli_common::printer::Printer;
 
 /// Uninstall a tool.

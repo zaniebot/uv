@@ -69,7 +69,7 @@ impl<'a, T: InstalledMetadata> From<ChangeEvent<'a, T>> for DryRunEvent<String> 
     fn from(value: ChangeEvent<'a, T>) -> Self {
         Self {
             name: value.dist.name().clone(),
-            version: value.dist.version().to_string(),
+            version: value.dist.installed_version().to_string(),
             kind: value.kind,
         }
     }

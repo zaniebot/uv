@@ -25,20 +25,22 @@ use uv_tool::InstalledTools;
 use uv_warnings::warn_user;
 use uv_workspace::WorkspaceCache;
 
-use crate::commands::ExitStatus;
-use crate::commands::pip::loggers::{DefaultInstallLogger, DefaultResolveLogger};
-use crate::commands::pip::operations::{self, Modifications};
-use crate::commands::project::{
-    EnvironmentSpecification, PlatformState, ProjectError, resolve_environment, resolve_names,
-    sync_environment, update_environment,
+use uv_cli_common::exit_status::ExitStatus;
+use uv_cli_pip::loggers::{DefaultInstallLogger, DefaultResolveLogger};
+use uv_cli_pip::operations::{self, Modifications};
+use uv_cli_project::{
+    EnvironmentSpecification, PlatformState, ProjectError,
 };
-use crate::commands::tool::common::{
-    finalize_tool_install, refine_interpreter, remove_entrypoints,
-};
-use crate::commands::tool::{Target, ToolRequest};
-use crate::commands::{diagnostics, reporters::PythonDownloadReporter};
-use crate::settings::{NetworkSettings, ResolverInstallerSettings, ResolverSettings};
+use crate::common::{finalize_tool_install, refine_interpreter, remove_entrypoints};
+use crate::{Target, ToolRequest};
+
+// TODO: These functions need to be imported from correct location
+use uv_cli_project::{resolve_environment, resolve_names, sync_environment, update_environment};
+use uv_cli_pip::diagnostics;
+use uv_cli_common::reporters::PythonDownloadReporter;
 use uv_cli_common::printer::Printer;
+
+use uv_cli_common::settings::{NetworkSettings, ResolverInstallerSettings, ResolverSettings};
 
 /// Install a tool.
 #[allow(clippy::fn_params_excessive_bools)]

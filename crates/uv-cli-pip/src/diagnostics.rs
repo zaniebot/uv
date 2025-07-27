@@ -127,7 +127,7 @@ impl OperationDiagnostic {
                     anstream::eprint!("{err:?}");
                     None
                 } else {
-                    Some(pip::operations::Error::Requirements(err))
+                    Some(operations::Error::Requirements(err))
                 }
             }
             operations::Error::Resolve(uv_resolver::ResolveError::Client(err))

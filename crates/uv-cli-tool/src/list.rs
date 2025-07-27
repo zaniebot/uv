@@ -9,7 +9,7 @@ use uv_fs::Simplified;
 use uv_tool::InstalledTools;
 use uv_warnings::warn_user;
 
-use crate::commands::ExitStatus;
+use uv_cli_common::exit_status::ExitStatus;
 use uv_cli_common::printer::Printer;
 
 /// List installed tools.

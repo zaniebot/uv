@@ -11,7 +11,7 @@ use uv_fs::Simplified;
 use uv_shell::Shell;
 use uv_tool::tool_executable_dir;
 
-use crate::commands::ExitStatus;
+use uv_cli_common::exit_status::ExitStatus;
 use uv_cli_common::printer::Printer;
 
 /// Ensure that the executable directory is in PATH.

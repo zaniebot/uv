@@ -41,14 +41,14 @@ pub(crate) use python::uninstall::uninstall as python_uninstall;
 pub(crate) use python::update_shell::update_shell as python_update_shell;
 #[cfg(feature = "self-update")]
 pub(crate) use self_update::self_update;
-pub(crate) use tool::dir::dir as tool_dir;
-pub(crate) use tool::install::install as tool_install;
-pub(crate) use tool::list::list as tool_list;
-pub(crate) use tool::run::ToolRunCommand;
-pub(crate) use tool::run::run as tool_run;
-pub(crate) use tool::uninstall::uninstall as tool_uninstall;
-pub(crate) use tool::update_shell::update_shell as tool_update_shell;
-pub(crate) use tool::upgrade::upgrade as tool_upgrade;
+pub(crate) use uv_cli_tool::dir::dir as tool_dir;
+pub(crate) use uv_cli_tool::install::install as tool_install;
+pub(crate) use uv_cli_tool::list::list as tool_list;
+pub(crate) use uv_cli_tool::run::ToolRunCommand;
+pub(crate) use uv_cli_tool::run::run as tool_run;
+pub(crate) use uv_cli_tool::uninstall::uninstall as tool_uninstall;
+pub(crate) use uv_cli_tool::update_shell::update_shell as tool_update_shell;
+pub(crate) use uv_cli_tool::upgrade::upgrade as tool_upgrade;
 use uv_cache::Cache;
 use uv_configuration::Concurrency;
 use uv_distribution_types::InstalledMetadata;
@@ -75,7 +75,7 @@ mod python;
 pub(crate) mod reporters;
 #[cfg(feature = "self-update")]
 mod self_update;
-mod tool;
+// tool module has been moved to uv-cli-tool crate
 mod venv;
 
 pub(crate) use uv_cli_common::exit_status::ExitStatus;

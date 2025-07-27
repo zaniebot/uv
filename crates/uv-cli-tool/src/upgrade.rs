@@ -20,17 +20,18 @@ use uv_settings::{Combine, PythonInstallMirrors, ResolverInstallerOptions, ToolO
 use uv_tool::InstalledTools;
 use uv_workspace::WorkspaceCache;
 
-use crate::commands::pip::loggers::{
+use uv_cli_pip::loggers::{
     DefaultInstallLogger, SummaryResolveLogger, UpgradeInstallLogger,
 };
-use crate::commands::pip::operations::Modifications;
-use crate::commands::project::{
+use uv_cli_pip::operations::Modifications;
+use uv_cli_project::{
     EnvironmentUpdate, PlatformState, resolve_environment, sync_environment, update_environment,
 };
-use crate::commands::reporters::PythonDownloadReporter;
-use crate::commands::tool::common::remove_entrypoints;
-use crate::commands::{ExitStatus, conjunction, tool::common::finalize_tool_install};
-use crate::settings::{NetworkSettings, ResolverInstallerSettings};
+use uv_cli_common::reporters::PythonDownloadReporter;
+use crate::common::{remove_entrypoints, finalize_tool_install};
+use uv_cli_common::{exit_status::ExitStatus, conjunction};
+
+use uv_cli_common::settings::{NetworkSettings, ResolverInstallerSettings};
 use uv_cli_common::printer::Printer;
 
 /// Upgrade a tool.

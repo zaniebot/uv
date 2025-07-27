@@ -25,9 +25,10 @@ use uv_shell::Shell;
 use uv_tool::{InstalledTools, Tool, ToolEntrypoint, entrypoint_paths, tool_executable_dir};
 use uv_warnings::warn_user;
 
-use crate::commands::project::ProjectError;
-use crate::commands::reporters::PythonDownloadReporter;
-use crate::commands::{ExitStatus, pip};
+use uv_cli_project::ProjectError;
+use uv_cli_common::reporters::PythonDownloadReporter;
+use uv_cli_common::exit_status::ExitStatus;
+use uv_cli_pip as pip;
 use uv_cli_common::printer::Printer;
 
 /// Return all packages which contain an executable with the given name.
