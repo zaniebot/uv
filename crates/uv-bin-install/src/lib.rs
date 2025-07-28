@@ -9,6 +9,7 @@ use std::str::FromStr;
 use std::task::{Context, Poll};
 
 use futures::TryStreamExt;
+use serde::Deserialize;
 use thiserror::Error;
 use tokio::io::{AsyncRead, ReadBuf};
 use tokio_util::compat::FuturesAsyncReadCompatExt;
@@ -25,6 +26,7 @@ use uv_platform::{Arch, Libc, Os};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Binary {
     Ruff,
+    Uv,
 }
 
 impl Binary {
@@ -32,6 +34,7 @@ impl Binary {
     pub fn default_version(&self) -> Version {
         match self {
             Binary::Ruff => Version::from_str("0.12.5").expect("valid version"),
+            Binary::Uv => Version::from_str("0.5.0").expect("valid version"),
         }
     }
 
@@ -41,6 +44,7 @@ impl Binary {
     pub fn name(&self) -> &'static str {
         match self {
             Binary::Ruff => "ruff",
+            Binary::Uv => "uv",
         }
     }
 
@@ -58,6 +62,12 @@ impl Binary {
                 );
                 Url::parse(&url).map_err(|err| Error::UrlParse { url, source: err })
             }
+            Binary::Uv => {
+                let url = format!(
+                    "https://github.com/astral-sh/uv/releases/download/{version}/uv-{platform}.{ext}"
+                );
+                Url::parse(&url).map_err(|err| Error::UrlParse { url, source: err })
+            }
         }
     }
 
@@ -65,6 +75,13 @@ impl Binary {
     pub fn executable(&self) -> String {
         format!("{}{}", self.name(), std::env::consts::EXE_SUFFIX)
     }
+}
+
+/// GitHub release information for version resolution.
+#[derive(Debug, Deserialize)]
+struct GitHubRelease {
+    tag_name: String,
+    prerelease: bool,
 }
 
 /// Errors that can occur during binary download and installation.
@@ -107,6 +124,22 @@ pub enum Error {
     /// Platform detection error.
     #[error("Failed to detect platform")]
     Platform(#[from] uv_platform::Error),
+
+    /// GitHub API error.
+    #[error("Failed to fetch version information from GitHub API")]
+    GitHubApi(#[from] reqwest_middleware::Error),
+
+    /// Version parsing error.
+    #[error("Failed to parse version from GitHub release tag: {tag}")]
+    VersionParse {
+        tag: String,
+        #[source]
+        source: uv_pep440::VersionParseError,
+    },
+
+    /// No compatible version found.
+    #[error("No compatible version found for constraints: {constraints}")]
+    NoCompatibleVersion { constraints: String },
 }
 
 /// Progress reporter for binary downloads.
@@ -159,6 +192,89 @@ where
             poll => poll,
         }
     }
+}
+
+/// Find a compatible version of uv from GitHub releases.
+async fn find_compatible_uv_version(
+    constraints: &uv_pep440::VersionSpecifiers,
+    client: &uv_client::BaseClient,
+) -> Result<Version, Error> {
+    // First try the latest release
+    let latest_url = "https://api.github.com/repos/astral-sh/uv/releases/latest";
+    let latest_url_parsed = Url::parse(latest_url).map_err(|err| Error::UrlParse {
+        url: latest_url.to_string(),
+        source: err,
+    })?;
+    let response = client
+        .for_host(&latest_url_parsed.clone().into())
+        .get(latest_url_parsed.clone())
+        .send()
+        .await?
+        .error_for_status()
+        .map_err(reqwest_middleware::Error::Reqwest)?;
+
+    let latest_release: GitHubRelease = response
+        .json()
+        .await
+        .map_err(|err| Error::GitHubApi(reqwest_middleware::Error::Reqwest(err)))?;
+
+    // Parse version from tag (remove 'v' prefix if present)
+    let tag = latest_release
+        .tag_name
+        .strip_prefix('v')
+        .unwrap_or(&latest_release.tag_name);
+    let latest_version = Version::from_str(tag).map_err(|source| Error::VersionParse {
+        tag: latest_release.tag_name.clone(),
+        source,
+    })?;
+
+    // Check if latest version satisfies constraints
+    if !latest_release.prerelease && constraints.contains(&latest_version) {
+        return Ok(latest_version);
+    }
+
+    // If latest doesn't work, fetch all releases to find a compatible one
+    let releases_url = "https://api.github.com/repos/astral-sh/uv/releases";
+    let releases_url_parsed = Url::parse(releases_url).map_err(|err| Error::UrlParse {
+        url: releases_url.to_string(),
+        source: err,
+    })?;
+    let response = client
+        .for_host(&releases_url_parsed.clone().into())
+        .get(releases_url_parsed.clone())
+        .send()
+        .await?
+        .error_for_status()
+        .map_err(reqwest_middleware::Error::Reqwest)?;
+
+    let releases: Vec<GitHubRelease> = response
+        .json()
+        .await
+        .map_err(|err| Error::GitHubApi(reqwest_middleware::Error::Reqwest(err)))?;
+
+    // Find the first compatible non-prerelease version
+    for release in releases {
+        if release.prerelease {
+            continue;
+        }
+
+        let tag = release
+            .tag_name
+            .strip_prefix('v')
+            .unwrap_or(&release.tag_name);
+        let version = Version::from_str(tag).map_err(|source| Error::VersionParse {
+            tag: release.tag_name.clone(),
+            source,
+        })?;
+
+        if constraints.contains(&version) {
+            return Ok(version);
+        }
+    }
+
+    Err(Error::NoCompatibleVersion {
+        constraints: constraints.to_string(),
+    })
 }
 
 /// Install a binary for the given tool.
@@ -275,6 +391,20 @@ pub async fn bin_install(
     Ok(cache_entry.into_path_buf())
 }
 
+/// Install a compatible version of uv based on version constraints.
+pub async fn install_compatible_uv(
+    constraints: &uv_pep440::VersionSpecifiers,
+    client: &BaseClient,
+    cache: &Cache,
+    reporter: Option<&dyn Reporter>,
+) -> Result<PathBuf, Error> {
+    // Find a compatible version
+    let version = find_compatible_uv_version(constraints, client).await?;
+
+    // Install that version
+    bin_install(Binary::Uv, Some(&version), client, cache, reporter).await
+}
+
 /// Cast platform types to the binary target triple format.
 ///
 /// This performs some normalization to match cargo-dist's styling.
@@ -315,4 +445,65 @@ fn platform_name_for_binary(os: Os, arch: Arch, libc: Libc) -> String {
         "{arch_name}-{vendor}-{os_name}{abi}",
         abi = abi.map(|abi| format!("-{abi}")).unwrap_or_default()
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::str::FromStr;
+    use uv_pep440::VersionSpecifiers;
+
+    #[test]
+    fn test_uv_binary_properties() {
+        let uv_binary = Binary::Uv;
+
+        assert_eq!(uv_binary.name(), "uv");
+        assert_eq!(
+            uv_binary.executable(),
+            format!("uv{}", std::env::consts::EXE_SUFFIX)
+        );
+
+        let version = Version::from_str("0.5.0").unwrap();
+        let platform = "x86_64-unknown-linux-gnu";
+        let ext = SourceDistExtension::TarGz;
+
+        let url = uv_binary.download_url(&version, platform, &ext).unwrap();
+        assert!(url.as_str().contains("github.com/astral-sh/uv"));
+        assert!(url.as_str().contains("releases/download/0.5.0"));
+        assert!(url.as_str().contains("uv-x86_64-unknown-linux-gnu.tar.gz"));
+    }
+
+    #[test]
+    fn test_ruff_binary_properties() {
+        let ruff_binary = Binary::Ruff;
+
+        assert_eq!(ruff_binary.name(), "ruff");
+        assert_eq!(
+            ruff_binary.executable(),
+            format!("ruff{}", std::env::consts::EXE_SUFFIX)
+        );
+
+        let version = Version::from_str("0.12.5").unwrap();
+        let platform = "x86_64-apple-darwin";
+        let ext = SourceDistExtension::TarGz;
+
+        let url = ruff_binary.download_url(&version, platform, &ext).unwrap();
+        assert!(url.as_str().contains("github.com/astral-sh/ruff"));
+        assert!(url.as_str().contains("releases/download/0.12.5"));
+        assert!(url.as_str().contains("ruff-x86_64-apple-darwin.tar.gz"));
+    }
+
+    #[test]
+    fn test_version_constraints_parsing() {
+        // Test various version constraint formats that the function should handle
+        let constraints = [">=0.5.0", "==0.5.0", ">=0.5.0,<1.0.0", "~=0.5.0"];
+
+        for constraint_str in &constraints {
+            let specifiers = VersionSpecifiers::from_str(constraint_str)
+                .expect(&format!("Failed to parse: {}", constraint_str));
+
+            // Should not panic when creating version constraints
+            assert!(!specifiers.is_empty());
+        }
+    }
 }

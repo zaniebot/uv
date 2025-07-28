@@ -15,6 +15,7 @@ bitflags::bitflags! {
         const PYLOCK = 1 << 3;
         const ADD_BOUNDS = 1 << 4;
         const FORMAT = 1 << 5;
+        const INSTALL_REQUIRED_VERSION = 1 << 6;
     }
 }
 
@@ -30,6 +31,7 @@ impl PreviewFeatures {
             Self::PYLOCK => "pylock",
             Self::ADD_BOUNDS => "add-bounds",
             Self::FORMAT => "format",
+            Self::INSTALL_REQUIRED_VERSION => "install-required-version",
             _ => panic!("`flag_as_str` can only be used for exactly one feature flag"),
         }
     }
@@ -73,6 +75,7 @@ impl FromStr for PreviewFeatures {
                 "pylock" => Self::PYLOCK,
                 "add-bounds" => Self::ADD_BOUNDS,
                 "format" => Self::FORMAT,
+                "install-required-version" => Self::INSTALL_REQUIRED_VERSION,
                 _ => {
                     warn_user_once!("Unknown preview feature: `{part}`");
                     continue;
@@ -169,6 +172,10 @@ mod tests {
         let features = PreviewFeatures::from_str("unknown-feature,pylock").unwrap();
         assert!(features.contains(PreviewFeatures::PYLOCK));
         assert_eq!(features.bits().count_ones(), 1);
+
+        // Test install-required-version feature
+        let features = PreviewFeatures::from_str("install-required-version").unwrap();
+        assert_eq!(features, PreviewFeatures::INSTALL_REQUIRED_VERSION);
     }
 
     #[test]
@@ -236,6 +243,10 @@ mod tests {
         assert_eq!(PreviewFeatures::PYLOCK.flag_as_str(), "pylock");
         assert_eq!(PreviewFeatures::ADD_BOUNDS.flag_as_str(), "add-bounds");
         assert_eq!(PreviewFeatures::FORMAT.flag_as_str(), "format");
+        assert_eq!(
+            PreviewFeatures::INSTALL_REQUIRED_VERSION.flag_as_str(),
+            "install-required-version"
+        );
     }
 
     #[test]

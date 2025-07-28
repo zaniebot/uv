@@ -29,6 +29,8 @@ anyhow = { workspace = true }
 futures = { workspace = true }
 reqwest = { workspace = true }
 reqwest-middleware = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
 target-lexicon = { workspace = true }
 tempfile = { workspace = true }
 thiserror = { workspace = true }

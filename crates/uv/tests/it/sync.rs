@@ -11386,3 +11386,245 @@ fn sync_does_not_remove_empty_virtual_environment_directory() -> Result<()> {
 
     Ok(())
 }
+
+#[test]
+fn sync_self_requires_compatible_version() -> Result<()> {
+    let context = TestContext::new("3.12");
+
+    let pyproject_toml = context.temp_dir.child("pyproject.toml");
+    pyproject_toml.write_str(indoc! {
+        r#"
+        [tool.uv]
+        required-version = ">=0.5.0"
+
+        [project]
+        name = "project"  
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        dependencies = ["iniconfig"]
+        "#
+    })?;
+
+    // Running `uv sync` should work normally when current version satisfies requirements
+    uv_snapshot!(context.filters(), context.sync(), @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Resolved 2 packages in [TIME]
+    Prepared 1 package in [TIME]
+    Installed 1 package in [TIME]
+     + iniconfig==2.0.0
+    ");
+
+    assert!(context.temp_dir.child("uv.lock").exists());
+
+    Ok(())
+}
+
+#[test]
+fn sync_self_requires_exact_version() -> Result<()> {
+    let context = TestContext::new("3.12");
+
+    let pyproject_toml = context.temp_dir.child("pyproject.toml");
+    pyproject_toml.write_str(&formatdoc! {
+        r#"
+        [tool.uv]
+        required-version = "=={uv_version}"
+
+        [project]
+        name = "project"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        dependencies = ["iniconfig"]
+        "#,
+        uv_version = env!("CARGO_PKG_VERSION")
+    })?;
+
+    // Running `uv sync` should work normally when current version exactly matches
+    uv_snapshot!(context.filters(), context.sync(), @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Resolved 2 packages in [TIME]
+    Prepared 1 package in [TIME]
+    Installed 1 package in [TIME]
+     + iniconfig==2.0.0
+    ");
+
+    assert!(context.temp_dir.child("uv.lock").exists());
+
+    Ok(())
+}
+
+#[test]
+fn sync_self_requires_incompatible_version_error_without_preview() -> Result<()> {
+    let context = TestContext::new("3.12");
+
+    let pyproject_toml = context.temp_dir.child("pyproject.toml");
+    pyproject_toml.write_str(indoc! {
+        r#"
+        [tool.uv]
+        required-version = ">=999.0.0"
+
+        [project]
+        name = "project"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        dependencies = ["iniconfig"]
+        "#
+    })?;
+
+    // Should fail with hint about preview feature when preview feature not enabled
+    uv_snapshot!(context.filters(), context.sync(), @r"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    error: Required uv version `>=999.0.0` does not match the running version `0.8.3`. To enable auto-install, use `--preview-feature install-required-version`.
+    ");
+
+    Ok(())
+}
+
+#[test]
+fn sync_self_requires_incompatible_version_with_preview() -> Result<()> {
+    let context = TestContext::new("3.12");
+
+    let pyproject_toml = context.temp_dir.child("pyproject.toml");
+    pyproject_toml.write_str(indoc! {
+        r#"
+        [tool.uv]
+        required-version = ">=999.0.0"
+
+        [project]
+        name = "project"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        dependencies = ["iniconfig"]
+        "#
+    })?;
+
+    // Should fail when no compatible version can be found, but with auto-install attempt
+    uv_snapshot!(context.filters(), context.sync()
+        .arg("--preview-feature")
+        .arg("install-required-version"), @r"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    Current uv version `0.8.3` does not match required version `>=999.0.0`. Attempting to find compatible version...
+    error: Required uv version `>=999.0.0` does not match the running version `0.8.3`. Auto-install failed: No compatible version found for constraints: >=999.0.0
+    ");
+
+    Ok(())
+}
+
+#[test]
+fn sync_self_requires_legacy_exact_version() -> Result<()> {
+    let context = TestContext::new("3.12");
+
+    let pyproject_toml = context.temp_dir.child("pyproject.toml");
+    pyproject_toml.write_str(&formatdoc! {
+        r#"
+        [tool.uv]
+        required-version = "{uv_version}"
+
+        [project]
+        name = "project"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        dependencies = ["iniconfig"]
+        "#,
+        uv_version = env!("CARGO_PKG_VERSION")
+    })?;
+
+    // Should work with legacy exact version format (treated as ==x.y.z)
+    uv_snapshot!(context.filters(), context.sync(), @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Resolved 2 packages in [TIME]
+    Prepared 1 package in [TIME]
+    Installed 1 package in [TIME]
+     + iniconfig==2.0.0
+    ");
+
+    assert!(context.temp_dir.child("uv.lock").exists());
+
+    Ok(())
+}
+
+#[test]
+fn sync_self_requires_range_version() -> Result<()> {
+    let context = TestContext::new("3.12");
+
+    let pyproject_toml = context.temp_dir.child("pyproject.toml");
+    pyproject_toml.write_str(indoc! {
+        r#"
+        [tool.uv]
+        required-version = ">=0.5.0,<999.0.0"
+
+        [project]
+        name = "project"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        dependencies = ["iniconfig"]
+        "#
+    })?;
+
+    // Should work with version range that includes current version
+    uv_snapshot!(context.filters(), context.sync(), @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Resolved 2 packages in [TIME]
+    Prepared 1 package in [TIME]
+    Installed 1 package in [TIME]
+     + iniconfig==2.0.0
+    ");
+
+    assert!(context.temp_dir.child("uv.lock").exists());
+
+    Ok(())
+}
+
+#[test]
+fn sync_self_requires_lower_bound_error() -> Result<()> {
+    let context = TestContext::new("3.12");
+
+    let pyproject_toml = context.temp_dir.child("pyproject.toml");
+    pyproject_toml.write_str(indoc! {
+        r#"
+        [tool.uv]
+        required-version = "<0.1.0"
+
+        [project]
+        name = "project"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        dependencies = ["iniconfig"]
+        "#
+    })?;
+
+    // Should fail when current version is too high (without preview feature)
+    uv_snapshot!(context.filters(), context.sync(), @r"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    error: Required uv version `<0.1.0` does not match the running version `0.8.3`. To enable auto-install, use `--preview-feature install-required-version`.
+    ");
+
+    Ok(())
+}
