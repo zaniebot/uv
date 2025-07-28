@@ -2181,6 +2181,7 @@ async fn run_project(
                 globals.network_settings,
                 cache,
                 printer,
+                globals.preview,
             ))
             .await
         }
