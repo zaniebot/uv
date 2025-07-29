@@ -999,6 +999,13 @@ impl TestContext {
         command
     }
 
+    pub fn self_install(&self) -> Command {
+        let mut command = self.new_command();
+        command.arg("self").arg("install");
+        self.add_shared_options(&mut command, false);
+        command
+    }
+
     /// Create a `uv publish` command with options shared across scenarios.
     pub fn publish(&self) -> Command {
         let mut command = self.new_command();

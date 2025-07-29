@@ -700,7 +700,13 @@ pub struct SelfNamespace {
 #[derive(Subcommand)]
 pub enum SelfCommand {
     /// Update uv.
+    #[cfg(feature = "self-update")]
     Update(SelfUpdateArgs),
+    /// Install uv to a specific directory and update PATH.
+    ///
+    /// This command moves the current uv binary to a target directory and updates
+    /// shell configuration files to add the directory to PATH if needed.
+    Install(SelfInstallArgs),
     /// Display uv's version
     Version {
         /// Only print the version
@@ -709,6 +715,19 @@ pub enum SelfCommand {
         #[arg(long, value_enum, default_value = "text")]
         output_format: VersionFormat,
     },
+}
+
+#[derive(Args, Debug)]
+pub struct SelfInstallArgs {
+    /// The directory to install uv into.
+    ///
+    /// By default, uv will be installed to:
+    /// - `$XDG_BIN_HOME` (if set)
+    /// - `$XDG_DATA_HOME/../bin` (if `XDG_DATA_HOME` is set)
+    /// - `$HOME/.local/bin` (Unix)
+    /// - `%APPDATA%\..\.local\bin` (Windows)
+    #[arg(long)]
+    pub bin_dir: Option<PathBuf>,
 }
 
 #[derive(Args, Debug)]

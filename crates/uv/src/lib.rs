@@ -22,7 +22,7 @@ use tracing::{debug, instrument};
 use uv_cache::{Cache, Refresh};
 use uv_cache_info::Timestamp;
 #[cfg(feature = "self-update")]
-use uv_cli::SelfUpdateArgs;
+use uv_cli::{SelfUpdateArgs, SelfInstallArgs};
 use uv_cli::{
     BuildBackendCommand, CacheCommand, CacheNamespace, Cli, Commands, PipCommand, PipNamespace,
     ProjectCommand, PythonCommand, PythonNamespace, SelfCommand, SelfNamespace, ToolCommand,
@@ -1084,6 +1084,11 @@ async fn run(mut cli: Cli) -> Result<ExitStatus> {
             .await
         }
         Commands::Self_(SelfNamespace {
+            command: SelfCommand::Install(args),
+        }) => {
+            commands::self_install(args.bin_dir, printer).await
+        }
+        Commands::Self_(SelfNamespace {
             command:
                 SelfCommand::Version {
                     short,
@@ -1092,13 +1097,6 @@ async fn run(mut cli: Cli) -> Result<ExitStatus> {
         }) => {
             commands::self_version(short, output_format, printer)?;
             Ok(ExitStatus::Success)
-        }
-        #[cfg(not(feature = "self-update"))]
-        Commands::Self_(_) => {
-            anyhow::bail!(
-                "uv was installed through an external package manager, and self-update \
-                is not available. Please use your package manager to update uv."
-            );
         }
         Commands::GenerateShellCompletion(args) => {
             args.shell.generate(&mut Cli::command(), &mut stdout());

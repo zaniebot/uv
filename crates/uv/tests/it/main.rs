@@ -96,6 +96,8 @@ mod run;
 #[cfg(feature = "self-update")]
 mod self_update;
 
+mod self_install;
+
 #[cfg(all(feature = "python", feature = "pypi"))]
 mod show_settings;
 

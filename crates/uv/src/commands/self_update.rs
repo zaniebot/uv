@@ -1,6 +1,6 @@
 use std::fmt::Write;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use axoupdater::{AxoUpdater, AxoupdateError, UpdateRequest};
 use owo_colors::OwoColorize;
 use tracing::debug;
@@ -223,3 +223,4 @@ pub(crate) async fn self_update(
 
     Ok(ExitStatus::Success)
 }
+
