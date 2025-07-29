@@ -77,11 +77,29 @@ impl Binary {
     }
 }
 
-/// GitHub release information for version resolution.
+/// Binary version manifest structure.
 #[derive(Debug, Deserialize)]
-struct GitHubRelease {
-    tag_name: String,
-    prerelease: bool,
+struct BinVersionManifest {
+    versions: Vec<BinVersionInfo>,
+}
+
+/// Binary version information.
+#[derive(Debug, Deserialize)]
+struct BinVersionInfo {
+    version: String,
+    #[allow(dead_code)]
+    date: String,
+    artifacts: Vec<BinArtifact>,
+}
+
+/// Binary artifact information.
+#[derive(Debug, Deserialize)]
+struct BinArtifact {
+    platform: String,
+    url: String,
+    #[allow(dead_code)]
+    sha256_url: String,
+    archive_format: String,
 }
 
 /// Errors that can occur during binary download and installation.
@@ -125,14 +143,14 @@ pub enum Error {
     #[error("Failed to detect platform")]
     Platform(#[from] uv_platform::Error),
 
-    /// GitHub API error.
-    #[error("Failed to fetch version information from GitHub API")]
-    GitHubApi(#[from] reqwest_middleware::Error),
+    /// Version manifest fetch error.
+    #[error("Failed to fetch version manifest")]
+    ManifestFetch(#[from] reqwest_middleware::Error),
 
     /// Version parsing error.
-    #[error("Failed to parse version from GitHub release tag: {tag}")]
+    #[error("Failed to parse version: {version}")]
     VersionParse {
-        tag: String,
+        version: String,
         #[source]
         source: uv_pep440::VersionParseError,
     },
@@ -140,6 +158,10 @@ pub enum Error {
     /// No compatible version found.
     #[error("No compatible version found for constraints: {constraints}")]
     NoCompatibleVersion { constraints: String },
+
+    /// Unsupported archive format.
+    #[error("Unsupported archive format: {0}")]
+    UnsupportedArchiveFormat(String),
 }
 
 /// Progress reporter for binary downloads.
@@ -194,81 +216,41 @@ where
     }
 }
 
-/// Find a compatible version of uv from GitHub releases.
-async fn find_compatible_uv_version(
+/// Find a compatible version from the versions manifest.
+async fn find_compatible_version(
+    binary: Binary,
     constraints: &uv_pep440::VersionSpecifiers,
     client: &uv_client::BaseClient,
-) -> Result<Version, Error> {
-    // First try the latest release
-    let latest_url = "https://api.github.com/repos/astral-sh/uv/releases/latest";
-    let latest_url_parsed = Url::parse(latest_url).map_err(|err| Error::UrlParse {
-        url: latest_url.to_string(),
+) -> Result<(Version, Vec<BinArtifact>), Error> {
+    // Fetch the versions manifest
+    let manifest_url = format!("https://zanieb.github.io/versions/{}.json", binary.name());
+    let manifest_url_parsed = Url::parse(&manifest_url).map_err(|err| Error::UrlParse {
+        url: manifest_url.clone(),
         source: err,
     })?;
+
     let response = client
-        .for_host(&latest_url_parsed.clone().into())
-        .get(latest_url_parsed.clone())
+        .for_host(&manifest_url_parsed.clone().into())
+        .get(manifest_url_parsed.clone())
         .send()
         .await?
         .error_for_status()
         .map_err(reqwest_middleware::Error::Reqwest)?;
 
-    let latest_release: GitHubRelease = response
+    let manifest: BinVersionManifest = response
         .json()
         .await
-        .map_err(|err| Error::GitHubApi(reqwest_middleware::Error::Reqwest(err)))?;
+        .map_err(|err| Error::ManifestFetch(reqwest_middleware::Error::Reqwest(err)))?;
 
-    // Parse version from tag (remove 'v' prefix if present)
-    let tag = latest_release
-        .tag_name
-        .strip_prefix('v')
-        .unwrap_or(&latest_release.tag_name);
-    let latest_version = Version::from_str(tag).map_err(|source| Error::VersionParse {
-        tag: latest_release.tag_name.clone(),
-        source,
-    })?;
-
-    // Check if latest version satisfies constraints
-    if !latest_release.prerelease && constraints.contains(&latest_version) {
-        return Ok(latest_version);
-    }
-
-    // If latest doesn't work, fetch all releases to find a compatible one
-    let releases_url = "https://api.github.com/repos/astral-sh/uv/releases";
-    let releases_url_parsed = Url::parse(releases_url).map_err(|err| Error::UrlParse {
-        url: releases_url.to_string(),
-        source: err,
-    })?;
-    let response = client
-        .for_host(&releases_url_parsed.clone().into())
-        .get(releases_url_parsed.clone())
-        .send()
-        .await?
-        .error_for_status()
-        .map_err(reqwest_middleware::Error::Reqwest)?;
-
-    let releases: Vec<GitHubRelease> = response
-        .json()
-        .await
-        .map_err(|err| Error::GitHubApi(reqwest_middleware::Error::Reqwest(err)))?;
-
-    // Find the first compatible non-prerelease version
-    for release in releases {
-        if release.prerelease {
-            continue;
-        }
-
-        let tag = release
-            .tag_name
-            .strip_prefix('v')
-            .unwrap_or(&release.tag_name);
-        let version = Version::from_str(tag).map_err(|source| Error::VersionParse {
-            tag: release.tag_name.clone(),
+    // Find the first compatible version (versions are sorted newest first)
+    for version_info in manifest.versions {
+        let version = Version::from_str(&version_info.version).map_err(|source| Error::VersionParse {
+            version: version_info.version.clone(),
             source,
         })?;
 
         if constraints.contains(&version) {
-            return Ok(version);
+            return Ok((version, version_info.artifacts));
         }
     }
 
@@ -285,6 +267,17 @@ pub async fn bin_install(
     cache: &Cache,
     reporter: Option<&dyn Reporter>,
 ) -> Result<PathBuf, Error> {
+    // For uv, use the manifest-based approach
+    if binary == Binary::Uv {
+        let version = version.cloned().unwrap_or_else(|| binary.default_version());
+        let constraints = uv_pep440::VersionSpecifiers::from(
+            uv_pep440::VersionSpecifier::from_version(
+                uv_pep440::Operator::Equal,
+                version.clone(),
+            ).unwrap()
+        );
+        return install_compatible_uv(&constraints, client, cache, reporter).await;
+    }
     let os = Os::from_env();
     let arch = Arch::from_env();
     let libc = Libc::from_env()?;
@@ -391,6 +384,144 @@ pub async fn bin_install(
     Ok(cache_entry.into_path_buf())
 }
 
+/// Find a binary in a directory, searching common archive structures.
+fn find_binary_in_dir(dir: &std::path::Path, binary_name: &str) -> Result<PathBuf, Error> {
+    // Check if the binary is directly in the directory
+    let direct_path = dir.join(binary_name);
+    if direct_path.exists() {
+        return Ok(direct_path);
+    }
+
+    // Check if it's in a subdirectory (common for archives)
+    for entry in std::fs::read_dir(dir)? {
+        let entry = entry?;
+        if entry.file_type()?.is_dir() {
+            let nested_path = entry.path().join(binary_name);
+            if nested_path.exists() {
+                return Ok(nested_path);
+            }
+        }
+    }
+
+    Err(Error::BinaryNotFound {
+        tool: binary_name.to_string(),
+        expected: dir.join(binary_name),
+    })
+}
+
+/// Install a binary with specific artifact URLs from the manifest.
+async fn install_binary_with_artifacts(
+    binary: Binary,
+    version: &Version,
+    artifacts: Vec<BinArtifact>,
+    client: &BaseClient,
+    cache: &Cache,
+    reporter: Option<&dyn Reporter>,
+) -> Result<PathBuf, Error> {
+    let os = Os::from_env();
+    let arch = Arch::from_env();
+    let libc = Libc::from_env()?;
+    let platform_name = platform_name_for_binary(os, arch, libc);
+
+    // Find the artifact for this platform
+    let artifact = artifacts
+        .into_iter()
+        .find(|a| a.platform == platform_name)
+        .ok_or_else(|| Error::NoCompatibleVersion {
+            constraints: format!("No artifact found for platform {}", platform_name),
+        })?;
+
+    // Check the cache first
+    let cache_entry = CacheEntry::new(
+        cache
+            .bucket(CacheBucket::Binaries)
+            .join(binary.name())
+            .join(version.to_string())
+            .join(&platform_name),
+        binary.executable(),
+    );
+
+    if let Ok(true) = cache_entry.path().try_exists() {
+        return Ok(cache_entry.into_path_buf());
+    }
+
+    let download_url = Url::parse(&artifact.url).map_err(|err| Error::UrlParse {
+        url: artifact.url.clone(),
+        source: err,
+    })?;
+
+    let cache_dir = cache_entry.dir();
+    tokio::fs::create_dir_all(&cache_dir).await?;
+
+    // Create a temporary directory for extraction
+    let temp_dir = tempfile::tempdir_in(cache_dir.parent().unwrap())?;
+
+    // If the user provided a custom certificate bundle, use it for the download
+    let resp = client
+        .for_host(&download_url.clone().into())
+        .get(download_url)
+        .send()
+        .await?
+        .error_for_status()
+        .map_err(reqwest_middleware::Error::Reqwest)?;
+
+    // Download the artifact
+    let reader = resp
+        .bytes_stream()
+        .map_err(|err| std::io::Error::new(std::io::ErrorKind::Other, err))
+        .into_async_read()
+        .compat();
+
+    let reader: Pin<Box<dyn tokio::io::AsyncRead + Send + Sync>> = if let Some(reporter) = reporter
+    {
+        Box::pin(ProgressReader::new(reader, 0, reporter))
+    } else {
+        Box::pin(reader)
+    };
+
+    // Determine the extension from the archive format field
+    let ext = match artifact.archive_format.as_str() {
+        "tar.gz" => SourceDistExtension::TarGz,
+        "zip" => SourceDistExtension::Zip,
+        other => return Err(Error::UnsupportedArchiveFormat(other.to_string())),
+    };
+
+    // Extract the binary
+    uv_extract::stream::archive(reader, ext, temp_dir.path())
+        .await
+        .map_err(|e| Error::Extract {
+            tool: binary.name().to_string(),
+            source: e.into(),
+        })?;
+
+    // Find the binary in the extracted files
+    let binary_name = binary.executable();
+    let extracted_binary = find_binary_in_dir(temp_dir.path(), &binary_name)?;
+
+    // Move the binary to the cache location
+    match tokio::fs::rename(&extracted_binary, cache_entry.path()).await {
+        Ok(()) => {}
+        Err(err) if err.kind() == std::io::ErrorKind::CrossesDevices => {
+            tokio::fs::copy(&extracted_binary, cache_entry.path()).await?;
+            tokio::fs::remove_file(&extracted_binary).await?;
+        }
+        Err(err) => return Err(err.into()),
+    }
+
+    // Set executable permissions on Unix
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut perms = tokio::fs::metadata(cache_entry.path())
+            .await?
+            .permissions();
+        perms.set_mode(0o755);
+        tokio::fs::set_permissions(cache_entry.path(), perms).await?;
+    }
+
+    Ok(cache_entry.into_path_buf())
+}
+
 /// Install a compatible version of uv based on version constraints.
 pub async fn install_compatible_uv(
     constraints: &uv_pep440::VersionSpecifiers,
@@ -398,11 +529,11 @@ pub async fn install_compatible_uv(
     cache: &Cache,
     reporter: Option<&dyn Reporter>,
 ) -> Result<PathBuf, Error> {
-    // Find a compatible version
-    let version = find_compatible_uv_version(constraints, client).await?;
+    // Find a compatible version and its artifacts
+    let (version, artifacts) = find_compatible_version(Binary::Uv, constraints, client).await?;
 
-    // Install that version
-    bin_install(Binary::Uv, Some(&version), client, cache, reporter).await
+    // Install that version with artifact URLs
+    install_binary_with_artifacts(Binary::Uv, &version, artifacts, client, cache, reporter).await
 }
 
 /// Cast platform types to the binary target triple format.
