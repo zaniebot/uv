@@ -79,6 +79,7 @@ impl Binary {
 
 /// Binary version manifest structure.
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct BinVersionManifest {
     versions: Vec<BinVersionInfo>,
 }
@@ -217,13 +218,20 @@ where
 }
 
 /// Find a compatible version from the versions manifest.
+///
+/// Uses NDJSON format for efficient streaming line-by-line.
 async fn find_compatible_version(
     binary: Binary,
     constraints: &uv_pep440::VersionSpecifiers,
     client: &uv_client::BaseClient,
 ) -> Result<(Version, Vec<BinArtifact>), Error> {
-    // Fetch the versions manifest
-    let manifest_url = format!("https://zanieb.github.io/versions/{}.json", binary.name());
+    use futures::StreamExt;
+
+    // Fetch the NDJSON versions manifest
+    let manifest_url = format!(
+        "https://zanieb.github.io/versions/v1/{}.ndjson",
+        binary.name()
+    );
     let manifest_url_parsed = Url::parse(&manifest_url).map_err(|err| Error::UrlParse {
         url: manifest_url.clone(),
         source: err,
@@ -237,20 +245,69 @@ async fn find_compatible_version(
         .error_for_status()
         .map_err(reqwest_middleware::Error::Reqwest)?;
 
-    let manifest: BinVersionManifest = response
-        .json()
-        .await
-        .map_err(|err| Error::ManifestFetch(reqwest_middleware::Error::Reqwest(err)))?;
+    // Stream the response line by line
+    let mut stream = response.bytes_stream();
+    let mut buffer = Vec::new();
 
-    // Find the first compatible version (versions are sorted newest first)
-    for version_info in manifest.versions {
-        let version = Version::from_str(&version_info.version).map_err(|source| Error::VersionParse {
-            version: version_info.version.clone(),
-            source,
+    while let Some(chunk) = stream.next().await {
+        let chunk =
+            chunk.map_err(|e| Error::ManifestFetch(reqwest_middleware::Error::Reqwest(e)))?;
+        buffer.extend_from_slice(&chunk);
+
+        // Process complete lines
+        while let Some(newline_pos) = buffer.iter().position(|&b| b == b'\n') {
+            let line = buffer.drain(..=newline_pos).collect::<Vec<_>>();
+
+            // Skip empty lines
+            if line.len() <= 1 {
+                continue;
+            }
+
+            // Parse the JSON line (removing the newline)
+            let line_str = std::str::from_utf8(&line[..line.len() - 1]).map_err(|e| {
+                Error::NoCompatibleVersion {
+                    constraints: format!("Invalid UTF-8 in manifest: {}", e),
+                }
+            })?;
+
+            let version_info: BinVersionInfo =
+                serde_json::from_str(line_str).map_err(|err| Error::NoCompatibleVersion {
+                    constraints: format!("Failed to parse version line: {}", err),
+                })?;
+
+            let version =
+                Version::from_str(&version_info.version).map_err(|source| Error::VersionParse {
+                    version: version_info.version.clone(),
+                    source,
+                })?;
+
+            if constraints.contains(&version) {
+                return Ok((version, version_info.artifacts));
+            }
+        }
+    }
+
+    // Process any remaining data in buffer
+    if !buffer.is_empty() {
+        let line_str = std::str::from_utf8(&buffer).map_err(|e| Error::NoCompatibleVersion {
+            constraints: format!("Invalid UTF-8 in manifest: {}", e),
         })?;
 
-        if constraints.contains(&version) {
-            return Ok((version, version_info.artifacts));
+        if !line_str.trim().is_empty() {
+            let version_info: BinVersionInfo =
+                serde_json::from_str(line_str).map_err(|err| Error::NoCompatibleVersion {
+                    constraints: format!("Failed to parse version line: {}", err),
+                })?;
+
+            let version =
+                Version::from_str(&version_info.version).map_err(|source| Error::VersionParse {
+                    version: version_info.version.clone(),
+                    source,
+                })?;
+
+            if constraints.contains(&version) {
+                return Ok((version, version_info.artifacts));
+            }
         }
     }
 
@@ -271,10 +328,8 @@ pub async fn bin_install(
     if binary == Binary::Uv {
         let version = version.cloned().unwrap_or_else(|| binary.default_version());
         let constraints = uv_pep440::VersionSpecifiers::from(
-            uv_pep440::VersionSpecifier::from_version(
-                uv_pep440::Operator::Equal,
-                version.clone(),
-            ).unwrap()
+            uv_pep440::VersionSpecifier::from_version(uv_pep440::Operator::Equal, version.clone())
+                .unwrap(),
         );
         return install_compatible_uv(&constraints, client, cache, reporter).await;
     }
@@ -512,9 +567,7 @@ async fn install_binary_with_artifacts(
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        let mut perms = tokio::fs::metadata(cache_entry.path())
-            .await?
-            .permissions();
+        let mut perms = tokio::fs::metadata(cache_entry.path()).await?.permissions();
         perms.set_mode(0o755);
         tokio::fs::set_permissions(cache_entry.path(), perms).await?;
     }
