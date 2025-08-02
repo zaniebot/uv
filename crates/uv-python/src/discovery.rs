@@ -505,8 +505,18 @@ fn python_executables<'a>(
     .flatten();
 
     let from_virtual_environments = python_executables_from_virtual_environments();
-    let from_installed =
-        python_executables_from_installed(version, implementation, platform, preference, preview);
+    let from_installed = python_executables_from_installed(
+        version,
+        implementation,
+        platform,
+        // If `--system` was requested, we'll also want to skip managed environments
+        if matches!(environments, EnvironmentPreference::OnlySystem) {
+            PythonPreference::System
+        } else {
+            preference
+        },
+        preview,
+    );
 
     // Limit the search to the relevant environment preference; this avoids unnecessary work like
     // traversal of the file system. Subsequent filtering should be done by the caller with
