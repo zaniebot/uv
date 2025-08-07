@@ -12766,3 +12766,98 @@ fn sync_build_dependencies_respect_locked_versions() -> Result<()> {
 
     Ok(())
 }
+
+#[test]
+fn sync_exclude_newer_build() -> Result<()> {
+    let context = TestContext::new("3.12").with_filtered_counts();
+
+    // Write a test package that requires a build dependency
+    let child = context.temp_dir.child("child");
+    child.create_dir_all()?;
+    let child_pyproject_toml = child.child("pyproject.toml");
+    child_pyproject_toml.write_str(indoc! {r#"
+        [project]
+        name = "child"
+        version = "0.1.0"
+        requires-python = ">=3.9"
+
+        [build-system]
+        requires = ["setuptools>=40", "wheel"]
+        build-backend = "setuptools.build_meta"
+    "#})?;
+    child.child("setup.py").write_str(indoc! {r#"
+        from setuptools import setup, find_packages
+        setup(
+            name="child",
+            version="0.1.0",
+            packages=find_packages(),
+        )
+    "#})?;
+    child.child("child").create_dir_all()?;
+    child.child("child/__init__.py").touch()?;
+
+    let parent = &context.temp_dir;
+    let pyproject_toml = parent.child("pyproject.toml");
+    pyproject_toml.write_str(indoc! {r#"
+        [project]
+        name = "parent"
+        version = "0.1.0"
+        requires-python = ">=3.9"
+        dependencies = ["child"]
+
+        [tool.uv.sources]
+        child = { path = "child" }
+
+        [tool.uv]
+        # Exclude setuptools versions newer than 2024-01-01
+        exclude-newer-build = "2024-01-01T00:00:00Z"
+    "#})?;
+
+    context.venv().arg("--clear").assert().success();
+    
+    // Running `uv sync` should use the exclude-newer-build constraint for build dependencies
+    uv_snapshot!(context.filters(), context.sync(), @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Resolved [N] packages in [TIME]
+    Prepared [N] packages in [TIME]
+    Installed [N] packages in [TIME]
+     + child==0.1.0 (from file://[TEMP_DIR]/child)
+    ");
+
+    // Verify we can also set exclude-newer-build via command line
+    context.venv().arg("--clear").assert().success();
+    
+    uv_snapshot!(context.filters(), context.sync()
+        .arg("--exclude-newer-build")
+        .arg("2023-06-01T00:00:00Z"), @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Resolved [N] packages in [TIME]
+    Installed [N] packages in [TIME]
+     + child==0.1.0 (from file://[TEMP_DIR]/child)
+    ");
+
+    // Test environment variable UV_EXCLUDE_NEWER_BUILD
+    context.venv().arg("--clear").assert().success();
+    
+    uv_snapshot!(context.filters(), context.sync()
+        .env("UV_EXCLUDE_NEWER_BUILD", "2023-12-01T00:00:00Z"), @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Resolved [N] packages in [TIME]
+    Installed [N] packages in [TIME]
+     + child==0.1.0 (from file://[TEMP_DIR]/child)
+    ");
+
+    Ok(())
+}

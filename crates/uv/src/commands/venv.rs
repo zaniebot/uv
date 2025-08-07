@@ -286,6 +286,7 @@ pub(crate) async fn venv(
             &build_options,
             &build_hasher,
             exclude_newer,
+            None, // exclude_newer_build
             sources,
             workspace_cache,
             concurrency,

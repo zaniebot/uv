@@ -33,8 +33,8 @@ use uv_installer::{Installer, Plan, Planner, Preparer, SitePackages};
 use uv_pypi_types::Conflicts;
 use uv_python::{Interpreter, PythonEnvironment};
 use uv_resolver::{
-    ExcludeNewer, FlatIndex, Flexibility, InMemoryIndex, Manifest, OptionsBuilder,
-    PythonRequirement, Resolver, ResolverEnvironment,
+    ExcludeNewer, ExcludeNewerTimestamp, FlatIndex, Flexibility, InMemoryIndex, Manifest,
+    OptionsBuilder, PythonRequirement, Resolver, ResolverEnvironment,
 };
 use uv_types::{
     AnyErrorBuild, BuildArena, BuildContext, BuildIsolation, BuildStack, EmptyInstalledPackages,
@@ -96,6 +96,7 @@ pub struct BuildDispatch<'a> {
     config_settings_package: &'a PackageConfigSettings,
     hasher: &'a HashStrategy,
     exclude_newer: ExcludeNewer,
+    exclude_newer_build: Option<ExcludeNewerTimestamp>,
     source_build_context: SourceBuildContext,
     build_extra_env_vars: FxHashMap<OsString, OsString>,
     sources: SourceStrategy,
@@ -123,6 +124,7 @@ impl<'a> BuildDispatch<'a> {
         build_options: &'a BuildOptions,
         hasher: &'a HashStrategy,
         exclude_newer: ExcludeNewer,
+        exclude_newer_build: Option<ExcludeNewerTimestamp>,
         sources: SourceStrategy,
         workspace_cache: WorkspaceCache,
         concurrency: Concurrency,
@@ -146,6 +148,7 @@ impl<'a> BuildDispatch<'a> {
             build_options,
             hasher,
             exclude_newer,
+            exclude_newer_build,
             source_build_context: SourceBuildContext::default(),
             build_extra_env_vars: FxHashMap::default(),
             sources,
@@ -236,10 +239,20 @@ impl BuildContext for BuildDispatch<'_> {
         let marker_env = self.interpreter.resolver_marker_environment();
         let tags = self.interpreter.tags()?;
 
+        // Merge build-specific exclude-newer with the existing configuration
+        // This preserves per-package timestamps while updating the global timestamp for builds
+        let exclude_newer = if let Some(timestamp) = self.exclude_newer_build {
+            let mut exclude_newer = self.exclude_newer.clone();
+            exclude_newer.global = Some(timestamp);
+            exclude_newer
+        } else {
+            self.exclude_newer.clone()
+        };
+        
         let resolver = Resolver::new(
             Manifest::simple(requirements.to_vec()).with_constraints(self.constraints.clone()),
             OptionsBuilder::new()
-                .exclude_newer(self.exclude_newer.clone())
+                .exclude_newer(exclude_newer)
                 .index_strategy(self.index_strategy)
                 .build_options(self.build_options.clone())
                 .flexibility(Flexibility::Fixed)

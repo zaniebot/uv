@@ -2763,6 +2763,13 @@ pub struct VenvArgs {
     #[arg(long)]
     pub exclude_newer_package: Option<Vec<ExcludeNewerPackageEntry>>,
 
+    /// Limit build dependencies to those that were uploaded prior to the given date.
+    ///
+    /// Accepts both RFC 3339 timestamps (e.g., `2006-12-02T02:07:43Z`) and local dates in the same
+    /// format (e.g., `2006-12-02`) in your system's configured time zone.
+    #[arg(long, env = EnvVars::UV_EXCLUDE_NEWER_BUILD)]
+    pub exclude_newer_build: Option<ExcludeNewerTimestamp>,
+
     /// The method to use when installing packages from the global cache.
     ///
     /// This option is only used for installing seed packages.
@@ -4804,6 +4811,13 @@ pub struct ToolUpgradeArgs {
     #[arg(long, help_heading = "Resolver options")]
     pub exclude_newer_package: Option<Vec<ExcludeNewerPackageEntry>>,
 
+    /// Limit build dependencies to those that were uploaded prior to the given date.
+    ///
+    /// Accepts both RFC 3339 timestamps (e.g., `2006-12-02T02:07:43Z`) and local dates in the same
+    /// format (e.g., `2006-12-02`) in your system's configured time zone.
+    #[arg(long, env = EnvVars::UV_EXCLUDE_NEWER_BUILD, help_heading = "Resolver options")]
+    pub exclude_newer_build: Option<ExcludeNewerTimestamp>,
+
     /// The method to use when installing packages from the global cache.
     ///
     /// Defaults to `clone` (also known as Copy-on-Write) on macOS, and `hardlink` on Linux and
@@ -5608,6 +5622,13 @@ pub struct InstallerArgs {
     #[arg(long, help_heading = "Resolver options")]
     pub exclude_newer_package: Option<Vec<ExcludeNewerPackageEntry>>,
 
+    /// Limit build dependencies to those that were uploaded prior to the given date.
+    ///
+    /// Accepts both RFC 3339 timestamps (e.g., `2006-12-02T02:07:43Z`) and local dates in the same
+    /// format (e.g., `2006-12-02`) in your system's configured time zone.
+    #[arg(long, env = EnvVars::UV_EXCLUDE_NEWER_BUILD, help_heading = "Resolver options")]
+    pub exclude_newer_build: Option<ExcludeNewerTimestamp>,
+
     /// The method to use when installing packages from the global cache.
     ///
     /// Defaults to `clone` (also known as Copy-on-Write) on macOS, and `hardlink` on Linux and
@@ -5818,6 +5839,13 @@ pub struct ResolverArgs {
     #[arg(long, help_heading = "Resolver options")]
     pub exclude_newer_package: Option<Vec<ExcludeNewerPackageEntry>>,
 
+    /// Limit build dependencies to those that were uploaded prior to the given date.
+    ///
+    /// Accepts both RFC 3339 timestamps (e.g., `2006-12-02T02:07:43Z`) and local dates in the same
+    /// format (e.g., `2006-12-02`) in your system's configured time zone.
+    #[arg(long, env = EnvVars::UV_EXCLUDE_NEWER_BUILD, help_heading = "Resolver options")]
+    pub exclude_newer_build: Option<ExcludeNewerTimestamp>,
+
     /// The method to use when installing packages from the global cache.
     ///
     /// This option is only used when building source distributions.
@@ -6023,6 +6051,13 @@ pub struct ResolverInstallerArgs {
     /// Can be provided multiple times for different packages.
     #[arg(long, help_heading = "Resolver options")]
     pub exclude_newer_package: Option<Vec<ExcludeNewerPackageEntry>>,
+
+    /// Limit build dependencies to those that were uploaded prior to the given date.
+    ///
+    /// Accepts both RFC 3339 timestamps (e.g., `2006-12-02T02:07:43Z`) and local dates in the same
+    /// format (e.g., `2006-12-02`) in your system's configured time zone.
+    #[arg(long, env = EnvVars::UV_EXCLUDE_NEWER_BUILD, help_heading = "Resolver options")]
+    pub exclude_newer_build: Option<ExcludeNewerTimestamp>,
 
     /// The method to use when installing packages from the global cache.
     ///

@@ -320,6 +320,7 @@ fn warn_uv_toml_masked_fields(options: &Options) {
                 extra_build_dependencies,
                 exclude_newer,
                 exclude_newer_package,
+                exclude_newer_build: _,
                 link_mode,
                 compile_bytecode,
                 no_sources,

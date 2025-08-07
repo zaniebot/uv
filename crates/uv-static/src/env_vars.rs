@@ -140,6 +140,10 @@ impl EnvVars {
     /// exclude distributions published after the specified date.
     pub const UV_EXCLUDE_NEWER: &'static str = "UV_EXCLUDE_NEWER";
 
+    /// Equivalent to the `--exclude-newer-build` command-line argument. If set, uv will
+    /// exclude build dependencies published after the specified date.
+    pub const UV_EXCLUDE_NEWER_BUILD: &'static str = "UV_EXCLUDE_NEWER_BUILD";
+
     /// Whether uv should prefer system or managed Python versions.
     pub const UV_PYTHON_PREFERENCE: &'static str = "UV_PYTHON_PREFERENCE";
 

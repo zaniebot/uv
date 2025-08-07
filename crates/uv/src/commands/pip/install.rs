@@ -449,6 +449,7 @@ pub(crate) async fn pip_install(
         &build_options,
         &build_hasher,
         exclude_newer.clone(),
+        None, // exclude_newer_build
         sources,
         WorkspaceCache::default(),
         concurrency,
@@ -581,6 +582,7 @@ pub(crate) async fn pip_install(
         &build_options,
         &hasher,
         exclude_newer.clone(),
+        None, // exclude_newer_build
         sources,
         WorkspaceCache::default(),
         concurrency,

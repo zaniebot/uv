@@ -35,8 +35,8 @@ use uv_pypi_types::SupportedEnvironments;
 use uv_python::{Prefix, PythonDownloads, PythonPreference, PythonVersion, Target};
 use uv_redacted::DisplaySafeUrl;
 use uv_resolver::{
-    AnnotationStyle, DependencyMode, ExcludeNewer, ExcludeNewerPackage, ForkStrategy,
-    PrereleaseMode, ResolutionMode,
+    AnnotationStyle, DependencyMode, ExcludeNewer, ExcludeNewerPackage, ExcludeNewerTimestamp,
+    ForkStrategy, PrereleaseMode, ResolutionMode,
 };
 use uv_settings::{
     Combine, EnvironmentOptions, FilesystemOptions, Options, PipOptions, PublishOptions,
@@ -731,6 +731,7 @@ impl ToolUpgradeSettings {
             no_compile_bytecode,
             no_sources,
             exclude_newer_package,
+            exclude_newer_build,
             build,
         } = args;
 
@@ -763,6 +764,7 @@ impl ToolUpgradeSettings {
             build_isolation,
             exclude_newer,
             exclude_newer_package,
+            exclude_newer_build,
             link_mode,
             compile_bytecode,
             no_compile_bytecode,
@@ -2676,6 +2678,7 @@ impl VenvSettings {
             refresh,
             compat_args: _,
             exclude_newer_package,
+            exclude_newer_build,
         } = args;
 
         Self {
@@ -2697,6 +2700,7 @@ impl VenvSettings {
                     exclude_newer,
                     exclude_newer_package: exclude_newer_package
                         .map(ExcludeNewerPackage::from_iter),
+                    exclude_newer_build,
                     link_mode,
                     ..PipOptions::from(index_args)
                 },
@@ -2722,6 +2726,7 @@ pub(crate) struct InstallerSettingsRef<'a> {
     pub(crate) no_build_isolation_package: &'a [PackageName],
     pub(crate) extra_build_dependencies: &'a ExtraBuildDependencies,
     pub(crate) exclude_newer: ExcludeNewer,
+    pub(crate) exclude_newer_build: Option<ExcludeNewerTimestamp>,
     pub(crate) link_mode: LinkMode,
     pub(crate) compile_bytecode: bool,
     pub(crate) reinstall: &'a Reinstall,
@@ -2740,6 +2745,7 @@ pub(crate) struct ResolverSettings {
     pub(crate) config_settings_package: PackageConfigSettings,
     pub(crate) dependency_metadata: DependencyMetadata,
     pub(crate) exclude_newer: ExcludeNewer,
+    pub(crate) exclude_newer_build: Option<ExcludeNewerTimestamp>,
     pub(crate) fork_strategy: ForkStrategy,
     pub(crate) index_locations: IndexLocations,
     pub(crate) index_strategy: IndexStrategy,
@@ -2802,6 +2808,7 @@ impl From<ResolverOptions> for ResolverSettings {
             no_build_isolation_package: value.no_build_isolation_package.unwrap_or_default(),
             extra_build_dependencies: value.extra_build_dependencies.unwrap_or_default(),
             exclude_newer: value.exclude_newer,
+            exclude_newer_build: value.exclude_newer_build,
             link_mode: value.link_mode.unwrap_or_default(),
             sources: SourceStrategy::from_args(value.no_sources.unwrap_or_default()),
             upgrade: Upgrade::from_args(
@@ -2891,6 +2898,7 @@ impl From<ResolverInstallerOptions> for ResolverInstallerSettings {
                         .map(Into::into)
                         .collect(),
                 ),
+                exclude_newer_build: value.exclude_newer_build,
                 fork_strategy: value.fork_strategy.unwrap_or_default(),
                 index_locations,
                 index_strategy: value.index_strategy.unwrap_or_default(),
@@ -2963,6 +2971,7 @@ pub(crate) struct PipSettings {
     pub(crate) python_platform: Option<TargetTriple>,
     pub(crate) universal: bool,
     pub(crate) exclude_newer: ExcludeNewer,
+    pub(crate) exclude_newer_build: Option<ExcludeNewerTimestamp>,
     pub(crate) no_emit_package: Vec<PackageName>,
     pub(crate) emit_index_url: bool,
     pub(crate) emit_find_links: bool,
@@ -3051,6 +3060,7 @@ impl PipSettings {
             reinstall,
             reinstall_package,
             exclude_newer_package,
+            exclude_newer_build,
         } = pip.unwrap_or_default();
 
         let ResolverInstallerOptions {
@@ -3083,6 +3093,7 @@ impl PipSettings {
             no_binary: top_level_no_binary,
             no_binary_package: top_level_no_binary_package,
             exclude_newer_package: top_level_exclude_newer_package,
+            exclude_newer_build: top_level_exclude_newer_build,
         } = top_level;
 
         // Merge the top-level options (`tool.uv`) with the pip-specific options (`tool.uv.pip`),
@@ -3231,6 +3242,7 @@ impl PipSettings {
                 exclude_newer,
                 exclude_newer_package.into_iter().map(Into::into).collect(),
             ),
+            exclude_newer_build: exclude_newer_build.combine(top_level_exclude_newer_build),
             no_emit_package: args
                 .no_emit_package
                 .combine(no_emit_package)
@@ -3324,6 +3336,7 @@ impl<'a> From<&'a ResolverInstallerSettings> for InstallerSettingsRef<'a> {
             no_build_isolation_package: &settings.resolver.no_build_isolation_package,
             extra_build_dependencies: &settings.resolver.extra_build_dependencies,
             exclude_newer: settings.resolver.exclude_newer.clone(),
+            exclude_newer_build: settings.resolver.exclude_newer_build,
             link_mode: settings.resolver.link_mode,
             compile_bytecode: settings.compile_bytecode,
             reinstall: &settings.reinstall,

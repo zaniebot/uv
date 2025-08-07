@@ -506,6 +506,7 @@ pub(crate) async fn pip_compile(
         &build_options,
         &build_hashes,
         exclude_newer.clone(),
+        None, // exclude_newer_build
         sources,
         WorkspaceCache::default(),
         concurrency,

@@ -36,7 +36,7 @@ use uv_python::{
     VersionRequest,
 };
 use uv_requirements::RequirementsSource;
-use uv_resolver::{ExcludeNewer, FlatIndex};
+use uv_resolver::{ExcludeNewer, ExcludeNewerTimestamp, FlatIndex};
 use uv_settings::PythonInstallMirrors;
 use uv_types::{AnyErrorBuild, BuildContext, BuildIsolation, BuildStack, HashStrategy};
 use uv_workspace::pyproject::ExtraBuildDependencies;
@@ -204,6 +204,7 @@ async fn build_impl(
         no_build_isolation_package,
         extra_build_dependencies,
         exclude_newer,
+        exclude_newer_build,
         link_mode,
         upgrade: _,
         build_options,
@@ -353,6 +354,7 @@ async fn build_impl(
             *index_strategy,
             *keyring_provider,
             exclude_newer.clone(),
+            *exclude_newer_build,
             *sources,
             concurrency,
             build_options,
@@ -432,6 +434,7 @@ async fn build_package(
     index_strategy: IndexStrategy,
     keyring_provider: KeyringProviderType,
     exclude_newer: ExcludeNewer,
+    exclude_newer_build: Option<ExcludeNewerTimestamp>,
     sources: SourceStrategy,
     concurrency: Concurrency,
     build_options: &BuildOptions,
@@ -587,6 +590,7 @@ async fn build_package(
         build_options,
         &hasher,
         exclude_newer,
+        exclude_newer_build,
         sources,
         workspace_cache,
         concurrency,

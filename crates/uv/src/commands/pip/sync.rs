@@ -384,6 +384,7 @@ pub(crate) async fn pip_sync(
         &build_options,
         &build_hasher,
         exclude_newer.clone(),
+        None, // exclude_newer_build
         sources,
         WorkspaceCache::default(),
         concurrency,
@@ -518,6 +519,7 @@ pub(crate) async fn pip_sync(
         &build_options,
         &build_hasher,
         exclude_newer.clone(),
+        None, // exclude_newer_build
         sources,
         WorkspaceCache::default(),
         concurrency,

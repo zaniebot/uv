@@ -367,6 +367,7 @@ pub struct ResolverOptions {
     pub config_settings: Option<ConfigSettings>,
     pub config_settings_package: Option<PackageConfigSettings>,
     pub exclude_newer: ExcludeNewer,
+    pub exclude_newer_build: Option<ExcludeNewerTimestamp>,
     pub link_mode: Option<LinkMode>,
     pub upgrade: Option<bool>,
     pub upgrade_package: Option<Vec<Requirement<VerbatimParsedUrl>>>,
@@ -667,6 +668,18 @@ pub struct ResolverInstallerOptions {
         "#
     )]
     pub exclude_newer_package: Option<ExcludeNewerPackage>,
+    /// Limit build dependencies to those that were uploaded prior to the given date.
+    ///
+    /// Accepts both RFC 3339 timestamps (e.g., `2006-12-02T02:07:43Z`) and local dates in the same
+    /// format (e.g., `2006-12-02`) in your system's configured time zone.
+    #[option(
+        default = "None",
+        value_type = "str",
+        example = r#"
+            exclude-newer-build = "2006-12-02T02:07:43Z"
+        "#
+    )]
+    pub exclude_newer_build: Option<ExcludeNewerTimestamp>,
     /// The method to use when installing packages from the global cache.
     ///
     /// Defaults to `clone` (also known as Copy-on-Write) on macOS, and `hardlink` on Linux and
@@ -1465,6 +1478,18 @@ pub struct PipOptions {
         "#
     )]
     pub exclude_newer_package: Option<ExcludeNewerPackage>,
+    /// Limit build dependencies to those that were uploaded prior to the given date.
+    ///
+    /// Accepts both RFC 3339 timestamps (e.g., `2006-12-02T02:07:43Z`) and local dates in the same
+    /// format (e.g., `2006-12-02`) in your system's configured time zone.
+    #[option(
+        default = "None",
+        value_type = "str",
+        example = r#"
+            exclude-newer-build = "2006-12-02T02:07:43Z"
+        "#
+    )]
+    pub exclude_newer_build: Option<ExcludeNewerTimestamp>,
     /// Specify a package to omit from the output resolution. Its dependencies will still be
     /// included in the resolution. Equivalent to pip-compile's `--unsafe-package` option.
     #[option(
@@ -1739,6 +1764,7 @@ impl From<ResolverInstallerOptions> for ResolverOptions {
                     .map(Into::into)
                     .collect(),
             ),
+            exclude_newer_build: value.exclude_newer_build,
             link_mode: value.link_mode,
             upgrade: value.upgrade,
             upgrade_package: value.upgrade_package,
@@ -1817,6 +1843,7 @@ pub struct ToolOptions {
     pub extra_build_dependencies: Option<ExtraBuildDependencies>,
     pub exclude_newer: Option<ExcludeNewerTimestamp>,
     pub exclude_newer_package: Option<ExcludeNewerPackage>,
+    pub exclude_newer_build: Option<ExcludeNewerTimestamp>,
     pub link_mode: Option<LinkMode>,
     pub compile_bytecode: Option<bool>,
     pub no_sources: Option<bool>,
@@ -1847,6 +1874,7 @@ impl From<ResolverInstallerOptions> for ToolOptions {
             extra_build_dependencies: value.extra_build_dependencies,
             exclude_newer: value.exclude_newer,
             exclude_newer_package: value.exclude_newer_package,
+            exclude_newer_build: value.exclude_newer_build,
             link_mode: value.link_mode,
             compile_bytecode: value.compile_bytecode,
             no_sources: value.no_sources,
@@ -1879,6 +1907,7 @@ impl From<ToolOptions> for ResolverInstallerOptions {
             extra_build_dependencies: value.extra_build_dependencies,
             exclude_newer: value.exclude_newer,
             exclude_newer_package: value.exclude_newer_package,
+            exclude_newer_build: value.exclude_newer_build,
             link_mode: value.link_mode,
             compile_bytecode: value.compile_bytecode,
             no_sources: value.no_sources,
@@ -1934,6 +1963,7 @@ pub struct OptionsWire {
     extra_build_dependencies: Option<ExtraBuildDependencies>,
     exclude_newer: Option<ExcludeNewerTimestamp>,
     exclude_newer_package: Option<ExcludeNewerPackage>,
+    exclude_newer_build: Option<ExcludeNewerTimestamp>,
     link_mode: Option<LinkMode>,
     compile_bytecode: Option<bool>,
     no_sources: Option<bool>,
@@ -2025,6 +2055,7 @@ impl From<OptionsWire> for Options {
             no_build_isolation_package,
             exclude_newer,
             exclude_newer_package,
+            exclude_newer_build,
             link_mode,
             compile_bytecode,
             no_sources,
@@ -2095,6 +2126,7 @@ impl From<OptionsWire> for Options {
                 extra_build_dependencies,
                 exclude_newer,
                 exclude_newer_package,
+                exclude_newer_build,
                 link_mode,
                 compile_bytecode,
                 no_sources,
