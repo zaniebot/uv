@@ -183,7 +183,7 @@ mod resolver {
         let build_context = BuildDispatch::new(
             client,
             &cache,
-            &build_constraints,
+            build_constraints,
             interpreter,
             &index_locations,
             &flat_index,

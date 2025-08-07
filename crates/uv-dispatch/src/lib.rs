@@ -81,7 +81,7 @@ impl IsBuildBackendError for BuildDispatchError {
 pub struct BuildDispatch<'a> {
     client: &'a RegistryClient,
     cache: &'a Cache,
-    constraints: &'a Constraints,
+    constraints: Constraints,
     interpreter: &'a Interpreter,
     index_locations: &'a IndexLocations,
     index_strategy: IndexStrategy,
@@ -109,7 +109,7 @@ impl<'a> BuildDispatch<'a> {
     pub fn new(
         client: &'a RegistryClient,
         cache: &'a Cache,
-        constraints: &'a Constraints,
+        constraints: Constraints,
         interpreter: &'a Interpreter,
         index_locations: &'a IndexLocations,
         flat_index: &'a FlatIndex,

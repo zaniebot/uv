@@ -689,14 +689,11 @@ async fn do_lock(
     }
     .into_inner();
 
-    // Convert to the `Constraints` format.
-    let dispatch_constraints = Constraints::from_requirements(build_constraints.iter().cloned());
-
     // Create a build dispatch.
     let build_dispatch = BuildDispatch::new(
         &client,
         cache,
-        &dispatch_constraints,
+        Constraints::from_requirements(build_constraints.iter().cloned()),
         interpreter,
         index_locations,
         &flat_index,

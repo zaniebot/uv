@@ -372,7 +372,7 @@ pub(crate) async fn pip_sync(
     let build_dispatch = BuildDispatch::new(
         &client,
         &cache,
-        &build_constraints,
+        build_constraints.clone(),
         interpreter,
         &index_locations,
         &flat_index,
@@ -507,7 +507,7 @@ pub(crate) async fn pip_sync(
     let build_dispatch = BuildDispatch::new(
         &client,
         &cache,
-        &build_constraints,
+        build_constraints.clone(),
         interpreter,
         &index_locations,
         &flat_index,
