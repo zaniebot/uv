@@ -16,7 +16,7 @@ use uv_pypi_types::VerbatimParsedUrl;
 use uv_redacted::DisplaySafeUrl;
 use uv_settings::{GlobalOptions, ResolverInstallerOptions};
 use uv_warnings::warn_user;
-use uv_workspace::pyproject::{ExtraBuildDependency, Sources};
+use uv_workspace::pyproject::Sources;
 
 static FINDER: LazyLock<Finder> = LazyLock::new(|| Finder::new(b"# /// script"));
 
@@ -428,7 +428,8 @@ pub struct ToolUv {
     pub override_dependencies: Option<Vec<uv_pep508::Requirement<VerbatimParsedUrl>>>,
     pub constraint_dependencies: Option<Vec<uv_pep508::Requirement<VerbatimParsedUrl>>>,
     pub build_constraint_dependencies: Option<Vec<uv_pep508::Requirement<VerbatimParsedUrl>>>,
-    pub extra_build_dependencies: Option<BTreeMap<PackageName, Vec<ExtraBuildDependency>>>,
+    pub extra_build_dependencies:
+        Option<BTreeMap<PackageName, Vec<uv_pep508::Requirement<VerbatimParsedUrl>>>>,
     pub sources: Option<BTreeMap<PackageName, Sources>>,
 }
 

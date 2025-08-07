@@ -900,31 +900,9 @@
       "additionalProperties": {
         "type": "array",
         "items": {
-          "$ref": "#/definitions/ExtraBuildDependency"
+          "$ref": "#/definitions/Requirement"
         }
       }
-    },
-    "ExtraBuildDependency": {
-      "anyOf": [
-        {
-          "$ref": "#/definitions/Requirement"
-        },
-        {
-          "type": "object",
-          "properties": {
-            "match-runtime": {
-              "type": "boolean"
-            },
-            "requirement": {
-              "$ref": "#/definitions/Requirement"
-            }
-          },
-          "required": [
-            "requirement",
-            "match-runtime"
-          ]
-        }
-      ]
     },
     "ExtraBuildVariables": {
       "description": "Extra environment variables to set during builds, on a per-package basis.",

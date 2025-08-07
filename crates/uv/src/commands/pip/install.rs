@@ -561,9 +561,6 @@ pub(crate) async fn pip_install(
         (resolution, hasher)
     };
 
-    // Constrain any build requirements marked as `match-runtime = true`.
-    let extra_build_requires = extra_build_requires.match_runtime(&resolution)?;
-
     // Create a build dispatch.
     let build_dispatch = BuildDispatch::new(
         &client,

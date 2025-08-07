@@ -328,7 +328,6 @@ impl SourceBuild {
             .and_then(|name| extra_build_requires.get(name).cloned())
             .unwrap_or_default()
             .into_iter()
-            .map(Requirement::from)
             .collect();
 
         // Create a virtual environment, or install into the shared environment if requested.

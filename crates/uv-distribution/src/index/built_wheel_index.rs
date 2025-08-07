@@ -5,8 +5,8 @@ use uv_cache_info::CacheInfo;
 use uv_cache_key::cache_digest;
 use uv_configuration::{ConfigSettings, PackageConfigSettings};
 use uv_distribution_types::{
-    BuildVariables, DirectUrlSourceDist, DirectorySourceDist, ExtraBuildRequirement,
-    ExtraBuildRequires, ExtraBuildVariables, GitSourceDist, Hashed, PathSourceDist,
+    BuildVariables, DirectUrlSourceDist, DirectorySourceDist, ExtraBuildRequires, ExtraBuildVariables,
+    GitSourceDist, Hashed, PathSourceDist, Requirement,
 };
 use uv_normalize::PackageName;
 use uv_platform_tags::Tags;
@@ -302,8 +302,8 @@ impl<'a> BuiltWheelIndex<'a> {
         }
     }
 
-    /// Determine the extra build requirements for the given package name.
-    fn extra_build_requires_for(&self, name: &PackageName) -> &[ExtraBuildRequirement] {
+    /// Determine the extra build dependencies for the given package name.
+    fn extra_build_requires_for(&self, name: &PackageName) -> &[Requirement] {
         self.extra_build_requires
             .get(name)
             .map(Vec::as_slice)
