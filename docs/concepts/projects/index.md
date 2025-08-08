@@ -1,3 +1,7 @@
+---
+description: Core concepts for working with uv projects to manage Python code spanning multiple files
+---
+
 # Projects
 
 Projects help manage Python code spanning multiple files.

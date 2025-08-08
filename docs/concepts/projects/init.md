@@ -1,3 +1,7 @@
+---
+description: How to create new Python projects with uv init, including applications and libraries
+---
+
 # Creating projects
 
 uv supports creating a project with `uv init`.

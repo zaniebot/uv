@@ -1,3 +1,7 @@
+---
+description: Understanding uv project structure, including pyproject.toml configuration and the project environment layout
+---
+
 # Project structure and files
 
 ## The `pyproject.toml`
