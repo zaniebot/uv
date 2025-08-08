@@ -26,6 +26,7 @@ use uv_resolver::{
 };
 use uv_static::EnvVars;
 use uv_torch::TorchMode;
+use uv_types::HashMode;
 use uv_workspace::pyproject_mut::AddBoundsKind;
 
 pub mod comma;
@@ -1354,6 +1355,13 @@ pub struct PipCompileArgs {
 
     #[arg(long, overrides_with("generate_hashes"), hide = true)]
     pub no_generate_hashes: bool,
+
+    /// Configure how hashes are included when `--generate-hashes` is enabled.
+    ///
+    /// By default, hashes are included for all distributions (`all`). When set to `compatible`,
+    /// only hashes for distributions compatible with the current platform are included.
+    #[arg(long, default_value = "all", value_enum)]
+    pub hashes: HashMode,
 
     /// Don't build source distributions.
     ///

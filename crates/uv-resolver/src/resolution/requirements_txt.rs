@@ -13,7 +13,7 @@ use uv_pep440::Version;
 use uv_pep508::{MarkerTree, Scheme, split_scheme};
 use uv_pypi_types::HashDigest;
 
-use crate::resolution::AnnotatedDist;
+use crate::resolution::{AnnotatedDist, HashedWheel};
 
 #[derive(Debug, Clone)]
 /// A pinned package with its resolved distribution and all the extras that were pinned for it.
@@ -21,6 +21,7 @@ pub(crate) struct RequirementsTxtDist<'dist> {
     pub(crate) dist: &'dist ResolvedDist,
     pub(crate) version: &'dist Version,
     pub(crate) hashes: &'dist [HashDigest],
+    pub(crate) wheel_hashes: &'dist [HashedWheel],
     pub(crate) markers: MarkerTree,
     pub(crate) extras: Vec<ExtraName>,
 }
@@ -178,6 +179,7 @@ impl<'dist> RequirementsTxtDist<'dist> {
             dist: &annotated.dist,
             version: &annotated.version,
             hashes: annotated.hashes.as_slice(),
+            wheel_hashes: &annotated.wheel_hashes,
             // OK because we've asserted above that this dist
             // does not have a non-trivial conflicting marker
             // that we would otherwise need to care about.

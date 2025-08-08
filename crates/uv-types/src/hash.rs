@@ -13,6 +13,17 @@ use uv_pep440::Version;
 use uv_pypi_types::{HashDigest, HashDigests, HashError, ResolverMarkerEnvironment};
 use uv_redacted::DisplaySafeUrl;
 
+#[derive(Debug, Default, Clone, Copy, clap::ValueEnum, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+#[serde(rename_all = "lowercase")]
+pub enum HashMode {
+    /// Include hashes for all distributions (default).
+    #[default]
+    All,
+    /// Include hashes only for distributions compatible with the current platform.
+    Compatible,
+}
+
 #[derive(Debug, Default, Clone)]
 pub enum HashStrategy {
     /// No hash policy is specified.

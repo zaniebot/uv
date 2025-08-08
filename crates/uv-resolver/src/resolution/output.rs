@@ -12,7 +12,7 @@ use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
 use uv_configuration::{Constraints, Overrides};
 use uv_distribution::Metadata;
 use uv_distribution_types::{
-    Dist, DistributionMetadata, Edge, IndexUrl, Name, Node, Requirement, RequiresPython,
+    BuiltDist, Dist, DistributionMetadata, Edge, IndexUrl, Name, Node, Requirement, RequiresPython,
     ResolutionDiagnostic, ResolvedDist, VersionId, VersionOrUrlRef,
 };
 use uv_git::GitResolver;
@@ -25,7 +25,7 @@ use crate::graph_ops::{marker_reachability, simplify_conflict_markers};
 use crate::pins::FilePins;
 use crate::preferences::Preferences;
 use crate::redirect::url_to_precise;
-use crate::resolution::AnnotatedDist;
+use crate::resolution::{AnnotatedDist, HashedWheel};
 use crate::resolution_mode::ResolutionStrategy;
 use crate::resolver::{Resolution, ResolutionDependencyEdge, ResolutionPackage};
 use crate::universal_marker::{ConflictMarker, UniversalMarker};
@@ -343,7 +343,7 @@ impl ResolverOutput {
             index,
         } = &package;
         // Map the package to a distribution.
-        let (dist, hashes, metadata) = Self::parse_dist(
+        let (dist, hashes, wheel_hashes, metadata) = Self::parse_dist(
             name,
             index.as_ref(),
             url.as_ref(),
@@ -385,6 +385,7 @@ impl ResolverOutput {
             extra: extra.clone(),
             dev: dev.clone(),
             hashes,
+            wheel_hashes,
             metadata,
             marker: UniversalMarker::TRUE,
         }));
@@ -412,7 +413,15 @@ impl ResolverOutput {
         preferences: &Preferences,
         in_memory: &InMemoryIndex,
         git: &GitResolver,
-    ) -> Result<(ResolvedDist, HashDigests, Option<Metadata>), ResolveError> {
+    ) -> Result<
+        (
+            ResolvedDist,
+            HashDigests,
+            Vec<HashedWheel>,
+            Option<Metadata>,
+        ),
+        ResolveError,
+    > {
         Ok(if let Some(url) = url {
             // Create the distribution.
             let dist = Dist::from_url(name.clone(), url_to_precise(url.clone(), git))?;
@@ -452,6 +461,7 @@ impl ResolverOutput {
                     version: Some(version.clone()),
                 },
                 hashes,
+                vec![], // URL distributions don't have wheel-specific hashes
                 Some(metadata),
             )
         } else {
@@ -490,6 +500,10 @@ impl ResolverOutput {
                 in_memory,
             );
 
+            // Extract wheel-specific hashes for registry distributions
+            let wheel_hashes =
+                Self::get_wheel_hashes(&dist, name, index, version, preferences, in_memory);
+
             // Extract the metadata.
             let metadata = {
                 in_memory
@@ -504,7 +518,7 @@ impl ResolverOutput {
                     })
             };
 
-            (dist, hashes, metadata)
+            (dist, hashes, wheel_hashes, metadata)
         })
     }
 
@@ -586,6 +600,64 @@ impl ResolverOutput {
         }
 
         HashDigests::empty()
+    }
+
+    /// Extract wheel-specific hashes for a distribution.
+    fn get_wheel_hashes(
+        dist: &ResolvedDist,
+        name: &PackageName,
+        _index: Option<&IndexUrl>,
+        version: &Version,
+        preferences: &Preferences,
+        _in_memory: &InMemoryIndex,
+    ) -> Vec<HashedWheel> {
+        // Only process registry distributions with wheels
+        let dist = match dist {
+            ResolvedDist::Installable { dist, .. } => match dist.as_ref() {
+                Dist::Built(BuiltDist::Registry(registry_dist)) => registry_dist,
+                _ => return vec![],
+            },
+            ResolvedDist::Installed { .. } => return vec![],
+        };
+
+        // Get all wheels from the registry distribution
+        let mut wheel_hashes = Vec::new();
+
+        // First, check if we have wheel-specific hashes from the lockfile
+        if let Some(lockfile_hashes) = preferences.match_hashes(name, version) {
+            if !lockfile_hashes.is_empty() {
+                // If we have lockfile hashes, try to match them to specific wheels
+                for wheel in &dist.wheels {
+                    let mut hashes = Vec::new();
+                    for hash in lockfile_hashes {
+                        // Check if this hash belongs to this wheel by checking the file
+                        if wheel.file.hashes.as_slice().contains(hash) {
+                            hashes.push(hash.clone());
+                        }
+                    }
+                    if !hashes.is_empty() {
+                        wheel_hashes.push(HashedWheel {
+                            wheel: wheel.clone(),
+                            hashes,
+                        });
+                    }
+                }
+                return wheel_hashes;
+            }
+        }
+
+        // Otherwise, extract hashes from each wheel's file
+        for wheel in &dist.wheels {
+            let hashes: Vec<_> = wheel.file.hashes.as_slice().to_vec();
+            if !hashes.is_empty() {
+                wheel_hashes.push(HashedWheel {
+                    wheel: wheel.clone(),
+                    hashes,
+                });
+            }
+        }
+
+        wheel_hashes
     }
 
     /// Returns an iterator over the distinct packages in the graph.

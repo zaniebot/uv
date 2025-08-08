@@ -4983,6 +4983,7 @@ dependencies = [
  "uv-settings",
  "uv-static",
  "uv-torch",
+ "uv-types",
  "uv-version",
  "uv-warnings",
  "uv-workspace",
@@ -5915,6 +5916,7 @@ dependencies = [
  "uv-resolver",
  "uv-static",
  "uv-torch",
+ "uv-types",
  "uv-warnings",
  "uv-workspace",
 ]
@@ -6026,8 +6028,11 @@ name = "uv-types"
 version = "0.0.1"
 dependencies = [
  "anyhow",
+ "clap",
  "dashmap",
  "rustc-hash",
+ "schemars",
+ "serde",
  "thiserror 2.0.12",
  "uv-cache",
  "uv-configuration",

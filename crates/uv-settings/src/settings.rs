@@ -24,6 +24,7 @@ use uv_resolver::{
 };
 use uv_static::EnvVars;
 use uv_torch::TorchMode;
+use uv_types::HashMode;
 use uv_workspace::{pyproject::ExtraBuildDependencies, pyproject_mut::AddBoundsKind};
 
 /// A `pyproject.toml` with an (optional) `[tool.uv]` section.
@@ -1412,6 +1413,18 @@ pub struct PipOptions {
         "#
     )]
     pub generate_hashes: Option<bool>,
+    /// Configure how hashes are included when `generate-hashes` is enabled.
+    ///
+    /// By default, hashes are included for all distributions (`all`). When set to `compatible`,
+    /// only hashes for distributions compatible with the current platform are included.
+    #[option(
+        default = "\"all\"",
+        value_type = "str",
+        example = r#"
+            hash-mode = "compatible"
+        "#
+    )]
+    pub hash_mode: Option<HashMode>,
     /// Settings to pass to the [PEP 517](https://peps.python.org/pep-0517/) build backend,
     /// specified as `KEY=VALUE` pairs.
     #[option(

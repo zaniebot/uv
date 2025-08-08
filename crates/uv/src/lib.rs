@@ -495,6 +495,7 @@ async fn run(mut cli: Cli) -> Result<ExitStatus> {
                 args.settings.dependency_mode,
                 args.settings.upgrade,
                 args.settings.generate_hashes,
+                args.settings.hash_mode,
                 args.settings.no_emit_package,
                 args.settings.no_strip_extras,
                 args.settings.no_strip_markers,

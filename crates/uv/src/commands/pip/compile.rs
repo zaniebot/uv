@@ -45,7 +45,7 @@ use uv_resolver::{
     ResolverEnvironment,
 };
 use uv_torch::{TorchMode, TorchStrategy};
-use uv_types::{BuildIsolation, EmptyInstalledPackages, HashStrategy};
+use uv_types::{BuildIsolation, EmptyInstalledPackages, HashMode, HashStrategy};
 use uv_warnings::{warn_user, warn_user_once};
 use uv_workspace::WorkspaceCache;
 use uv_workspace::pyproject::ExtraBuildDependencies;
@@ -77,6 +77,7 @@ pub(crate) async fn pip_compile(
     dependency_mode: DependencyMode,
     upgrade: Upgrade,
     generate_hashes: bool,
+    hash_mode: HashMode,
     no_emit_packages: Vec<PackageName>,
     include_extras: bool,
     include_markers: bool,
@@ -673,6 +674,7 @@ pub(crate) async fn pip_compile(
                     &resolver_env,
                     &no_emit_packages,
                     generate_hashes,
+                    hash_mode,
                     include_extras,
                     include_markers || universal,
                     include_annotations,

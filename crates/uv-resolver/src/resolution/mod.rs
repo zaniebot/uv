@@ -2,12 +2,12 @@ use std::fmt::Display;
 
 use uv_distribution::Metadata;
 use uv_distribution_types::{
-    BuiltDist, Dist, DistributionMetadata, IndexUrl, Name, ResolvedDist, SourceDist,
-    VersionOrUrlRef,
+    BuiltDist, Dist, DistributionMetadata, IndexUrl, Name, RegistryBuiltWheel, ResolvedDist,
+    SourceDist, VersionOrUrlRef,
 };
 use uv_normalize::{ExtraName, GroupName, PackageName};
 use uv_pep440::Version;
-use uv_pypi_types::HashDigests;
+use uv_pypi_types::{HashDigest, HashDigests};
 
 pub use crate::resolution::display::{AnnotationStyle, DisplayResolutionGraph};
 pub(crate) use crate::resolution::output::ResolutionGraphNode;
@@ -18,6 +18,13 @@ use crate::universal_marker::UniversalMarker;
 mod display;
 mod output;
 mod requirements_txt;
+
+/// Represents a wheel and its associated hashes.
+#[derive(Debug, Clone)]
+pub(crate) struct HashedWheel {
+    pub(crate) wheel: RegistryBuiltWheel,
+    pub(crate) hashes: Vec<HashDigest>,
+}
 
 /// A pinned package with its resolved distribution and metadata. The [`ResolvedDist`] refers to a
 /// specific distribution (e.g., a specific wheel), while the [`Metadata23`] refers to the metadata
@@ -30,6 +37,9 @@ pub(crate) struct AnnotatedDist {
     pub(crate) extra: Option<ExtraName>,
     pub(crate) dev: Option<GroupName>,
     pub(crate) hashes: HashDigests,
+    /// Wheel-specific hashes for compatible mode filtering.
+    /// Only populated for registry distributions with wheels.
+    pub(crate) wheel_hashes: Vec<HashedWheel>,
     pub(crate) metadata: Option<Metadata>,
     /// The "full" marker for this distribution. It precisely describes all
     /// marker environments for which this distribution _can_ be installed.

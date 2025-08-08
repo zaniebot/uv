@@ -46,6 +46,7 @@ use uv_settings::{
 };
 use uv_static::EnvVars;
 use uv_torch::TorchMode;
+use uv_types::HashMode;
 use uv_warnings::warn_user_once;
 use uv_workspace::pyproject::{DependencyType, ExtraBuildDependencies};
 use uv_workspace::pyproject_mut::AddBoundsKind;
@@ -1913,6 +1914,7 @@ impl PipCompileSettings {
             no_system,
             generate_hashes,
             no_generate_hashes,
+            hashes,
             no_build,
             build,
             no_binary,
@@ -2022,6 +2024,7 @@ impl PipCompileSettings {
                     no_header: flag(no_header, header, "header"),
                     custom_compile_command,
                     generate_hashes: flag(generate_hashes, no_generate_hashes, "generate-hashes"),
+                    hash_mode: Some(hashes),
                     python_version,
                     python_platform,
                     universal: flag(universal, no_universal, "universal"),
@@ -2964,6 +2967,7 @@ pub(crate) struct PipSettings {
     pub(crate) no_header: bool,
     pub(crate) custom_compile_command: Option<String>,
     pub(crate) generate_hashes: bool,
+    pub(crate) hash_mode: HashMode,
     pub(crate) config_setting: ConfigSettings,
     pub(crate) config_settings_package: PackageConfigSettings,
     pub(crate) python_version: Option<PythonVersion>,
@@ -3036,6 +3040,7 @@ impl PipSettings {
             no_header,
             custom_compile_command,
             generate_hashes,
+            hash_mode,
             config_settings,
             config_settings_package,
             python_version,
@@ -3209,6 +3214,7 @@ impl PipSettings {
                 .generate_hashes
                 .combine(generate_hashes)
                 .unwrap_or_default(),
+            hash_mode: args.hash_mode.combine(hash_mode).unwrap_or_default(),
             allow_empty_requirements: args
                 .allow_empty_requirements
                 .combine(allow_empty_requirements)

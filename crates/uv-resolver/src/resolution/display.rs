@@ -4,12 +4,15 @@ use owo_colors::OwoColorize;
 use petgraph::visit::EdgeRef;
 use petgraph::{Directed, Direction, Graph};
 use rustc_hash::{FxBuildHasher, FxHashMap};
+use uv_platform_tags::{LanguageTag, PlatformTag};
 
 use uv_distribution_types::{DistributionMetadata, Name, SourceAnnotation, SourceAnnotations};
 use uv_normalize::PackageName;
 use uv_pep508::MarkerTree;
+use uv_pypi_types::HashDigest;
+use uv_types::HashMode;
 
-use crate::resolution::{RequirementsTxtDist, ResolutionGraphNode};
+use crate::resolution::{HashedWheel, RequirementsTxtDist, ResolutionGraphNode};
 use crate::{ResolverEnvironment, ResolverOutput};
 
 /// A [`std::fmt::Display`] implementation for the resolution graph.
@@ -23,6 +26,8 @@ pub struct DisplayResolutionGraph<'a> {
     no_emit_packages: &'a [PackageName],
     /// Whether to include hashes in the output.
     show_hashes: bool,
+    /// Hash generation mode (all or compatible).
+    hash_mode: HashMode,
     /// Whether to include extras in the output (e.g., `black[colorama]`).
     include_extras: bool,
     /// Whether to include environment markers in the output (e.g., `black ; sys_platform == "win32"`).
@@ -56,6 +61,7 @@ impl<'a> DisplayResolutionGraph<'a> {
         env: &'a ResolverEnvironment,
         no_emit_packages: &'a [PackageName],
         show_hashes: bool,
+        hash_mode: HashMode,
         include_extras: bool,
         include_markers: bool,
         include_annotations: bool,
@@ -74,11 +80,156 @@ impl<'a> DisplayResolutionGraph<'a> {
             env,
             no_emit_packages,
             show_hashes,
+            hash_mode,
             include_extras,
             include_markers,
             include_annotations,
             include_index_annotation,
             annotation_style,
+        }
+    }
+
+    /// Filter wheel hashes to only include those compatible with the current platform.
+    #[allow(clippy::cast_possible_truncation)]
+    fn filter_compatible_hashes<'b>(&self, wheel_hashes: &'b [HashedWheel]) -> Vec<&'b HashDigest> {
+        let mut compatible_hashes = Vec::new();
+
+        // Get the current environment's marker environment to check compatibility
+        let Some(marker_env) = self.env.marker_environment() else {
+            // If no marker environment (e.g., universal resolution), include all hashes
+            return wheel_hashes.iter().flat_map(|hw| &hw.hashes).collect();
+        };
+
+        // Check each wheel for compatibility
+        for hashed_wheel in wheel_hashes {
+            let wheel = &hashed_wheel.wheel;
+
+            // Check if this wheel's filename is compatible with the current platform
+            // by examining the wheel's platform tags
+            let is_compatible = {
+                // Check Python version compatibility
+                let python_compatible = wheel.filename.python_tags().iter().any(|py_tag| {
+                    // Check if the Python version matches
+                    match py_tag {
+                        LanguageTag::Python { major, minor } => {
+                            // Compare with marker environment's Python version
+                            let python_version = &marker_env.python_version().version;
+                            // Get the major and minor version numbers
+                            let version_parts: Vec<u64> =
+                                python_version.release().iter().take(2).copied().collect();
+                            let env_major = version_parts.first().copied().unwrap_or(0) as u8;
+                            let env_minor = version_parts.get(1).copied().unwrap_or(0) as u8;
+
+                            *major == env_major && minor.is_none_or(|m| m == env_minor)
+                        }
+                        LanguageTag::CPython {
+                            python_version: (major, minor),
+                        } => {
+                            let env_version = &marker_env.python_version().version;
+                            let version_parts: Vec<u64> =
+                                env_version.release().iter().take(2).copied().collect();
+                            let env_major = version_parts.first().copied().unwrap_or(0) as u8;
+                            let env_minor = version_parts.get(1).copied().unwrap_or(0) as u8;
+                            *major == env_major && *minor == env_minor
+                        }
+                        LanguageTag::PyPy {
+                            python_version: (major, minor),
+                        } => {
+                            // PyPy wheels require PyPy runtime, check implementation name
+                            let env_version = &marker_env.python_version().version;
+                            let version_parts: Vec<u64> =
+                                env_version.release().iter().take(2).copied().collect();
+                            let env_major = version_parts.first().copied().unwrap_or(0) as u8;
+                            let env_minor = version_parts.get(1).copied().unwrap_or(0) as u8;
+                            *major == env_major && *minor == env_minor
+                        }
+                        LanguageTag::GraalPy {
+                            python_version: (major, minor),
+                        } => {
+                            // GraalPy wheels require GraalPy runtime
+                            let env_version = &marker_env.python_version().version;
+                            let version_parts: Vec<u64> =
+                                env_version.release().iter().take(2).copied().collect();
+                            let env_major = version_parts.first().copied().unwrap_or(0) as u8;
+                            let env_minor = version_parts.get(1).copied().unwrap_or(0) as u8;
+                            *major == env_major && *minor == env_minor
+                        }
+                        LanguageTag::Pyston {
+                            python_version: (major, minor),
+                        } => {
+                            // Pyston wheels require Pyston runtime
+                            let env_version = &marker_env.python_version().version;
+                            let version_parts: Vec<u64> =
+                                env_version.release().iter().take(2).copied().collect();
+                            let env_major = version_parts.first().copied().unwrap_or(0) as u8;
+                            let env_minor = version_parts.get(1).copied().unwrap_or(0) as u8;
+                            *major == env_major && *minor == env_minor
+                        }
+                        LanguageTag::None => true, // No specific Python requirement
+                    }
+                });
+
+                if !python_compatible {
+                    false
+                } else {
+                    // Check platform compatibility using markers
+
+                    wheel.filename.platform_tags().iter().any(|platform_tag| {
+                        match platform_tag {
+                            PlatformTag::Any => true,
+                            _ => {
+                                // Check if the platform tag matches the current platform
+                                // We'll use the marker environment to determine compatibility
+                                Self::is_platform_compatible(platform_tag, marker_env)
+                            }
+                        }
+                    })
+                }
+            };
+
+            if is_compatible {
+                // Add all hashes from this compatible wheel
+                compatible_hashes.extend(&hashed_wheel.hashes);
+            }
+        }
+
+        compatible_hashes
+    }
+
+    /// Check if a platform tag is compatible with the current marker environment.
+    fn is_platform_compatible(
+        platform_tag: &PlatformTag,
+        marker_env: &uv_pep508::MarkerEnvironment,
+    ) -> bool {
+        match platform_tag {
+            PlatformTag::Any => true,
+
+            // Windows platforms
+            PlatformTag::Win32 => {
+                marker_env.sys_platform() == "win32" && marker_env.platform_machine() == "x86"
+            }
+            PlatformTag::WinAmd64 => {
+                marker_env.sys_platform() == "win32" && marker_env.platform_machine() == "AMD64"
+            }
+            PlatformTag::WinArm64 => {
+                marker_env.sys_platform() == "win32" && marker_env.platform_machine() == "arm64"
+            }
+
+            // macOS platforms
+            PlatformTag::Macos { .. } => marker_env.sys_platform() == "darwin",
+
+            // Linux platforms
+            PlatformTag::Manylinux { .. }
+            | PlatformTag::Manylinux1 { .. }
+            | PlatformTag::Manylinux2010 { .. }
+            | PlatformTag::Manylinux2014 { .. }
+            | PlatformTag::Musllinux { .. }
+            | PlatformTag::Linux { .. } => marker_env.sys_platform() == "linux",
+
+            _ => {
+                // For unknown platforms, be conservative and exclude them
+                false
+            }
         }
     }
 }
@@ -192,11 +343,40 @@ impl std::fmt::Display for DisplayResolutionGraph<'_> {
             // Display the distribution hashes, if any.
             let mut has_hashes = false;
             if self.show_hashes {
-                for hash in node.hashes {
-                    has_hashes = true;
-                    line.push_str(" \\\n");
-                    line.push_str("    --hash=");
-                    line.push_str(&hash.to_string());
+                // Filter hashes based on the hash mode
+                match self.hash_mode {
+                    HashMode::All => {
+                        // Display all hashes
+                        for hash in node.hashes {
+                            has_hashes = true;
+                            line.push_str(" \\\n");
+                            line.push_str("    --hash=");
+                            line.push_str(&hash.to_string());
+                        }
+                    }
+                    HashMode::Compatible => {
+                        // In compatible mode, only include hashes for distributions
+                        // that are compatible with the current platform
+                        if node.wheel_hashes.is_empty() {
+                            // If no wheel-specific hashes, fall back to all hashes (e.g., for source distributions)
+                            for hash in node.hashes {
+                                has_hashes = true;
+                                line.push_str(" \\\n");
+                                line.push_str("    --hash=");
+                                line.push_str(&hash.to_string());
+                            }
+                        } else {
+                            // Filter wheel hashes based on platform compatibility
+                            let compatible_hashes =
+                                self.filter_compatible_hashes(node.wheel_hashes);
+                            for hash in compatible_hashes {
+                                has_hashes = true;
+                                line.push_str(" \\\n");
+                                line.push_str("    --hash=");
+                                line.push_str(&hash.to_string());
+                            }
+                        }
+                    }
                 }
             }
 

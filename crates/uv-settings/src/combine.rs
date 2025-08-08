@@ -19,6 +19,7 @@ use uv_resolver::{
     PrereleaseMode, ResolutionMode,
 };
 use uv_torch::TorchMode;
+use uv_types::HashMode;
 use uv_workspace::pyproject::ExtraBuildDependencies;
 use uv_workspace::pyproject_mut::AddBoundsKind;
 
@@ -87,6 +88,7 @@ impl_combine_or!(ExcludeNewer);
 impl_combine_or!(ExcludeNewerTimestamp);
 impl_combine_or!(ExportFormat);
 impl_combine_or!(ForkStrategy);
+impl_combine_or!(HashMode);
 impl_combine_or!(Index);
 impl_combine_or!(IndexStrategy);
 impl_combine_or!(IndexUrl);

@@ -210,6 +210,7 @@ fn resolve_uv_toml() -> anyhow::Result<()> {
             no_header: false,
             custom_compile_command: None,
             generate_hashes: true,
+            hash_mode: All,
             config_setting: ConfigSettings(
                 {},
             ),
@@ -410,6 +411,7 @@ fn resolve_uv_toml() -> anyhow::Result<()> {
             no_header: false,
             custom_compile_command: None,
             generate_hashes: true,
+            hash_mode: All,
             config_setting: ConfigSettings(
                 {},
             ),
@@ -611,6 +613,7 @@ fn resolve_uv_toml() -> anyhow::Result<()> {
             no_header: false,
             custom_compile_command: None,
             generate_hashes: false,
+            hash_mode: All,
             config_setting: ConfigSettings(
                 {},
             ),
@@ -844,6 +847,7 @@ fn resolve_pyproject_toml() -> anyhow::Result<()> {
             no_header: false,
             custom_compile_command: None,
             generate_hashes: true,
+            hash_mode: All,
             config_setting: ConfigSettings(
                 {},
             ),
@@ -1012,6 +1016,7 @@ fn resolve_pyproject_toml() -> anyhow::Result<()> {
             no_header: false,
             custom_compile_command: None,
             generate_hashes: false,
+            hash_mode: All,
             config_setting: ConfigSettings(
                 {},
             ),
@@ -1224,6 +1229,7 @@ fn resolve_pyproject_toml() -> anyhow::Result<()> {
             no_header: false,
             custom_compile_command: None,
             generate_hashes: true,
+            hash_mode: All,
             config_setting: ConfigSettings(
                 {},
             ),
@@ -1484,6 +1490,7 @@ fn resolve_index_url() -> anyhow::Result<()> {
             no_header: false,
             custom_compile_command: None,
             generate_hashes: false,
+            hash_mode: All,
             config_setting: ConfigSettings(
                 {},
             ),
@@ -1754,6 +1761,7 @@ fn resolve_index_url() -> anyhow::Result<()> {
             no_header: false,
             custom_compile_command: None,
             generate_hashes: false,
+            hash_mode: All,
             config_setting: ConfigSettings(
                 {},
             ),
@@ -1979,6 +1987,7 @@ fn resolve_find_links() -> anyhow::Result<()> {
             no_header: false,
             custom_compile_command: None,
             generate_hashes: false,
+            hash_mode: All,
             config_setting: ConfigSettings(
                 {},
             ),
@@ -2169,6 +2178,7 @@ fn resolve_top_level() -> anyhow::Result<()> {
             no_header: false,
             custom_compile_command: None,
             generate_hashes: false,
+            hash_mode: All,
             config_setting: ConfigSettings(
                 {},
             ),
@@ -2419,6 +2429,7 @@ fn resolve_top_level() -> anyhow::Result<()> {
             no_header: false,
             custom_compile_command: None,
             generate_hashes: false,
+            hash_mode: All,
             config_setting: ConfigSettings(
                 {},
             ),
@@ -2652,6 +2663,7 @@ fn resolve_top_level() -> anyhow::Result<()> {
             no_header: false,
             custom_compile_command: None,
             generate_hashes: false,
+            hash_mode: All,
             config_setting: ConfigSettings(
                 {},
             ),
@@ -2841,6 +2853,7 @@ fn resolve_user_configuration() -> anyhow::Result<()> {
             no_header: false,
             custom_compile_command: None,
             generate_hashes: false,
+            hash_mode: All,
             config_setting: ConfigSettings(
                 {},
             ),
@@ -3014,6 +3027,7 @@ fn resolve_user_configuration() -> anyhow::Result<()> {
             no_header: false,
             custom_compile_command: None,
             generate_hashes: true,
+            hash_mode: All,
             config_setting: ConfigSettings(
                 {},
             ),
@@ -3187,6 +3201,7 @@ fn resolve_user_configuration() -> anyhow::Result<()> {
             no_header: false,
             custom_compile_command: None,
             generate_hashes: false,
+            hash_mode: All,
             config_setting: ConfigSettings(
                 {},
             ),
@@ -3362,6 +3377,7 @@ fn resolve_user_configuration() -> anyhow::Result<()> {
             no_header: false,
             custom_compile_command: None,
             generate_hashes: false,
+            hash_mode: All,
             config_setting: ConfigSettings(
                 {},
             ),
@@ -3744,6 +3760,7 @@ fn resolve_poetry_toml() -> anyhow::Result<()> {
             no_header: false,
             custom_compile_command: None,
             generate_hashes: false,
+            hash_mode: All,
             config_setting: ConfigSettings(
                 {},
             ),
@@ -3985,6 +4002,7 @@ fn resolve_both() -> anyhow::Result<()> {
             no_header: false,
             custom_compile_command: None,
             generate_hashes: true,
+            hash_mode: All,
             config_setting: ConfigSettings(
                 {},
             ),
@@ -4230,6 +4248,7 @@ fn resolve_both_special_fields() -> anyhow::Result<()> {
             no_header: false,
             custom_compile_command: None,
             generate_hashes: true,
+            hash_mode: All,
             config_setting: ConfigSettings(
                 {},
             ),
@@ -4554,6 +4573,7 @@ fn resolve_config_file() -> anyhow::Result<()> {
             no_header: false,
             custom_compile_command: None,
             generate_hashes: true,
+            hash_mode: All,
             config_setting: ConfigSettings(
                 {},
             ),
@@ -4820,6 +4840,7 @@ fn resolve_skip_empty() -> anyhow::Result<()> {
             no_header: false,
             custom_compile_command: None,
             generate_hashes: false,
+            hash_mode: All,
             config_setting: ConfigSettings(
                 {},
             ),
@@ -4996,6 +5017,7 @@ fn resolve_skip_empty() -> anyhow::Result<()> {
             no_header: false,
             custom_compile_command: None,
             generate_hashes: false,
+            hash_mode: All,
             config_setting: ConfigSettings(
                 {},
             ),
@@ -5191,6 +5213,7 @@ fn allow_insecure_host() -> anyhow::Result<()> {
             no_header: false,
             custom_compile_command: None,
             generate_hashes: false,
+            hash_mode: All,
             config_setting: ConfigSettings(
                 {},
             ),
@@ -5447,6 +5470,7 @@ fn index_priority() -> anyhow::Result<()> {
             no_header: false,
             custom_compile_command: None,
             generate_hashes: false,
+            hash_mode: All,
             config_setting: ConfigSettings(
                 {},
             ),
@@ -5682,6 +5706,7 @@ fn index_priority() -> anyhow::Result<()> {
             no_header: false,
             custom_compile_command: None,
             generate_hashes: false,
+            hash_mode: All,
             config_setting: ConfigSettings(
                 {},
             ),
@@ -5923,6 +5948,7 @@ fn index_priority() -> anyhow::Result<()> {
             no_header: false,
             custom_compile_command: None,
             generate_hashes: false,
+            hash_mode: All,
             config_setting: ConfigSettings(
                 {},
             ),
@@ -6159,6 +6185,7 @@ fn index_priority() -> anyhow::Result<()> {
             no_header: false,
             custom_compile_command: None,
             generate_hashes: false,
+            hash_mode: All,
             config_setting: ConfigSettings(
                 {},
             ),
@@ -6402,6 +6429,7 @@ fn index_priority() -> anyhow::Result<()> {
             no_header: false,
             custom_compile_command: None,
             generate_hashes: false,
+            hash_mode: All,
             config_setting: ConfigSettings(
                 {},
             ),
@@ -6638,6 +6666,7 @@ fn index_priority() -> anyhow::Result<()> {
             no_header: false,
             custom_compile_command: None,
             generate_hashes: false,
+            hash_mode: All,
             config_setting: ConfigSettings(
                 {},
             ),
@@ -6818,6 +6847,7 @@ fn verify_hashes() -> anyhow::Result<()> {
             no_header: false,
             custom_compile_command: None,
             generate_hashes: false,
+            hash_mode: All,
             config_setting: ConfigSettings(
                 {},
             ),
@@ -6984,6 +7014,7 @@ fn verify_hashes() -> anyhow::Result<()> {
             no_header: false,
             custom_compile_command: None,
             generate_hashes: false,
+            hash_mode: All,
             config_setting: ConfigSettings(
                 {},
             ),
@@ -7148,6 +7179,7 @@ fn verify_hashes() -> anyhow::Result<()> {
             no_header: false,
             custom_compile_command: None,
             generate_hashes: false,
+            hash_mode: All,
             config_setting: ConfigSettings(
                 {},
             ),
@@ -7314,6 +7346,7 @@ fn verify_hashes() -> anyhow::Result<()> {
             no_header: false,
             custom_compile_command: None,
             generate_hashes: false,
+            hash_mode: All,
             config_setting: ConfigSettings(
                 {},
             ),
@@ -7478,6 +7511,7 @@ fn verify_hashes() -> anyhow::Result<()> {
             no_header: false,
             custom_compile_command: None,
             generate_hashes: false,
+            hash_mode: All,
             config_setting: ConfigSettings(
                 {},
             ),
@@ -7643,6 +7677,7 @@ fn verify_hashes() -> anyhow::Result<()> {
             no_header: false,
             custom_compile_command: None,
             generate_hashes: false,
+            hash_mode: All,
             config_setting: ConfigSettings(
                 {},
             ),

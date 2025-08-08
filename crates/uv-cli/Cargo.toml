@@ -30,6 +30,7 @@ uv-resolver = { workspace = true, features = ["clap"] }
 uv-settings = { workspace = true, features = ["schemars"] }
 uv-static = { workspace = true }
 uv-torch = { workspace = true, features = ["clap"] }
+uv-types = { workspace = true }
 uv-version = { workspace = true }
 uv-warnings = { workspace = true }
 uv-workspace = { workspace = true }
