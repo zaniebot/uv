@@ -81,6 +81,10 @@ impl<'a> Planner<'a> {
         let mut reinstalls = vec![];
         let mut extraneous = vec![];
 
+        // Create a clone of site_packages for checking match-runtime dependencies
+        // We need this because we'll be modifying site_packages as we iterate
+        let site_packages_snapshot = site_packages.clone();
+
         // TODO(charlie): There are a few assumptions here that are hard to spot:
         //
         // 1. Apparently, we never return direct URL distributions as [`ResolvedDist::Installed`].
@@ -119,8 +123,76 @@ impl<'a> Planner<'a> {
                                 );
                             }
                             RequirementSatisfaction::Satisfied => {
-                                debug!("Requirement already installed: {installed}");
-                                continue;
+                                // Check if the package has match-runtime build dependencies that may have changed
+                                if let Some(build_requirements) =
+                                    extra_build_requires.get(dist.name())
+                                {
+                                    // Check if any match-runtime dependencies have changed versions
+                                    let mut needs_rebuild = false;
+
+                                    for req in build_requirements {
+                                        if req.match_runtime {
+                                            // The requirement has match_runtime, so req.requirement.source contains
+                                            // the exact version from the current resolution
+
+                                            // Check what's currently in the resolution for this dependency
+                                            let dep_in_resolution = self
+                                                .resolution
+                                                .distributions()
+                                                .find(|d| d.name() == &req.requirement.name);
+
+                                            if let Some(dep_dist) = dep_in_resolution {
+                                                // Get what's currently installed for this dependency
+                                                // Use the snapshot to avoid issues with modified site_packages
+                                                let installed_deps = site_packages_snapshot
+                                                    .get_packages(&req.requirement.name);
+
+                                                if installed_deps.is_empty() {
+                                                    // The dependency isn't installed yet, so we need to rebuild
+                                                    debug!(
+                                                        "Match-runtime dependency {} not installed, marking {} for reinstall",
+                                                        req.requirement.name, installed
+                                                    );
+                                                    needs_rebuild = true;
+                                                    break;
+                                                }
+
+                                                // Check if any installed version matches what we need now
+                                                let source_from_resolution =
+                                                    RequirementSource::from(dep_dist);
+                                                let satisfied =
+                                                    installed_deps.iter().any(|installed_dep| {
+                                                        matches!(
+                                                            RequirementSatisfaction::check(
+                                                                installed_dep,
+                                                                &source_from_resolution
+                                                            ),
+                                                            RequirementSatisfaction::Satisfied
+                                                        )
+                                                    });
+
+                                                if !satisfied {
+                                                    debug!(
+                                                        "Match-runtime dependency {} has changed version, marking {} for reinstall",
+                                                        req.requirement.name, installed
+                                                    );
+                                                    needs_rebuild = true;
+                                                    break;
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    if needs_rebuild {
+                                        reinstalls.push(installed.clone());
+                                    } else {
+                                        debug!("Requirement already installed: {installed}");
+                                        continue;
+                                    }
+                                } else {
+                                    debug!("Requirement already installed: {installed}");
+                                    continue;
+                                }
                             }
                             RequirementSatisfaction::OutOfDate => {
                                 debug!("Requirement installed, but not fresh: {installed}");

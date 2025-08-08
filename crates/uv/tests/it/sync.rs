@@ -12666,6 +12666,50 @@ fn sync_build_dependencies_respect_locked_versions() -> Result<()> {
      ~ child==0.1.0 (from file://[TEMP_DIR]/child)
     ");
 
+    // Test automatic invalidation: sync without --reinstall should rebuild child automatically
+    // when match-runtime dependencies change
+    pyproject_toml.write_str(indoc! {r#"
+        [project]
+        name = "parent"
+        version = "0.1.0"
+        requires-python = ">=3.9"
+        dependencies = ["anyio==4.2.0", "child"]
+
+        [tool.uv.sources]
+        child = { path = "child" }
+
+        [tool.uv.extra-build-dependencies]
+        child = [{ requirement = "anyio", match-runtime = true }]
+    "#})?;
+
+    uv_snapshot!(context.filters(), context.sync().env("EXPECTED_ANYIO_VERSION", "4.2"), @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    warning: The `extra-build-dependencies` option is experimental and may change without warning. Pass `--preview-features extra-build-dependencies` to disable this warning.
+    Resolved [N] packages in [TIME]
+    Prepared [N] packages in [TIME]
+    Uninstalled [N] packages in [TIME]
+    Installed [N] packages in [TIME]
+     - anyio==3.7.1
+     + anyio==4.2.0
+     ~ child==0.1.0 (from file://[TEMP_DIR]/child)
+    ");
+
+    // Test that we don't rebuild unnecessarily when dependencies haven't changed
+    uv_snapshot!(context.filters(), context.sync().env("EXPECTED_ANYIO_VERSION", "4.2"), @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    warning: The `extra-build-dependencies` option is experimental and may change without warning. Pass `--preview-features extra-build-dependencies` to disable this warning.
+    Resolved [N] packages in [TIME]
+    Audited [N] packages in [TIME]
+    ");
+
     // With preview enabled, there's no warning
     uv_snapshot!(context.filters(), context.sync()
         .arg("--preview-features").arg("extra-build-dependencies")
@@ -12766,6 +12810,7 @@ fn sync_build_dependencies_respect_locked_versions() -> Result<()> {
 
     Ok(())
 }
+
 
 #[test]
 fn sync_extra_build_variables() -> Result<()> {
