@@ -489,7 +489,7 @@ pub async fn check_url(
     let registry_client = registry_client_builder
         .clone()
         .cache(cache_refresh)
-        .wrap_existing(client);
+        .apply_middleware(client.clone());
 
     debug!("Checking for {filename} in the registry");
     let response = match registry_client

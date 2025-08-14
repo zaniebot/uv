@@ -69,7 +69,7 @@ pub(crate) async fn publish(
         .build();
     let oidc_client = BaseClientBuilder::new()
         .auth_integration(AuthIntegration::NoAuthMiddleware)
-        .wrap_existing(&upload_client);
+        .apply_middleware_to_existing(upload_client.clone());
     // We're only checking a single URL and one at a time, so 1 permit is sufficient
     let download_concurrency = Arc::new(Semaphore::new(1));
 

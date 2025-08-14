@@ -325,17 +325,9 @@ impl<'a> BaseClientBuilder<'a> {
             self.redirect_policy,
         );
 
-        // Wrap in any relevant middleware and handle connectivity.
-        let client = RedirectClientWithMiddleware {
-            client: self.apply_middleware(raw_client.clone()),
-            redirect_policy: self.redirect_policy,
-            cross_origin_credentials_policy: self.cross_origin_credential_policy,
-        };
-        let dangerous_client = RedirectClientWithMiddleware {
-            client: self.apply_middleware(raw_dangerous_client.clone()),
-            redirect_policy: self.redirect_policy,
-            cross_origin_credentials_policy: self.cross_origin_credential_policy,
-        };
+        // Create versions of the clients with middleware applied.
+        let client = self.redirect_client_with_middleware(raw_client.clone());
+        let dangerous_client = self.redirect_client_with_middleware(raw_dangerous_client.clone());
 
         BaseClient {
             connectivity: self.connectivity,
@@ -349,28 +341,23 @@ impl<'a> BaseClientBuilder<'a> {
         }
     }
 
-    /// Share the underlying client between two different middleware configurations.
-    pub fn wrap_existing(&self, existing: &BaseClient) -> BaseClient {
-        // Wrap in any relevant middleware and handle connectivity.
-        let client = RedirectClientWithMiddleware {
-            client: self.apply_middleware(existing.raw_client.clone()),
-            redirect_policy: self.redirect_policy,
-            cross_origin_credentials_policy: self.cross_origin_credential_policy,
-        };
-        let dangerous_client = RedirectClientWithMiddleware {
-            client: self.apply_middleware(existing.raw_dangerous_client.clone()),
-            redirect_policy: self.redirect_policy,
-            cross_origin_credentials_policy: self.cross_origin_credential_policy,
-        };
-
+    /// Apply the middleware defined on this [`BaseClientBuilder`] to a [`BaseClient`].
+    ///
+    /// This allows sharing the underlying client between two different middleware configurations.
+    ///
+    /// This also applies the redirect policy and cors policy.
+    pub fn apply_middleware_to_existing(&self, existing: BaseClient) -> BaseClient {
+        let client = self.redirect_client_with_middleware(existing.raw_client.clone());
+        let dangerous_client =
+            self.redirect_client_with_middleware(existing.raw_dangerous_client.clone());
         BaseClient {
             connectivity: self.connectivity,
             allow_insecure_host: self.allow_insecure_host.clone(),
             retries: self.retries,
             client,
             dangerous_client,
-            raw_client: existing.raw_client.clone(),
-            raw_dangerous_client: existing.raw_dangerous_client.clone(),
+            raw_client: existing.raw_client,
+            raw_dangerous_client: existing.raw_dangerous_client,
             timeout: existing.timeout,
         }
     }
@@ -429,7 +416,18 @@ impl<'a> BaseClientBuilder<'a> {
             .expect("Failed to build HTTP client.")
     }
 
-    fn apply_middleware(&self, client: Client) -> ClientWithMiddleware {
+    /// Apply the middleware, redirect, and cors policies defined on this [`BaseClientBuilder`] to a
+    /// [`Client`].
+    fn redirect_client_with_middleware(&self, client: Client) -> RedirectClientWithMiddleware {
+        RedirectClientWithMiddleware {
+            client: self.client_with_middleware(client),
+            redirect_policy: self.redirect_policy,
+            cross_origin_credentials_policy: self.cross_origin_credential_policy,
+        }
+    }
+
+    /// Apply the middleware defined on this [`BaseClientBuilder`] to a [`Client`].
+    fn client_with_middleware(&self, client: Client) -> ClientWithMiddleware {
         match self.connectivity {
             Connectivity::Online => {
                 let mut client = reqwest_middleware::ClientBuilder::new(client);

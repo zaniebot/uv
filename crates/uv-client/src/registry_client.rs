@@ -202,10 +202,14 @@ impl<'a> RegistryClientBuilder<'a> {
         }
     }
 
-    /// Share the underlying client between two different middleware configurations.
-    pub fn wrap_existing(self, existing: &BaseClient) -> RegistryClient {
+    /// Apply the middleware defined on this [`RegistryClientBuilder`] to a [`BaseClient`].
+    ///
+    /// This allows sharing the underlying client between two different middleware configurations.
+    pub fn apply_middleware(self, existing: BaseClient) -> RegistryClient {
         // Wrap in any relevant middleware and handle connectivity.
-        let client = self.base_client_builder.wrap_existing(existing);
+        let client = self
+            .base_client_builder
+            .apply_middleware_to_existing(existing);
 
         let timeout = client.timeout();
         let connectivity = client.connectivity();
