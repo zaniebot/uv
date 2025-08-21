@@ -185,6 +185,61 @@ pub enum VersionRequest {
     Range(VersionSpecifiers, PythonVariant),
 }
 
+/// A collection of discovered Python executables.
+pub(crate) struct PythonExecutables<'a> {
+    executables: Box<dyn Iterator<Item = Result<(PythonSource, PathBuf), Error>> + 'a>,
+}
+
+impl<'a> PythonExecutables<'a> {
+    pub(crate) fn new(
+        executables: Box<dyn Iterator<Item = Result<(PythonSource, PathBuf), Error>> + 'a>,
+    ) -> Self {
+        Self { executables }
+    }
+
+    pub(crate) fn iter(
+        self,
+    ) -> Box<dyn Iterator<Item = Result<(PythonSource, PathBuf), Error>> + 'a> {
+        self.executables
+    }
+}
+
+/// A collection of discovered Python interpreters.
+pub(crate) struct PythonInterpreters<'a> {
+    interpreters: Box<dyn Iterator<Item = Result<(PythonSource, Interpreter), Error>> + 'a>,
+}
+
+impl<'a> PythonInterpreters<'a> {
+    pub(crate) fn new(
+        interpreters: Box<dyn Iterator<Item = Result<(PythonSource, Interpreter), Error>> + 'a>,
+    ) -> Self {
+        Self { interpreters }
+    }
+
+    pub(crate) fn iter(
+        self,
+    ) -> Box<dyn Iterator<Item = Result<(PythonSource, Interpreter), Error>> + 'a> {
+        self.interpreters
+    }
+}
+
+/// A collection of discovered Python installations.
+pub struct PythonInstallations<'a> {
+    installations: Box<dyn Iterator<Item = Result<FindPythonResult, Error>> + 'a>,
+}
+
+impl<'a> PythonInstallations<'a> {
+    pub fn new(
+        installations: Box<dyn Iterator<Item = Result<FindPythonResult, Error>> + 'a>,
+    ) -> Self {
+        Self { installations }
+    }
+
+    pub fn iter(self) -> Box<dyn Iterator<Item = Result<FindPythonResult, Error>> + 'a> {
+        self.installations
+    }
+}
+
 /// The result of an Python installation search.
 ///
 /// Returned by [`find_python_installation`].
@@ -336,7 +391,7 @@ fn python_executables_from_installed<'a>(
     platform: PlatformRequest,
     preference: PythonPreference,
     preview: Preview,
-) -> Box<dyn Iterator<Item = Result<(PythonSource, PathBuf), Error>> + 'a> {
+) -> PythonExecutables<'a> {
     let from_managed_installations = iter::once_with(move || {
         ManagedPythonInstallations::from_settings(None)
             .map_err(Error::from)
@@ -465,29 +520,32 @@ fn python_executables_from_installed<'a>(
     })
     .flatten();
 
-    match preference {
-        PythonPreference::OnlyManaged => {
-            // TODO(zanieb): Ideally, we'd create "fake" managed installation directories for tests,
-            // but for now... we'll just include the test interpreters which are always on the
-            // search path.
-            if std::env::var(uv_static::EnvVars::UV_INTERNAL__TEST_PYTHON_MANAGED).is_ok() {
-                Box::new(from_managed_installations.chain(from_search_path))
-            } else {
-                Box::new(from_managed_installations)
+    let executables: Box<dyn Iterator<Item = Result<(PythonSource, PathBuf), Error>> + 'a> =
+        match preference {
+            PythonPreference::OnlyManaged => {
+                // TODO(zanieb): Ideally, we'd create "fake" managed installation directories for tests,
+                // but for now... we'll just include the test interpreters which are always on the
+                // search path.
+                if std::env::var(uv_static::EnvVars::UV_INTERNAL__TEST_PYTHON_MANAGED).is_ok() {
+                    Box::new(from_managed_installations.chain(from_search_path))
+                } else {
+                    Box::new(from_managed_installations)
+                }
             }
-        }
-        PythonPreference::Managed => Box::new(
-            from_managed_installations
-                .chain(from_search_path)
-                .chain(from_windows_registry),
-        ),
-        PythonPreference::System => Box::new(
-            from_search_path
-                .chain(from_windows_registry)
-                .chain(from_managed_installations),
-        ),
-        PythonPreference::OnlySystem => Box::new(from_search_path.chain(from_windows_registry)),
-    }
+            PythonPreference::Managed => Box::new(
+                from_managed_installations
+                    .chain(from_search_path)
+                    .chain(from_windows_registry),
+            ),
+            PythonPreference::System => Box::new(
+                from_search_path
+                    .chain(from_windows_registry)
+                    .chain(from_managed_installations),
+            ),
+            PythonPreference::OnlySystem => Box::new(from_search_path.chain(from_windows_registry)),
+        };
+
+    PythonExecutables::new(executables)
 }
 
 /// Lazily iterate over all discoverable Python executables.
@@ -506,7 +564,7 @@ fn python_executables<'a>(
     environments: EnvironmentPreference,
     preference: PythonPreference,
     preview: Preview,
-) -> Box<dyn Iterator<Item = Result<(PythonSource, PathBuf), Error>> + 'a> {
+) -> PythonExecutables<'a> {
     // Always read from `UV_INTERNAL__PARENT_INTERPRETER` — it could be a system interpreter
     let from_parent_interpreter = iter::once_with(|| {
         env::var_os(EnvVars::UV_INTERNAL__PARENT_INTERPRETER)
@@ -531,22 +589,25 @@ fn python_executables<'a>(
     // Limit the search to the relevant environment preference; this avoids unnecessary work like
     // traversal of the file system. Subsequent filtering should be done by the caller with
     // `source_satisfies_environment_preference` and `interpreter_satisfies_environment_preference`.
-    match environments {
-        EnvironmentPreference::OnlyVirtual => {
-            Box::new(from_parent_interpreter.chain(from_virtual_environments))
-        }
-        EnvironmentPreference::ExplicitSystem | EnvironmentPreference::Any => Box::new(
-            from_parent_interpreter
-                .chain(from_virtual_environments)
-                .chain(from_base_conda_environment)
-                .chain(from_installed),
-        ),
-        EnvironmentPreference::OnlySystem => Box::new(
-            from_parent_interpreter
-                .chain(from_base_conda_environment)
-                .chain(from_installed),
-        ),
-    }
+    let executables: Box<dyn Iterator<Item = Result<(PythonSource, PathBuf), Error>> + 'a> =
+        match environments {
+            EnvironmentPreference::OnlyVirtual => {
+                Box::new(from_parent_interpreter.chain(from_virtual_environments))
+            }
+            EnvironmentPreference::ExplicitSystem | EnvironmentPreference::Any => Box::new(
+                from_parent_interpreter
+                    .chain(from_virtual_environments)
+                    .chain(from_base_conda_environment)
+                    .chain(from_installed.iter()),
+            ),
+            EnvironmentPreference::OnlySystem => Box::new(
+                from_parent_interpreter
+                    .chain(from_base_conda_environment)
+                    .chain(from_installed.iter()),
+            ),
+        };
+
+    PythonExecutables::new(executables)
 }
 
 /// Lazily iterate over Python executables in the `PATH`.
@@ -726,8 +787,8 @@ fn python_interpreters<'a>(
     preference: PythonPreference,
     cache: &'a Cache,
     preview: Preview,
-) -> impl Iterator<Item = Result<(PythonSource, Interpreter), Error>> + 'a {
-    python_interpreters_from_executables(
+) -> PythonInterpreters<'a> {
+    let interpreters = python_interpreters_from_executables(
         // Perform filtering on the discovered executables based on their source. This avoids
         // unnecessary interpreter queries, which are generally expensive. We'll filter again
         // with `interpreter_satisfies_environment_preference` after querying.
@@ -739,6 +800,7 @@ fn python_interpreters<'a>(
             preference,
             preview,
         )
+        .iter()
         .filter_ok(move |(source, path)| {
             source_satisfies_environment_preference(*source, path, environments)
         }),
@@ -761,7 +823,9 @@ fn python_interpreters<'a>(
     })
     .filter_ok(move |(source, interpreter)| {
         satisfies_python_preference(*source, interpreter, preference)
-    })
+    });
+
+    PythonInterpreters::new(Box::new(interpreters))
 }
 
 /// Lazily convert Python executables into interpreters.
@@ -1076,14 +1140,14 @@ pub fn find_python_installations<'a>(
     preference: PythonPreference,
     cache: &'a Cache,
     preview: Preview,
-) -> Box<dyn Iterator<Item = Result<FindPythonResult, Error>> + 'a> {
+) -> PythonInstallations<'a> {
     let sources = DiscoveryPreferences {
         python_preference: preference,
         environment_preference: environments,
     }
     .sources(request);
 
-    match request {
+    let installations = match request {
         PythonRequest::File(path) => Box::new(iter::once({
             if preference.allows(PythonSource::ProvidedPath) {
                 debug!("Checking for Python interpreter at {request}");
@@ -1137,26 +1201,28 @@ pub fn find_python_installations<'a>(
             }
         })),
         PythonRequest::ExecutableName(name) => {
-            if preference.allows(PythonSource::SearchPath) {
-                debug!("Searching for Python interpreter with {request}");
-                Box::new(
-                    python_interpreters_with_executable_name(name, cache)
-                        .filter_ok(move |(source, interpreter)| {
-                            interpreter_satisfies_environment_preference(
-                                *source,
-                                interpreter,
-                                environments,
-                            )
-                        })
-                        .map_ok(|tuple| Ok(PythonInstallation::from_tuple(tuple))),
-                )
-            } else {
-                Box::new(iter::once(Err(Error::SourceNotAllowed(
-                    request.clone(),
-                    PythonSource::SearchPath,
-                    preference,
-                ))))
-            }
+            let iterator: Box<dyn Iterator<Item = Result<FindPythonResult, Error>> + 'a> =
+                if preference.allows(PythonSource::SearchPath) {
+                    debug!("Searching for Python interpreter with {request}");
+                    Box::new(
+                        python_interpreters_with_executable_name(name, cache)
+                            .filter_ok(move |(source, interpreter)| {
+                                interpreter_satisfies_environment_preference(
+                                    *source,
+                                    interpreter,
+                                    environments,
+                                )
+                            })
+                            .map_ok(|tuple| Ok(PythonInstallation::from_tuple(tuple))),
+                    )
+                } else {
+                    Box::new(iter::once(Err(Error::SourceNotAllowed(
+                        request.clone(),
+                        PythonSource::SearchPath,
+                        preference,
+                    ))))
+                };
+            iterator
         }
         PythonRequest::Any => Box::new({
             debug!("Searching for any Python interpreter in {sources}");
@@ -1169,6 +1235,7 @@ pub fn find_python_installations<'a>(
                 cache,
                 preview,
             )
+            .iter()
             .map_ok(|tuple| Ok(PythonInstallation::from_tuple(tuple)))
         }),
         PythonRequest::Default => Box::new({
@@ -1182,11 +1249,14 @@ pub fn find_python_installations<'a>(
                 cache,
                 preview,
             )
+            .iter()
             .map_ok(|tuple| Ok(PythonInstallation::from_tuple(tuple)))
         }),
         PythonRequest::Version(version) => {
             if let Err(err) = version.check_supported() {
-                return Box::new(iter::once(Err(Error::InvalidVersionRequest(err))));
+                return PythonInstallations::new(Box::new(iter::once(Err(
+                    Error::InvalidVersionRequest(err),
+                ))));
             }
             Box::new({
                 debug!("Searching for {request} in {sources}");
@@ -1199,6 +1269,7 @@ pub fn find_python_installations<'a>(
                     cache,
                     preview,
                 )
+                .interpreters
                 .map_ok(|tuple| Ok(PythonInstallation::from_tuple(tuple)))
             })
         }
@@ -1213,12 +1284,15 @@ pub fn find_python_installations<'a>(
                 cache,
                 preview,
             )
+            .iter()
             .filter_ok(|(_source, interpreter)| implementation.matches_interpreter(interpreter))
             .map_ok(|tuple| Ok(PythonInstallation::from_tuple(tuple)))
         }),
         PythonRequest::ImplementationVersion(implementation, version) => {
             if let Err(err) = version.check_supported() {
-                return Box::new(iter::once(Err(Error::InvalidVersionRequest(err))));
+                return PythonInstallations::new(Box::new(iter::once(Err(
+                    Error::InvalidVersionRequest(err),
+                ))));
             }
             Box::new({
                 debug!("Searching for {request} in {sources}");
@@ -1231,6 +1305,7 @@ pub fn find_python_installations<'a>(
                     cache,
                     preview,
                 )
+                .iter()
                 .filter_ok(|(_source, interpreter)| implementation.matches_interpreter(interpreter))
                 .map_ok(|tuple| Ok(PythonInstallation::from_tuple(tuple)))
             })
@@ -1238,7 +1313,9 @@ pub fn find_python_installations<'a>(
         PythonRequest::Key(request) => {
             if let Some(version) = request.version() {
                 if let Err(err) = version.check_supported() {
-                    return Box::new(iter::once(Err(Error::InvalidVersionRequest(err))));
+                    return PythonInstallations::new(Box::new(iter::once(Err(
+                        Error::InvalidVersionRequest(err),
+                    ))));
                 }
             }
 
@@ -1253,13 +1330,16 @@ pub fn find_python_installations<'a>(
                     cache,
                     preview,
                 )
+                .iter()
                 .filter_ok(move |(_source, interpreter)| {
                     request.satisfied_by_interpreter(interpreter)
                 })
                 .map_ok(|tuple| Ok(PythonInstallation::from_tuple(tuple)))
             })
         }
-    }
+    };
+
+    PythonInstallations::new(installations)
 }
 
 /// Find a Python installation that satisfies the given request.
@@ -1278,7 +1358,7 @@ pub(crate) fn find_python_installation(
     let mut first_prerelease = None;
     let mut first_managed = None;
     let mut first_error = None;
-    for result in installations {
+    for result in installations.iter() {
         // Iterate until the first critical error or happy result
         if !result.as_ref().err().is_none_or(Error::is_critical) {
             // Track the first non-critical error

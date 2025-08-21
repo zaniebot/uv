@@ -130,6 +130,7 @@ pub(crate) async fn list(
                 cache,
                 preview,
             )
+            .iter()
             // Raise discovery errors if critical
             .filter(|result| {
                 result
