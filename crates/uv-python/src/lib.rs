@@ -6,9 +6,10 @@ use thiserror::Error;
 use uv_static::EnvVars;
 
 pub use crate::discovery::{
-    EnvironmentPreference, Error as DiscoveryError, PythonDownloads, PythonNotFound,
-    PythonPreference, PythonRequest, PythonSource, PythonVariant, VersionRequest,
-    find_python_installations, satisfies_python_preference,
+    DiscoveredInstallation, EnvironmentPreference, Error as DiscoveryError, IncompatibilityReason,
+    IncompatiblePythonExecutable, PythonDownloads, PythonNotFound, PythonPreference, PythonRequest,
+    PythonSource, PythonVariant, VersionRequest, find_python_installations,
+    satisfies_python_preference,
 };
 pub use crate::downloads::PlatformRequest;
 pub use crate::environment::{InvalidEnvironmentKind, PythonEnvironment};

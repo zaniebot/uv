@@ -13,8 +13,8 @@ use uv_cache::Cache;
 use uv_fs::Simplified;
 use uv_python::downloads::PythonDownloadRequest;
 use uv_python::{
-    DiscoveryError, EnvironmentPreference, PythonDownloads, PythonInstallation, PythonNotFound,
-    PythonPreference, PythonRequest, PythonSource, find_python_installations,
+    EnvironmentPreference, PythonDownloads, PythonPreference, PythonRequest, PythonSource,
+    find_python_installations,
 };
 
 use crate::commands::ExitStatus;
@@ -120,45 +120,37 @@ pub(crate) async fn list(
         }
     }
 
-    let installed =
-        match kinds {
-            PythonListKinds::Installed | PythonListKinds::Default => {
-                Some(find_python_installations(
+    let installed = match kinds {
+        PythonListKinds::Installed | PythonListKinds::Default => {
+            let (compatible, _incompatible) = find_python_installations(
                 request.as_ref().unwrap_or(&PythonRequest::Any),
                 EnvironmentPreference::OnlySystem,
                 python_preference,
                 cache,
                 preview,
             )
-            .iter()
-            // Raise discovery errors if critical
-            .filter(|result| {
-                result
-                    .as_ref()
-                    .err()
-                    .is_none_or(DiscoveryError::is_critical)
-            })
-            .collect::<Result<Vec<Result<PythonInstallation, PythonNotFound>>, DiscoveryError>>()?
-            .into_iter()
-            // Drop any "missing" installations
-            .filter_map(Result::ok))
-            }
-            PythonListKinds::Downloads => None,
-        };
+            .skip_non_critical_errors()
+            .partition()?;
 
-    if let Some(installed) = installed {
-        for installation in installed {
-            let kind = if matches!(installation.source(), PythonSource::Managed) {
-                Kind::Managed
-            } else {
-                Kind::System
-            };
-            output.insert((
-                installation.key(),
-                kind,
-                Either::Left(installation.interpreter().real_executable().to_path_buf()),
-            ));
+            // TODO(zanieb): If the compatible set is empty, we can give hints based on the
+            // incompatible set.
+
+            compatible
         }
+        PythonListKinds::Downloads => vec![],
+    };
+
+    for installation in &installed {
+        let kind = if matches!(installation.source(), PythonSource::Managed) {
+            Kind::Managed
+        } else {
+            Kind::System
+        };
+        output.insert((
+            installation.key(),
+            kind,
+            Either::Left(installation.interpreter().real_executable().to_path_buf()),
+        ));
     }
 
     let mut seen_minor = FxHashSet::default();
