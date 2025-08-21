@@ -185,58 +185,115 @@ pub enum VersionRequest {
     Range(VersionSpecifiers, PythonVariant),
 }
 
+/// Information about a Python executable that was incompatible during discovery.
+#[derive(Debug, Clone)]
+pub struct IncompatiblePythonExecutable {
+    pub path: PathBuf,
+    pub source: PythonSource,
+    pub reason: IncompatibilityReason,
+}
+
+/// Reasons why a Python executable might be incompatible.
+#[derive(Debug, Clone)]
+pub enum IncompatibilityReason {
+    /// Version does not match the requested version
+    VersionMismatch { requested: String, found: String },
+    /// Platform does not match the requested platform  
+    PlatformMismatch { requested: String, found: String },
+    /// Build version was requested but not recorded for this installation
+    MissingBuildVersion { requested: String },
+    /// Build version does not match the requested build version
+    BuildVersionMismatch { requested: String, found: String },
+    /// Python version is unsupported (below minimum required version)
+    UnsupportedVersion { found: String },
+    /// File is not executable
+    NotExecutable,
+    /// Windows Store shim executable (redirects to Microsoft Store)
+    WindowsStoreShim,
+    /// File name does not match expected Python executable pattern
+    InvalidFileName { found: String },
+    /// Implementation does not match the requested implementation
+    ImplementationMismatch { requested: String, found: String },
+}
+
+/// Result of Python executable discovery.
+#[derive(Debug, Clone)]
+pub(crate) enum DiscoveredExecutable {
+    /// A Python executable that is compatible with the request
+    Compatible(PythonSource, PathBuf),
+    /// A Python executable that was found but is incompatible
+    Incompatible(IncompatiblePythonExecutable),
+}
+
+/// Result of Python interpreter discovery.
+#[derive(Debug, Clone)]
+pub(crate) enum DiscoveredInterpreter {
+    /// A Python interpreter that is compatible with the request
+    Compatible(PythonSource, Interpreter),
+    /// A Python executable that was found but is incompatible
+    Incompatible(IncompatiblePythonExecutable),
+}
+
+/// Result of Python installation discovery.
+#[derive(Debug, Clone)]
+pub enum DiscoveredInstallation {
+    /// A Python installation that is compatible with the request
+    Compatible(PythonInstallation),
+    /// A Python installation that was found but is incompatible
+    Incompatible(IncompatiblePythonExecutable),
+}
+
 /// A collection of discovered Python executables.
 pub(crate) struct PythonExecutables<'a> {
-    executables: Box<dyn Iterator<Item = Result<(PythonSource, PathBuf), Error>> + 'a>,
+    inner: Box<dyn Iterator<Item = Result<DiscoveredExecutable, Error>> + 'a>,
 }
 
 impl<'a> PythonExecutables<'a> {
     pub(crate) fn new(
-        executables: Box<dyn Iterator<Item = Result<(PythonSource, PathBuf), Error>> + 'a>,
+        inner: Box<dyn Iterator<Item = Result<DiscoveredExecutable, Error>> + 'a>,
     ) -> Self {
-        Self { executables }
+        Self { inner }
     }
 
-    pub(crate) fn iter(
-        self,
-    ) -> Box<dyn Iterator<Item = Result<(PythonSource, PathBuf), Error>> + 'a> {
-        self.executables
+    /// Iterate over all results (both compatible and incompatible)
+    pub(crate) fn iter(self) -> Box<dyn Iterator<Item = Result<DiscoveredExecutable, Error>> + 'a> {
+        self.inner
     }
 }
 
 /// A collection of discovered Python interpreters.
 pub(crate) struct PythonInterpreters<'a> {
-    interpreters: Box<dyn Iterator<Item = Result<(PythonSource, Interpreter), Error>> + 'a>,
+    inner: Box<dyn Iterator<Item = Result<DiscoveredInterpreter, Error>> + 'a>,
 }
 
 impl<'a> PythonInterpreters<'a> {
     pub(crate) fn new(
-        interpreters: Box<dyn Iterator<Item = Result<(PythonSource, Interpreter), Error>> + 'a>,
+        inner: Box<dyn Iterator<Item = Result<DiscoveredInterpreter, Error>> + 'a>,
     ) -> Self {
-        Self { interpreters }
+        Self { inner }
     }
 
     pub(crate) fn iter(
         self,
-    ) -> Box<dyn Iterator<Item = Result<(PythonSource, Interpreter), Error>> + 'a> {
-        self.interpreters
+    ) -> Box<dyn Iterator<Item = Result<DiscoveredInterpreter, Error>> + 'a> {
+        self.inner
     }
 }
 
 /// A collection of discovered Python installations.
 pub struct PythonInstallations<'a> {
-    installations: Box<dyn Iterator<Item = Result<FindPythonResult, Error>> + 'a>,
+    inner: Box<dyn Iterator<Item = Result<DiscoveredInstallation, Error>> + 'a>,
 }
 
 impl<'a> PythonInstallations<'a> {
     pub fn new(
-        installations: Box<dyn Iterator<Item = Result<FindPythonResult, Error>> + 'a>,
+        inner: Box<dyn Iterator<Item = Result<DiscoveredInstallation, Error>> + 'a>,
     ) -> Self {
-        Self { installations }
+        Self { inner }
     }
 
-    pub fn iter(self) -> Box<dyn Iterator<Item = Result<FindPythonResult, Error>> + 'a> {
-        self.installations
+    pub fn iter(self) -> Box<dyn Iterator<Item = Result<DiscoveredInstallation, Error>> + 'a> {
+        self.inner
     }
 }
 
@@ -408,35 +465,67 @@ fn python_executables_from_installed<'a>(
                 // unnecessary interpreter queries later
                 Ok(installations
                     .into_iter()
-                    .filter(move |installation| {
+                    .map(move |installation| {
+                        // Check version compatibility
                         if !version.matches_version(&installation.version()) {
                             debug!("Skipping managed installation `{installation}`: does not satisfy `{version}`");
-                            return false;
-                        }
-                        if !platform.matches(installation.platform()) {
-                            debug!("Skipping managed installation `{installation}`: does not satisfy requested platform `{platform}`");
-                            return false;
+                            let incompatible = IncompatiblePythonExecutable {
+                                path: installation.executable(false),
+                                source: PythonSource::Managed,
+                                reason: IncompatibilityReason::VersionMismatch {
+                                    requested: version.to_string(),
+                                    found: installation.version().to_string(),
+                                },
+                            };
+                            debug!("SKIP INFO CAPTURED: {:?}", incompatible);
+                            return DiscoveredExecutable::Incompatible(incompatible);
                         }
 
+                        // Check platform compatibility
+                        if !platform.matches(installation.platform()) {
+                            debug!("Skipping managed installation `{installation}`: does not satisfy requested platform `{platform}`");
+                            return DiscoveredExecutable::Incompatible(IncompatiblePythonExecutable {
+                                path: installation.executable(false),
+                                source: PythonSource::Managed,
+                                reason: IncompatibilityReason::PlatformMismatch {
+                                    requested: platform.to_string(),
+                                    found: installation.platform().to_string(),
+                                },
+                            });
+                        }
+
+                        // Check build version compatibility
                         if let Some(requested_build) = build_versions.get(&installation.implementation()) {
                             let Some(installation_build) = installation.build() else {
                                 debug!(
                                     "Skipping managed installation `{installation}`: a build version was requested but is not recorded for this installation"
                                 );
-                                return false;
+                                return DiscoveredExecutable::Incompatible(IncompatiblePythonExecutable {
+                                    path: installation.executable(false),
+                                    source: PythonSource::Managed,
+                                    reason: IncompatibilityReason::MissingBuildVersion {
+                                        requested: requested_build.to_string(),
+                                    },
+                                });
                             };
                             if installation_build != requested_build {
                                 debug!(
                                     "Skipping managed installation `{installation}`: requested build version `{requested_build}` does not match installation build version `{installation_build}`"
                                 );
-                                return false;
+                                return DiscoveredExecutable::Incompatible(IncompatiblePythonExecutable {
+                                    path: installation.executable(false),
+                                    source: PythonSource::Managed,
+                                    reason: IncompatibilityReason::BuildVersionMismatch {
+                                        requested: requested_build.to_string(),
+                                        found: installation_build.to_string(),
+                                    },
+                                });
                             }
                         }
 
-                        true
-                    })
-                    .inspect(|installation| debug!("Found managed installation `{installation}`"))
-                    .map(move |installation| {
+                        // Installation is compatible
+                        debug!("Found managed installation `{installation}`");
+
                         // If it's not a patch version request, then attempt to read the stable
                         // minor version link.
                         let executable = version
@@ -456,7 +545,8 @@ fn python_executables_from_installed<'a>(
                                 })
                                 .flatten()
                                 .unwrap_or_else(|| installation.executable(false));
-                        (PythonSource::Managed, executable)
+
+                        DiscoveredExecutable::Compatible(PythonSource::Managed, executable)
                     })
                 )
             })
@@ -466,11 +556,26 @@ fn python_executables_from_installed<'a>(
     let from_search_path = iter::once_with(move || {
         python_executables_from_search_path(version, implementation)
             .enumerate()
-            .map(|(i, path)| {
-                if i == 0 {
-                    Ok((PythonSource::SearchPathFirst, path))
-                } else {
-                    Ok((PythonSource::SearchPath, path))
+            .map(|(i, discovered)| {
+                // Update the source to mark the first executable as SearchPathFirst
+                match discovered {
+                    DiscoveredExecutable::Compatible(_, path) => {
+                        let source = if i == 0 {
+                            PythonSource::SearchPathFirst
+                        } else {
+                            PythonSource::SearchPath
+                        };
+                        Ok(DiscoveredExecutable::Compatible(source, path))
+                    }
+                    DiscoveredExecutable::Incompatible(mut incompatible) => {
+                        // Update source for incompatible executables too
+                        incompatible.source = if i == 0 {
+                            PythonSource::SearchPathFirst
+                        } else {
+                            PythonSource::SearchPath
+                        };
+                        Ok(DiscoveredExecutable::Incompatible(incompatible))
+                    }
                 }
             })
     })
@@ -479,17 +584,30 @@ fn python_executables_from_installed<'a>(
     let from_windows_registry = iter::once_with(move || {
         #[cfg(windows)]
         {
-            // Skip interpreter probing if we already know the version doesn't match.
-            let version_filter = move |entry: &WindowsPython| {
+            // Check interpreter compatibility and track incompatible ones
+            let check_compatibility = move |entry: &WindowsPython, source: PythonSource| {
                 if let Some(found) = &entry.version {
                     // Some distributions emit the patch version (example: `SysVersion: 3.9`)
-                    if found.string.chars().filter(|c| *c == '.').count() == 1 {
+                    let matches = if found.string.chars().filter(|c| *c == '.').count() == 1 {
                         version.matches_major_minor(found.major(), found.minor())
                     } else {
                         version.matches_version(found)
+                    };
+
+                    if matches {
+                        DiscoveredExecutable::Compatible(source, entry.path.clone())
+                    } else {
+                        DiscoveredExecutable::Incompatible(IncompatiblePythonExecutable {
+                            path: entry.path.clone(),
+                            source,
+                            reason: IncompatibilityReason::VersionMismatch {
+                                requested: version.to_string(),
+                                found: found.string.clone(),
+                            },
+                        })
                     }
                 } else {
-                    true
+                    DiscoveredExecutable::Compatible(source, entry.path.clone())
                 }
             };
 
@@ -500,13 +618,10 @@ fn python_executables_from_installed<'a>(
                         .map(|entries| {
                             entries
                                 .into_iter()
-                                .filter(version_filter)
-                                .map(|entry| (PythonSource::Registry, entry.path))
-                                .chain(
-                                    find_microsoft_store_pythons()
-                                        .filter(version_filter)
-                                        .map(|entry| (PythonSource::MicrosoftStore, entry.path)),
-                                )
+                                .map(|entry| check_compatibility(&entry, PythonSource::Registry))
+                                .chain(find_microsoft_store_pythons().map(|entry| {
+                                    check_compatibility(&entry, PythonSource::MicrosoftStore)
+                                }))
                         })
                         .map_err(Error::from)
                 })
@@ -520,7 +635,7 @@ fn python_executables_from_installed<'a>(
     })
     .flatten();
 
-    let executables: Box<dyn Iterator<Item = Result<(PythonSource, PathBuf), Error>> + 'a> =
+    let executables: Box<dyn Iterator<Item = Result<DiscoveredExecutable, Error>> + 'a> =
         match preference {
             PythonPreference::OnlyManaged => {
                 // TODO(zanieb): Ideally, we'd create "fake" managed installation directories for tests,
@@ -569,7 +684,12 @@ fn python_executables<'a>(
     let from_parent_interpreter = iter::once_with(|| {
         env::var_os(EnvVars::UV_INTERNAL__PARENT_INTERPRETER)
             .into_iter()
-            .map(|path| Ok((PythonSource::ParentInterpreter, PathBuf::from(path))))
+            .map(|path| {
+                Ok(DiscoveredExecutable::Compatible(
+                    PythonSource::ParentInterpreter,
+                    PathBuf::from(path),
+                ))
+            })
     })
     .flatten();
 
@@ -578,18 +698,24 @@ fn python_executables<'a>(
         conda_environment_from_env(CondaEnvironmentKind::Base)
             .into_iter()
             .map(virtualenv_python_executable)
-            .map(|path| Ok((PythonSource::BaseCondaPrefix, path)))
+            .map(|path| {
+                Ok(DiscoveredExecutable::Compatible(
+                    PythonSource::BaseCondaPrefix,
+                    path,
+                ))
+            })
     })
     .flatten();
 
-    let from_virtual_environments = python_executables_from_virtual_environments();
+    let from_virtual_environments = python_executables_from_virtual_environments()
+        .map(|result| result.map(|(source, path)| DiscoveredExecutable::Compatible(source, path)));
     let from_installed =
         python_executables_from_installed(version, implementation, platform, preference, preview);
 
     // Limit the search to the relevant environment preference; this avoids unnecessary work like
     // traversal of the file system. Subsequent filtering should be done by the caller with
     // `source_satisfies_environment_preference` and `interpreter_satisfies_environment_preference`.
-    let executables: Box<dyn Iterator<Item = Result<(PythonSource, PathBuf), Error>> + 'a> =
+    let executables: Box<dyn Iterator<Item = Result<DiscoveredExecutable, Error>> + 'a> =
         match environments {
             EnvironmentPreference::OnlyVirtual => {
                 Box::new(from_parent_interpreter.chain(from_virtual_environments))
@@ -624,7 +750,7 @@ fn python_executables<'a>(
 fn python_executables_from_search_path<'a>(
     version: &'a VersionRequest,
     implementation: Option<&'a ImplementationName>,
-) -> impl Iterator<Item = PathBuf> + 'a {
+) -> impl Iterator<Item = DiscoveredExecutable> + 'a {
     // `UV_TEST_PYTHON_PATH` can be used to override `PATH` to limit Python executable availability in the test suite
     let search_path = env::var_os(EnvVars::UV_TEST_PYTHON_PATH)
         .unwrap_or(env::var_os(EnvVars::PATH).unwrap_or_default());
@@ -667,7 +793,8 @@ fn python_executables_from_search_path<'a>(
                 // If we cannot determine if the directory is unique, we'll assume it is
                 .unwrap_or(true)
                 .then(|| {
-                    possible_names
+                    // Convert PathBuf results from which() to DiscoveredExecutable, handling Windows Store shims
+                    let from_which = possible_names
                         .clone()
                         .into_iter()
                         .flat_map(move |name| {
@@ -679,23 +806,51 @@ fn python_executables_from_search_path<'a>(
                                 // parameters, and the dir is local while we return the iterator.
                                 .collect::<Vec<_>>()
                         })
-                        .chain(find_all_minor(implementation, version, &dir_clone))
-                        .filter(|path| !is_windows_store_shim(path))
-                        .inspect(|path| {
-                            trace!("Found possible Python executable: {}", path.display());
-                        })
-                        .chain(
-                            // TODO(zanieb): Consider moving `python.bat` into `possible_names` to avoid a chain
-                            cfg!(windows)
-                                .then(move || {
-                                    which::which_in_global("python.bat", Some(&dir_clone))
-                                        .into_iter()
-                                        .flatten()
-                                        .collect::<Vec<_>>()
+                        .map(|path| {
+                            if is_windows_store_shim(&path) {
+                                DiscoveredExecutable::Incompatible(IncompatiblePythonExecutable {
+                                    path,
+                                    source: PythonSource::SearchPath,
+                                    reason: IncompatibilityReason::WindowsStoreShim,
                                 })
+                            } else {
+                                DiscoveredExecutable::Compatible(PythonSource::SearchPath, path)
+                            }
+                        });
+
+                    // Chain with find_all_minor which already returns DiscoveredExecutable
+                    let from_minor_versions = find_all_minor(implementation, version, &dir_clone);
+
+                    // Convert python.bat results to DiscoveredExecutable
+                    let from_python_bat = cfg!(windows)
+                        .then(move || {
+                            which::which_in_global("python.bat", Some(&dir_clone))
                                 .into_iter()
-                                .flatten(),
-                        )
+                                .flatten()
+                                .collect::<Vec<_>>()
+                        })
+                        .into_iter()
+                        .flatten()
+                        .map(|path| {
+                            if is_windows_store_shim(&path) {
+                                DiscoveredExecutable::Incompatible(IncompatiblePythonExecutable {
+                                    path,
+                                    source: PythonSource::SearchPath,
+                                    reason: IncompatibilityReason::WindowsStoreShim,
+                                })
+                            } else {
+                                DiscoveredExecutable::Compatible(PythonSource::SearchPath, path)
+                            }
+                        });
+
+                    from_which
+                        .chain(from_minor_versions)
+                        .chain(from_python_bat)
+                        .inspect(|discovered| {
+                            if let DiscoveredExecutable::Compatible(_, path) = discovered {
+                                trace!("Found possible Python executable: {}", path.display());
+                            }
+                        })
                 })
                 .into_iter()
                 .flatten()
@@ -710,7 +865,7 @@ fn find_all_minor(
     implementation: Option<&ImplementationName>,
     version_request: &VersionRequest,
     dir: &Path,
-) -> impl Iterator<Item = PathBuf> + use<> {
+) -> impl Iterator<Item = DiscoveredExecutable> + use<> {
     match version_request {
         &VersionRequest::Any
         | VersionRequest::Default
@@ -735,15 +890,41 @@ fn find_all_minor(
                 .flatten()
                 .flatten()
                 .map(|entry| entry.path())
-                .filter(move |path| {
+                .filter_map(move |path| {
                     let Some(filename) = path.file_name() else {
-                        return false;
+                        return Some(DiscoveredExecutable::Incompatible(
+                            IncompatiblePythonExecutable {
+                                path,
+                                source: PythonSource::SearchPath,
+                                reason: IncompatibilityReason::InvalidFileName {
+                                    found: "<no filename>".to_string(),
+                                },
+                            },
+                        ));
                     };
-                    let Some(filename) = filename.to_str() else {
-                        return false;
+                    let Some(filename_str) = filename.to_str() else {
+                        let filename_string = filename.to_string_lossy().to_string();
+                        return Some(DiscoveredExecutable::Incompatible(
+                            IncompatiblePythonExecutable {
+                                path,
+                                source: PythonSource::SearchPath,
+                                reason: IncompatibilityReason::InvalidFileName {
+                                    found: filename_string,
+                                },
+                            },
+                        ));
                     };
-                    let Some(captures) = regex.captures(filename) else {
-                        return false;
+                    let Some(captures) = regex.captures(filename_str) else {
+                        let filename_string = filename_str.to_string();
+                        return Some(DiscoveredExecutable::Incompatible(
+                            IncompatiblePythonExecutable {
+                                path,
+                                source: PythonSource::SearchPath,
+                                reason: IncompatibilityReason::InvalidFileName {
+                                    found: filename_string,
+                                },
+                            },
+                        ));
                     };
 
                     // Filter out interpreter we already know have a too low minor version.
@@ -751,16 +932,47 @@ fn find_all_minor(
                     if let Some(minor) = minor {
                         // Optimization: Skip generally unsupported Python versions without querying.
                         if minor < 7 {
-                            return false;
+                            return Some(DiscoveredExecutable::Incompatible(
+                                IncompatiblePythonExecutable {
+                                    path,
+                                    source: PythonSource::SearchPath,
+                                    reason: IncompatibilityReason::UnsupportedVersion {
+                                        found: format!("3.{}", minor),
+                                    },
+                                },
+                            ));
                         }
                         // Optimization 2: Skip excluded Python (minor) versions without querying.
                         if !version_request.matches_major_minor(3, minor) {
-                            return false;
+                            return Some(DiscoveredExecutable::Incompatible(
+                                IncompatiblePythonExecutable {
+                                    path,
+                                    source: PythonSource::SearchPath,
+                                    reason: IncompatibilityReason::VersionMismatch {
+                                        requested: version_request.to_string(),
+                                        found: format!("3.{}", minor),
+                                    },
+                                },
+                            ));
                         }
                     }
-                    true
+
+                    // Check if file is executable
+                    if !is_executable(&path) {
+                        Some(DiscoveredExecutable::Incompatible(
+                            IncompatiblePythonExecutable {
+                                path,
+                                source: PythonSource::SearchPath,
+                                reason: IncompatibilityReason::NotExecutable,
+                            },
+                        ))
+                    } else {
+                        Some(DiscoveredExecutable::Compatible(
+                            PythonSource::SearchPath,
+                            path,
+                        ))
+                    }
                 })
-                .filter(|path| is_executable(path))
                 .collect::<Vec<_>>();
             Either::Left(all_minors.into_iter())
         }
@@ -801,28 +1013,40 @@ fn python_interpreters<'a>(
             preview,
         )
         .iter()
-        .filter_ok(move |(source, path)| {
-            source_satisfies_environment_preference(*source, path, environments)
+        .filter_ok(move |discovered| match discovered {
+            DiscoveredExecutable::Compatible(source, path) => {
+                source_satisfies_environment_preference(*source, path, environments)
+            }
+            DiscoveredExecutable::Incompatible(_) => true, // Always pass through incompatible items
         }),
         cache,
     )
-    .filter_ok(move |(source, interpreter)| {
-        interpreter_satisfies_environment_preference(*source, interpreter, environments)
-    })
-    .filter_ok(move |(source, interpreter)| {
-        let request = version.clone().into_request_for_source(*source);
-        if request.matches_interpreter(interpreter) {
-            true
-        } else {
-            debug!(
-                "Skipping interpreter at `{}` from {source}: does not satisfy request `{request}`",
-                interpreter.sys_executable().user_display()
-            );
-            false
+    .filter_ok(move |discovered| match discovered {
+        DiscoveredInterpreter::Compatible(source, interpreter) => {
+            interpreter_satisfies_environment_preference(*source, interpreter, environments)
         }
+        DiscoveredInterpreter::Incompatible(_) => true, // Pass through incompatible items
     })
-    .filter_ok(move |(source, interpreter)| {
-        satisfies_python_preference(*source, interpreter, preference)
+    .filter_ok(move |discovered| match discovered {
+        DiscoveredInterpreter::Compatible(source, interpreter) => {
+            let request = version.clone().into_request_for_source(*source);
+            if request.matches_interpreter(interpreter) {
+                true
+            } else {
+                debug!(
+                    "Skipping interpreter at `{}` from {source}: does not satisfy request `{request}`",
+                    interpreter.sys_executable().user_display()
+                );
+                false
+            }
+        }
+        DiscoveredInterpreter::Incompatible(_) => true, // Pass through incompatible items
+    })
+    .filter_ok(move |discovered| match discovered {
+        DiscoveredInterpreter::Compatible(source, interpreter) => {
+            satisfies_python_preference(*source, interpreter, preference)
+        }
+        DiscoveredInterpreter::Incompatible(_) => true, // Pass through incompatible items
     });
 
     PythonInterpreters::new(Box::new(interpreters))
@@ -830,21 +1054,27 @@ fn python_interpreters<'a>(
 
 /// Lazily convert Python executables into interpreters.
 fn python_interpreters_from_executables<'a>(
-    executables: impl Iterator<Item = Result<(PythonSource, PathBuf), Error>> + 'a,
+    executables: impl Iterator<Item = Result<DiscoveredExecutable, Error>> + 'a,
     cache: &'a Cache,
-) -> impl Iterator<Item = Result<(PythonSource, Interpreter), Error>> + 'a {
+) -> impl Iterator<Item = Result<DiscoveredInterpreter, Error>> + 'a {
     executables.map(|result| match result {
-        Ok((source, path)) => Interpreter::query(&path, cache)
-            .map(|interpreter| (source, interpreter))
-            .inspect(|(source, interpreter)| {
-                debug!(
-                    "Found `{}` at `{}` ({source})",
-                    interpreter.key(),
-                    path.display()
-                );
+        Ok(DiscoveredExecutable::Compatible(source, path)) => Interpreter::query(&path, cache)
+            .map(|interpreter| DiscoveredInterpreter::Compatible(source, interpreter))
+            .inspect(|discovered| {
+                if let DiscoveredInterpreter::Compatible(source, interpreter) = discovered {
+                    debug!(
+                        "Found `{}` at `{}` ({source})",
+                        interpreter.key(),
+                        path.display()
+                    );
+                }
             })
             .map_err(|err| Error::Query(Box::new(err), path, source))
             .inspect_err(|err| debug!("{err}")),
+        Ok(DiscoveredExecutable::Incompatible(incompatible)) => {
+            // Pass through incompatible executables without querying interpreter
+            Ok(DiscoveredInterpreter::Incompatible(incompatible))
+        }
         Err(err) => Err(err),
     })
 }
@@ -1124,11 +1354,16 @@ fn python_installation_from_directory(
 fn python_interpreters_with_executable_name<'a>(
     name: &'a str,
     cache: &'a Cache,
-) -> impl Iterator<Item = Result<(PythonSource, Interpreter), Error>> + 'a {
+) -> impl Iterator<Item = Result<DiscoveredInterpreter, Error>> + 'a {
     python_interpreters_from_executables(
-        which_all(name)
-            .into_iter()
-            .flat_map(|inner| inner.map(|path| Ok((PythonSource::SearchPath, path)))),
+        which_all(name).into_iter().flat_map(|inner| {
+            inner.map(|path| {
+                Ok(DiscoveredExecutable::Compatible(
+                    PythonSource::SearchPath,
+                    path,
+                ))
+            })
+        }),
         cache,
     )
 }
@@ -1152,14 +1387,16 @@ pub fn find_python_installations<'a>(
             if preference.allows(PythonSource::ProvidedPath) {
                 debug!("Checking for Python interpreter at {request}");
                 match python_installation_from_executable(path, cache) {
-                    Ok(installation) => Ok(Ok(installation)),
-                    Err(InterpreterError::NotFound(_) | InterpreterError::BrokenSymlink(_)) => {
-                        Ok(Err(PythonNotFound {
-                            request: request.clone(),
-                            python_preference: preference,
-                            environment_preference: environments,
-                        }))
-                    }
+                    Ok(installation) => Ok(DiscoveredInstallation::Compatible(installation)),
+                    Err(InterpreterError::NotFound(_) | InterpreterError::BrokenSymlink(_)) => Ok(
+                        DiscoveredInstallation::Incompatible(IncompatiblePythonExecutable {
+                            path: path.clone(),
+                            source: PythonSource::ProvidedPath,
+                            reason: IncompatibilityReason::MissingBuildVersion {
+                                requested: "File not found".to_string(),
+                            },
+                        }),
+                    ),
                     Err(err) => Err(Error::Query(
                         Box::new(err),
                         path.clone(),
@@ -1178,14 +1415,16 @@ pub fn find_python_installations<'a>(
             if preference.allows(PythonSource::ProvidedPath) {
                 debug!("Checking for Python interpreter in {request}");
                 match python_installation_from_directory(path, cache) {
-                    Ok(installation) => Ok(Ok(installation)),
-                    Err(InterpreterError::NotFound(_) | InterpreterError::BrokenSymlink(_)) => {
-                        Ok(Err(PythonNotFound {
-                            request: request.clone(),
-                            python_preference: preference,
-                            environment_preference: environments,
-                        }))
-                    }
+                    Ok(installation) => Ok(DiscoveredInstallation::Compatible(installation)),
+                    Err(InterpreterError::NotFound(_) | InterpreterError::BrokenSymlink(_)) => Ok(
+                        DiscoveredInstallation::Incompatible(IncompatiblePythonExecutable {
+                            path: path.clone(),
+                            source: PythonSource::ProvidedPath,
+                            reason: IncompatibilityReason::MissingBuildVersion {
+                                requested: "File not found".to_string(),
+                            },
+                        }),
+                    ),
                     Err(err) => Err(Error::Query(
                         Box::new(err),
                         path.clone(),
@@ -1201,20 +1440,41 @@ pub fn find_python_installations<'a>(
             }
         })),
         PythonRequest::ExecutableName(name) => {
-            let iterator: Box<dyn Iterator<Item = Result<FindPythonResult, Error>> + 'a> =
+            let iterator: Box<dyn Iterator<Item = Result<DiscoveredInstallation, Error>> + 'a> =
                 if preference.allows(PythonSource::SearchPath) {
                     debug!("Searching for Python interpreter with {request}");
-                    Box::new(
-                        python_interpreters_with_executable_name(name, cache)
-                            .filter_ok(move |(source, interpreter)| {
-                                interpreter_satisfies_environment_preference(
-                                    *source,
-                                    interpreter,
+                    Box::new(python_interpreters_with_executable_name(name, cache).map(
+                        move |result| match result {
+                            Ok(DiscoveredInterpreter::Compatible(source, interpreter)) => {
+                                if interpreter_satisfies_environment_preference(
+                                    source,
+                                    &interpreter,
                                     environments,
-                                )
-                            })
-                            .map_ok(|tuple| Ok(PythonInstallation::from_tuple(tuple))),
-                    )
+                                ) {
+                                    Ok(DiscoveredInstallation::Compatible(PythonInstallation {
+                                        source,
+                                        interpreter,
+                                    }))
+                                } else {
+                                    Ok(DiscoveredInstallation::Incompatible(
+                                        IncompatiblePythonExecutable {
+                                            path: interpreter.sys_executable().to_path_buf(),
+                                            source,
+                                            reason: IncompatibilityReason::VersionMismatch {
+                                                requested: "Environment preference not satisfied"
+                                                    .to_string(),
+                                                found: interpreter.key().to_string(),
+                                            },
+                                        },
+                                    ))
+                                }
+                            }
+                            Ok(DiscoveredInterpreter::Incompatible(incompatible)) => {
+                                Ok(DiscoveredInstallation::Incompatible(incompatible))
+                            }
+                            Err(e) => Err(e),
+                        },
+                    ))
                 } else {
                     Box::new(iter::once(Err(Error::SourceNotAllowed(
                         request.clone(),
@@ -1236,7 +1496,18 @@ pub fn find_python_installations<'a>(
                 preview,
             )
             .iter()
-            .map_ok(|tuple| Ok(PythonInstallation::from_tuple(tuple)))
+            .map(|result| match result {
+                Ok(DiscoveredInterpreter::Compatible(source, interpreter)) => {
+                    Ok(DiscoveredInstallation::Compatible(PythonInstallation {
+                        source,
+                        interpreter,
+                    }))
+                }
+                Ok(DiscoveredInterpreter::Incompatible(incompatible)) => {
+                    Ok(DiscoveredInstallation::Incompatible(incompatible))
+                }
+                Err(e) => Err(e),
+            })
         }),
         PythonRequest::Default => Box::new({
             debug!("Searching for default Python interpreter in {sources}");
@@ -1250,7 +1521,18 @@ pub fn find_python_installations<'a>(
                 preview,
             )
             .iter()
-            .map_ok(|tuple| Ok(PythonInstallation::from_tuple(tuple)))
+            .map(|result| match result {
+                Ok(DiscoveredInterpreter::Compatible(source, interpreter)) => {
+                    Ok(DiscoveredInstallation::Compatible(PythonInstallation {
+                        source,
+                        interpreter,
+                    }))
+                }
+                Ok(DiscoveredInterpreter::Incompatible(incompatible)) => {
+                    Ok(DiscoveredInstallation::Incompatible(incompatible))
+                }
+                Err(e) => Err(e),
+            })
         }),
         PythonRequest::Version(version) => {
             if let Err(err) = version.check_supported() {
@@ -1269,8 +1551,19 @@ pub fn find_python_installations<'a>(
                     cache,
                     preview,
                 )
-                .interpreters
-                .map_ok(|tuple| Ok(PythonInstallation::from_tuple(tuple)))
+                .iter()
+                .map(|result| match result {
+                    Ok(DiscoveredInterpreter::Compatible(source, interpreter)) => {
+                        Ok(DiscoveredInstallation::Compatible(PythonInstallation {
+                            source,
+                            interpreter,
+                        }))
+                    }
+                    Ok(DiscoveredInterpreter::Incompatible(incompatible)) => {
+                        Ok(DiscoveredInstallation::Incompatible(incompatible))
+                    }
+                    Err(e) => Err(e),
+                })
             })
         }
         PythonRequest::Implementation(implementation) => Box::new({
@@ -1285,8 +1578,31 @@ pub fn find_python_installations<'a>(
                 preview,
             )
             .iter()
-            .filter_ok(|(_source, interpreter)| implementation.matches_interpreter(interpreter))
-            .map_ok(|tuple| Ok(PythonInstallation::from_tuple(tuple)))
+            .map(|result| match result {
+                Ok(DiscoveredInterpreter::Compatible(source, interpreter)) => {
+                    if implementation.matches_interpreter(&interpreter) {
+                        Ok(DiscoveredInstallation::Compatible(PythonInstallation {
+                            source,
+                            interpreter,
+                        }))
+                    } else {
+                        Ok(DiscoveredInstallation::Incompatible(
+                            IncompatiblePythonExecutable {
+                                path: interpreter.sys_executable().to_path_buf(),
+                                source,
+                                reason: IncompatibilityReason::ImplementationMismatch {
+                                    requested: implementation.to_string(),
+                                    found: interpreter.implementation_name().to_string(),
+                                },
+                            },
+                        ))
+                    }
+                }
+                Ok(DiscoveredInterpreter::Incompatible(incompatible)) => {
+                    Ok(DiscoveredInstallation::Incompatible(incompatible))
+                }
+                Err(e) => Err(e),
+            })
         }),
         PythonRequest::ImplementationVersion(implementation, version) => {
             if let Err(err) = version.check_supported() {
@@ -1306,8 +1622,31 @@ pub fn find_python_installations<'a>(
                     preview,
                 )
                 .iter()
-                .filter_ok(|(_source, interpreter)| implementation.matches_interpreter(interpreter))
-                .map_ok(|tuple| Ok(PythonInstallation::from_tuple(tuple)))
+                .map(|result| match result {
+                    Ok(DiscoveredInterpreter::Compatible(source, interpreter)) => {
+                        if implementation.matches_interpreter(&interpreter) {
+                            Ok(DiscoveredInstallation::Compatible(PythonInstallation {
+                                source,
+                                interpreter,
+                            }))
+                        } else {
+                            Ok(DiscoveredInstallation::Incompatible(
+                                IncompatiblePythonExecutable {
+                                    path: interpreter.sys_executable().to_path_buf(),
+                                    source,
+                                    reason: IncompatibilityReason::ImplementationMismatch {
+                                        requested: implementation.to_string(),
+                                        found: interpreter.implementation_name().to_string(),
+                                    },
+                                },
+                            ))
+                        }
+                    }
+                    Ok(DiscoveredInterpreter::Incompatible(incompatible)) => {
+                        Ok(DiscoveredInstallation::Incompatible(incompatible))
+                    }
+                    Err(e) => Err(e),
+                })
             })
         }
         PythonRequest::Key(request) => {
@@ -1331,10 +1670,31 @@ pub fn find_python_installations<'a>(
                     preview,
                 )
                 .iter()
-                .filter_ok(move |(_source, interpreter)| {
-                    request.satisfied_by_interpreter(interpreter)
+                .map(move |result| match result {
+                    Ok(DiscoveredInterpreter::Compatible(source, interpreter)) => {
+                        if request.satisfied_by_interpreter(&interpreter) {
+                            Ok(DiscoveredInstallation::Compatible(PythonInstallation {
+                                source,
+                                interpreter,
+                            }))
+                        } else {
+                            Ok(DiscoveredInstallation::Incompatible(
+                                IncompatiblePythonExecutable {
+                                    path: interpreter.sys_executable().to_path_buf(),
+                                    source,
+                                    reason: IncompatibilityReason::VersionMismatch {
+                                        requested: request.to_string(),
+                                        found: interpreter.key().to_string(),
+                                    },
+                                },
+                            ))
+                        }
+                    }
+                    Ok(DiscoveredInterpreter::Incompatible(incompatible)) => {
+                        Ok(DiscoveredInstallation::Incompatible(incompatible))
+                    }
+                    Err(e) => Err(e),
                 })
-                .map_ok(|tuple| Ok(PythonInstallation::from_tuple(tuple)))
             })
         }
     };
@@ -1355,24 +1715,29 @@ pub(crate) fn find_python_installation(
 ) -> Result<FindPythonResult, Error> {
     let installations =
         find_python_installations(request, environments, preference, cache, preview);
+    let mut invalid_items = Vec::new(); // Collect invalid items here!
     let mut first_prerelease = None;
     let mut first_managed = None;
     let mut first_error = None;
     for result in installations.iter() {
-        // Iterate until the first critical error or happy result
-        if !result.as_ref().err().is_none_or(Error::is_critical) {
-            // Track the first non-critical error
-            if first_error.is_none() {
-                if let Err(err) = result {
-                    first_error = Some(err);
+        let installation = match result {
+            Ok(DiscoveredInstallation::Compatible(installation)) => installation,
+            Ok(DiscoveredInstallation::Incompatible(incompatible)) => {
+                invalid_items.push(incompatible);
+                continue; // Keep looking for valid installations
+            }
+            Err(err) => {
+                // Iterate until the first critical error or happy result
+                if !err.is_critical() {
+                    // Track the first non-critical error
+                    if first_error.is_none() {
+                        first_error = Some(err);
+                    }
+                    continue;
+                } else {
+                    return Err(err);
                 }
             }
-            continue;
-        }
-
-        // If it's an error, we're done.
-        let Ok(Ok(ref installation)) = result else {
-            return result;
         };
 
         // Check if we need to skip the interpreter because it is "not allowed", e.g., if it is a
@@ -1429,7 +1794,7 @@ pub(crate) fn find_python_installation(
         }
 
         // If we didn't skip it, this is the installation to use
-        return result;
+        return Ok(Ok(installation));
     }
 
     // If we only found managed installations, and the preference allows them, we should return
@@ -1455,6 +1820,19 @@ pub(crate) fn find_python_installation(
     // couldn't find any Python interpreters.
     if let Some(err) = first_error {
         return Err(err);
+    }
+
+    debug!(
+        "Collected {} invalid items during discovery",
+        invalid_items.len()
+    );
+    for invalid in &invalid_items {
+        debug!(
+            "Invalid: {} from {} due to {:?}",
+            invalid.path.display(),
+            invalid.source,
+            invalid.reason
+        );
     }
 
     Ok(Err(PythonNotFound {
