@@ -333,7 +333,6 @@ fn token_native_keyring() -> Result<()> {
 }
 
 #[test]
-#[cfg(feature = "keyring-tests")]
 fn token_subprocess_keyring() {
     let context = TestContext::new("3.12");
 
