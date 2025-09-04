@@ -1201,11 +1201,34 @@ mod tests {
         let baseenv = context.tempdir.child("base");
         TestContext::mock_conda_prefix(&baseenv, "3.12.1")?;
 
-        // But not if it's a base environment
-        let result = context.run_with_vars(
+        // Directory name matches environment name, so it's treated as a child environment (virtual)
+        let python = context.run_with_vars(
             &[
                 ("CONDA_PREFIX", Some(baseenv.as_os_str())),
                 ("CONDA_DEFAULT_ENV", Some(&OsString::from("base"))),
+            ],
+            || {
+                find_python_installation(
+                    &PythonRequest::Default,
+                    EnvironmentPreference::OnlyVirtual,
+                    PythonPreference::OnlySystem,
+                    &context.cache,
+                    Preview::default(),
+                )
+            },
+        )??;
+
+        assert_eq!(
+            python.interpreter().python_full_version().to_string(),
+            "3.12.1",
+            "We should find the conda environment when directory name matches environment name"
+        );
+
+        // Directory name doesn't match environment name, so it's treated as base environment (system)
+        let result = context.run_with_vars(
+            &[
+                ("CONDA_PREFIX", Some(baseenv.as_os_str())),
+                ("CONDA_DEFAULT_ENV", Some(&OsString::from("different"))),
             ],
             || {
                 find_python_installation(
@@ -1220,33 +1243,10 @@ mod tests {
 
         assert!(
             matches!(result, Err(PythonNotFound { .. })),
-            "We should not allow the non-virtual environment; got {result:?}"
+            "We should not find the environment when directory name doesn't match environment name"
         );
 
-        // Unless, system interpreters are included...
-        let python = context.run_with_vars(
-            &[
-                ("CONDA_PREFIX", Some(baseenv.as_os_str())),
-                ("CONDA_DEFAULT_ENV", Some(&OsString::from("base"))),
-            ],
-            || {
-                find_python_installation(
-                    &PythonRequest::Default,
-                    EnvironmentPreference::OnlySystem,
-                    PythonPreference::OnlySystem,
-                    &context.cache,
-                    Preview::default(),
-                )
-            },
-        )??;
-
-        assert_eq!(
-            python.interpreter().python_full_version().to_string(),
-            "3.12.1",
-            "We should find the base conda environment"
-        );
-
-        // When CONDA_DEFAULT_ENV is "base", it should always be treated as base environment
+        // Directory name doesn't match environment name, so it's treated as base environment (system)
         let result = context.run_with_vars(
             &[
                 ("CONDA_PREFIX", Some(condaenv.as_os_str())),
@@ -1265,16 +1265,14 @@ mod tests {
 
         assert!(
             matches!(result, Err(PythonNotFound { .. })),
-            "We should not allow the base environment when looking for virtual environments"
+            "We should not find the base environment when looking for virtual environments"
         );
 
-        // When environment name matches directory name, it should be treated as a child environment
-        let myenv_dir = context.tempdir.child("myenv");
-        TestContext::mock_conda_prefix(&myenv_dir, "3.12.5")?;
+        // Directory name matches environment name, so it's treated as child environment (virtual)
         let python = context.run_with_vars(
             &[
-                ("CONDA_PREFIX", Some(myenv_dir.as_os_str())),
-                ("CONDA_DEFAULT_ENV", Some(&OsString::from("myenv"))),
+                ("CONDA_PREFIX", Some(condaenv.as_os_str())),
+                ("CONDA_DEFAULT_ENV", Some(&OsString::from("condaenv"))),
             ],
             || {
                 find_python_installation(
@@ -1289,8 +1287,8 @@ mod tests {
 
         assert_eq!(
             python.interpreter().python_full_version().to_string(),
-            "3.12.5",
-            "We should find the child conda environment"
+            "3.12.0",
+            "We should find the conda environment when directory name matches environment name"
         );
 
         Ok(())

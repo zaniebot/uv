@@ -91,12 +91,6 @@ impl CondaEnvironmentKind {
             return Self::Child;
         };
 
-        // If the environment name is "base" or "root", treat it as a base environment
-        if current_env == "base" || current_env == "root" {
-            return Self::Base;
-        }
-
-        // For other environment names, use the path-based logic
         let Some(name) = path.file_name() else {
             return Self::Child;
         };
