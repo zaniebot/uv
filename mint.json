@@ -202,5 +202,59 @@
     "og:site_name": "uv",
     "og:description": "An extremely fast Python package and project manager, written in Rust.",
     "twitter:site": "@astral_sh"
-  }
+  },
+  "redirects": [
+    {
+      "source": "/guides/publish",
+      "destination": "/guides/package"
+    },
+    {
+      "source": "/concepts/workspaces",
+      "destination": "/concepts/projects/workspaces"
+    },
+    {
+      "source": "/concepts/dependencies",
+      "destination": "/concepts/projects/dependencies"
+    },
+    {
+      "source": "/reference/versioning",
+      "destination": "/reference/policies/versioning"
+    },
+    {
+      "source": "/reference/platforms",
+      "destination": "/reference/policies/platforms"
+    },
+    {
+      "source": "/reference/build_failures",
+      "destination": "/reference/troubleshooting/build-failures"
+    },
+    {
+      "source": "/reference/resolver-internals",
+      "destination": "/reference/internals/resolver"
+    },
+    {
+      "source": "/configuration/installer",
+      "destination": "/reference/installer"
+    },
+    {
+      "source": "/configuration/authentication",
+      "destination": "/concepts/authentication/index"
+    },
+    {
+      "source": "/configuration/build-backend",
+      "destination": "/concepts/build-backend"
+    },
+    {
+      "source": "/configuration/files",
+      "destination": "/concepts/configuration-files"
+    },
+    {
+      "source": "/configuration/indexes",
+      "destination": "/concepts/indexes"
+    },
+    {
+      "source": "/configuration/environment",
+      "destination": "/reference/environment"
+    }
+  ]
 }
