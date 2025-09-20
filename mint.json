@@ -3,10 +3,10 @@
   "name": "uv",
   "theme": "mint",
   "logo": {
-    "light": "/assets/logo-letter.svg",
-    "dark": "/assets/logo-letter.svg"
+    "light": "assets/logo-letter.svg",
+    "dark": "assets/logo-letter.svg"
   },
-  "favicon": "/assets/favicon.ico",
+  "favicon": "assets/favicon.ico",
   "colors": {
     "primary": "#261230",
     "light": "#d7ff64",
