@@ -1,0 +1,206 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "name": "uv",
+  "theme": "mint",
+  "logo": {
+    "light": "/assets/logo-letter.svg",
+    "dark": "/assets/logo-letter.svg"
+  },
+  "favicon": "/assets/favicon.ico",
+  "colors": {
+    "primary": "#261230",
+    "light": "#d7ff64",
+    "dark": "#6340ac",
+    "background": {
+      "light": "#ffffff",
+      "dark": "#261230"
+    }
+  },
+  "topbarLinks": [
+    {
+      "name": "GitHub",
+      "url": "https://github.com/astral-sh/uv"
+    }
+  ],
+  "topbarCtaButton": {
+    "name": "Discord",
+    "url": "https://discord.com/invite/astral-sh"
+  },
+  "tabs": [
+    {
+      "name": "Documentation",
+      "url": "/"
+    },
+    {
+      "name": "Reference",
+      "url": "/reference"
+    }
+  ],
+  "navigation": [
+    {
+      "group": "Introduction",
+      "pages": [
+        "index"
+      ]
+    },
+    {
+      "group": "Getting started",
+      "pages": [
+        "getting-started/index",
+        "getting-started/installation",
+        "getting-started/first-steps",
+        "getting-started/features",
+        "getting-started/help"
+      ]
+    },
+    {
+      "group": "Guides",
+      "pages": [
+        "guides/index",
+        "guides/install-python",
+        "guides/scripts",
+        "guides/tools",
+        "guides/projects",
+        "guides/package"
+      ]
+    },
+    {
+      "group": "Migration",
+      "pages": [
+        "guides/migration/index",
+        "guides/migration/pip-to-project"
+      ]
+    },
+    {
+      "group": "Integrations",
+      "pages": [
+        "guides/integration/index",
+        "guides/integration/docker",
+        "guides/integration/jupyter",
+        "guides/integration/marimo",
+        "guides/integration/github",
+        "guides/integration/gitlab",
+        "guides/integration/pre-commit",
+        "guides/integration/pytorch",
+        "guides/integration/fastapi",
+        "guides/integration/alternative-indexes",
+        "guides/integration/dependency-bots",
+        "guides/integration/aws-lambda",
+        "guides/integration/coiled"
+      ]
+    },
+    {
+      "group": "Concepts",
+      "pages": [
+        "concepts/index"
+      ]
+    },
+    {
+      "group": "Projects",
+      "pages": [
+        "concepts/projects/index",
+        "concepts/projects/layout",
+        "concepts/projects/init",
+        "concepts/projects/dependencies",
+        "concepts/projects/run",
+        "concepts/projects/sync",
+        "concepts/projects/config",
+        "concepts/projects/build",
+        "concepts/projects/workspaces"
+      ]
+    },
+    {
+      "group": "Features",
+      "pages": [
+        "concepts/tools",
+        "concepts/python-versions",
+        "concepts/configuration-files",
+        "concepts/indexes",
+        "concepts/resolution",
+        "concepts/build-backend",
+        "concepts/cache",
+        "concepts/preview"
+      ]
+    },
+    {
+      "group": "Authentication",
+      "pages": [
+        "concepts/authentication/index",
+        "concepts/authentication/cli",
+        "concepts/authentication/http",
+        "concepts/authentication/git",
+        "concepts/authentication/certificates",
+        "concepts/authentication/third-party"
+      ]
+    },
+    {
+      "group": "The pip interface",
+      "pages": [
+        "pip/index",
+        "pip/environments",
+        "pip/packages",
+        "pip/inspection",
+        "pip/dependencies",
+        "pip/compile",
+        "pip/compatibility"
+      ]
+    },
+    {
+      "group": "Reference",
+      "pages": [
+        "reference/index",
+        "reference/cli",
+        "reference/settings",
+        "reference/environment",
+        "reference/installer"
+      ]
+    },
+    {
+      "group": "Troubleshooting",
+      "pages": [
+        "reference/troubleshooting/index",
+        "reference/troubleshooting/build-failures",
+        "reference/troubleshooting/reproducible-examples"
+      ]
+    },
+    {
+      "group": "Internals",
+      "pages": [
+        "reference/internals/index",
+        "reference/internals/resolver"
+      ]
+    },
+    {
+      "group": "Policies",
+      "pages": [
+        "reference/policies/index",
+        "reference/policies/versioning",
+        "reference/policies/platforms",
+        "reference/policies/license"
+      ]
+    },
+    {
+      "group": "Benchmarks",
+      "pages": [
+        "reference/benchmarks"
+      ]
+    }
+  ],
+  "footer": {
+    "socials": {
+      "github": "https://github.com/astral-sh/uv",
+      "discord": "https://discord.com/invite/astral-sh",
+      "x": "https://x.com/astral_sh"
+    }
+  },
+  "analytics": {
+    "fathom": {
+      "siteId": "AOCSRYMM"
+    }
+  },
+  "metadata": {
+    "og:site_name": "uv",
+    "og:description": "An extremely fast Python package and project manager, written in Rust.",
+    "twitter:site": "@astral_sh"
+  }
+}
