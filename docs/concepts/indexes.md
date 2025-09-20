@@ -140,8 +140,9 @@ While `unsafe-best-match` is the closest to pip's behavior, it exposes users to 
 Most private package indexes require authentication to access packages, typically via a username and
 password (or access token).
 
-!!! tip
+<Tip>
 
+</Tip>
     See the [alternative index guide](../guides/integration/alternative-indexes.md) for details on
     authenticating with specific private index providers, e.g., from AWS, Azure, or GCP.
 
@@ -191,15 +192,16 @@ By default, uv will attempt an unauthenticated request before querying providers
 fails, uv will search for credentials. If credentials are found, an authenticated request will be
 attempted.
 
-!!! note
+<Note>
 
+</Note>
     If a username is set, uv will search for credentials before making an unauthenticated request.
 
 Some indexes (e.g., GitLab) will forward unauthenticated requests to a public index, like PyPI —
 which means that uv will not search for credentials. This behavior can be changed per-index, using
 the `authenticate` setting. For example, to always search for credentials:
 
-```toml hl_lines="4"
+```toml 
 [[tool.uv.index]]
 name = "example"
 url = "https://example.com/simple"
@@ -234,7 +236,7 @@ be overridden.
 
 To prevent leaking credentials, authentication can be disabled for an index:
 
-```toml hl_lines="4"
+```toml 
 [[tool.uv.index]]
 name = "example"
 url = "https://example.com/simple"

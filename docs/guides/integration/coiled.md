@@ -15,14 +15,15 @@ Coiled for cloud deployment.
 
 ## Managing script dependencies with uv
 
-!!! note
+<Note>
 
+</Note>
     We'll use this concrete example throughout this guide, but any Python script can be used with
     uv and Coiled.
 
 We'll use the following script as an example:
 
-```python title="process.py" hl_lines="1-8"
+```python title="process.py" 
 # /// script
 # requires-python = ">=3.12"
 # dependencies = [
@@ -82,7 +83,7 @@ using Coiled.
 
 To instruct Coiled to run the script on a virtual machine on AWS, add two comments to the top:
 
-```python title="process.py" hl_lines="1-2"
+```python title="process.py" 
 # COILED container ghcr.io/astral-sh/uv:debian-slim
 # COILED region us-east-2
 
@@ -104,8 +105,9 @@ df = pd.read_parquet(
 print(df.head())
 ```
 
-!!! tip
+<Tip>
 
+</Tip>
     While Coiled supports AWS, GCP, and Azure, this example assumes AWS is being used
     (see the `region` option above). If you're new to Coiled, you'll automatically have
     access to a free account running on AWS. If you're not running on AWS, you can either use
@@ -119,7 +121,7 @@ To submit a batch job for Coiled to run, use
 [`coiled batch run`](https://docs.coiled.io/user_guide/api.html?utm_source=uv-docs#coiled-batch-run)
 to execute the `uv run` command in the cloud:
 
-```bash hl_lines="1"
+```bash 
 $ uvx coiled batch run \
     uv run process.py
 ```

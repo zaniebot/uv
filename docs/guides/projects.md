@@ -82,10 +82,10 @@ You'll use this file to specify dependencies, as well as details about the proje
 description or license. You can edit this file manually, or use commands like `uv add` and
 `uv remove` to manage your project from the terminal.
 
-!!! tip
-
-    See the official [`pyproject.toml` guide](https://packaging.python.org/en/latest/guides/writing-pyproject-toml/)
-    for more details on getting started with the `pyproject.toml` format.
+<Tip>
+  See the official [`pyproject.toml` guide](https://packaging.python.org/en/latest/guides/writing-pyproject-toml/)
+  for more details on getting started with the `pyproject.toml` format.
+</Tip>
 
 You'll also use this file to specify uv [configuration options](../concepts/configuration-files.md)
 in a [`[tool.uv]`](../reference/settings.md) section.
@@ -224,27 +224,28 @@ $ uv run example.py
 Alternatively, you can use `uv sync` to manually update the environment then activate it before
 executing a command:
 
-=== "macOS and Linux"
-
+<Tabs>
+  <Tab title="macOS and Linux">
     ```console
     $ uv sync
     $ source .venv/bin/activate
     $ flask run -p 3000
     $ python example.py
     ```
-
-=== "Windows"
-
+  </Tab>
+  <Tab title="Windows">
     ```pwsh-session
     PS> uv sync
     PS> .venv\Scripts\activate
     PS> flask run -p 3000
     PS> python example.py
     ```
+  </Tab>
+</Tabs>
 
-!!! note
-
-    The virtual environment must be active to run scripts and commands in the project without `uv run`. Virtual environment activation differs per shell and platform.
+<Note>
+  The virtual environment must be active to run scripts and commands in the project without `uv run`. Virtual environment activation differs per shell and platform.
+</Note>
 
 See the documentation on [running commands and scripts](../concepts/projects/run.md) in projects for
 more details.

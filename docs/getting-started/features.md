@@ -86,8 +86,9 @@ Locking packages in an environment (replacing [`pip-tools`](https://github.com/j
 
 See the documentation on [locking environments](../pip/compile.md) for details.
 
-!!! important
+<Warning>
 
+</Warning>
     These commands do not exactly implement the interfaces and behavior of the tools they are based on. The further you stray from common workflows, the more likely you are to encounter differences. Consult the [pip-compatibility guide](../pip/compatibility.md) for details.
 
 ## Utility

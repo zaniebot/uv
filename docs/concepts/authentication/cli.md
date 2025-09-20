@@ -15,8 +15,9 @@ This will prompt for the credentials.
 The credentials can also be provided using the `--username` and `--password` options, or the
 `--token` option for services which use a `__token__` or arbitrary username.
 
-!!! note
+<Note>
 
+</Note>
     We recommend providing the secret via stdin. Use `-` to indicate the value should be read from
     stdin, e.g., for `--password`:
 
@@ -30,8 +31,9 @@ Once credentials are added, uv will use them for packaging operations that requi
 from the given service. At this time, only HTTPS Basic authentication is supported. The credentials
 will not yet be used for Git requests.
 
-!!! note
+<Note>
 
+</Note>
     The credentials will not be validated, i.e., incorrect credentials will not fail.
 
 ## Logging out of a service
@@ -42,8 +44,9 @@ To remove credentials, use the `uv auth logout` command:
 $ uv auth logout example.com
 ```
 
-!!! note
+<Note>
 
+</Note>
     The credentials will not be invalidated with the remote server, i.e., they will only be removed
     from local storage not rendered unusable.
 

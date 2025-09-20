@@ -20,8 +20,9 @@ command in a particular workspace member from any workspace directory.
 To create a workspace, add a `tool.uv.workspace` table to a `pyproject.toml`, which will implicitly
 create a workspace rooted at that package.
 
-!!! tip
+<Tip>
 
+</Tip>
     By default, running `uv init` inside an existing package will add the newly created member to the workspace, creating a `tool.uv.workspace` table in the workspace root if it doesn't already exist.
 
 In defining a workspace, you must specify the `members` (required) and `exclude` (optional) keys,
@@ -84,8 +85,9 @@ the workspace. The `workspace = true` key-value pair in the `tool.uv.sources` ta
 `bird-feeder` dependency should be provided by the workspace, rather than fetched from PyPI or
 another registry.
 
-!!! note
+<Note>
 
+</Note>
     Dependencies between workspace members are editable.
 
 Any `tool.uv.sources` definitions in the workspace root apply to all members, unless overridden in
@@ -113,8 +115,9 @@ build-backend = "uv_build"
 Every workspace member would, by default, install `tqdm` from GitHub, unless a specific member
 overrides the `tqdm` entry in its own `tool.uv.sources` table.
 
-!!! note
+<Note>
 
+</Note>
     If a workspace member provides `tool.uv.sources` for some dependency, it will ignore any
     `tool.uv.sources` for the same dependency in the workspace root, even if the member's source is
     limited by a [marker](dependencies.md#platform-specific-sources) that doesn't match the current
@@ -201,6 +204,7 @@ intersection of all members' `requires-python` values. If you need to support te
 on a Python version that isn't supported by the rest of the workspace, you may need to use `uv pip`
 to install that member in a separate virtual environment.
 
-!!! note
+<Note>
 
+</Note>
     As Python does not provide dependency isolation, uv can't ensure that a package uses its declared dependencies and nothing else. For workspaces specifically, uv can't ensure that packages don't import dependencies declared by another workspace member.

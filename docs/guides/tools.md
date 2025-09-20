@@ -20,8 +20,9 @@ For example, to run `ruff`:
 $ uvx ruff
 ```
 
-!!! note
+<Note>
 
+</Note>
     This is exactly equivalent to:
 
     ```console
@@ -48,8 +49,9 @@ $ uvx pycowsay hello from uv
 
 Tools are installed into temporary, isolated environments when using `uvx`.
 
-!!! note
+<Note>
 
+</Note>
     If you are running a tool in a [_project_](../concepts/projects/index.md) and the tool requires that
     your project is installed, e.g., when using `pytest` or `mypy`, you'll want to use
     [`uv run`](./projects.md#running-commands) instead of `uvx`. Otherwise, the tool will be run in
@@ -155,8 +157,9 @@ $ uvx --with mkdocs-material mkdocs --help
 If a tool is used often, it is useful to install it to a persistent environment and add it to the
 `PATH` instead of invoking `uvx` repeatedly.
 
-!!! tip
+<Tip>
 
+</Tip>
     `uvx` is a convenient alias for `uv tool run`. All of the other commands for interacting with
     tools require the full `uv tool` prefix.
 

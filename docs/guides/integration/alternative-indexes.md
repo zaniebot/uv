@@ -11,8 +11,9 @@ While uv uses the official Python Package Index (PyPI) by default, it also suppo
 [alternative package indexes](../../concepts/indexes.md). Most alternative indexes require various
 forms of authentication, which require some initial setup.
 
-!!! important
+<Warning>
 
+</Warning>
     If using the pip interface, please read the documentation
     on [using multiple indexes](../../pip/compatibility.md#packages-that-exist-on-multiple-indexes)
     in uv — the default behavior is different from pip to prevent dependency confusion attacks, but
@@ -49,8 +50,9 @@ export UV_INDEX_PRIVATE_REGISTRY_USERNAME=dummy
 export UV_INDEX_PRIVATE_REGISTRY_PASSWORD="$AZURE_ARTIFACTS_TOKEN"
 ```
 
-!!! note
+<Note>
 
+</Note>
     `PRIVATE_REGISTRY` should match the name of the index defined in your `pyproject.toml`.
 
 ### Authenticate with `keyring` and `artifacts-keyring`
@@ -82,8 +84,9 @@ export UV_KEYRING_PROVIDER=subprocess
 export UV_INDEX_PRIVATE_REGISTRY_USERNAME=VssSessionToken
 ```
 
-!!! note
+<Note>
 
+</Note>
     The [`tool.uv.keyring-provider`](../../reference/settings.md#keyring-provider)
     setting can be used to enable keyring in your `uv.toml` or `pyproject.toml`.
 
@@ -96,7 +99,7 @@ described in the [Building and publishing guide](../package.md).
 
 First, add a `publish-url` to the index you want to publish packages to. For example:
 
-```toml title="pyproject.toml" hl_lines="4"
+```toml title="pyproject.toml" 
 [[tool.uv.index]]
 name = "private-registry"
 url = "https://pkgs.dev.azure.com/<ORGANIZATION>/<PROJECT>/_packaging/<FEED>/pypi/simple/"
@@ -132,8 +135,9 @@ uv can install packages from
 [Google Artifact Registry](https://cloud.google.com/artifact-registry/docs), either by using an
 access token, or using the [`keyring`](https://github.com/jaraco/keyring) package.
 
-!!! note
+<Note>
 
+</Note>
     This guide assumes that [`gcloud`](https://cloud.google.com/sdk/gcloud) CLI is installed and
     authenticated.
 
@@ -158,8 +162,9 @@ export ARTIFACT_REGISTRY_TOKEN=$(
 )
 ```
 
-!!! note
+<Note>
 
+</Note>
     You might need to pass extra parameters to properly generate the token (like `--project`), this
     is a basic example.
 
@@ -170,8 +175,9 @@ export UV_INDEX_PRIVATE_REGISTRY_USERNAME=oauth2accesstoken
 export UV_INDEX_PRIVATE_REGISTRY_PASSWORD="$ARTIFACT_REGISTRY_TOKEN"
 ```
 
-!!! note
+<Note>
 
+</Note>
     `PRIVATE_REGISTRY` should match the name of the index defined in your `pyproject.toml`.
 
 ### Authenticate with `keyring` and `keyrings.google-artifactregistry-auth`
@@ -202,8 +208,9 @@ export UV_KEYRING_PROVIDER=subprocess
 export UV_INDEX_PRIVATE_REGISTRY_USERNAME=oauth2accesstoken
 ```
 
-!!! note
+<Note>
 
+</Note>
     The [`tool.uv.keyring-provider`](../../reference/settings.md#keyring-provider)
     setting can be used to enable keyring in your `uv.toml` or `pyproject.toml`.
 
@@ -216,7 +223,7 @@ as described in the [Building and publishing guide](../package.md).
 
 First, add a `publish-url` to the index you want to publish packages to. For example:
 
-```toml title="pyproject.toml" hl_lines="4"
+```toml title="pyproject.toml" 
 [[tool.uv.index]]
 name = "private-registry"
 url = "https://<REGION>-python.pkg.dev/<PROJECT>/<REPOSITORY>/simple/"
@@ -252,8 +259,9 @@ uv can install packages from
 [AWS CodeArtifact](https://docs.aws.amazon.com/codeartifact/latest/ug/using-python.html), either by
 using an access token, or using the [`keyring`](https://github.com/jaraco/keyring) package.
 
-!!! note
+<Note>
 
+</Note>
     This guide assumes that [`awscli`](https://aws.amazon.com/cli/) is installed and authenticated.
 
 The index can be declared like so:
@@ -281,8 +289,9 @@ export AWS_CODEARTIFACT_TOKEN="$(
 )"
 ```
 
-!!! note
+<Note>
 
+</Note>
     You might need to pass extra parameters to properly generate the token (like `--region`), this
     is a basic example.
 
@@ -293,8 +302,9 @@ export UV_INDEX_PRIVATE_REGISTRY_USERNAME=aws
 export UV_INDEX_PRIVATE_REGISTRY_PASSWORD="$AWS_CODEARTIFACT_TOKEN"
 ```
 
-!!! note
+<Note>
 
+</Note>
     `PRIVATE_REGISTRY` should match the name of the index defined in your `pyproject.toml`.
 
 ### Authenticate with `keyring` and `keyrings.codeartifact`
@@ -324,8 +334,9 @@ export UV_KEYRING_PROVIDER=subprocess
 export UV_INDEX_PRIVATE_REGISTRY_USERNAME=aws
 ```
 
-!!! note
+<Note>
 
+</Note>
     The [`tool.uv.keyring-provider`](../../reference/settings.md#keyring-provider)
     setting can be used to enable keyring in your `uv.toml` or `pyproject.toml`.
 
@@ -338,7 +349,7 @@ described in the [Building and publishing guide](../package.md).
 
 First, add a `publish-url` to the index you want to publish packages to. For example:
 
-```toml title="pyproject.toml" hl_lines="4"
+```toml title="pyproject.toml" 
 [[tool.uv.index]]
 name = "private-registry"
 url = "https://<DOMAIN>-<ACCOUNT_ID>.d.codeartifact.<REGION>.amazonaws.com/pypi/<REPOSITORY>/simple/"
@@ -395,8 +406,9 @@ $ export UV_INDEX_PRIVATE_REGISTRY_USERNAME=""
 $ export UV_INDEX_PRIVATE_REGISTRY_PASSWORD="$JFROG_JWT_TOKEN"
 ```
 
-!!! note
+<Note>
 
+</Note>
     Replace `PRIVATE_REGISTRY` in the environment variable names with the actual index name defined in your `pyproject.toml`.
 
 ### Publishing packages to JFrog Artifactory
@@ -410,8 +422,9 @@ url = "https://<organization>.jfrog.io/artifactory/api/pypi/<repository>/simple"
 publish-url = "https://<organization>.jfrog.io/artifactory/api/pypi/<repository>"
 ```
 
-!!! important
+<Warning>
 
+</Warning>
     If you use `--token "$JFROG_TOKEN"` or `UV_PUBLISH_TOKEN` with JFrog, you will receive a
     401 Unauthorized error as JFrog requires an empty username but uv passes `__token__` for as
     the username when `--token` is used.
@@ -430,6 +443,7 @@ $ export UV_PUBLISH_PASSWORD="$JFROG_TOKEN"
 $ uv publish --index private-registry
 ```
 
-!!! note
+<Note>
 
+</Note>
     The publish environment variables (`UV_PUBLISH_USERNAME` and `UV_PUBLISH_PASSWORD`) do not include the index name.

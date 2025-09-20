@@ -10,11 +10,11 @@ Dependencies of the project are defined in several fields:
 - [`dependency-groups`](#dependency-groups): Local dependencies for development.
 - [`tool.uv.sources`](#dependency-sources): Alternative sources for dependencies during development.
 
-!!! note
-
-    The `project.dependencies` and `project.optional-dependencies` fields can be used even if
-    project isn't going to be published. `dependency-groups` are a recently standardized feature
-    and may not be supported by all tools yet.
+<Note>
+  The `project.dependencies` and `project.optional-dependencies` fields can be used even if
+  project isn't going to be published. `dependency-groups` are a recently standardized feature
+  and may not be supported by all tools yet.
+</Note>
 
 uv supports modifying the project's dependencies with `uv add` and `uv remove`, but dependency
 metadata can also be updated by editing the `pyproject.toml` directly.
@@ -29,7 +29,7 @@ $ uv add httpx
 
 An entry will be added in the `project.dependencies` field:
 
-```toml title="pyproject.toml" hl_lines="4"
+```toml title="pyproject.toml" 
 [project]
 name = "example"
 version = "0.1.0"
@@ -57,7 +57,7 @@ $ uv add "httpx @ git+https://github.com/encode/httpx"
 
 The `pyproject.toml` will include a [Git source entry](#git):
 
-```toml title="pyproject.toml" hl_lines="8-9"
+```toml title="pyproject.toml" 
 [project]
 name = "example"
 version = "0.1.0"
@@ -111,8 +111,9 @@ To change an existing dependency, e.g., to use a different constraint for `httpx
 $ uv add "httpx>0.1.0"
 ```
 
-!!! note
+<Note>
 
+</Note>
     In this example, we are changing the constraints for the dependency in the `pyproject.toml`.
     The locked version of the dependency will only change if necessary to satisfy the new
     constraints. To force the package version to update to the latest within the constraints, use `--upgrade-package <name>`, e.g.:
@@ -145,7 +146,7 @@ $ uv add "jax; sys_platform == 'linux'"
 The resulting `pyproject.toml` will then include the environment marker in the dependency
 definition:
 
-```toml title="pyproject.toml" hl_lines="6"
+```toml title="pyproject.toml" 
 [project]
 name = "project"
 version = "0.1.0"
@@ -162,8 +163,9 @@ $ uv add "numpy; python_version >= '3.11'"
 See Python's [environment marker](https://peps.python.org/pep-0508/#environment-markers)
 documentation for a complete enumeration of the available markers and operators.
 
-!!! tip
+<Tip>
 
+</Tip>
     Dependency sources can also be [changed per-platform](#platform-specific-sources).
 
 ## Project dependencies
@@ -206,7 +208,7 @@ Dependency sources add support for common patterns that are not supported by the
 `project.dependencies` standard, like editable installations and relative paths. For example, to
 install `foo` from a directory relative to the project root:
 
-```toml title="pyproject.toml" hl_lines="7"
+```toml title="pyproject.toml" 
 [project]
 name = "example"
 version = "0.1.0"
@@ -224,8 +226,9 @@ The following dependency sources are supported by uv:
 - [Path](#path): A local wheel, source distribution, or project directory.
 - [Workspace](#workspace-member): A member of the current workspace.
 
-!!! important
+<Warning>
 
+</Warning>
     Sources are only respected by uv. If another tool is used, only the definitions in the standard
     project tables will be used. If another tool is being used for development, any metadata
     provided in the source table will need to be re-specified in the other tool's format.
@@ -252,8 +255,9 @@ name = "pytorch"
 url = "https://download.pytorch.org/whl/cpu"
 ```
 
-!!! tip
+<Tip>
 
+</Tip>
     The above example will only work on x86-64 Linux, due to the specifics of the PyTorch index.
     See the [PyTorch guide](../../guides/integration/pytorch.md) for more information about setting
     up PyTorch.
@@ -265,7 +269,7 @@ When defining an index, an `explicit` flag can be included to indicate that the 
 be used for packages that explicitly specify it in `tool.uv.sources`. If `explicit` is not set,
 other packages may be resolved from the index, if not found elsewhere.
 
-```toml title="pyproject.toml" hl_lines="4"
+```toml title="pyproject.toml" 
 [[tool.uv.index]]
 name = "pytorch"
 url = "https://download.pytorch.org/whl/cpu"
@@ -286,7 +290,7 @@ $ # Install over SSH.
 $ uv add git+ssh://git@github.com/encode/httpx
 ```
 
-```toml title="pyproject.toml" hl_lines="5"
+```toml title="pyproject.toml" 
 [project]
 dependencies = ["httpx"]
 
@@ -300,7 +304,7 @@ Specific Git references can be requested, e.g., a tag:
 $ uv add git+https://github.com/encode/httpx --tag 0.27.0
 ```
 
-```toml title="pyproject.toml" hl_lines="7"
+```toml title="pyproject.toml" 
 [project]
 dependencies = ["httpx"]
 
@@ -314,7 +318,7 @@ Or, a branch:
 $ uv add git+https://github.com/encode/httpx --branch main
 ```
 
-```toml title="pyproject.toml" hl_lines="7"
+```toml title="pyproject.toml" 
 [project]
 dependencies = ["httpx"]
 
@@ -328,7 +332,7 @@ Or, a revision (commit):
 $ uv add git+https://github.com/encode/httpx --rev 326b9431c761e1ef1e00b9f760d1f654c8db48c6
 ```
 
-```toml title="pyproject.toml" hl_lines="7"
+```toml title="pyproject.toml" 
 [project]
 dependencies = ["httpx"]
 
@@ -364,7 +368,7 @@ $ uv add "https://files.pythonhosted.org/packages/5c/2d/3da5bdf4408b8b2800061c33
 
 Will result in a `pyproject.toml` with:
 
-```toml title="pyproject.toml" hl_lines="5"
+```toml title="pyproject.toml" 
 [project]
 dependencies = ["httpx"]
 
@@ -411,8 +415,9 @@ Or, a path to a project directory:
 $ uv add ~/projects/bar/
 ```
 
-!!! important
+<Warning>
 
+</Warning>
     When using a directory as a path dependency, uv will attempt to build and install the target as
     a package by default. See the [virtual dependency](#virtual-dependencies) documentation for
     details.
@@ -434,8 +439,9 @@ dependencies = ["bar"]
 bar = { path = "../projects/bar", editable = true }
 ```
 
-!!! tip
+<Tip>
 
+</Tip>
     For multiple packages in the same repository, [_workspaces_](./workspaces.md) may be a better
     fit.
 
@@ -467,7 +473,7 @@ environment markers for the source.
 
 For example, to pull `httpx` from GitHub, but only on macOS, use the following:
 
-```toml title="pyproject.toml" hl_lines="8"
+```toml title="pyproject.toml" 
 [project]
 dependencies = ["httpx"]
 
@@ -486,7 +492,7 @@ environment markers.
 
 For example, to pull in different `httpx` tags on macOS vs. Linux:
 
-```toml title="pyproject.toml" hl_lines="6-7"
+```toml title="pyproject.toml" 
 [project]
 dependencies = ["httpx"]
 
@@ -500,7 +506,7 @@ httpx = [
 This strategy extends to using different indexes based on environment markers. For example, to
 install `torch` from different PyTorch indexes based on the platform:
 
-```toml title="pyproject.toml" hl_lines="6-7"
+```toml title="pyproject.toml" 
 [project]
 dependencies = ["torch"]
 
@@ -573,8 +579,9 @@ To add an optional dependency, use the `--optional <extra>` option:
 $ uv add httpx --optional network
 ```
 
-!!! note
+<Note>
 
+</Note>
     If you have optional dependencies that conflict with one another, resolution will fail
     unless you explicitly [declare them as conflicting](./config.md#conflicting-dependencies).
 
@@ -661,8 +668,9 @@ lint = [
 Once groups are defined, the `--all-groups`, `--no-default-groups`, `--group`, `--only-group`, and
 `--no-group` options can be used to include or exclude their dependencies.
 
-!!! tip
+<Tip>
 
+</Tip>
     The `--dev`, `--only-dev`, and `--no-dev` flags are equivalent to `--group dev`,
     `--only-group dev`, and `--no-group dev` respectively.
 
@@ -672,8 +680,9 @@ together when creating the lockfile.
 If dependencies declared in one group are not compatible with those in another group, uv will fail
 to resolve the requirements of the project with an error.
 
-!!! note
+<Note>
 
+</Note>
     If you have dependency groups that conflict with one another, resolution will fail
     unless you explicitly [declare them as conflicting](./config.md#conflicting-dependencies).
 
@@ -714,8 +723,9 @@ To enable all dependencies groups by default, use `"all"` instead of listing gro
 default-groups = "all"
 ```
 
-!!! tip
+<Tip>
 
+</Tip>
     To disable this behaviour during `uv run` or `uv sync`, use `--no-default-groups`.
     To exclude a specific default group, use `--no-group <name>`.
 
@@ -726,7 +736,7 @@ By default, dependency groups must be compatible with your project's `requires-p
 If a dependency group requires a different range of Python versions than your project, you can
 specify a `requires-python` for the group in `[tool.uv.dependency-groups]`, e.g.:
 
-```toml title="pyproject.toml" hl_lines="9-10"
+```toml title="pyproject.toml" 
 [project]
 name = "example"
 version = "0.0.0"
@@ -754,8 +764,9 @@ dev-dependencies = [
 Dependencies declared in this section will be combined with the contents in the
 `dependency-groups.dev`. Eventually, the `dev-dependencies` field will be deprecated and removed.
 
-!!! note
+<Note>
 
+</Note>
     If a `tool.uv.dev-dependencies` field exists, `uv add --dev` will use the existing section
     instead of adding a new `dependency-groups.dev` section.
 

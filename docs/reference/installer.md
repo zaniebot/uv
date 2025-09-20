@@ -8,17 +8,23 @@ Similarly, if `XDG_DATA_HOME` is set, the target directory will be inferred as
 
 To change the installation path, use `UV_INSTALL_DIR`:
 
-=== "macOS and Linux"
+<Tabs>
+  <Tab title="macOS and Linux">
 
     ```console
     $ curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR="/custom/path" sh
     ```
+  </Tab>
+</Tabs>
 
-=== "Windows"
+<Tabs>
+  <Tab title="Windows">
 
     ```pwsh-session
     PS> powershell -ExecutionPolicy ByPass -c {$env:UV_INSTALL_DIR = "C:\Custom\Path";irm https://astral.sh/uv/install.ps1 | iex}
     ```
+  </Tab>
+</Tabs>
 
 ## Disabling shell modifications
 

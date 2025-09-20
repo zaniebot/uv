@@ -24,8 +24,9 @@ To authenticate over HTTP Basic authentication using a password or token:
 - `git+https://<token>@<hostname>/...` (e.g., `git+https://github_pat_asdf@github.com/astral-sh/uv`)
 - `git+https://<user>@<hostname>/...` (e.g., `git+https://git@github.com/astral-sh/uv`)
 
-!!! note
+<Note>
 
+</Note>
     When using a GitHub personal access token, the username is arbitrary. GitHub doesn't allow you to
     use your account name and password in URLs like this, although other hosts may.
 
@@ -61,8 +62,9 @@ $ gh auth login
 See the [`gh auth login`](https://cli.github.com/manual/gh_auth_login) documentation for more
 details.
 
-!!! note
+<Note>
 
+</Note>
     When using `gh auth login` interactively, the credential helper will be configured automatically.
     But when using `gh auth login --with-token`, as in the uv
     [GitHub Actions guide](../../guides/integration/github.md#private-repos), the

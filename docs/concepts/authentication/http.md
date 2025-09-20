@@ -33,8 +33,9 @@ Credentials are stored in a plaintext file in uv's state directory, e.g.,
 `~/.local/share/uv/credentials/credentials.toml` on Unix. This file is currently not intended to be
 edited manually.
 
-!!! note
+<Note>
 
+</Note>
     A secure, system native storage mechanism is in [preview](../preview.md) — it is still
     experimental and being actively developed. In the future, this will become the default storage
     mechanism.

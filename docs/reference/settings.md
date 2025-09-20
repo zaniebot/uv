@@ -10,11 +10,11 @@ Including a package as a constraint will _not_ trigger installation of the packa
 a build; instead, the package must be requested elsewhere in the project's build dependency
 graph.
 
-!!! note
-    In `uv lock`, `uv sync`, and `uv run`, uv will only read `build-constraint-dependencies` from
-    the `pyproject.toml` at the workspace root, and will ignore any declarations in other
-    workspace members or `uv.toml` files.
-
+<Note>
+  In `uv lock`, `uv sync`, and `uv run`, uv will only read `build-constraint-dependencies` from
+  the `pyproject.toml` at the workspace root, and will ignore any declarations in other
+  workspace members or `uv.toml` files.
+</Note>
 **Default value**: `[]`
 
 **Type**: `list[str]`
@@ -88,11 +88,11 @@ Including a package as a constraint will _not_ trigger installation of the packa
 own; instead, the package must be requested elsewhere in the project's first-party or
 transitive dependencies.
 
-!!! note
-    In `uv lock`, `uv sync`, and `uv run`, uv will only read `constraint-dependencies` from
-    the `pyproject.toml` at the workspace root, and will ignore any declarations in other
-    workspace members or `uv.toml` files.
-
+<Note>
+  In `uv lock`, `uv sync`, and `uv run`, uv will only read `constraint-dependencies` from
+  the `pyproject.toml` at the workspace root, and will ignore any declarations in other
+  workspace members or `uv.toml` files.
+</Note>
 **Default value**: `[]`
 
 **Type**: `list[str]`
@@ -281,11 +281,11 @@ Including a package as an override will _not_ trigger installation of the packag
 own; instead, the package must be requested elsewhere in the project's first-party or
 transitive dependencies.
 
-!!! note
-    In `uv lock`, `uv sync`, and `uv run`, uv will only read `override-dependencies` from
-    the `pyproject.toml` at the workspace root, and will ignore any declarations in other
-    workspace members or `uv.toml` files.
-
+<Note>
+  In `uv lock`, `uv sync`, and `uv run`, uv will only read `override-dependencies` from
+  the `pyproject.toml` at the workspace root, and will ignore any declarations in other
+  workspace members or `uv.toml` files.
+</Note>
 **Default value**: `[]`
 
 **Type**: `list[str]`
@@ -704,17 +704,21 @@ This option is in preview and may change in any future release.
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv]
     add-bounds = "major"
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     add-bounds = "major"
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -735,17 +739,21 @@ bypasses SSL verification and could expose you to MITM attacks.
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv]
     allow-insecure-host = ["localhost:8080"]
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     allow-insecure-host = ["localhost:8080"]
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -762,17 +770,21 @@ Defaults to `$XDG_CACHE_HOME/uv` or `$HOME/.cache/uv` on Linux and macOS, and
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv]
     cache-dir = "./.uv_cache"
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     cache-dir = "./.uv_cache"
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -820,17 +832,21 @@ globs are interpreted as relative to the project directory.
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv]
     cache-keys = [{ file = "pyproject.toml" }, { file = "requirements.txt" }, { git = { commit = true } }]
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     cache-keys = [{ file = "pyproject.toml" }, { file = "requirements.txt" }, { git = { commit = true } }]
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -856,17 +872,21 @@ The index must provide one of the supported hashes (SHA-256, SHA-384, or SHA-512
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv]
     check-url = "https://test.pypi.org/simple"
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     check-url = "https://test.pypi.org/simple"
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -889,17 +909,21 @@ ignore errors.
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv]
     compile-bytecode = true
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     compile-bytecode = true
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -916,17 +940,21 @@ Defaults to the number of available CPU cores.
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv]
     concurrent-builds = 4
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     concurrent-builds = 4
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -941,17 +969,21 @@ time.
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv]
     concurrent-downloads = 4
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     concurrent-downloads = 4
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -967,17 +999,21 @@ Defaults to the number of available CPU cores.
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv]
     concurrent-installs = 4
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     concurrent-installs = 4
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -992,17 +1028,21 @@ specified as `KEY=VALUE` pairs.
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv]
     config-settings = { editable_mode = "compat" }
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     config-settings = { editable_mode = "compat" }
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -1019,17 +1059,21 @@ Accepts a map from package names to string key-value pairs.
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv]
     config-settings-package = { numpy = { editable_mode = "compat" } }
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     config-settings-package = { numpy = { editable_mode = "compat" } }
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -1055,7 +1099,8 @@ standard, though only the following fields are respected:
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv]
@@ -1063,13 +1108,16 @@ standard, though only the following fields are respected:
         { name = "flask", version = "1.0.0", requires-dist = ["werkzeug"], requires-python = ">=3.6" },
     ]
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     dependency-metadata = [
         { name = "flask", version = "1.0.0", requires-dist = ["werkzeug"], requires-python = ">=3.6" },
     ]
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -1087,17 +1135,21 @@ behave consistently across timezones.
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv]
     exclude-newer = "2006-12-02T02:07:43Z"
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     exclude-newer = "2006-12-02T02:07:43Z"
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -1113,17 +1165,21 @@ Accepts package-date pairs in a dictionary format.
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv]
     exclude-newer-package = { tqdm = "2022-04-04T00:00:00Z" }
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     exclude-newer-package = { tqdm = "2022-04-04T00:00:00Z" }
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -1141,17 +1197,21 @@ additional packages. This is useful for packages that assume the presence of pac
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv]
     extra-build-dependencies = { pytest = ["setuptools"] }
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     extra-build-dependencies = { pytest = ["setuptools"] }
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -1168,17 +1228,21 @@ specified packages.
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv]
     extra-build-variables = { flash-attn = { FLASH_ATTENTION_SKIP_CUDA_BUILD = "TRUE" } }
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     extra-build-variables = { flash-attn = { FLASH_ATTENTION_SKIP_CUDA_BUILD = "TRUE" } }
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -1204,17 +1268,21 @@ To control uv's resolution strategy when multiple indexes are present, see
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv]
     extra-index-url = ["https://download.pytorch.org/whl/cpu"]
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     extra-index-url = ["https://download.pytorch.org/whl/cpu"]
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -1235,17 +1303,21 @@ formats described above.
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv]
     find-links = ["https://download.pytorch.org/whl/torch_stable.html"]
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     find-links = ["https://download.pytorch.org/whl/torch_stable.html"]
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -1271,17 +1343,21 @@ versions or platforms.
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv]
     fork-strategy = "fewest"
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     fork-strategy = "fewest"
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -1321,20 +1397,24 @@ PyPI default index.
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [[tool.uv.index]]
     name = "pytorch"
     url = "https://download.pytorch.org/whl/cu121"
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     [[tool.uv.index]]
     name = "pytorch"
     url = "https://download.pytorch.org/whl/cu121"
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -1357,17 +1437,21 @@ same name to an alternate index.
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv]
     index-strategy = "unsafe-best-match"
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     index-strategy = "unsafe-best-match"
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -1389,17 +1473,21 @@ The index provided by this setting is given lower priority than any indexes spec
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv]
     index-url = "https://test.pypi.org/simple"
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     index-url = "https://test.pypi.org/simple"
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -1416,17 +1504,21 @@ use the `keyring` CLI to handle authentication.
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv]
     keyring-provider = "subprocess"
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     keyring-provider = "subprocess"
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -1453,17 +1545,21 @@ symlinks with caution.
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv]
     link-mode = "copy"
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     link-mode = "copy"
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -1485,17 +1581,21 @@ included in your system's certificate store.
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv]
     native-tls = true
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     native-tls = true
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -1512,17 +1612,21 @@ pre-built wheels to extract package metadata, if available.
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv]
     no-binary = true
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     no-binary = true
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -1536,17 +1640,21 @@ Don't install pre-built wheels for a specific package.
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv]
     no-binary-package = ["ruff"]
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     no-binary-package = ["ruff"]
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -1564,17 +1672,21 @@ distributions will exit with an error.
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv]
     no-build = true
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     no-build = true
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -1591,17 +1703,21 @@ are already installed.
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv]
     no-build-isolation = true
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     no-build-isolation = true
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -1618,17 +1734,21 @@ are already installed.
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv]
     no-build-isolation-package = ["package1", "package2"]
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     no-build-isolation-package = ["package1", "package2"]
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -1642,17 +1762,21 @@ Don't build source distributions for a specific package.
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv]
     no-build-package = ["ruff"]
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     no-build-package = ["ruff"]
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -1667,17 +1791,21 @@ duration of the operation.
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv]
     no-cache = true
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     no-cache = true
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -1692,17 +1820,21 @@ those provided via `--find-links`.
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv]
     no-index = true
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     no-index = true
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -1718,17 +1850,21 @@ sources.
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv]
     no-sources = true
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     no-sources = true
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -1742,17 +1878,21 @@ Disable network access, relying only on locally cached data and locally availabl
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv]
     offline = true
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     offline = true
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -1776,17 +1916,21 @@ declared specifiers (`if-necessary-or-explicit`).
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv]
     prerelease = "allow"
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     prerelease = "allow"
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -1800,17 +1944,21 @@ Whether to enable experimental, preview features.
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv]
     preview = true
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     preview = true
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -1825,17 +1973,21 @@ The URL for publishing packages to the Python package index (by default:
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv]
     publish-url = "https://test.pypi.org/legacy/"
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     publish-url = "https://test.pypi.org/legacy/"
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -1856,17 +2008,21 @@ local directory by using the `file://` URL scheme.
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv]
     pypy-install-mirror = "https://downloads.python.org/pypy"
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     pypy-install-mirror = "https://downloads.python.org/pypy"
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -1884,17 +2040,21 @@ Whether to allow Python downloads.
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv]
     python-downloads = "manual"
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     python-downloads = "manual"
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -1910,17 +2070,21 @@ Note that currently, only local paths are supported.
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv]
     python-downloads-json-url = "/etc/uv/python-downloads.json"
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     python-downloads-json-url = "/etc/uv/python-downloads.json"
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -1940,17 +2104,21 @@ Distributions can be read from a local directory by using the `file://` URL sche
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv]
     python-install-mirror = "https://github.com/astral-sh/python-build-standalone/releases/download"
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     python-install-mirror = "https://github.com/astral-sh/python-build-standalone/releases/download"
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -1970,17 +2138,21 @@ those that are downloaded and installed by uv.
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv]
     python-preference = "managed"
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     python-preference = "managed"
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -1994,17 +2166,21 @@ Reinstall all packages, regardless of whether they're already installed. Implies
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv]
     reinstall = true
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     reinstall = true
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -2019,17 +2195,21 @@ Reinstall a specific package, regardless of whether it's already installed. Impl
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv]
     reinstall-package = ["ruff"]
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     reinstall-package = ["ruff"]
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -2048,17 +2228,21 @@ Accepts a [PEP 440](https://peps.python.org/pep-0440/) specifier, like `==0.5.0`
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv]
     required-version = ">=0.5.0"
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     required-version = ">=0.5.0"
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -2079,17 +2263,21 @@ By default, uv will use the latest compatible version of each package (`highest`
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv]
     resolution = "lowest-direct"
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     resolution = "lowest-direct"
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -2108,17 +2296,21 @@ uv's supported environments for trusted publishing include GitHub Actions and Gi
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv]
     trusted-publishing = "always"
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     trusted-publishing = "always"
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -2132,17 +2324,21 @@ Allow package upgrades, ignoring pinned versions in any existing output file.
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv]
     upgrade = true
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     upgrade = true
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -2159,17 +2355,21 @@ Accepts both standalone package names (`ruff`) and version specifiers (`ruff<0.5
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv]
     upgrade-package = ["ruff"]
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     upgrade-package = ["ruff"]
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -2193,18 +2393,22 @@ Only applies to `pyproject.toml`, `setup.py`, and `setup.cfg` sources.
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv.pip]
     all-extras = true
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     [pip]
     all-extras = true
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -2220,18 +2424,22 @@ packages.
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv.pip]
     allow-empty-requirements = true
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     [pip]
     allow-empty-requirements = true
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -2250,18 +2458,22 @@ source of each package.
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv.pip]
     annotation-style = "line"
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     [pip]
     annotation-style = "line"
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -2281,18 +2493,22 @@ explicitly recommend against modifications by other package managers (like uv or
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv.pip]
     break-system-packages = true
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     [pip]
     break-system-packages = true
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -2316,18 +2532,22 @@ ignore errors.
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv.pip]
     compile-bytecode = true
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     [pip]
     compile-bytecode = true
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -2343,18 +2563,22 @@ specified as `KEY=VALUE` pairs.
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv.pip]
     config-settings = { editable_mode = "compat" }
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     [pip]
     config-settings = { editable_mode = "compat" }
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -2370,18 +2594,22 @@ specified as `KEY=VALUE` pairs.
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv.pip]
     config-settings-package = { numpy = { editable_mode = "compat" } }
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     [pip]
     config-settings-package = { numpy = { editable_mode = "compat" } }
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -2398,18 +2626,22 @@ Used to reflect custom build scripts and commands that wrap `uv pip compile`.
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv.pip]
     custom-compile-command = "./custom-uv-compile.sh"
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     [pip]
     custom-compile-command = "./custom-uv-compile.sh"
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -2436,7 +2668,8 @@ standard, though only the following fields are respected:
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv.pip]
@@ -2444,7 +2677,8 @@ standard, though only the following fields are respected:
         { name = "flask", version = "1.0.0", requires-dist = ["werkzeug"], requires-python = ">=3.6" },
     ]
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     [pip]
@@ -2452,6 +2686,8 @@ standard, though only the following fields are respected:
         { name = "flask", version = "1.0.0", requires-dist = ["werkzeug"], requires-python = ">=3.6" },
     ]
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -2466,18 +2702,22 @@ Include `--no-binary` and `--only-binary` entries in the output file generated b
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv.pip]
     emit-build-options = true
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     [pip]
     emit-build-options = true
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -2492,18 +2732,22 @@ Include `--find-links` entries in the output file generated by `uv pip compile`.
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv.pip]
     emit-find-links = true
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     [pip]
     emit-find-links = true
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -2519,18 +2763,22 @@ Include comment annotations indicating the index used to resolve each package (e
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv.pip]
     emit-index-annotation = true
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     [pip]
     emit-index-annotation = true
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -2545,18 +2793,22 @@ Include `--index-url` and `--extra-index-url` entries in the output file generat
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv.pip]
     emit-index-url = true
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     [pip]
     emit-index-url = true
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -2576,18 +2828,22 @@ be correct.
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv.pip]
     emit-marker-expression = true
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     [pip]
     emit-marker-expression = true
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -2606,18 +2862,22 @@ behave consistently across timezones.
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv.pip]
     exclude-newer = "2006-12-02T02:07:43Z"
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     [pip]
     exclude-newer = "2006-12-02T02:07:43Z"
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -2634,18 +2894,22 @@ Accepts package-date pairs in a dictionary format.
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv.pip]
     exclude-newer-package = { tqdm = "2022-04-04T00:00:00Z" }
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     [pip]
     exclude-newer-package = { tqdm = "2022-04-04T00:00:00Z" }
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -2662,18 +2926,22 @@ Only applies to `pyproject.toml`, `setup.py`, and `setup.cfg` sources.
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv.pip]
     extra = ["dev", "docs"]
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     [pip]
     extra = ["dev", "docs"]
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -2692,18 +2960,22 @@ additional packages. This is useful for packages that assume the presence of pac
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv.pip]
     extra-build-dependencies = { pytest = ["setuptools"] }
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     [pip]
     extra-build-dependencies = { pytest = ["setuptools"] }
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -2721,18 +2993,22 @@ specified packages.
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv.pip]
     extra-build-variables = { flash-attn = { FLASH_ATTENTION_SKIP_CUDA_BUILD = "TRUE" } }
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     [pip]
     extra-build-variables = { flash-attn = { FLASH_ATTENTION_SKIP_CUDA_BUILD = "TRUE" } }
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -2756,18 +3032,22 @@ To control uv's resolution strategy when multiple indexes are present, see
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv.pip]
     extra-index-url = ["https://download.pytorch.org/whl/cpu"]
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     [pip]
     extra-index-url = ["https://download.pytorch.org/whl/cpu"]
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -2789,18 +3069,22 @@ formats described above.
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv.pip]
     find-links = ["https://download.pytorch.org/whl/torch_stable.html"]
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     [pip]
     find-links = ["https://download.pytorch.org/whl/torch_stable.html"]
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -2827,18 +3111,22 @@ versions or platforms.
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv.pip]
     fork-strategy = "fewest"
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     [pip]
     fork-strategy = "fewest"
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -2853,18 +3141,22 @@ Include distribution hashes in the output file.
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv.pip]
     generate-hashes = true
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     [pip]
     generate-hashes = true
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -2879,18 +3171,22 @@ Include the following dependency groups.
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv.pip]
     group = ["dev", "docs"]
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     [pip]
     group = ["dev", "docs"]
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -2914,18 +3210,22 @@ same name to an alternate index.
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv.pip]
     index-strategy = "unsafe-best-match"
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     [pip]
     index-strategy = "unsafe-best-match"
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -2946,18 +3246,22 @@ The index provided by this setting is given lower priority than any indexes spec
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv.pip]
     index-url = "https://test.pypi.org/simple"
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     [pip]
     index-url = "https://test.pypi.org/simple"
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -2975,18 +3279,22 @@ use the `keyring` CLI to handle authentication.
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv.pip]
     keyring-provider = "subprocess"
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     [pip]
     keyring-provider = "subprocess"
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -3014,18 +3322,22 @@ symlinks with caution.
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv.pip]
     link-mode = "copy"
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     [pip]
     link-mode = "copy"
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -3041,18 +3353,22 @@ generated by `uv pip compile`.
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv.pip]
     no-annotate = true
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     [pip]
     no-annotate = true
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -3073,18 +3389,22 @@ Clear previously specified packages with `:none:`.
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv.pip]
     no-binary = ["ruff"]
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     [pip]
     no-binary = ["ruff"]
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -3105,18 +3425,22 @@ Alias for `--only-binary :all:`.
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv.pip]
     no-build = true
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     [pip]
     no-build = true
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -3134,18 +3458,22 @@ are already installed.
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv.pip]
     no-build-isolation = true
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     [pip]
     no-build-isolation = true
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -3163,18 +3491,22 @@ are already installed.
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv.pip]
     no-build-isolation-package = ["package1", "package2"]
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     [pip]
     no-build-isolation-package = ["package1", "package2"]
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -3190,18 +3522,22 @@ on the command line to the resulting requirements file.
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv.pip]
     no-deps = true
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     [pip]
     no-deps = true
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -3217,18 +3553,22 @@ included in the resolution. Equivalent to pip-compile's `--unsafe-package` optio
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv.pip]
     no-emit-package = ["ruff"]
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     [pip]
     no-emit-package = ["ruff"]
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -3243,20 +3583,24 @@ Exclude the specified optional dependencies if `all-extras` is supplied.
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv.pip]
     all-extras = true
     no-extra = ["dev", "docs"]
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     [pip]
     all-extras = true
     no-extra = ["dev", "docs"]
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -3271,18 +3615,22 @@ Exclude the comment header at the top of output file generated by `uv pip compil
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv.pip]
     no-header = true
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     [pip]
     no-header = true
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -3298,18 +3646,22 @@ those provided via `--find-links`.
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv.pip]
     no-index = true
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     [pip]
     no-index = true
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -3326,18 +3678,22 @@ sources.
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv.pip]
     no-sources = true
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     [pip]
     no-sources = true
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -3356,18 +3712,22 @@ as dependencies in the output file directly. Further, output files generated wit
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv.pip]
     no-strip-extras = true
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     [pip]
     no-strip-extras = true
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -3385,18 +3745,22 @@ only guaranteed to be correct for the target environment.
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv.pip]
     no-strip-markers = true
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     [pip]
     no-strip-markers = true
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -3418,18 +3782,22 @@ Clear previously specified packages with `:none:`.
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv.pip]
     only-binary = ["ruff"]
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     [pip]
     only-binary = ["ruff"]
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -3447,18 +3815,22 @@ dependencies, unless `--upgrade` is also specified.
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv.pip]
     output-file = "requirements.txt"
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     [pip]
     output-file = "requirements.txt"
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -3479,18 +3851,22 @@ non-portable.
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv.pip]
     prefix = "./prefix"
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     [pip]
     prefix = "./prefix"
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -3515,18 +3891,22 @@ declared specifiers (`if-necessary-or-explicit`).
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv.pip]
     prerelease = "allow"
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     [pip]
     prerelease = "allow"
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -3552,18 +3932,22 @@ Supported formats:
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv.pip]
     python = "3.10"
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     [pip]
     python = "3.10"
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -3582,18 +3966,22 @@ its CPU, vendor, and operating system name, like `x86_64-unknown-linux-gnu` or
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv.pip]
     python-platform = "x86_64-unknown-linux-gnu"
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     [pip]
     python-platform = "x86_64-unknown-linux-gnu"
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -3612,18 +4000,22 @@ mapped to `3.8.0`.
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv.pip]
     python-version = "3.8"
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     [pip]
     python-version = "3.8"
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -3638,18 +4030,22 @@ Reinstall all packages, regardless of whether they're already installed. Implies
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv.pip]
     reinstall = true
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     [pip]
     reinstall = true
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -3665,18 +4061,22 @@ Reinstall a specific package, regardless of whether it's already installed. Impl
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv.pip]
     reinstall-package = ["ruff"]
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     [pip]
     reinstall-package = ["ruff"]
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -3702,18 +4102,22 @@ Hash-checking mode introduces a number of additional constraints:
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv.pip]
     require-hashes = true
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     [pip]
     require-hashes = true
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -3735,18 +4139,22 @@ By default, uv will use the latest compatible version of each package (`highest`
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv.pip]
     resolution = "lowest-direct"
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     [pip]
     resolution = "lowest-direct"
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -3762,18 +4170,22 @@ issues.
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv.pip]
     strict = true
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     [pip]
     strict = true
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -3795,18 +4207,22 @@ should be used with caution, as it can modify the system Python installation.
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv.pip]
     system = true
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     [pip]
     system = true
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -3822,18 +4238,22 @@ environment. The packages will be installed at the top-level of the directory.
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv.pip]
     target = "./target"
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     [pip]
     target = "./target"
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -3859,18 +4279,22 @@ This option is in preview and may change in any future release.
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv.pip]
     torch-backend = "auto"
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     [pip]
     torch-backend = "auto"
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -3891,18 +4315,22 @@ universal resolution for Python 3.7 and later.
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv.pip]
     universal = true
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     [pip]
     universal = true
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -3917,18 +4345,22 @@ Allow package upgrades, ignoring pinned versions in any existing output file.
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv.pip]
     upgrade = true
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     [pip]
     upgrade = true
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -3946,18 +4378,22 @@ Accepts both standalone package names (`ruff`) and version specifiers (`ruff<0.5
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv.pip]
     upgrade-package = ["ruff"]
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     [pip]
     upgrade-package = ["ruff"]
     ```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -3976,18 +4412,22 @@ include them.
 
 **Example usage**:
 
-=== "pyproject.toml"
+<Tabs>
+  <Tab title="pyproject.toml">
 
     ```toml
     [tool.uv.pip]
     verify-hashes = true
     ```
-=== "uv.toml"
+  </Tab>
+  <Tab title="uv.toml">
 
     ```toml
     [pip]
     verify-hashes = true
     ```
+  </Tab>
+</Tabs>
 
 ---
 

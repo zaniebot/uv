@@ -13,8 +13,9 @@ a combination of a package name and acceptable versions. The dependencies define
 project are called _direct dependencies_. The dependencies added by each dependency of the current
 project are called _indirect_ or _transitive dependencies_.
 
-!!! note
+<Note>
 
+</Note>
     See the [dependency specifiers
     page](https://packaging.python.org/en/latest/specifications/dependency-specifiers/)
     in the Python Packaging documentation for details about dependencies.
@@ -65,8 +66,9 @@ Markers are used to adjust a package's dependencies based on the current environ
 For example, markers can be used to modify dependencies by operating system, CPU architecture,
 Python version, Python implementation, and more.
 
-!!! note
+<Note>
 
+</Note>
     See the [environment
     markers](https://packaging.python.org/en/latest/specifications/dependency-specifiers/#environment-markers)
     section in the Python Packaging documentation for more details about markers.
@@ -94,8 +96,9 @@ produce a resolution for Python 3.10 on Linux instead. Unlike universal resoluti
 platform-specific resolution, the provided `--python-version` is the exact python version to use,
 not a lower bound.
 
-!!! note
+<Note>
 
+</Note>
     Python's environment markers expose far more information about the current machine
     than can be expressed by a simple `--python-platform` argument. For example, the `platform_version` marker
     on macOS includes the time at which the kernel was built, which can (in theory) be encoded in
@@ -443,8 +446,9 @@ package's metadata is incorrect or incomplete, or when a package is not availabl
 index. While dependency overrides allow overriding the allowed versions of a package globally,
 metadata overrides allow overriding the declared metadata of a _specific package_.
 
-!!! note
+<Note>
 
+</Note>
     The `version` field in `tool.uv.dependency-metadata` is optional for registry-based
     dependencies (when omitted, uv will assume the metadata applies to all versions of the package),
     but _required_ for direct URL dependencies (like Git dependencies).
@@ -565,8 +569,9 @@ To ensure reproducibility, messages for unsatisfiable resolutions will not menti
 distributions were excluded due to the `--exclude-newer` flag — newer distributions will be treated
 as if they do not exist.
 
-!!! note
+<Note>
 
+</Note>
     The `--exclude-newer` option is only applied to packages that are read from a registry (as opposed to, e.g., Git
     dependencies). Further, when using the `uv pip` interface, uv will not downgrade previously installed packages
     unless the `--reinstall` flag is provided, in which case uv will perform a new resolution.

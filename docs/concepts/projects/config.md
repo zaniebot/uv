@@ -7,7 +7,7 @@ field of the `pyproject.toml`.
 
 It is recommended to set a `requires-python` value:
 
-```toml title="pyproject.toml" hl_lines="4"
+```toml title="pyproject.toml" 
 [project]
 name = "example"
 version = "0.1.0"
@@ -26,8 +26,9 @@ the official term for an installed package to advertise interfaces. These includ
 - [Graphical user interfaces](#graphical-user-interfaces)
 - [Plugin entry points](#plugin-entry-points)
 
-!!! important
+<Warning>
 
+</Warning>
     Using the entry point tables requires a [build system](#build-systems) to be defined.
 
 ### Command-line interfaces
@@ -54,8 +55,9 @@ $ uv run hello
 Projects may define graphical user interfaces (GUIs) for the project in the `[project.gui-scripts]`
 table of the `pyproject.toml`.
 
-!!! important
+<Warning>
 
+</Warning>
     These are only different from [command-line interfaces](#command-line-interfaces) on Windows, where
     they are wrapped by a GUI executable so they can be started without a console. On other platforms,
     they behave the same.
@@ -90,8 +92,9 @@ for plugin in entry_points(group='example.plugins'):
     plugin.load()
 ```
 
-!!! note
+<Note>
 
+</Note>
     The `group` key can be an arbitrary value, it does not need to include the package name or
     "plugins". However, it is recommended to namespace the key by the package name to avoid
     collisions with other packages.
@@ -110,8 +113,9 @@ The `--build-backend` option can be provided to `uv init` to create a packaged p
 appropriate layout. The `--package` option can be provided to `uv init` to create a packaged project
 with the default build system.
 
-!!! note
+<Note>
 
+</Note>
     While uv will not build and install the current project without a build system definition,
     the presence of a `[build-system]` table is not required in other packages. For legacy reasons,
     if a build system is not defined, then `setuptools.build_meta:__legacy__` is used to build the
@@ -182,14 +186,16 @@ $ python -c "import sysconfig; print(sysconfig.get_config_var('prefix'))"
 
 To target this environment, you'd export `UV_PROJECT_ENVIRONMENT=/usr/local`.
 
-!!! important
+<Warning>
 
+</Warning>
     If an absolute path is provided and the setting is used across multiple projects, the
     environment will be overwritten by invocations in each project. This setting is only recommended
     for use for a single project in CI or Docker images.
 
-!!! note
+<Note>
 
+</Note>
     By default, uv does not read the `VIRTUAL_ENV` environment variable during project operations.
     A warning will be displayed if `VIRTUAL_ENV` is set to a different path than the project's
     environment. The `--active` flag can be used to opt-in to respecting `VIRTUAL_ENV`. The
@@ -294,8 +300,9 @@ flash-attn = [{ requirement = "torch", match-runtime = true }]
 flash-attn = { FLASH_ATTENTION_SKIP_CUDA_BUILD = "TRUE" }
 ```
 
-!!! note
+<Note>
 
+</Note>
     The `FLASH_ATTENTION_SKIP_CUDA_BUILD` environment variable ensures that `flash-attn` is installed
     from a compatible, pre-built wheel, rather than attempting to build it from source, which requires
     access to the CUDA development toolkit. If the CUDA toolkit is not available, the environment variable
@@ -375,8 +382,9 @@ version = "2.6.3"
 requires-dist = ["torch", "einops"]
 ```
 
-!!! tip
+<Tip>
 
+</Tip>
     To determine the package metadata for a package like `flash-attn`, navigate to the appropriate Git repository,
     or look it up on [PyPI](https://pypi.org/project/flash-attn) and download the package's source distribution.
     The package requirements can typically be found in the `setup.py` or `setup.cfg` file.

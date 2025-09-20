@@ -13,8 +13,9 @@ code without provisioning or managing servers.
 You can use uv with AWS Lambda to manage your Python dependencies, build your deployment package,
 and deploy your Lambda functions.
 
-!!! tip
+<Tip>
 
+</Tip>
     Check out the [`uv-aws-lambda-example`](https://github.com/astral-sh/uv-aws-lambda-example) project for
     an example of best practices when using uv to deploy an application to AWS Lambda.
 
@@ -130,8 +131,9 @@ COPY ./app ${LAMBDA_TASK_ROOT}/app
 CMD ["app.main.handler"]
 ```
 
-!!! tip
+<Tip>
 
+</Tip>
     To deploy to ARM-based AWS Lambda runtimes, replace `public.ecr.aws/lambda/python:3.13` with `public.ecr.aws/lambda/python:3.13-arm64`.
 
 We can build the image with, e.g.:
@@ -385,8 +387,9 @@ COPY ./app ${LAMBDA_TASK_ROOT}/app
 CMD ["app.main.handler"]
 ```
 
-!!! tip
+<Tip>
 
+</Tip>
     To deploy to ARM-based AWS Lambda runtimes, replace `public.ecr.aws/lambda/python:3.13` with `public.ecr.aws/lambda/python:3.13-arm64`.
 
 From there, we can build and deploy the updated image as before.
@@ -413,8 +416,9 @@ $ uv pip install \
    -r requirements.txt
 ```
 
-!!! tip
+<Tip>
 
+</Tip>
     To deploy to ARM-based AWS Lambda runtimes, replace `x86_64-manylinux2014` with `aarch64-manylinux2014`.
 
 Following the
@@ -463,8 +467,9 @@ $ aws lambda update-function-code \
    --zip-file fileb://package.zip
 ```
 
-!!! note
+<Note>
 
+</Note>
     By default, the AWS Management Console assumes a Lambda entrypoint of `lambda_function.lambda_handler`.
     If your application uses a different entrypoint, you'll need to modify it in the AWS Management Console.
     For example, the above FastAPI application uses `app.main.handler`.
@@ -545,8 +550,9 @@ $ cp -r packages/lib python/
 $ zip -r layer_content.zip python
 ```
 
-!!! tip
+<Tip>
 
+</Tip>
     To generate deterministic zip archives, consider passing the `-X` flag to `zip` to exclude
     extended attributes and file system metadata.
 

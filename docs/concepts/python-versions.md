@@ -11,8 +11,9 @@ Since it is common for a system to have an existing Python installation, uv supp
 types of Python installations, uv refers to Python versions it installs as _managed_ Python
 installations and all other Python installations as _system_ Python installations.
 
-!!! note
+<Note>
 
+</Note>
     uv does not distinguish between Python versions installed by the operating system vs those
     installed and managed by other tools. For example, if a Python installation is managed with
     `pyenv`, it would still be considered a _system_ Python version in uv.
@@ -71,8 +72,9 @@ user configuration directory).
 
 uv bundles a list of downloadable CPython and PyPy distributions for macOS, Linux, and Windows.
 
-!!! tip
+<Tip>
 
+</Tip>
     By default, Python versions are automatically downloaded as needed without using
     `uv python install`.
 
@@ -114,8 +116,9 @@ latest version. If a `.python-version` file is present, uv will install the Pyth
 the file. A project that requires multiple Python versions may define a `.python-versions` file. If
 present, uv will install all the Python versions listed in the file.
 
-!!! important
+<Warning>
 
+</Warning>
     The available Python versions are frozen for each uv release. To install new Python versions,
     you may need upgrade uv.
 
@@ -124,8 +127,9 @@ present, uv will install all the Python versions listed in the file.
 uv installs Python executables into your `PATH` by default, e.g., `uv python install 3.12` will
 install a Python executable into `~/.local/bin`, e.g., as `python3.12`.
 
-!!! tip
+<Tip>
 
+</Tip>
     If `~/.local/bin` is not in your `PATH`, you can add it with `uv tool update-shell`.
 
 To install `python` and `python3` executables, include the experimental `--default` option:
@@ -149,8 +153,9 @@ $ uv python install 3.12.8  # Updates `python3.12` to point to 3.12.8
 
 ## Upgrading Python versions
 
-!!! important
+<Warning>
 
+</Warning>
     Support for upgrading Python versions is in _preview_. This means the behavior is experimental
     and subject to change.
 
@@ -184,8 +189,9 @@ If the Python version was installed with the `python-upgrade` [preview feature](
 enabled, e.g., `uv python install 3.12 --preview-features python-upgrade`, virtual environments
 using the Python version will be automatically upgraded to the new patch version.
 
-!!! note
+<Note>
 
+</Note>
     If the virtual environment was created _before_ opting in to the preview mode, it will not be
     included in the automatic upgrades.
 
@@ -334,8 +340,9 @@ The [`python-downloads`](../reference/settings.md#python-downloads) option can b
 this behavior. By default, it is set to `automatic`; set to `manual` to only allow Python downloads
 during `uv python install`.
 
-!!! tip
+<Tip>
 
+</Tip>
     The `python-downloads` setting can be set in a
     [persistent configuration file](./configuration-files.md) to change the default behavior, or
     the `--no-python-downloads` flag can be passed to any uv command.
@@ -378,8 +385,9 @@ The following alternative options are available:
 - `only-system`: Only use system Python installations; never use managed Python installations.
   Equivalent to `--no-managed-python`.
 
-!!! note
+<Note>
 
+</Note>
     Automatic Python version downloads can be [disabled](#disabling-automatic-python-downloads)
     without changing the preference.
 

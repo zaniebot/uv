@@ -27,8 +27,9 @@ from your reproduction; they may differ on your machine in a critical way. Using
 Below, we'll cover several specific [strategies](#strategies-for-reproducible-examples) for creating
 and sharing reproducible examples.
 
-!!! tip
+<Tip>
 
+</Tip>
     There's a great guide to the basics of creating MREs on
     [Stack Overflow](https://stackoverflow.com/help/minimal-reproducible-example).
 
@@ -39,8 +40,9 @@ and sharing reproducible examples.
 Writing a Docker image is often the best way to share a reproducible example because it is entirely
 self-contained. This means that the state from the reproducer's system does not affect the problem.
 
-!!! note
+<Note>
 
+</Note>
     Using a Docker image is only feasible if the issue is reproducible on Linux. When using macOS,
     it's prudent to ensure your image is not reproducible on Linux but some bugs _are_ specific
     to the operating system. While using Docker to run Windows containers is feasible, it's not

@@ -6,8 +6,9 @@ Python project metadata is defined in a
 [`pyproject.toml`](https://packaging.python.org/en/latest/guides/writing-pyproject-toml/) file. uv
 requires this file to identify the root directory of a project.
 
-!!! tip
+<Tip>
 
+</Tip>
     `uv init` can be used to create a new project. See [Creating projects](./init.md) for
     details.
 
@@ -48,8 +49,9 @@ project dependencies, use `uv add` to add a package to the environment. For one-
 use [`uvx`](../../guides/tools.md) or
 [`uv run --with`](./run.md#requesting-additional-dependencies).
 
-!!! tip
+<Tip>
 
+</Tip>
     If you don't want uv to manage the project environment, set [`managed = false`](../../reference/settings.md#managed)
     to disable automatic locking and syncing of the project. For example:
 

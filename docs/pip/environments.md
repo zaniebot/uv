@@ -45,20 +45,27 @@ $ uv pip install ruff
 
 The virtual environment can be "activated" to make its packages available:
 
-=== "macOS and Linux"
+<Tabs>
+  <Tab title="macOS and Linux">
 
     ```console
     $ source .venv/bin/activate
     ```
+  </Tab>
+</Tabs>
 
-=== "Windows"
+<Tabs>
+  <Tab title="Windows">
 
     ```pwsh-session
     PS> .venv\Scripts\activate
     ```
+  </Tab>
+</Tabs>
 
-!!! note
+<Note>
 
+</Note>
     The default activation script on Unix is for POSIX compliant shells like `sh`, `bash`, or `zsh`.
     There are additional activation scripts for common alternative shells.
 

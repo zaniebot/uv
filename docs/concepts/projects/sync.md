@@ -49,8 +49,9 @@ $ uv lock --check
 
 This is equivalent to the `--locked` flag for other commands.
 
-!!! important
+<Warning>
 
+</Warning>
     uv will not consider lockfiles outdated when new versions of packages are released — the lockfile
     needs to be explicitly updated if you want to upgrade dependencies. See the documentation on
     [upgrading locked package versions](#upgrading-locked-package-versions) for details.
@@ -84,8 +85,9 @@ environment.
 
 To opt-out of this behavior, use the `--no-editable` option.
 
-!!! note
+<Note>
 
+</Note>
     If the project does not define a build system, it will not be installed.
     See the [build systems](./config.md#build-systems) documentation for details.
 
@@ -174,8 +176,9 @@ $ uv lock --upgrade-package <package>==<version>
 In all cases, upgrades are limited to the project's dependency constraints. For example, if the
 project defines an upper bound for a package then an upgrade will not go beyond that version.
 
-!!! note
+<Note>
 
+</Note>
     uv applies similar logic to Git dependencies. For example, if a Git dependency references
     the `main` branch, uv will prefer the locked commit SHA in an existing `uv.lock` file over
     the latest commit on the `main` branch, unless the `--upgrade` or `--upgrade-package` flags

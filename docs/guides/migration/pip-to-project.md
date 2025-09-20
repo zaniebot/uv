@@ -3,16 +3,18 @@
 This guide will discuss converting from a `pip` and `pip-tools` workflow centered on `requirements`
 files to uv's project workflow using a `pyproject.toml` and `uv.lock` file.
 
-!!! note
+<Note>
 
+</Note>
     If you're looking to migrate from `pip` and `pip-tools` to uv's drop-in interface or from an
     existing workflow where you're already using a `pyproject.toml`, those guides are not yet
     written. See [#5200](https://github.com/astral-sh/uv/issues/5200) to track progress.
 
 We'll start with an overview of developing with `pip`, then discuss migrating to uv.
 
-!!! tip
+<Tip>
 
+</Tip>
     If you're familiar with the ecosystem, you can jump ahead to the
     [requirements file import](#importing-requirements-files) instructions.
 
@@ -163,8 +165,9 @@ environment considers _all_ of the dependencies together. The `-c requirements.t
 package version to ensure that the `requirements-dev.txt` uses the same versions as
 `requirements.txt`.
 
-!!! note
+<Note>
 
+</Note>
     It's common to use `-r requirements.txt` directly instead of using both
     `-r requirements.in`, and `-c requirements.txt`. There's no difference in the resulting package
     versions, but using both files produces annotations which allow you to determine which
@@ -263,8 +266,9 @@ tqdm==4.67.1
 When using `pip` and `pip-tools`, a project needs to declare a requirements lock file for each
 supported platform.
 
-!!! note
+<Note>
 
+</Note>
     uv's resolver can compile dependencies for multiple platforms at once (see ["universal resolution"](../../concepts/resolution.md#universal-resolution)),
     allowing you to use a single `requirements.txt` for all platforms:
 
@@ -330,8 +334,9 @@ The uv lockfile also supports concepts like
 [pinning packages to specific indexes](../../concepts/indexes.md#pinning-a-package-to-an-index),
 which is not representable in `requirements.txt` files.
 
-!!! tip
+<Tip>
 
+</Tip>
     If you only need to lock for a subset of platforms, use the
     [`tool.uv.environments`](../../concepts/resolution.md#limited-resolution-environments) setting
     to limit the resolution and lockfile.
@@ -457,8 +462,9 @@ consistent, locked environment.
 
 The project environment can also be explicitly created with `uv sync`, e.g., for use with editors.
 
-!!! note
+<Note>
 
+</Note>
     When in projects, uv will prefer a `.venv` in the project directory and ignore the active
     environment as declared by the `VIRTUAL_ENV` variable by default. You can opt-in to using the
     active environment with the `--active` flag.

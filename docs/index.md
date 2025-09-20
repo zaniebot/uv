@@ -39,24 +39,25 @@ uv is backed by [Astral](https://astral.sh), the creators of
 
 Install uv with our official standalone installer:
 
-=== "macOS and Linux"
-
+<Tabs>
+  <Tab title="macOS and Linux">
     ```console
     $ curl -LsSf https://astral.sh/uv/install.sh | sh
     ```
-
-=== "Windows"
-
+  </Tab>
+  <Tab title="Windows">
     ```pwsh-session
     PS> powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
     ```
+  </Tab>
+</Tabs>
 
 Then, check out the [first steps](./getting-started/first-steps.md) or read on for a brief overview.
 
-!!! tip
-
-    uv may also be installed with pip, Homebrew, and more. See all of the methods on the
-    [installation page](./getting-started/installation.md).
+<Tip>
+  uv may also be installed with pip, Homebrew, and more. See all of the methods on the
+  [installation page](./getting-started/installation.md).
+</Tip>
 
 ## Projects
 

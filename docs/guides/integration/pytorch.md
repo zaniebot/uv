@@ -12,8 +12,9 @@ development. You can use uv to manage PyTorch projects and PyTorch dependencies 
 Python versions and environments, even controlling for the choice of accelerator (e.g., CPU-only vs.
 CUDA).
 
-!!! note
+<Note>
 
+</Note>
     Some of the features outlined in this guide require uv version 0.5.3 or later. We recommend upgrading prior to configuring PyTorch.
 
 ## Installing PyTorch
@@ -50,8 +51,11 @@ dependencies = [
 ]
 ```
 
-!!! tip "Supported Python versions"
+<Tip>
+  **Supported Python versions**
 
+
+</Tip>
     At time of writing, PyTorch does not yet publish wheels for Python 3.14; as such projects with
     `requires-python = ">=3.14"` may fail to resolve. See the
     [compatibility matrix](https://github.com/pytorch/pytorch/blob/main/RELEASE.md#release-compatibility-matrix).
@@ -67,7 +71,8 @@ may want to use the CPU-only builds on Linux too.
 
 In such cases, the first step is to add the relevant PyTorch index to your `pyproject.toml`:
 
-=== "CPU-only"
+<Tabs>
+  <Tab title="CPU-only">
 
     ```toml
     [[tool.uv.index]]
@@ -75,8 +80,11 @@ In such cases, the first step is to add the relevant PyTorch index to your `pypr
     url = "https://download.pytorch.org/whl/cpu"
     explicit = true
     ```
+  </Tab>
+</Tabs>
 
-=== "CUDA 11.8"
+<Tabs>
+  <Tab title="CUDA 11.8">
 
     ```toml
     [[tool.uv.index]]
@@ -84,8 +92,11 @@ In such cases, the first step is to add the relevant PyTorch index to your `pypr
     url = "https://download.pytorch.org/whl/cu118"
     explicit = true
     ```
+  </Tab>
+</Tabs>
 
-=== "CUDA 12.6"
+<Tabs>
+  <Tab title="CUDA 12.6">
 
     ```toml
     [[tool.uv.index]]
@@ -93,8 +104,11 @@ In such cases, the first step is to add the relevant PyTorch index to your `pypr
     url = "https://download.pytorch.org/whl/cu126"
     explicit = true
     ```
+  </Tab>
+</Tabs>
 
-=== "CUDA 12.8"
+<Tabs>
+  <Tab title="CUDA 12.8">
 
     ```toml
     [[tool.uv.index]]
@@ -102,8 +116,11 @@ In such cases, the first step is to add the relevant PyTorch index to your `pypr
     url = "https://download.pytorch.org/whl/cu128"
     explicit = true
     ```
+  </Tab>
+</Tabs>
 
-=== "ROCm6"
+<Tabs>
+  <Tab title="ROCm6">
 
     ```toml
     [[tool.uv.index]]
@@ -111,8 +128,11 @@ In such cases, the first step is to add the relevant PyTorch index to your `pypr
     url = "https://download.pytorch.org/whl/rocm6.3"
     explicit = true
     ```
+  </Tab>
+</Tabs>
 
-=== "Intel GPUs"
+<Tabs>
+  <Tab title="Intel GPUs">
 
     ```toml
     [[tool.uv.index]]
@@ -120,6 +140,8 @@ In such cases, the first step is to add the relevant PyTorch index to your `pypr
     url = "https://download.pytorch.org/whl/xpu"
     explicit = true
     ```
+  </Tab>
+</Tabs>
 
 We recommend the use of `explicit = true` to ensure that the index is _only_ used for `torch`,
 `torchvision`, and other PyTorch-related packages, as opposed to generic dependencies like `jinja2`,
@@ -127,7 +149,8 @@ which should continue to be sourced from the default index (PyPI).
 
 Next, update the `pyproject.toml` to point `torch` and `torchvision` to the desired index:
 
-=== "CPU-only"
+<Tabs>
+  <Tab title="CPU-only">
 
     ```toml
     [tool.uv.sources]
@@ -138,8 +161,11 @@ Next, update the `pyproject.toml` to point `torch` and `torchvision` to the desi
       { index = "pytorch-cpu" },
     ]
     ```
+  </Tab>
+</Tabs>
 
-=== "CUDA 11.8"
+<Tabs>
+  <Tab title="CUDA 11.8">
 
     PyTorch doesn't publish CUDA builds for macOS. As such, we gate on `sys_platform` to instruct uv to use
     the PyTorch index on Linux and Windows, but fall back to PyPI on macOS:
@@ -153,8 +179,11 @@ Next, update the `pyproject.toml` to point `torch` and `torchvision` to the desi
       { index = "pytorch-cu118", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
     ]
     ```
+  </Tab>
+</Tabs>
 
-=== "CUDA 12.6"
+<Tabs>
+  <Tab title="CUDA 12.6">
 
     PyTorch doesn't publish CUDA builds for macOS. As such, we gate on `sys_platform` to instruct uv to limit
     the PyTorch index to Linux and Windows, falling back to PyPI on macOS:
@@ -168,8 +197,11 @@ Next, update the `pyproject.toml` to point `torch` and `torchvision` to the desi
       { index = "pytorch-cu126", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
     ]
     ```
+  </Tab>
+</Tabs>
 
-=== "CUDA 12.8"
+<Tabs>
+  <Tab title="CUDA 12.8">
 
     PyTorch doesn't publish CUDA builds for macOS. As such, we gate on `sys_platform` to instruct uv to limit
     the PyTorch index to Linux and Windows, falling back to PyPI on macOS:
@@ -183,8 +215,11 @@ Next, update the `pyproject.toml` to point `torch` and `torchvision` to the desi
       { index = "pytorch-cu128", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
     ]
     ```
+  </Tab>
+</Tabs>
 
-=== "ROCm6"
+<Tabs>
+  <Tab title="ROCm6">
 
     PyTorch doesn't publish ROCm6 builds for macOS or Windows. As such, we gate on `sys_platform` to instruct uv
     to limit the PyTorch index to Linux, falling back to PyPI on macOS and Windows:
@@ -203,8 +238,11 @@ Next, update the `pyproject.toml` to point `torch` and `torchvision` to the desi
       { index = "pytorch-rocm", marker = "sys_platform == 'linux'" },
     ]
     ```
+  </Tab>
+</Tabs>
 
-=== "Intel GPUs"
+<Tabs>
+  <Tab title="Intel GPUs">
 
     PyTorch doesn't publish Intel GPU builds for macOS. As such, we gate on `sys_platform` to instruct uv to limit
     the PyTorch index to Linux and Windows, falling back to PyPI on macOS:
@@ -223,6 +261,8 @@ Next, update the `pyproject.toml` to point `torch` and `torchvision` to the desi
       { index = "pytorch-xpu", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
     ]
     ```
+  </Tab>
+</Tabs>
 
 As a complete example, the following project would use PyTorch's CPU-only builds on all platforms:
 
@@ -407,8 +447,9 @@ url = "https://download.pytorch.org/whl/cu128"
 explicit = true
 ```
 
-!!! note
+<Note>
 
+</Note>
     Since GPU-accelerated builds aren't available on macOS, the above configuration will fail to install
     on macOS when the `cu128` extra is enabled.
 

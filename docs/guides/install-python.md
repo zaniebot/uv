@@ -20,8 +20,9 @@ To install the latest Python version:
 $ uv python install
 ```
 
-!!! note
+<Note>
 
+</Note>
     Python does not publish official distributable binaries. As such, uv uses distributions from the Astral [`python-build-standalone`](https://github.com/astral-sh/python-build-standalone) project. See the [Python distributions](../concepts/python-versions.md#managed-python-distributions) documentation for more details.
 
 Once Python is installed, it will be used by `uv` commands automatically. uv also adds the installed
@@ -38,8 +39,9 @@ include the experimental `--default` option:
 $ uv python install --default
 ```
 
-!!! tip
+<Tip>
 
+</Tip>
     See the documentation on [installing Python executables](../concepts/python-versions.md#installing-python-executables)
     for more details.
 
@@ -107,8 +109,9 @@ before creating a new virtual environment:
 $ uv venv
 ```
 
-!!! tip
+<Tip>
 
+</Tip>
     Automatic Python downloads can be [easily disabled](../concepts/python-versions.md#disabling-automatic-python-downloads) if you want more control over when Python is downloaded.
 
 <!-- TODO(zanieb): Restore when Python shim management is added
@@ -129,8 +132,9 @@ documentation for more details.
 
 ## Upgrading Python versions
 
-!!! important
+<Warning>
 
+</Warning>
     Support for upgrading Python patch versions is in _preview_. This means the behavior is
     experimental and subject to change.
 

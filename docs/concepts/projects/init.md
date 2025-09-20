@@ -34,8 +34,9 @@ example-app
 └── pyproject.toml
 ```
 
-!!! note
+<Note>
 
+</Note>
     Prior to v0.6.0, uv created a file named `hello.py` instead of `main.py`.
 
 The `pyproject.toml` includes basic metadata. It does not include a build system, it is not a
@@ -98,7 +99,7 @@ example-pkg
 A [build system](./config.md#build-systems) is defined, so the project will be installed into the
 environment:
 
-```toml title="pyproject.toml" hl_lines="12-14"
+```toml title="pyproject.toml" 
 [project]
 name = "example-pkg"
 version = "0.1.0"
@@ -115,13 +116,14 @@ requires = ["uv_build>=0.8.19,<0.9.0"]
 build-backend = "uv_build"
 ```
 
-!!! tip
+<Tip>
 
+</Tip>
     The `--build-backend` option can be used to request an alternative build system.
 
 A [command](./config.md#entry-points) definition is included:
 
-```toml title="pyproject.toml" hl_lines="9 10"
+```toml title="pyproject.toml" 
 [project]
 name = "example-pkg"
 version = "0.1.0"
@@ -157,8 +159,9 @@ Libraries can be created by using the `--lib` flag:
 $ uv init --lib example-lib
 ```
 
-!!! note
+<Note>
 
+</Note>
     Using `--lib` implies `--package`. Libraries always require a packaged project.
 
 As with a [packaged application](#packaged-applications), a `src` layout is used. A `py.typed`
@@ -176,8 +179,9 @@ example-lib
         └── __init__.py
 ```
 
-!!! note
+<Note>
 
+</Note>
     A `src` layout is particularly valuable when developing libraries. It ensures that the library is
     isolated from any `python` invocations in the project root and that distributed library code is
     well separated from the rest of the project source.
@@ -185,7 +189,7 @@ example-lib
 A [build system](./config.md#build-systems) is defined, so the project will be installed into the
 environment:
 
-```toml title="pyproject.toml" hl_lines="12-14"
+```toml title="pyproject.toml" 
 [project]
 name = "example-lib"
 version = "0.1.0"
@@ -199,8 +203,9 @@ requires = ["uv_build>=0.8.19,<0.9.0"]
 build-backend = "uv_build"
 ```
 
-!!! tip
+<Tip>
 
+</Tip>
     You can select a different build backend template by using `--build-backend` with `hatchling`,
     `uv_build`, `flit-core`, `pdm-backend`, `setuptools`, `maturin`, or `scikit-build-core`. An
     alternative backend is required if you want to create a [library with extension modules](#projects-with-extension-modules).
@@ -239,8 +244,9 @@ Specify the build system with the `--build-backend` flag:
 $ uv init --build-backend maturin example-ext
 ```
 
-!!! note
+<Note>
 
+</Note>
     Using `--build-backend` implies `--package`.
 
 The project contains a `Cargo.toml` and a `lib.rs` file in addition to the typical Python project
@@ -260,8 +266,9 @@ example-ext
         └── _core.pyi
 ```
 
-!!! note
+<Note>
 
+</Note>
     If using `scikit-build-core`, you'll see CMake configuration and a `main.cpp` file instead.
 
 The Rust library defines a simple function:
@@ -299,8 +306,9 @@ $ uv run example-ext
 Hello from example-ext!
 ```
 
-!!! important
+<Warning>
 
+</Warning>
     When creating a project with maturin or scikit-build-core, uv configures [`tool.uv.cache-keys`](https://docs.astral.sh/uv/reference/settings/#cache-keys)
     to include common source file types. To force a rebuild, e.g. when changing files outside
     `cache-keys` or when not using `cache-keys`, use `--reinstall`.

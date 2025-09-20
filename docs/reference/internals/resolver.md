@@ -1,7 +1,8 @@
 # Resolver internals
 
-!!! tip
+<Tip>
 
+</Tip>
     This document focuses on the internal workings of uv's resolver. For using uv, see the
     [resolution concept](../../concepts/resolution.md) documentation.
 
@@ -60,8 +61,9 @@ the root dependencies and their transitive dependencies are picked, there will a
 From the incompatibilities tracked in PubGrub, an error message is constructed to enumerate the
 involved packages.
 
-!!! tip
+<Tip>
 
+</Tip>
     For more details on the PubGrub algorithm, see [Internals of the PubGrub
     algorithm](https://pubgrub-rs-guide.pages.dev/internals/intro).
 
@@ -102,8 +104,9 @@ A fork would be created for `sys_platform == 'darwin'`, for `sys_platform == 'wi
 Forks can be nested, e.g., each fork is dependent on any previous forks that occurred. Forks with
 identical packages are merged to keep the number of forks low.
 
-!!! tip
+<Tip>
 
+</Tip>
     Forking can be observed in the logs of `uv lock -v` by looking for
     `Splitting resolution on ...`, `Solving split ... (requires-python: ...)` and `Split ... resolution
     took ...`.

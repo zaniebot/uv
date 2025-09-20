@@ -11,8 +11,9 @@ A Python script is a file intended for standalone execution, e.g., with `python 
 uv to execute scripts ensures that script dependencies are managed without manually managing
 environments.
 
-!!! note
+<Note>
 
+</Note>
     If you are not familiar with Python environments: every Python installation has an environment
     that packages can be installed in. Typically, creating [_virtual_ environments](https://docs.python.org/3/library/venv.html) is recommended to
     isolate packages required by each script. uv automatically manages virtual environments for you
@@ -192,8 +193,9 @@ $ uv run example.py
 ]
 ```
 
-!!! important
+<Warning>
 
+</Warning>
     When using inline script metadata, even if `uv run` is [used in a _project_](../concepts/projects/run.md), the project's dependencies will be ignored. The `--no-project` flag is not required.
 
 uv also respects Python version requirements:
@@ -209,8 +211,9 @@ type Point = tuple[float, float]
 print(Point)
 ```
 
-!!! note
+<Note>
 
+</Note>
     The `dependencies` field must be provided even if empty.
 
 `uv run` will search for and use the required Python version. The Python version will download if it

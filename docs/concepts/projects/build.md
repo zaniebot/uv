@@ -8,8 +8,9 @@ distributions (wheels). The former is typically a `.tar.gz` or `.zip` file conta
 source code along with some additional metadata, while the latter is a `.whl` file containing
 pre-built artifacts that can be installed directly.
 
-!!! important
+<Warning>
 
+</Warning>
     When using `uv build`, uv acts as a [build frontend](https://peps.python.org/pep-0517/#terminology-and-goals)
     and only determines the Python version to use and invokes the build backend. The details of
     the builds, such as the included files and the distribution filenames, are determined by the build

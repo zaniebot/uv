@@ -9,8 +9,9 @@ description:
 
 ## Getting started
 
-!!! tip
+<Tip>
 
+</Tip>
     Check out the [`uv-docker-example`](https://github.com/astral-sh/uv-docker-example) project for
     an example of best practices when using uv to build an application in Docker.
 
@@ -139,8 +140,9 @@ In either case, it is best practice to pin to a specific uv version, e.g., with:
 COPY --from=ghcr.io/astral-sh/uv:0.8.19 /uv /uvx /bin/
 ```
 
-!!! tip
+<Tip>
 
+</Tip>
     While the Dockerfile example above pins to a specific tag, it's also
     possible to pin a specific SHA256. Pinning a specific SHA256 is considered
     best practice in environments that require reproducible builds as tags can
@@ -170,8 +172,9 @@ WORKDIR /app
 RUN uv sync --locked
 ```
 
-!!! important
+<Warning>
 
+</Warning>
     It is best practice to add `.venv` to a [`.dockerignore` file](https://docs.docker.com/build/concepts/context/#dockerignore-files)
     in your repository to prevent it from being included in image builds. The project virtual
     environment is dependent on your local platform and should be created from scratch in the image.
@@ -183,8 +186,9 @@ Then, to start your application by default:
 CMD ["uv", "run", "my_app"]
 ```
 
-!!! tip
+<Tip>
 
+</Tip>
     It is best practice to use [intermediate layers](#intermediate-layers) separating installation
     of dependencies and the project itself to improve Docker image build times.
 
@@ -206,8 +210,9 @@ Or, you can use `uv run` for any commands that require the environment:
 RUN uv run some_script.py
 ```
 
-!!! tip
+<Tip>
 
+</Tip>
     Alternatively, the
     [`UV_PROJECT_ENVIRONMENT` setting](../../concepts/projects/config.md#project-environment-path) can
     be set before syncing to install to the system Python environment and skip environment activation
@@ -237,8 +242,9 @@ $ docker run -it $(docker build -q .) /bin/bash -c "cowsay -t hello"
             ||     ||
 ```
 
-!!! note
+<Note>
 
+</Note>
     The tool bin directory's location can be determined by running the `uv tool dir --bin` command
     in the container.
 
@@ -276,8 +282,9 @@ with an [anonymous volume](https://docs.docker.com/engine/storage/#volumes):
 $ docker run --rm --volume .:/app --volume /app/.venv [...]
 ```
 
-!!! tip
+<Tip>
 
+</Tip>
     The `--rm` flag is included to ensure the container and anonymous volume are cleaned up when the
     container exits.
 
@@ -291,8 +298,9 @@ When using Docker compose, more sophisticated tooling is available for container
 allows for greater granularity than is practical with a bind mount and supports triggering updates
 to the containerized service when files change.
 
-!!! note
+<Note>
 
+</Note>
     This feature requires Compose 2.22.0 which is bundled with Docker Desktop 4.24.
 
 Configure `watch` in your
@@ -377,8 +385,9 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv python install
 ```
 
-!!! note
+<Note>
 
+</Note>
     The cache directory's location can be determined by running the `uv cache dir` command in the
     container.
 
@@ -422,8 +431,9 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 Note that the `pyproject.toml` is required to identify the project root and name, but the project
 _contents_ are not copied into the image until the final `uv sync` command.
 
-!!! tip
+<Tip>
 
+</Tip>
     If you're using a [workspace](../../concepts/projects/workspaces.md), then use the
     `--no-install-workspace` flag which excludes the project _and_ any workspace members.
 
@@ -587,8 +597,9 @@ $ cosign verify-blob-attestation \
 Verified OK
 ```
 
-!!! tip
+<Tip>
 
+</Tip>
     These examples use `latest`, but best practice is to verify the attestation for a specific
     version tag, e.g., `ghcr.io/astral-sh/uv:0.8.19`, or (even better) the specific image digest,
     such as `ghcr.io/astral-sh/uv:0.5.27@sha256:5adf09a5a526f380237408032a9308000d14d5947eafa687ad6c6a2476787b4f`.

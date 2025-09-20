@@ -18,8 +18,9 @@ build it by default. This means that your project may not be ready for distribut
 the effect of declaring a build system in the
 [project concept](../concepts/projects/config.md#build-systems) documentation.
 
-!!! note
+<Note>
 
+</Note>
     If you have internal packages that you do not want to be published, you can mark them as
     private:
 
@@ -48,8 +49,9 @@ artifacts in a `dist/` subdirectory.
 Alternatively, `uv build <SRC>` will build the package in the specified directory, while
 `uv build --package <PACKAGE>` will build the specified package within the current workspace.
 
-!!! info
+<Info>
 
+</Info>
     By default, `uv build` respects `tool.uv.sources` when resolving build dependencies from the
     `build-system.requires` section of the `pyproject.toml`. When publishing a package, we recommend
     running `uv build --no-sources` to ensure that the package builds correctly when `tool.uv.sources`
@@ -114,15 +116,17 @@ uv version --bump stable
 hello-world 1.3.1b2 => 1.3.1
 ```
 
-!!! info
+<Info>
 
+</Info>
     By default, when `uv version` modifies the project it will perform a lock and sync. To
     prevent locking and syncing, use `--frozen`, or,  to just prevent syncing, use `--no-sync`.
 
 ## Publishing your package
 
-!!! note
+<Note>
 
+</Note>
     A complete guide to publishing from GitHub Actions to PyPI can be found in the
     [GitHub Guide](integration/github.md#publishing-to-pypi)
 
@@ -138,8 +142,9 @@ PyPI from GitHub Actions or another Trusted Publisher, you don't need to set any
 Instead,
 [add a trusted publisher to the PyPI project](https://docs.pypi.org/trusted-publishers/adding-a-publisher/).
 
-!!! note
+<Note>
 
+</Note>
     PyPI does not support publishing with username and password anymore, instead you need to
     generate a token. Using a token is equivalent to setting `--username __token__` and using the
     token as password.
@@ -155,8 +160,9 @@ publish-url = "https://test.pypi.org/legacy/"
 explicit = true
 ```
 
-!!! note
+<Note>
 
+</Note>
     When using `uv publish --index <name>`, the `pyproject.toml` must be present, i.e., you need to
     have a checkout step in a publish CI job.
 
@@ -179,8 +185,9 @@ $ uv run --with <PACKAGE> --no-project -- python -c "import <PACKAGE>"
 
 The `--no-project` flag is used to avoid installing the package from your local project directory.
 
-!!! tip
+<Tip>
 
+</Tip>
     If you have recently installed the package, you may need to include the
     `--refresh-package <PACKAGE>` option to avoid using a cached version of the package.
 

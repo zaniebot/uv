@@ -76,8 +76,9 @@ pip._vendor.pyproject_hooks._impl.BackendUnavailable: Traceback (most recent cal
 ModuleNotFoundError: No module named 'distutils'
 ```
 
-!!! important
+<Warning>
 
+</Warning>
     The `--use-pep517` flag should be included with the `pip install` invocation to ensure the same
     build isolation behavior. uv always uses [build isolation by default](../../pip/compatibility.md#pep-517-build-isolation).
 
@@ -145,8 +146,9 @@ Then, you'll need to install it with your system package manager, e.g., to resol
 $ apt install gcc
 ```
 
-!!! tip
+<Tip>
 
+</Tip>
     When using the uv-managed Python versions, it's common to need `clang` installed instead of
     `gcc`.
 
@@ -203,8 +205,9 @@ $ apt install libgraphviz-dev
 Note that installing the `graphviz` package is not sufficient, the development headers need to be
 installed.
 
-!!! tip
+<Tip>
 
+</Tip>
     To resolve an error where `Python.h` is missing, install the [`python3-dev` package](https://packages.debian.org/bookworm/python3-dev).
 
 ### Module is missing or cannot be imported

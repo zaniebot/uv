@@ -5,8 +5,9 @@ uv supports persistent configuration files at both the project- and user-level.
 Specifically, uv will search for a `pyproject.toml` or `uv.toml` file in the current directory, or
 in the nearest parent directory.
 
-!!! note
+<Note>
 
+</Note>
     For `tool` commands, which operate at the user level, local configuration
     files will be ignored. Instead, uv will exclusively read from user-level configuration
     (e.g., `~/.config/uv/uv.toml`) and system-level configuration (e.g., `/etc/uv/uv.toml`).
@@ -36,8 +37,9 @@ url = "https://test.pypi.org/simple"
 default = true
 ```
 
-!!! note
+<Note>
 
+</Note>
     `uv.toml` files take precedence over `pyproject.toml` files, so if both `uv.toml` and
     `pyproject.toml` files are present in a directory, configuration will be read from `uv.toml`, and
     `[tool.uv]` section in the accompanying `pyproject.toml` will be ignored.

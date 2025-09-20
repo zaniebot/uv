@@ -18,11 +18,11 @@ The uv build backend currently **only supports pure Python code**. An alternativ
 required to build a
 [library with extension modules](../concepts/projects/init.md#projects-with-extension-modules).
 
-!!! tip
-
-    While the backend supports a number of options for configuring your project structure, when build scripts or
-    a more flexible project layout are required, consider using the
-    [hatchling](https://hatch.pypa.io/latest/config/build/#build-system) build backend instead.
+<Tip>
+  While the backend supports a number of options for configuring your project structure, when build scripts or
+  a more flexible project layout are required, consider using the
+  [hatchling](https://hatch.pypa.io/latest/config/build/#build-system) build backend instead.
+</Tip>
 
 ## Using the uv build backend
 
@@ -35,8 +35,9 @@ requires = ["uv_build>=0.8.19,<0.9.0"]
 build-backend = "uv_build"
 ```
 
-!!! note
+<Note>
 
+</Note>
     The uv build backend follows the same [versioning policy](../reference/policies/versioning.md)
     as uv. Including an upper bound on the `uv_build` version ensures that your package continues to
     build correctly as new versions are released.
@@ -118,8 +119,9 @@ And the `module-name` configuration would be:
 module-name = "foo.bar"
 ```
 
-!!! important
+<Warning>
 
+</Warning>
     The `__init__.py` file is not included in `foo`, since it's the shared namespace module.
 
 It's also possible to have a complex namespace package with more than one root module, e.g., with
@@ -150,8 +152,9 @@ avoid explicitly declaring each module name, e.g.:
 namespace = true
 ```
 
-!!! warning
+<Warning>
 
+</Warning>
     Using `namespace = true` disables safety checks. Using an explicit list of module names is
     strongly recommended outside of legacy projects.
 
@@ -237,8 +240,9 @@ must either be under the module root or in the appropriate
 [data directory](../reference/settings.md#build-backend_data). Most packages store small data in the
 module root alongside the source code.
 
-!!! tip
+<Tip>
 
+</Tip>
     When using the uv build backend through a frontend that is not uv, such as pip or
     `python -m build`, debug logging can be enabled through environment variables with
     `RUST_LOG=uv=debug` or `RUST_LOG=uv=verbose`. When used through uv, the uv build backend shares
@@ -251,8 +255,9 @@ not `<root>/bar/pyproject.toml`. To recursively include all files under a direct
 suffix, e.g. `src/**`. Recursive inclusions are also anchored, e.g., `assets/**/sample.csv` includes
 all `sample.csv` files in `<root>/assets` or any of its children.
 
-!!! note
+<Note>
 
+</Note>
     For performance and reproducibility, avoid patterns without an anchor such as `**/sample.csv`.
 
 Excludes are not anchored, which means that `__pycache__` excludes all directories named

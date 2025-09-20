@@ -15,7 +15,7 @@ PATH, (optionally) persists the cache, and more, with support for all uv-support
 
 To install the latest version of uv:
 
-```yaml title="example.yml" hl_lines="11 12"
+```yaml title="example.yml" 
 name: Example
 
 jobs:
@@ -32,7 +32,7 @@ jobs:
 
 It is considered best practice to pin to a specific uv version, e.g., with:
 
-```yaml title="example.yml" hl_lines="14 15"
+```yaml title="example.yml" 
 name: Example
 
 jobs:
@@ -54,7 +54,7 @@ jobs:
 
 Python can be installed with the `python install` command:
 
-```yaml title="example.yml" hl_lines="14 15"
+```yaml title="example.yml" 
 name: Example
 
 jobs:
@@ -81,7 +81,7 @@ Set the
 [`python-version-file`](https://github.com/actions/setup-python/blob/main/docs/advanced-usage.md#using-the-python-version-file-input)
 option to use the pinned version for the project:
 
-```yaml title="example.yml" hl_lines="14"
+```yaml title="example.yml" 
 name: Example
 
 jobs:
@@ -104,7 +104,7 @@ jobs:
 Or, specify the `pyproject.toml` file to ignore the pin and use the latest version compatible with
 the project's `requires-python` constraint:
 
-```yaml title="example.yml" hl_lines="14"
+```yaml title="example.yml" 
 name: Example
 
 jobs:
@@ -130,7 +130,7 @@ When using a matrix to test multiple Python versions, set the Python version usi
 `astral-sh/setup-uv`, which will override the Python version specification in the `pyproject.toml`
 or `.python-version` files:
 
-```yaml title="example.yml" hl_lines="17 18"
+```yaml title="example.yml" 
 jobs:
   build:
     name: continuous-integration
@@ -153,7 +153,7 @@ jobs:
 
 If not using the `setup-uv` action, you can set the `UV_PYTHON` environment variable:
 
-```yaml title="example.yml" hl_lines="12"
+```yaml title="example.yml" 
 jobs:
   build:
     name: continuous-integration
@@ -175,7 +175,7 @@ jobs:
 Once uv and Python are installed, the project can be installed with `uv sync` and commands can be
 run in the environment with `uv run`:
 
-```yaml title="example.yml" hl_lines="15 17-22"
+```yaml title="example.yml" 
 name: Example
 
 jobs:
@@ -197,8 +197,9 @@ jobs:
         run: uv run pytest tests
 ```
 
-!!! tip
+<Tip>
 
+</Tip>
     The
     [`UV_PROJECT_ENVIRONMENT` setting](../../concepts/projects/config.md#project-environment-path) can
     be used to install to the system Python environment instead of creating a virtual environment.
@@ -247,12 +248,14 @@ jobs:
 The `uv cache prune --ci` command is used to reduce the size of the cache and is optimized for CI.
 Its effect on performance is dependent on the packages being installed.
 
-!!! tip
+<Tip>
 
+</Tip>
     If using `uv pip`, use `requirements.txt` instead of `uv.lock` in the cache key.
 
-!!! note
+<Note>
 
+</Note>
     [post-job-hook]: https://docs.github.com/en/actions/hosting-your-own-runners/managing-self-hosted-runners/running-scripts-before-or-after-a-job
 
     When using non-ephemeral, self-hosted runners the default cache directory can grow unbounded.

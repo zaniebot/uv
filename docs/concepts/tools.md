@@ -2,8 +2,9 @@
 
 Tools are Python packages that provide command-line interfaces.
 
-!!! note
+<Note>
 
+</Note>
     See the [tools guide](../guides/tools.md) for an introduction to working with the tools
     interface — this document discusses details of tool management.
 
@@ -124,8 +125,9 @@ $ uv tool dir
 Tool environments are placed in a directory with the same name as the tool package, e.g.,
 `.../tools/<name>`.
 
-!!! important
+<Warning>
 
+</Warning>
     Tool environments are _not_ intended to be mutated directly. It is strongly recommended never to
     mutate a tool environment manually, e.g., with a `pip` operation.
 
@@ -160,8 +162,9 @@ Similarly, tool upgrades will retain the settings provided when installing the t
 `uv tool install black --prerelease allow` followed by `uv tool upgrade black` will retain the
 `--prerelease allow` setting.
 
-!!! note
+<Note>
 
+</Note>
     Tool upgrades will reinstall the tool executables, even if they have not changed.
 
 To reinstall packages during upgrade, use the `--reinstall` and `--reinstall-package` options.

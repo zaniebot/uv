@@ -106,7 +106,8 @@ If you need to run Jupyter in a virtual environment that isn't associated with a
 [project](../../concepts/projects/index.md) (e.g., has no `pyproject.toml` or `uv.lock`), you can do
 so by adding Jupyter to the environment directly. For example:
 
-=== "macOS and Linux"
+<Tabs>
+  <Tab title="macOS and Linux">
 
     ```console
     $ uv venv --seed
@@ -114,8 +115,11 @@ so by adding Jupyter to the environment directly. For example:
     $ uv pip install jupyterlab
     $ .venv/bin/jupyter lab
     ```
+  </Tab>
+</Tabs>
 
-=== "Windows"
+<Tabs>
+  <Tab title="Windows">
 
     ```pwsh-session
     PS> uv venv --seed
@@ -123,6 +127,8 @@ so by adding Jupyter to the environment directly. For example:
     PS> uv pip install jupyterlab
     PS> .venv\Scripts\jupyter lab
     ```
+  </Tab>
+</Tabs>
 
 From here, `import pydantic` will work within the notebook, and you can install additional packages
 via `!uv pip install`, or even `!pip install`.
@@ -152,8 +158,9 @@ Once the project directory is open in VS Code, you can create a new Jupyter note
 "Python Environments" and select the virtual environment you created earlier (e.g.,
 `.venv/bin/python` on macOS and Linux, or `.venv\Scripts\python` on Windows).
 
-!!! note
+<Note>
 
+</Note>
     VS Code requires `ipykernel` to be present in the project environment. If you'd prefer to avoid
     adding `ipykernel` as a dev dependency, you can install it directly into the project environment
     with `uv pip install ipykernel`.

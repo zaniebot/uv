@@ -26,8 +26,9 @@ uv:
     # your `uv` commands
 ```
 
-!!! note
+<Note>
 
+</Note>
     If you are using a distroless image, you have to specify the entrypoint:
     ```yaml
     uv:

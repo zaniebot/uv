@@ -65,9 +65,9 @@ $ uv --version      # Same output as `uv self version`
 $ uv -V             # Will not include the build commit and date
 ```
 
-!!! note
-
-    Before uv 0.7.0, `uv version` was used instead of `uv self version`.
+<Note>
+  Before uv 0.7.0, `uv version` was used instead of `uv self version`.
+</Note>
 
 ## Troubleshooting issues
 

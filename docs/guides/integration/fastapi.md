@@ -11,8 +11,9 @@ description:
 You can use uv to manage your FastAPI project, including installing dependencies, managing
 environments, running FastAPI applications, and more.
 
-!!! note
+<Note>
 
+</Note>
     You can view the source code for this guide in the [uv-fastapi-example](https://github.com/astral-sh/uv-fastapi-example) repository.
 
 ## Migrating an existing FastAPI project
@@ -131,6 +132,7 @@ $ docker run -p 8000:80 fastapi-app
 Navigate to http://127.0.0.1:8000/?token=jessica in your browser to verify that the app is running
 correctly.
 
-!!! tip
+<Tip>
 
+</Tip>
     For more on using uv with Docker, see the [Docker guide](./docker.md).
