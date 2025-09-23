@@ -100,8 +100,9 @@ fn generate() -> String {
 
 /// Render an environment variable and its documentation.
 fn render(var: &str, doc: &str, since: Option<&str>) -> String {
+    let var_id = var.to_lowercase().replace('_', "-");
     if let Some(since) = since {
-        format!("### `{var}`\n<small>Since `{since}`</small>\n\n{doc}\n\n")
+        format!("### `{var}`\n<small id=\"since-{var_id}\">added in `{since}`</small>\n\n{doc}\n\n")
     } else {
         format!("### `{var}`\n\n{doc}\n\n")
     }
