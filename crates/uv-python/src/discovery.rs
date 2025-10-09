@@ -15,6 +15,7 @@ use uv_pep440::{
     LowerBound, Prerelease, UpperBound, Version, VersionSpecifier, VersionSpecifiers,
     release_specifiers_to_ranges,
 };
+use uv_platform::Platform;
 use uv_preview::Preview;
 use uv_static::EnvVars;
 use uv_warnings::warn_user_once;
@@ -2296,6 +2297,7 @@ pub(crate) struct ExecutableName {
     patch: Option<u8>,
     prerelease: Option<Prerelease>,
     variant: PythonVariant,
+    platform: Option<Platform>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -2370,6 +2372,14 @@ impl Ord for ExecutableNameComparator<'_> {
                 ordering
             };
         }
+        let ordering = self.name.platform.cmp(&other.name.platform);
+        if ordering != std::cmp::Ordering::Equal {
+            return if is_default_request {
+                ordering.reverse()
+            } else {
+                ordering
+            };
+        }
         ordering
     }
 }
@@ -2414,6 +2424,12 @@ impl ExecutableName {
     #[must_use]
     fn with_variant(mut self, variant: PythonVariant) -> Self {
         self.variant = variant;
+        self
+    }
+
+    #[must_use]
+    fn with_platform(mut self, platform: Platform) -> Self {
+        self.platform = Some(platform);
         self
     }
 
