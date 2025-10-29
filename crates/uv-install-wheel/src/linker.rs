@@ -263,6 +263,15 @@ fn clone_recursive(
                             synchronized_copy(&from, &to, locks)?;
                         }
                     }
+                } else if is_lustre_enodata_error(&err) {
+                    debug!(
+                        "Failed to clone `{}` to `{}` with ENODATA (Lustre filesystem), attempting to copy files as a fallback",
+                        from.display(),
+                        to.display()
+                    );
+                    // Fallback to copying for Lustre filesystem ENODATA errors
+                    *attempt = Attempt::UseCopyFallback;
+                    clone_recursive(site_packages, wheel, locks, entry, attempt)?;
                 } else {
                     debug!(
                         "Failed to clone `{}` to `{}`, attempting to copy files as a fallback",
@@ -290,6 +299,15 @@ fn clone_recursive(
                         reflink::reflink(&from, &tempfile)?;
                         fs::rename(&tempfile, to)?;
                     }
+                } else if is_lustre_enodata_error(&err) {
+                    debug!(
+                        "Failed to clone `{}` to `{}` with ENODATA (Lustre filesystem), falling back to copy",
+                        from.display(),
+                        to.display()
+                    );
+                    // Fall back to copying for ENODATA errors on Lustre filesystems
+                    *attempt = Attempt::UseCopyFallback;
+                    clone_recursive(site_packages, wheel, locks, entry, attempt)?;
                 } else {
                     return Err(Error::Reflink { from, to, err });
                 }
@@ -547,6 +565,50 @@ fn symlink_wheel_files(
     Ok(count)
 }
 
+/// Check if an IO error is ENODATA (errno 61), which occurs on Lustre filesystems
+/// when using sendfile() or copy_file_range().
+///
+/// See: <https://github.com/astral-sh/uv/issues/15304>
+/// See: <https://github.com/python/cpython/pull/139417>
+#[cfg(target_os = "linux")]
+fn is_lustre_enodata_error(err: &std::io::Error) -> bool {
+    err.raw_os_error() == Some(61)
+}
+
+#[cfg(not(target_os = "linux"))]
+fn is_lustre_enodata_error(_err: &std::io::Error) -> bool {
+    false
+}
+
+/// Copy a file using manual read/write operations.
+///
+/// This is used as a fallback when `fs::copy` fails with `ENODATA` on Lustre filesystems.
+/// See: <https://github.com/astral-sh/uv/issues/15304>
+/// See: <https://github.com/python/cpython/pull/139417>
+fn copy_fallback(from: &Path, to: &Path) -> std::io::Result<()> {
+    use std::io::{Read, Write};
+
+    let mut reader = fs::File::open(from)?;
+    let mut writer = fs::File::create(to)?;
+
+    // Use a reasonable buffer size (64KB)
+    let mut buffer = vec![0; 64 * 1024];
+
+    loop {
+        let bytes_read = reader.read(&mut buffer)?;
+        if bytes_read == 0 {
+            break;
+        }
+        writer.write_all(&buffer[..bytes_read])?;
+    }
+
+    // Copy file permissions
+    let metadata = fs::metadata(from)?;
+    fs::set_permissions(to, metadata.permissions())?;
+
+    Ok(())
+}
+
 /// Copy from `from` to `to`, ensuring that the parent directory is locked. Avoids simultaneous
 /// writes to the same file, which can lead to corruption.
 ///
@@ -565,9 +627,22 @@ fn synchronized_copy(from: &Path, to: &Path, locks: &Locks) -> std::io::Result<(
     let _dir_guard = dir_lock.lock().unwrap();
 
     // Copy the file, which will also set its permissions.
-    fs::copy(from, to)?;
-
-    Ok(())
+    // On Linux, fs::copy uses sendfile() which can fail with ENODATA (errno 61)
+    // on Lustre filesystems. Fall back to manual read/write in that case.
+    match fs::copy(from, to) {
+        Ok(_) => Ok(()),
+        Err(err) => {
+            if is_lustre_enodata_error(&err) {
+                debug!(
+                    "fs::copy failed with ENODATA (Lustre filesystem), falling back to manual copy: {} -> {}",
+                    from.display(),
+                    to.display()
+                );
+                return copy_fallback(from, to);
+            }
+            Err(err)
+        }
+    }
 }
 
 /// Warn when a module exists in multiple packages.
