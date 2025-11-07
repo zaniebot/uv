@@ -33,15 +33,24 @@ fn workspace_metadata_simple() {
     exit_code: 0
     ----- stdout -----
     {
-      "schema": {
-        "version": "preview"
-      },
+      "version": 1,
+      "requires_python": ">=3.12",
       "workspace_root": "[TEMP_DIR]/foo",
-      "members": [
+      "workspace_members": [
+        "foo"
+      ],
+      "packages": [
         {
           "name": "foo",
-          "path": "[TEMP_DIR]/foo",
-          "dependencies": []
+          "version": "0.1.0",
+          "source": {
+            "type": "directory",
+            "path": "[TEMP_DIR]/foo"
+          },
+          "manifest_path": "[TEMP_DIR]/foo/pyproject.toml",
+          "metadata": {
+            "requires_python": ">=3.12"
+          }
         }
       ]
     }
@@ -67,48 +76,61 @@ fn workspace_metadata_root_workspace() -> Result<()> {
     exit_code: 0
     ----- stdout -----
     {
-      "schema": {
-        "version": "preview"
-      },
+      "version": 1,
+      "requires_python": ">=3.12",
       "workspace_root": "[TEMP_DIR]/workspace",
-      "members": [
+      "workspace_members": [
+        "albatross",
+        "bird-feeder",
+        "seeds"
+      ],
+      "packages": [
         {
           "name": "albatross",
-          "path": "[TEMP_DIR]/workspace",
+          "version": "0.1.0",
+          "source": {
+            "type": "directory",
+            "path": "[TEMP_DIR]/workspace"
+          },
+          "manifest_path": "[TEMP_DIR]/workspace/pyproject.toml",
           "dependencies": [
-            {
-              "name": "bird-feeder",
-              "workspace": true
-            },
-            {
-              "name": "iniconfig",
-              "workspace": false
-            }
-          ]
+            "bird-feeder",
+            "iniconfig>=2,<3"
+          ],
+          "metadata": {
+            "requires_python": ">=3.12"
+          }
         },
         {
           "name": "bird-feeder",
-          "path": "[TEMP_DIR]/workspace/packages/bird-feeder",
+          "version": "1.0.0",
+          "source": {
+            "type": "directory",
+            "path": "[TEMP_DIR]/workspace/packages/bird-feeder"
+          },
+          "manifest_path": "[TEMP_DIR]/workspace/packages/bird-feeder/pyproject.toml",
           "dependencies": [
-            {
-              "name": "iniconfig",
-              "workspace": false
-            },
-            {
-              "name": "seeds",
-              "workspace": true
-            }
-          ]
+            "iniconfig>=2,<3",
+            "seeds"
+          ],
+          "metadata": {
+            "requires_python": ">=3.8"
+          }
         },
         {
           "name": "seeds",
-          "path": "[TEMP_DIR]/workspace/packages/seeds",
+          "version": "1.0.0",
+          "source": {
+            "type": "directory",
+            "path": "[TEMP_DIR]/workspace/packages/seeds"
+          },
+          "manifest_path": "[TEMP_DIR]/workspace/packages/seeds/pyproject.toml",
           "dependencies": [
-            {
-              "name": "idna",
-              "workspace": false
-            }
-          ]
+            "idna==3.6"
+          ],
+          "metadata": {
+            "requires_python": ">=3.12"
+          }
         }
       ]
     }
@@ -136,48 +158,61 @@ fn workspace_metadata_virtual_workspace() -> Result<()> {
     exit_code: 0
     ----- stdout -----
     {
-      "schema": {
-        "version": "preview"
-      },
+      "version": 1,
+      "requires_python": ">=3.12",
       "workspace_root": "[TEMP_DIR]/workspace",
-      "members": [
+      "workspace_members": [
+        "albatross",
+        "bird-feeder",
+        "seeds"
+      ],
+      "packages": [
         {
           "name": "albatross",
-          "path": "[TEMP_DIR]/workspace/packages/albatross",
+          "version": "0.1.0",
+          "source": {
+            "type": "directory",
+            "path": "[TEMP_DIR]/workspace/packages/albatross"
+          },
+          "manifest_path": "[TEMP_DIR]/workspace/packages/albatross/pyproject.toml",
           "dependencies": [
-            {
-              "name": "bird-feeder",
-              "workspace": true
-            },
-            {
-              "name": "iniconfig",
-              "workspace": false
-            }
-          ]
+            "bird-feeder",
+            "iniconfig>=2,<3"
+          ],
+          "metadata": {
+            "requires_python": ">=3.12"
+          }
         },
         {
           "name": "bird-feeder",
-          "path": "[TEMP_DIR]/workspace/packages/bird-feeder",
+          "version": "1.0.0",
+          "source": {
+            "type": "directory",
+            "path": "[TEMP_DIR]/workspace/packages/bird-feeder"
+          },
+          "manifest_path": "[TEMP_DIR]/workspace/packages/bird-feeder/pyproject.toml",
           "dependencies": [
-            {
-              "name": "anyio",
-              "workspace": false
-            },
-            {
-              "name": "seeds",
-              "workspace": true
-            }
-          ]
+            "anyio>=4.3.0,<5",
+            "seeds"
+          ],
+          "metadata": {
+            "requires_python": ">=3.12"
+          }
         },
         {
           "name": "seeds",
-          "path": "[TEMP_DIR]/workspace/packages/seeds",
+          "version": "1.0.0",
+          "source": {
+            "type": "directory",
+            "path": "[TEMP_DIR]/workspace/packages/seeds"
+          },
+          "manifest_path": "[TEMP_DIR]/workspace/packages/seeds/pyproject.toml",
           "dependencies": [
-            {
-              "name": "idna",
-              "workspace": false
-            }
-          ]
+            "idna==3.6"
+          ],
+          "metadata": {
+            "requires_python": ">=3.12"
+          }
         }
       ]
     }
@@ -207,48 +242,61 @@ fn workspace_metadata_from_member() -> Result<()> {
     exit_code: 0
     ----- stdout -----
     {
-      "schema": {
-        "version": "preview"
-      },
+      "version": 1,
+      "requires_python": ">=3.12",
       "workspace_root": "[TEMP_DIR]/workspace",
-      "members": [
+      "workspace_members": [
+        "albatross",
+        "bird-feeder",
+        "seeds"
+      ],
+      "packages": [
         {
           "name": "albatross",
-          "path": "[TEMP_DIR]/workspace",
+          "version": "0.1.0",
+          "source": {
+            "type": "directory",
+            "path": "[TEMP_DIR]/workspace"
+          },
+          "manifest_path": "[TEMP_DIR]/workspace/pyproject.toml",
           "dependencies": [
-            {
-              "name": "bird-feeder",
-              "workspace": true
-            },
-            {
-              "name": "iniconfig",
-              "workspace": false
-            }
-          ]
+            "bird-feeder",
+            "iniconfig>=2,<3"
+          ],
+          "metadata": {
+            "requires_python": ">=3.12"
+          }
         },
         {
           "name": "bird-feeder",
-          "path": "[TEMP_DIR]/workspace/packages/bird-feeder",
+          "version": "1.0.0",
+          "source": {
+            "type": "directory",
+            "path": "[TEMP_DIR]/workspace/packages/bird-feeder"
+          },
+          "manifest_path": "[TEMP_DIR]/workspace/packages/bird-feeder/pyproject.toml",
           "dependencies": [
-            {
-              "name": "iniconfig",
-              "workspace": false
-            },
-            {
-              "name": "seeds",
-              "workspace": true
-            }
-          ]
+            "iniconfig>=2,<3",
+            "seeds"
+          ],
+          "metadata": {
+            "requires_python": ">=3.8"
+          }
         },
         {
           "name": "seeds",
-          "path": "[TEMP_DIR]/workspace/packages/seeds",
+          "version": "1.0.0",
+          "source": {
+            "type": "directory",
+            "path": "[TEMP_DIR]/workspace/packages/seeds"
+          },
+          "manifest_path": "[TEMP_DIR]/workspace/packages/seeds/pyproject.toml",
           "dependencies": [
-            {
-              "name": "idna",
-              "workspace": false
-            }
-          ]
+            "idna==3.6"
+          ],
+          "metadata": {
+            "requires_python": ">=3.12"
+          }
         }
       ]
     }
@@ -290,25 +338,50 @@ fn workspace_metadata_multiple_members() {
     exit_code: 0
     ----- stdout -----
     {
-      "schema": {
-        "version": "preview"
-      },
+      "version": 1,
+      "requires_python": ">=3.12",
       "workspace_root": "[TEMP_DIR]/pkg-a",
-      "members": [
+      "workspace_members": [
+        "pkg-a",
+        "pkg-b",
+        "pkg-c"
+      ],
+      "packages": [
         {
           "name": "pkg-a",
-          "path": "[TEMP_DIR]/pkg-a",
-          "dependencies": []
+          "version": "0.1.0",
+          "source": {
+            "type": "directory",
+            "path": "[TEMP_DIR]/pkg-a"
+          },
+          "manifest_path": "[TEMP_DIR]/pkg-a/pyproject.toml",
+          "metadata": {
+            "requires_python": ">=3.12"
+          }
         },
         {
           "name": "pkg-b",
-          "path": "[TEMP_DIR]/pkg-a/pkg-b",
-          "dependencies": []
+          "version": "0.1.0",
+          "source": {
+            "type": "directory",
+            "path": "[TEMP_DIR]/pkg-a/pkg-b"
+          },
+          "manifest_path": "[TEMP_DIR]/pkg-a/pkg-b/pyproject.toml",
+          "metadata": {
+            "requires_python": ">=3.12"
+          }
         },
         {
           "name": "pkg-c",
-          "path": "[TEMP_DIR]/pkg-a/pkg-c",
-          "dependencies": []
+          "version": "0.1.0",
+          "source": {
+            "type": "directory",
+            "path": "[TEMP_DIR]/pkg-a/pkg-c"
+          },
+          "manifest_path": "[TEMP_DIR]/pkg-a/pkg-c/pyproject.toml",
+          "metadata": {
+            "requires_python": ">=3.12"
+          }
         }
       ]
     }
@@ -332,15 +405,24 @@ fn workspace_metadata_single_project() {
     exit_code: 0
     ----- stdout -----
     {
-      "schema": {
-        "version": "preview"
-      },
+      "version": 1,
+      "requires_python": ">=3.12",
       "workspace_root": "[TEMP_DIR]/my-project",
-      "members": [
+      "workspace_members": [
+        "my-project"
+      ],
+      "packages": [
         {
           "name": "my-project",
-          "path": "[TEMP_DIR]/my-project",
-          "dependencies": []
+          "version": "0.1.0",
+          "source": {
+            "type": "directory",
+            "path": "[TEMP_DIR]/my-project"
+          },
+          "manifest_path": "[TEMP_DIR]/my-project/pyproject.toml",
+          "metadata": {
+            "requires_python": ">=3.12"
+          }
         }
       ]
     }
@@ -366,20 +448,27 @@ fn workspace_metadata_with_excluded() -> Result<()> {
     exit_code: 0
     ----- stdout -----
     {
-      "schema": {
-        "version": "preview"
-      },
+      "version": 1,
+      "requires_python": ">=3.12",
       "workspace_root": "[TEMP_DIR]/workspace",
-      "members": [
+      "workspace_members": [
+        "albatross"
+      ],
+      "packages": [
         {
           "name": "albatross",
-          "path": "[TEMP_DIR]/workspace",
+          "version": "0.1.0",
+          "source": {
+            "type": "directory",
+            "path": "[TEMP_DIR]/workspace"
+          },
+          "manifest_path": "[TEMP_DIR]/workspace/pyproject.toml",
           "dependencies": [
-            {
-              "name": "iniconfig",
-              "workspace": false
-            }
-          ]
+            "iniconfig>=2,<3"
+          ],
+          "metadata": {
+            "requires_python": ">=3.12"
+          }
         }
       ]
     }
@@ -446,32 +535,80 @@ fn workspace_metadata_with_regular_dependencies() {
     exit_code: 0
     ----- stdout -----
     {
-      "schema": {
-        "version": "preview"
-      },
+      "version": 1,
+      "requires_python": ">=3.12",
       "workspace_root": "[TEMP_DIR]/workspace-root",
-      "members": [
+      "workspace_members": [
+        "app-b",
+        "lib-a",
+        "workspace-root"
+      ],
+      "packages": [
         {
           "name": "app-b",
-          "path": "[TEMP_DIR]/workspace-root/app-b",
+          "version": "0.1.0",
+          "source": {
+            "type": "directory",
+            "path": "[TEMP_DIR]/workspace-root/app-b"
+          },
+          "manifest_path": "[TEMP_DIR]/workspace-root/app-b/pyproject.toml",
           "dependencies": [
-            {
-              "name": "lib-a",
-              "workspace": true
-            }
-          ]
+            "lib-a"
+          ],
+          "metadata": {
+            "requires_python": ">=3.12"
+          }
         },
         {
           "name": "lib-a",
-          "path": "[TEMP_DIR]/workspace-root/lib-a",
-          "dependencies": []
+          "version": "0.1.0",
+          "source": {
+            "type": "directory",
+            "path": "[TEMP_DIR]/workspace-root/lib-a"
+          },
+          "manifest_path": "[TEMP_DIR]/workspace-root/lib-a/pyproject.toml",
+          "metadata": {
+            "requires_python": ">=3.12"
+          }
         },
         {
           "name": "workspace-root",
-          "path": "[TEMP_DIR]/workspace-root",
-          "dependencies": []
+          "version": "0.1.0",
+          "source": {
+            "type": "directory",
+            "path": "[TEMP_DIR]/workspace-root"
+          },
+          "manifest_path": "[TEMP_DIR]/workspace-root/pyproject.toml",
+          "metadata": {
+            "requires_python": ">=3.12"
+          }
         }
-      ]
+      ],
+      "resolve": {
+        "packages": [
+          {
+            "name": "app-b",
+            "version": "0.1.0",
+            "source": {
+              "type": "registry"
+            }
+          },
+          {
+            "name": "lib-a",
+            "version": "0.1.0",
+            "source": {
+              "type": "registry"
+            }
+          },
+          {
+            "name": "workspace-root",
+            "version": "0.1.0",
+            "source": {
+              "type": "registry"
+            }
+          }
+        ]
+      }
     }
 
     ----- stderr -----
@@ -537,43 +674,105 @@ fn workspace_metadata_with_extras() {
     exit_code: 0
     ----- stdout -----
     {
-      "schema": {
-        "version": "preview"
-      },
+      "version": 1,
+      "requires_python": ">=3.12",
       "workspace_root": "[TEMP_DIR]/workspace-root",
-      "members": [
+      "workspace_members": [
+        "app",
+        "lib-a",
+        "lib-b",
+        "workspace-root"
+      ],
+      "packages": [
         {
           "name": "app",
-          "path": "[TEMP_DIR]/workspace-root/app",
-          "dependencies": [
-            {
-              "name": "lib-a",
-              "workspace": true,
-              "extra": "extra-a"
-            },
-            {
-              "name": "lib-b",
-              "workspace": true,
-              "extra": "extra-b"
-            }
-          ]
+          "version": "0.1.0",
+          "source": {
+            "type": "directory",
+            "path": "[TEMP_DIR]/workspace-root/app"
+          },
+          "manifest_path": "[TEMP_DIR]/workspace-root/app/pyproject.toml",
+          "optional_dependencies": {
+            "extra-a": [
+              "lib-a"
+            ],
+            "extra-b": [
+              "lib-b"
+            ]
+          },
+          "metadata": {
+            "requires_python": ">=3.12"
+          }
         },
         {
           "name": "lib-a",
-          "path": "[TEMP_DIR]/workspace-root/lib-a",
-          "dependencies": []
+          "version": "0.1.0",
+          "source": {
+            "type": "directory",
+            "path": "[TEMP_DIR]/workspace-root/lib-a"
+          },
+          "manifest_path": "[TEMP_DIR]/workspace-root/lib-a/pyproject.toml",
+          "metadata": {
+            "requires_python": ">=3.12"
+          }
         },
         {
           "name": "lib-b",
-          "path": "[TEMP_DIR]/workspace-root/lib-b",
-          "dependencies": []
+          "version": "0.1.0",
+          "source": {
+            "type": "directory",
+            "path": "[TEMP_DIR]/workspace-root/lib-b"
+          },
+          "manifest_path": "[TEMP_DIR]/workspace-root/lib-b/pyproject.toml",
+          "metadata": {
+            "requires_python": ">=3.12"
+          }
         },
         {
           "name": "workspace-root",
-          "path": "[TEMP_DIR]/workspace-root",
-          "dependencies": []
+          "version": "0.1.0",
+          "source": {
+            "type": "directory",
+            "path": "[TEMP_DIR]/workspace-root"
+          },
+          "manifest_path": "[TEMP_DIR]/workspace-root/pyproject.toml",
+          "metadata": {
+            "requires_python": ">=3.12"
+          }
         }
-      ]
+      ],
+      "resolve": {
+        "packages": [
+          {
+            "name": "app",
+            "version": "0.1.0",
+            "source": {
+              "type": "registry"
+            }
+          },
+          {
+            "name": "lib-a",
+            "version": "0.1.0",
+            "source": {
+              "type": "registry"
+            }
+          },
+          {
+            "name": "lib-b",
+            "version": "0.1.0",
+            "source": {
+              "type": "registry"
+            }
+          },
+          {
+            "name": "workspace-root",
+            "version": "0.1.0",
+            "source": {
+              "type": "registry"
+            }
+          }
+        ]
+      }
     }
 
     ----- stderr -----
@@ -639,43 +838,105 @@ fn workspace_metadata_with_dependency_groups() {
     exit_code: 0
     ----- stdout -----
     {
-      "schema": {
-        "version": "preview"
-      },
+      "version": 1,
+      "requires_python": ">=3.12",
       "workspace_root": "[TEMP_DIR]/workspace-root",
-      "members": [
+      "workspace_members": [
+        "app",
+        "dev-tools",
+        "test-utils",
+        "workspace-root"
+      ],
+      "packages": [
         {
           "name": "app",
-          "path": "[TEMP_DIR]/workspace-root/app",
-          "dependencies": [
-            {
-              "name": "dev-tools",
-              "workspace": true,
-              "group": "dev"
-            },
-            {
-              "name": "test-utils",
-              "workspace": true,
-              "group": "test"
-            }
-          ]
+          "version": "0.1.0",
+          "source": {
+            "type": "directory",
+            "path": "[TEMP_DIR]/workspace-root/app"
+          },
+          "manifest_path": "[TEMP_DIR]/workspace-root/app/pyproject.toml",
+          "dependency_groups": {
+            "dev": [
+              "dev-tools"
+            ],
+            "test": [
+              "test-utils"
+            ]
+          },
+          "metadata": {
+            "requires_python": ">=3.12"
+          }
         },
         {
           "name": "dev-tools",
-          "path": "[TEMP_DIR]/workspace-root/dev-tools",
-          "dependencies": []
+          "version": "0.1.0",
+          "source": {
+            "type": "directory",
+            "path": "[TEMP_DIR]/workspace-root/dev-tools"
+          },
+          "manifest_path": "[TEMP_DIR]/workspace-root/dev-tools/pyproject.toml",
+          "metadata": {
+            "requires_python": ">=3.12"
+          }
         },
         {
           "name": "test-utils",
-          "path": "[TEMP_DIR]/workspace-root/test-utils",
-          "dependencies": []
+          "version": "0.1.0",
+          "source": {
+            "type": "directory",
+            "path": "[TEMP_DIR]/workspace-root/test-utils"
+          },
+          "manifest_path": "[TEMP_DIR]/workspace-root/test-utils/pyproject.toml",
+          "metadata": {
+            "requires_python": ">=3.12"
+          }
         },
         {
           "name": "workspace-root",
-          "path": "[TEMP_DIR]/workspace-root",
-          "dependencies": []
+          "version": "0.1.0",
+          "source": {
+            "type": "directory",
+            "path": "[TEMP_DIR]/workspace-root"
+          },
+          "manifest_path": "[TEMP_DIR]/workspace-root/pyproject.toml",
+          "metadata": {
+            "requires_python": ">=3.12"
+          }
         }
-      ]
+      ],
+      "resolve": {
+        "packages": [
+          {
+            "name": "app",
+            "version": "0.1.0",
+            "source": {
+              "type": "registry"
+            }
+          },
+          {
+            "name": "dev-tools",
+            "version": "0.1.0",
+            "source": {
+              "type": "registry"
+            }
+          },
+          {
+            "name": "test-utils",
+            "version": "0.1.0",
+            "source": {
+              "type": "registry"
+            }
+          },
+          {
+            "name": "workspace-root",
+            "version": "0.1.0",
+            "source": {
+              "type": "registry"
+            }
+          }
+        ]
+      }
     }
 
     ----- stderr -----
@@ -720,30 +981,63 @@ fn workspace_metadata_no_workspace_dependencies() {
     exit_code: 0
     ----- stdout -----
     {
-      "schema": {
-        "version": "preview"
-      },
+      "version": 1,
+      "requires_python": ">=3.12",
       "workspace_root": "[TEMP_DIR]/workspace-root",
-      "members": [
+      "workspace_members": [
+        "package-a",
+        "package-b",
+        "package-c",
+        "workspace-root"
+      ],
+      "packages": [
         {
           "name": "package-a",
-          "path": "[TEMP_DIR]/workspace-root/package-a",
-          "dependencies": []
+          "version": "0.1.0",
+          "source": {
+            "type": "directory",
+            "path": "[TEMP_DIR]/workspace-root/package-a"
+          },
+          "manifest_path": "[TEMP_DIR]/workspace-root/package-a/pyproject.toml",
+          "metadata": {
+            "requires_python": ">=3.12"
+          }
         },
         {
           "name": "package-b",
-          "path": "[TEMP_DIR]/workspace-root/package-b",
-          "dependencies": []
+          "version": "0.1.0",
+          "source": {
+            "type": "directory",
+            "path": "[TEMP_DIR]/workspace-root/package-b"
+          },
+          "manifest_path": "[TEMP_DIR]/workspace-root/package-b/pyproject.toml",
+          "metadata": {
+            "requires_python": ">=3.12"
+          }
         },
         {
           "name": "package-c",
-          "path": "[TEMP_DIR]/workspace-root/package-c",
-          "dependencies": []
+          "version": "0.1.0",
+          "source": {
+            "type": "directory",
+            "path": "[TEMP_DIR]/workspace-root/package-c"
+          },
+          "manifest_path": "[TEMP_DIR]/workspace-root/package-c/pyproject.toml",
+          "metadata": {
+            "requires_python": ">=3.12"
+          }
         },
         {
           "name": "workspace-root",
-          "path": "[TEMP_DIR]/workspace-root",
-          "dependencies": []
+          "version": "0.1.0",
+          "source": {
+            "type": "directory",
+            "path": "[TEMP_DIR]/workspace-root"
+          },
+          "manifest_path": "[TEMP_DIR]/workspace-root/pyproject.toml",
+          "metadata": {
+            "requires_python": ">=3.12"
+          }
         }
       ]
     }
@@ -829,52 +1123,130 @@ fn workspace_metadata_mixed_dependencies() {
     exit_code: 0
     ----- stdout -----
     {
-      "schema": {
-        "version": "preview"
-      },
+      "version": 1,
+      "requires_python": ">=3.12",
       "workspace_root": "[TEMP_DIR]/workspace-root",
-      "members": [
+      "workspace_members": [
+        "app",
+        "core",
+        "testing",
+        "utils",
+        "workspace-root"
+      ],
+      "packages": [
         {
           "name": "app",
-          "path": "[TEMP_DIR]/workspace-root/app",
+          "version": "0.1.0",
+          "source": {
+            "type": "directory",
+            "path": "[TEMP_DIR]/workspace-root/app"
+          },
+          "manifest_path": "[TEMP_DIR]/workspace-root/app/pyproject.toml",
           "dependencies": [
-            {
-              "name": "core",
-              "workspace": true
-            },
-            {
-              "name": "utils",
-              "workspace": true,
-              "extra": "utils"
-            },
-            {
-              "name": "testing",
-              "workspace": true,
-              "group": "test"
-            }
-          ]
+            "core"
+          ],
+          "optional_dependencies": {
+            "utils": [
+              "utils"
+            ]
+          },
+          "dependency_groups": {
+            "test": [
+              "testing"
+            ]
+          },
+          "metadata": {
+            "requires_python": ">=3.12"
+          }
         },
         {
           "name": "core",
-          "path": "[TEMP_DIR]/workspace-root/core",
-          "dependencies": []
+          "version": "0.1.0",
+          "source": {
+            "type": "directory",
+            "path": "[TEMP_DIR]/workspace-root/core"
+          },
+          "manifest_path": "[TEMP_DIR]/workspace-root/core/pyproject.toml",
+          "metadata": {
+            "requires_python": ">=3.12"
+          }
         },
         {
           "name": "testing",
-          "path": "[TEMP_DIR]/workspace-root/testing",
-          "dependencies": []
+          "version": "0.1.0",
+          "source": {
+            "type": "directory",
+            "path": "[TEMP_DIR]/workspace-root/testing"
+          },
+          "manifest_path": "[TEMP_DIR]/workspace-root/testing/pyproject.toml",
+          "metadata": {
+            "requires_python": ">=3.12"
+          }
         },
         {
           "name": "utils",
-          "path": "[TEMP_DIR]/workspace-root/utils",
-          "dependencies": []
+          "version": "0.1.0",
+          "source": {
+            "type": "directory",
+            "path": "[TEMP_DIR]/workspace-root/utils"
+          },
+          "manifest_path": "[TEMP_DIR]/workspace-root/utils/pyproject.toml",
+          "metadata": {
+            "requires_python": ">=3.12"
+          }
         },
         {
           "name": "workspace-root",
-          "path": "[TEMP_DIR]/workspace-root",
-          "dependencies": []
+          "version": "0.1.0",
+          "source": {
+            "type": "directory",
+            "path": "[TEMP_DIR]/workspace-root"
+          },
+          "manifest_path": "[TEMP_DIR]/workspace-root/pyproject.toml",
+          "metadata": {
+            "requires_python": ">=3.12"
+          }
         }
-      ]
+      ],
+      "resolve": {
+        "packages": [
+          {
+            "name": "app",
+            "version": "0.1.0",
+            "source": {
+              "type": "registry"
+            }
+          },
+          {
+            "name": "core",
+            "version": "0.1.0",
+            "source": {
+              "type": "registry"
+            }
+          },
+          {
+            "name": "testing",
+            "version": "0.1.0",
+            "source": {
+              "type": "registry"
+            }
+          },
+          {
+            "name": "utils",
+            "version": "0.1.0",
+            "source": {
+              "type": "registry"
+            }
+          },
+          {
+            "name": "workspace-root",
+            "version": "0.1.0",
+            "source": {
+              "type": "registry"
+            }
+          }
+        ]
+      }
     }
 
     ----- stderr -----

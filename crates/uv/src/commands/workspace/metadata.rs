@@ -1,15 +1,15 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write;
 use std::path::{Path, PathBuf};
-use std::str::FromStr;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use serde::Serialize;
 
 use uv_fs::PortablePathBuf;
 use uv_normalize::{ExtraName, GroupName, PackageName};
+use uv_pep440::Version;
 use uv_preview::{Preview, PreviewFeatures};
-use uv_pypi_types::VerbatimParsedUrl;
+use uv_resolver::Lock;
 use uv_warnings::warn_user;
 use uv_workspace::{DiscoveryOptions, Workspace, WorkspaceCache};
 
@@ -17,118 +17,272 @@ use crate::commands::ExitStatus;
 use crate::printer::Printer;
 
 /// The schema version for the metadata report.
-#[derive(Serialize, Debug, Default)]
-#[serde(rename_all = "snake_case")]
+#[derive(Serialize, Debug)]
+#[serde(untagged)]
 enum SchemaVersion {
-    /// An unstable, experimental schema.
-    #[default]
-    Preview,
+    /// Schema version number
+    Version(u32),
 }
 
-/// The schema metadata for the metadata report.
-#[derive(Serialize, Debug, Default)]
-struct SchemaReport {
-    /// The version of the schema.
-    version: SchemaVersion,
+impl Default for SchemaVersion {
+    fn default() -> Self {
+        Self::Version(1)
+    }
 }
 
-/// A dependency of a workspace member.
-#[derive(Serialize, Debug)]
-struct DependencyReport {
-    /// The name of the dependency.
+/// Source type for a package
+#[derive(Serialize, Debug, Clone)]
+#[serde(tag = "type", rename_all = "kebab-case")]
+enum PackageSource {
+    Registry {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        url: Option<String>,
+    },
+    Git {
+        url: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        subdirectory: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        rev: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        tag: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        branch: Option<String>,
+    },
+    Direct {
+        url: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        subdirectory: Option<String>,
+    },
+    Path {
+        path: String,
+    },
+    Directory {
+        path: String,
+    },
+    Editable {
+        path: String,
+    },
+    Virtual {
+        path: String,
+    },
+}
+
+/// Package identifier
+#[derive(Serialize, Debug, Clone)]
+struct PackageId {
     name: PackageName,
-    /// Whether this dependency is another workspace member.
-    workspace: bool,
-    /// The extra that requires this dependency, if any.
     #[serde(skip_serializing_if = "Option::is_none")]
-    extra: Option<ExtraName>,
-    /// The dependency group that requires this dependency, if any.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    group: Option<GroupName>,
+    version: Option<Version>,
+    source: PackageSource,
 }
 
-/// Report for a single workspace member.
+/// A dependency in the resolved graph
+#[derive(Serialize, Debug, Clone)]
+struct ResolvedDependency {
+    /// Package ID of the dependency
+    #[serde(flatten)]
+    id: PackageId,
+    /// Requested extras
+    #[serde(skip_serializing_if = "BTreeSet::is_empty")]
+    extras: BTreeSet<ExtraName>,
+    /// Environment marker (if conditional)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    marker: Option<String>,
+}
+
+/// Metadata for a single package (from manifest)
+#[derive(Serialize, Debug, Clone)]
+struct PackageManifestMetadata {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    requires_python: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    description: Option<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    authors: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    license: Option<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    keywords: Vec<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    classifiers: Vec<String>,
+}
+
+/// A package in the workspace
+#[derive(Serialize, Debug, Clone)]
+struct Package {
+    /// Package identifier
+    #[serde(flatten)]
+    id: PackageId,
+    /// Path to the package's pyproject.toml (for workspace members)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    manifest_path: Option<PathBuf>,
+    /// Dependencies (as declared in the manifest)
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    dependencies: Vec<String>,
+    /// Optional dependencies (extras)
+    #[serde(skip_serializing_if = "BTreeMap::is_empty", default)]
+    optional_dependencies: BTreeMap<ExtraName, Vec<String>>,
+    /// Dependency groups (PEP 735)
+    #[serde(skip_serializing_if = "BTreeMap::is_empty", default)]
+    dependency_groups: BTreeMap<GroupName, Vec<String>>,
+    /// Package metadata
+    #[serde(skip_serializing_if = "Option::is_none")]
+    metadata: Option<PackageManifestMetadata>,
+}
+
+/// A node in the resolved dependency graph
+#[derive(Serialize, Debug, Clone)]
+struct ResolveNode {
+    /// Package ID
+    #[serde(flatten)]
+    id: PackageId,
+    /// Resolved dependencies
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    dependencies: Vec<ResolvedDependency>,
+}
+
+/// The resolved dependency graph
 #[derive(Serialize, Debug)]
-struct WorkspaceMemberReport {
-    /// The name of the workspace member.
-    name: PackageName,
-    /// The path to the workspace member's root directory.
-    path: PathBuf,
-    /// All dependencies of this workspace member.
-    dependencies: Vec<DependencyReport>,
+struct Resolve {
+    /// Nodes in the dependency graph
+    packages: Vec<ResolveNode>,
 }
 
 /// The report for a metadata operation.
 #[derive(Serialize, Debug)]
 struct MetadataReport {
-    /// The schema of this report.
-    schema: SchemaReport,
-    /// The workspace root directory.
+    /// The schema version
+    version: SchemaVersion,
+    /// The Python version requirement
+    #[serde(skip_serializing_if = "Option::is_none")]
+    requires_python: Option<String>,
+    /// The workspace root directory
     workspace_root: PortablePathBuf,
-    /// The workspace members.
-    members: Vec<WorkspaceMemberReport>,
+    /// Workspace member names
+    workspace_members: Vec<PackageName>,
+    /// All packages (workspace members + dependencies)
+    packages: Vec<Package>,
+    /// The resolved dependency graph (if lock file exists)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    resolve: Option<Resolve>,
 }
 
-/// Extract all dependencies from a workspace member.
-///
-/// This function examines the member's regular dependencies, optional dependencies (extras),
-/// and dependency groups, marking which dependencies are workspace members.
-fn extract_dependencies(
-    package: &uv_workspace::WorkspaceMember,
-    workspace_names: &BTreeSet<PackageName>,
-) -> Vec<DependencyReport> {
-    let mut dependencies = Vec::new();
+/// Build a Package from a lock file package
+fn package_from_lock(lock_pkg: &uv_resolver::Package, root: &Path) -> Result<Package> {
+    // Use available public APIs
+    let name = lock_pkg.name().clone();
+    let version = lock_pkg.version().cloned();
 
-    // Extract regular dependencies
-    if let Some(deps) = package.project().dependencies.as_ref() {
-        for dep in deps {
-            if let Ok(req) = uv_pep508::Requirement::<VerbatimParsedUrl>::from_str(dep) {
-                dependencies.push(DependencyReport {
-                    name: req.name.clone(),
-                    workspace: workspace_names.contains(&req.name),
-                    extra: None,
-                    group: None,
-                });
-            }
+    // Determine source type using available public methods
+    let source = if let Ok(Some(index)) = lock_pkg.index(root) {
+        PackageSource::Registry {
+            url: Some(index.to_string()),
         }
-    }
+    } else if let Ok(Some(git_ref)) = lock_pkg.as_git_ref() {
+        PackageSource::Git {
+            url: git_ref.reference.url.to_string(),
+            subdirectory: None,
+            rev: Some(git_ref.sha.to_string()),
+            tag: None,
+            branch: None,
+        }
+    } else {
+        // Default to registry if we can't determine
+        PackageSource::Registry { url: None }
+    };
 
-    // Extract optional dependencies (extras)
-    if let Some(optional_dependencies) = package.project().optional_dependencies.as_ref() {
-        for (extra_name, deps) in optional_dependencies {
-            for dep in deps {
-                if let Ok(req) = uv_pep508::Requirement::<VerbatimParsedUrl>::from_str(dep) {
-                    dependencies.push(DependencyReport {
-                        name: req.name.clone(),
-                        workspace: workspace_names.contains(&req.name),
-                        extra: Some(extra_name.clone()),
-                        group: None,
-                    });
-                }
-            }
-        }
-    }
+    // Extract dependency groups as strings
+    let dependency_groups = lock_pkg
+        .dependency_groups()
+        .iter()
+        .map(|(name, reqs)| {
+            let deps: Vec<String> = reqs.iter().map(|r| r.to_string()).collect();
+            (name.clone(), deps)
+        })
+        .collect();
+
+    Ok(Package {
+        id: PackageId {
+            name,
+            version,
+            source,
+        },
+        manifest_path: None,
+        dependencies: vec![],
+        optional_dependencies: BTreeMap::new(),
+        dependency_groups,
+        metadata: None,
+    })
+}
+
+/// Build a Package from a workspace member
+fn package_from_member(member: &uv_workspace::WorkspaceMember, _root: &Path) -> Package {
+    let project = member.project();
+
+    // Extract dependencies as strings
+    let dependencies = project
+        .dependencies
+        .as_ref()
+        .map(|deps| deps.clone())
+        .unwrap_or_default();
+
+    // Extract optional dependencies
+    let optional_dependencies = project
+        .optional_dependencies
+        .as_ref()
+        .map(|opt_deps| opt_deps.clone())
+        .unwrap_or_default();
 
     // Extract dependency groups
-    if let Some(dependency_groups) = package.pyproject_toml().dependency_groups.as_ref() {
-        for (group_name, deps) in dependency_groups {
-            for dep_spec in deps {
-                // Only process Requirement variants, skip IncludeGroup
-                if let uv_pypi_types::DependencyGroupSpecifier::Requirement(dep) = dep_spec {
-                    if let Ok(req) = uv_pep508::Requirement::<VerbatimParsedUrl>::from_str(dep) {
-                        dependencies.push(DependencyReport {
-                            name: req.name.clone(),
-                            workspace: workspace_names.contains(&req.name),
-                            extra: None,
-                            group: Some(group_name.clone()),
-                        });
-                    }
-                }
-            }
-        }
-    }
+    let dependency_groups = member
+        .pyproject_toml()
+        .dependency_groups
+        .as_ref()
+        .map(|groups| {
+            groups
+                .iter()
+                .map(|(name, specs)| {
+                    let reqs: Vec<String> = specs
+                        .iter()
+                        .filter_map(|spec| {
+                            if let uv_pypi_types::DependencyGroupSpecifier::Requirement(req) = spec {
+                                Some(req.clone())
+                            } else {
+                                None
+                            }
+                        })
+                        .collect();
+                    (name.clone(), reqs)
+                })
+                .collect()
+        })
+        .unwrap_or_default();
 
-    dependencies
+    // Build metadata
+    let metadata = Some(PackageManifestMetadata {
+        requires_python: project.requires_python.as_ref().map(ToString::to_string),
+        description: None,  // TODO: Access from PyProjectToml
+        authors: vec![],    // TODO: Access from PyProjectToml
+        license: None,      // TODO: Access from PyProjectToml
+        keywords: vec![],   // TODO: Access from PyProjectToml
+        classifiers: vec![], // TODO: Access from PyProjectToml
+    });
+
+    Package {
+        id: PackageId {
+            name: project.name.clone(),
+            version: project.version.clone(),
+            source: PackageSource::Directory {
+                path: member.root().display().to_string(),
+            },
+        },
+        manifest_path: Some(member.root().join("pyproject.toml")),
+        dependencies,
+        optional_dependencies,
+        dependency_groups,
+        metadata,
+    }
 }
 
 /// Display package metadata.
@@ -148,27 +302,101 @@ pub(crate) async fn metadata(
     let workspace =
         Workspace::discover(project_dir, &DiscoveryOptions::default(), &workspace_cache).await?;
 
-    // Collect all workspace member names for filtering
-    let workspace_names: BTreeSet<PackageName> = workspace
+    let root = workspace.install_path();
+
+    // Collect workspace member names
+    let workspace_members: Vec<PackageName> = workspace
         .packages()
         .values()
         .map(|package| package.project().name.clone())
         .collect();
 
-    let members = workspace
+    // Build packages from workspace members
+    let mut packages: Vec<Package> = workspace
         .packages()
         .values()
-        .map(|package| WorkspaceMemberReport {
-            name: package.project().name.clone(),
-            path: package.root().clone(),
-            dependencies: extract_dependencies(package, &workspace_names),
-        })
+        .map(|member| package_from_member(member, root))
         .collect();
 
+    // Try to load the lock file
+    let lock_path = root.join("uv.lock");
+    let (resolve, lock_packages, requires_python) = if lock_path.exists() {
+        let lock_content = fs_err::read_to_string(&lock_path)
+            .context("Failed to read uv.lock")?;
+
+        match toml::from_str::<Lock>(&lock_content) {
+            Ok(lock) => {
+                // Get requires_python from lock file
+                let requires_python = Some(lock.requires_python().to_string());
+
+                // Add packages from lock file that aren't workspace members
+                let workspace_names: BTreeSet<_> = workspace_members.iter().collect();
+
+                let mut lock_packages = vec![];
+                let mut resolve_nodes = vec![];
+
+                for lock_pkg in lock.packages() {
+                    // Convert lock package to our Package type
+                    if let Ok(pkg) = package_from_lock(lock_pkg, root) {
+                        // Build resolve node
+                        let resolve_node = ResolveNode {
+                            id: pkg.id.clone(),
+                            dependencies: vec![], // TODO: Add dependencies when we have public access
+                        };
+                        resolve_nodes.push(resolve_node);
+
+                        // Only add to packages list if it's not a workspace member
+                        if !workspace_names.contains(&pkg.id.name) {
+                            lock_packages.push(pkg);
+                        }
+                    }
+                }
+
+                let resolve = if !resolve_nodes.is_empty() {
+                    Some(Resolve {
+                        packages: resolve_nodes,
+                    })
+                } else {
+                    None
+                };
+
+                (resolve, lock_packages, requires_python)
+            }
+            Err(e) => {
+                // If lock file exists but can't be read, warn but continue
+                warn_user!("Failed to read uv.lock: {e}");
+                let requires_python = workspace
+                    .packages()
+                    .values()
+                    .next()
+                    .and_then(|member| {
+                        member.project().requires_python.as_ref().map(ToString::to_string)
+                    });
+                (None, vec![], requires_python)
+            }
+        }
+    } else {
+        // No lock file, get requires_python from workspace
+        let requires_python = workspace
+            .packages()
+            .values()
+            .next()
+            .and_then(|member| {
+                member.project().requires_python.as_ref().map(ToString::to_string)
+            });
+        (None, vec![], requires_python)
+    };
+
+    // Add lock file packages to the packages list
+    packages.extend(lock_packages);
+
     let report = MetadataReport {
-        schema: SchemaReport::default(),
-        workspace_root: PortablePathBuf::from(workspace.install_path().as_path()),
-        members,
+        version: SchemaVersion::default(),
+        requires_python,
+        workspace_root: PortablePathBuf::from(root as &Path),
+        workspace_members,
+        packages,
+        resolve,
     };
 
     writeln!(
