@@ -7,9 +7,10 @@ pub use exclusions::Exclusions;
 pub use flat_index::{FlatDistributions, FlatIndex};
 pub use fork_strategy::ForkStrategy;
 pub use lock::{
-    Installable, Lock, LockError, LockVersion, Package, PackageMap, PylockToml,
-    PylockTomlErrorKind, RequirementsTxtExport, ResolverManifest, SatisfiesResult, TreeDisplay,
-    VERSION,
+    Dependency, DirectSource, GitSource, GitSourceKind, Hash, Installable, Lock, LockError,
+    LockVersion, Package, PackageId, PackageMap, PylockToml, PylockTomlErrorKind,
+    RegistrySource, RequirementsTxtExport, ResolverManifest, SatisfiesResult, Source, SourceDist,
+    SourceDistMetadata, TreeDisplay, VERSION, Wheel, WheelWireSource, ZstdWheel,
 };
 pub use manifest::Manifest;
 pub use options::{Flexibility, Options, OptionsBuilder};

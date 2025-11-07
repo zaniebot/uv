@@ -2326,9 +2326,9 @@ impl LockVersion {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Package {
-    pub(crate) id: PackageId,
-    sdist: Option<SourceDist>,
-    wheels: Vec<Wheel>,
+    pub id: PackageId,
+    pub sdist: Option<SourceDist>,
+    pub wheels: Vec<Wheel>,
     /// If there are multiple versions or sources for the same package name, we add the markers of
     /// the fork(s) that contained this version or source, so we can set the correct preferences in
     /// the next resolution.
@@ -2336,11 +2336,11 @@ pub struct Package {
     /// Named `resolution-markers` in `uv.lock`.
     fork_markers: Vec<UniversalMarker>,
     /// The resolved dependencies of the package.
-    dependencies: Vec<Dependency>,
+    pub dependencies: Vec<Dependency>,
     /// The resolved optional dependencies of the package.
-    optional_dependencies: BTreeMap<ExtraName, Vec<Dependency>>,
+    pub optional_dependencies: BTreeMap<ExtraName, Vec<Dependency>>,
     /// The resolved PEP 735 dependency groups of the package.
-    dependency_groups: BTreeMap<GroupName, Vec<Dependency>>,
+    pub dependency_groups: BTreeMap<GroupName, Vec<Dependency>>,
     /// The exact requirements from the package metadata.
     metadata: PackageMetadata,
 }
@@ -3306,10 +3306,10 @@ impl PackageWire {
 /// of the name, the version and the source url.
 #[derive(Clone, Debug, Eq, Hash, PartialEq, PartialOrd, Ord, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
-pub(crate) struct PackageId {
-    pub(crate) name: PackageName,
-    pub(crate) version: Option<Version>,
-    source: Source,
+pub struct PackageId {
+    pub name: PackageName,
+    pub version: Option<Version>,
+    pub source: Source,
 }
 
 impl PackageId {
@@ -3431,7 +3431,7 @@ impl From<PackageId> for PackageIdForDependency {
 /// canonical ordering of sources.
 #[derive(Clone, Debug, Eq, Hash, PartialEq, PartialOrd, Ord, serde::Deserialize)]
 #[serde(try_from = "SourceWire")]
-enum Source {
+pub enum Source {
     /// A registry or `--find-links` index.
     Registry(RegistrySource),
     /// A Git repository.
@@ -3816,7 +3816,7 @@ impl TryFrom<SourceWire> for Source {
 
 /// The source for a registry, which could be a URL or a relative path.
 #[derive(Clone, Debug, Eq, Hash, PartialEq, PartialOrd, Ord)]
-enum RegistrySource {
+pub enum RegistrySource {
     /// Ex) `https://pypi.org/simple`
     Url(UrlString),
     /// Ex) `../path/to/local/index`
@@ -3891,8 +3891,8 @@ impl From<RegistrySourceWire> for RegistrySource {
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq, PartialOrd, Ord, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
-struct DirectSource {
-    subdirectory: Option<Box<Path>>,
+pub struct DirectSource {
+    pub subdirectory: Option<Box<Path>>,
 }
 
 /// NOTE: Care should be taken when adding variants to this enum. Namely, new
@@ -3900,10 +3900,10 @@ struct DirectSource {
 /// variants. Otherwise, this could cause the lockfile to have a different
 /// canonical ordering of package entries.
 #[derive(Clone, Debug, Eq, Hash, PartialEq, PartialOrd, Ord)]
-struct GitSource {
-    precise: GitOid,
-    subdirectory: Option<Box<Path>>,
-    kind: GitSourceKind,
+pub struct GitSource {
+    pub precise: GitOid,
+    pub subdirectory: Option<Box<Path>>,
+    pub kind: GitSourceKind,
 }
 
 /// An error that occurs when a source string could not be parsed.
@@ -3941,7 +3941,7 @@ impl GitSource {
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq, PartialOrd, Ord, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
-enum GitSourceKind {
+pub enum GitSourceKind {
     Tag(String),
     Branch(String),
     Rev(String),
@@ -3951,16 +3951,16 @@ enum GitSourceKind {
 /// Inspired by: <https://discuss.python.org/t/lock-files-again-but-this-time-w-sdists/46593>
 #[derive(Clone, Debug, serde::Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
-struct SourceDistMetadata {
+pub struct SourceDistMetadata {
     /// A hash of the source distribution.
-    hash: Option<Hash>,
+    pub hash: Option<Hash>,
     /// The size of the source distribution in bytes.
     ///
     /// This is only present for source distributions that come from registries.
-    size: Option<u64>,
+    pub size: Option<u64>,
     /// The upload time of the source distribution.
     #[serde(alias = "upload_time")]
-    upload_time: Option<Timestamp>,
+    pub upload_time: Option<Timestamp>,
 }
 
 /// A URL or file path where the source dist that was
@@ -3969,7 +3969,7 @@ struct SourceDistMetadata {
 /// and/or recording where the source dist file originally came from.
 #[derive(Clone, Debug, serde::Deserialize, PartialEq, Eq)]
 #[serde(from = "SourceDistWire")]
-enum SourceDist {
+pub enum SourceDist {
     Url {
         url: UrlString,
         #[serde(flatten)]
@@ -4003,7 +4003,7 @@ impl SourceDist {
         }
     }
 
-    pub(crate) fn hash(&self) -> Option<&Hash> {
+    pub fn hash(&self) -> Option<&Hash> {
         match self {
             Self::Metadata { metadata } => metadata.hash.as_ref(),
             Self::Url { metadata, .. } => metadata.hash.as_ref(),
@@ -4011,7 +4011,7 @@ impl SourceDist {
         }
     }
 
-    pub(crate) fn size(&self) -> Option<u64> {
+    pub fn size(&self) -> Option<u64> {
         match self {
             Self::Metadata { metadata } => metadata.size,
             Self::Url { metadata, .. } => metadata.size,
@@ -4019,7 +4019,7 @@ impl SourceDist {
         }
     }
 
-    pub(crate) fn upload_time(&self) -> Option<Timestamp> {
+    pub fn upload_time(&self) -> Option<Timestamp> {
         match self {
             Self::Metadata { metadata } => metadata.upload_time,
             Self::Url { metadata, .. } => metadata.upload_time,
@@ -4353,43 +4353,43 @@ fn locked_git_url(git_dist: &GitSourceDist) -> DisplaySafeUrl {
 }
 
 #[derive(Clone, Debug, serde::Deserialize, PartialEq, Eq)]
-struct ZstdWheel {
-    hash: Option<Hash>,
-    size: Option<u64>,
+pub struct ZstdWheel {
+    pub hash: Option<Hash>,
+    pub size: Option<u64>,
 }
 
 /// Inspired by: <https://discuss.python.org/t/lock-files-again-but-this-time-w-sdists/46593>
 #[derive(Clone, Debug, serde::Deserialize, PartialEq, Eq)]
 #[serde(try_from = "WheelWire")]
-struct Wheel {
+pub struct Wheel {
     /// A URL or file path (via `file://`) where the wheel that was locked
     /// against was found. The location does not need to exist in the future,
     /// so this should be treated as only a hint to where to look and/or
     /// recording where the wheel file originally came from.
-    url: WheelWireSource,
+    pub url: WheelWireSource,
     /// A hash of the built distribution.
     ///
     /// This is only present for wheels that come from registries and direct
     /// URLs. Wheels from git or path dependencies do not have hashes
     /// associated with them.
-    hash: Option<Hash>,
+    pub hash: Option<Hash>,
     /// The size of the built distribution in bytes.
     ///
     /// This is only present for wheels that come from registries.
-    size: Option<u64>,
+    pub size: Option<u64>,
     /// The upload time of the built distribution.
     ///
     /// This is only present for wheels that come from registries.
-    upload_time: Option<Timestamp>,
+    pub upload_time: Option<Timestamp>,
     /// The filename of the wheel.
     ///
     /// This isn't part of the wire format since it's redundant with the
     /// URL. But we do use it for various things, and thus compute it at
     /// deserialization time. Not being able to extract a wheel filename from a
     /// wheel URL is thus a deserialization error.
-    filename: WheelFilename,
+    pub filename: WheelFilename,
     /// The zstandard-compressed wheel metadata, if any.
-    zstd: Option<ZstdWheel>,
+    pub zstd: Option<ZstdWheel>,
 }
 
 impl Wheel {
@@ -4668,7 +4668,7 @@ struct WheelWire {
 
 #[derive(Clone, Debug, serde::Deserialize, PartialEq, Eq)]
 #[serde(untagged, rename_all = "kebab-case")]
-enum WheelWireSource {
+pub enum WheelWireSource {
     /// Used for all wheels that come from remote sources.
     Url {
         /// A URL where the wheel that was locked against was found. The location
@@ -4690,6 +4690,16 @@ enum WheelWireSource {
         /// wheel entry.
         filename: WheelFilename,
     },
+}
+
+impl Display for WheelWireSource {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Self::Url { url } => write!(f, "{url}"),
+            Self::Path { path } => write!(f, "{}", path.display()),
+            Self::Filename { filename } => write!(f, "{filename}"),
+        }
+    }
 }
 
 impl Wheel {
@@ -4775,8 +4785,8 @@ impl TryFrom<WheelWire> for Wheel {
 /// A single dependency of a package in a lockfile.
 #[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
 pub struct Dependency {
-    package_id: PackageId,
-    extra: BTreeSet<ExtraName>,
+    pub package_id: PackageId,
+    pub extra: BTreeSet<ExtraName>,
     /// A marker simplified from the PEP 508 marker in `complexified_marker`
     /// by assuming `requires-python` is satisfied. So if
     /// `requires-python = '>=3.8'`, then
@@ -4927,7 +4937,7 @@ impl DependencyWire {
 /// A hash is encoded as a single TOML string in the format
 /// `{algorithm}:{digest}`.
 #[derive(Clone, Debug, PartialEq, Eq)]
-struct Hash(HashDigest);
+pub struct Hash(pub HashDigest);
 
 impl From<HashDigest> for Hash {
     fn from(hd: HashDigest) -> Self {
@@ -5961,7 +5971,7 @@ enum SourceParseError {
 
 /// An error that occurs when a hash digest could not be parsed.
 #[derive(Clone, Debug, Eq, PartialEq)]
-struct HashParseError(&'static str);
+pub struct HashParseError(pub &'static str);
 
 impl std::error::Error for HashParseError {}
 
