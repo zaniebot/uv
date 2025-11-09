@@ -5833,9 +5833,11 @@ name = "uv-distribution"
 version = "0.0.1"
 dependencies = [
  "anyhow",
+ "blake2",
  "either",
  "fs-err",
  "futures",
+ "hex",
  "indoc",
  "insta",
  "nanoid",
@@ -5856,6 +5858,7 @@ dependencies = [
  "uv-auth",
  "uv-cache",
  "uv-cache-info",
+ "uv-cache-key",
  "uv-client",
  "uv-configuration",
  "uv-distribution-filename",

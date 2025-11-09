@@ -10,7 +10,7 @@ use tempfile::TempDir;
 use tokio::io::{AsyncRead, AsyncSeekExt, ReadBuf};
 use tokio::sync::Semaphore;
 use tokio_util::compat::FuturesAsyncReadCompatExt;
-use tracing::{Instrument, info_span, instrument, warn, debug};
+use tracing::{Instrument, debug, info_span, instrument, warn};
 use url::Url;
 
 use uv_cache::{ArchiveId, CacheBucket, CacheEntry, WheelCache};
@@ -383,7 +383,7 @@ impl<'a, Context: BuildContext> DistributionDatabase<'a, Context> {
         hashes: HashPolicy<'_>,
     ) -> Result<LocalWheel, Error> {
         // If the metadata is available in a remote cache, fetch it.
-        if let Some(wheel) = self.get_remote_wheel(dist, tags, hashes).await? {
+        if let Ok(Some(wheel)) = self.get_remote_wheel(dist, tags, hashes).await {
             return Ok(wheel);
         }
 
@@ -558,7 +558,7 @@ impl<'a, Context: BuildContext> DistributionDatabase<'a, Context> {
         }
 
         // If the metadata is available in a remote cache, fetch it.
-        if let Some(metadata) = self.get_remote_metadata(source, hashes).await? {
+        if let Ok(Some(metadata)) = self.get_remote_metadata(source, hashes).await {
             return Ok(metadata);
         }
 
@@ -584,34 +584,31 @@ impl<'a, Context: BuildContext> DistributionDatabase<'a, Context> {
     /// Fetch a wheel from a remote cache, if available.
     async fn get_remote_wheel(
         &self,
-        dist: &SourceDist,
+        source: &SourceDist,
         tags: &Tags,
         hashes: HashPolicy<'_>,
     ) -> Result<Option<LocalWheel>, Error> {
         let Some(index) = self
             .resolver
-            .get_cached_distribution(dist, Some(tags), &self.client)
+            .get_cached_distribution(&BuildableSource::Dist(source), Some(tags), &self.client)
             .await?
         else {
             return Ok(None);
         };
-        let Some(entries) = index.get(dist.name()) else {
-            return Ok(None);
-        };
-        for (.., prioritized_dist) in entries.iter() {
+        for prioritized_dist in index.iter() {
             let Some(compatible_dist) = prioritized_dist.get() else {
                 continue;
             };
             match compatible_dist {
                 CompatibleDist::InstalledDist(..) => {}
                 CompatibleDist::SourceDist { sdist, .. } => {
-                    debug!("Found cached remote source distribution for: {dist}");
+                    debug!("Found cached remote source distribution for: {source}");
                     let dist = SourceDist::Registry(sdist.clone());
                     return self.build_wheel_inner(&dist, tags, hashes).await.map(Some);
                 }
                 CompatibleDist::CompatibleWheel { wheel, .. }
                 | CompatibleDist::IncompatibleWheel { wheel, .. } => {
-                    debug!("Found cached remote built distribution for: {dist}");
+                    debug!("Found cached remote built distribution for: {source}");
                     let dist = BuiltDist::Registry(RegistryBuiltDist {
                         wheels: vec![wheel.clone()],
                         best_wheel_index: 0,
@@ -630,30 +627,21 @@ impl<'a, Context: BuildContext> DistributionDatabase<'a, Context> {
         source: &BuildableSource<'_>,
         hashes: HashPolicy<'_>,
     ) -> Result<Option<ArchiveMetadata>, Error> {
-        // TODO(charlie): If the distribution is unnamed, we should be able to infer the name
-        // from the list of available distributions in the index, since we expect exactly one
-        // package name per cache entry.
-        let BuildableSource::Dist(dist) = source else {
-            return Ok(None);
-        };
         let Some(index) = self
             .resolver
-            .get_cached_distribution(dist, None, &self.client)
+            .get_cached_distribution(source, None, &self.client)
             .await?
         else {
             return Ok(None);
         };
-        let Some(entries) = index.get(dist.name()) else {
-            return Ok(None);
-        };
-        for (.., prioritized_dist) in entries.iter() {
+        for prioritized_dist in index.iter() {
             let Some(compatible_dist) = prioritized_dist.get() else {
                 continue;
             };
             match compatible_dist {
                 CompatibleDist::InstalledDist(..) => {}
                 CompatibleDist::SourceDist { sdist, .. } => {
-                    debug!("Found cached remote source distribution for: {dist}");
+                    debug!("Found cached remote source distribution for: {source}");
                     let dist = SourceDist::Registry(sdist.clone());
                     return self
                         .build_wheel_metadata_inner(&BuildableSource::Dist(&dist), hashes)
@@ -662,7 +650,7 @@ impl<'a, Context: BuildContext> DistributionDatabase<'a, Context> {
                 }
                 CompatibleDist::CompatibleWheel { wheel, .. }
                 | CompatibleDist::IncompatibleWheel { wheel, .. } => {
-                    debug!("Found cached remote built distribution for: {dist}");
+                    debug!("Found cached remote built distribution for: {source}");
                     let dist = BuiltDist::Registry(RegistryBuiltDist {
                         wheels: vec![wheel.clone()],
                         best_wheel_index: 0,
