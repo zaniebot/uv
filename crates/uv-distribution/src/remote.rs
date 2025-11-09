@@ -92,10 +92,14 @@ impl<'a, T: BuildContext> RemoteCacheResolver<'a, T> {
             return Ok(Vec::default());
         };
 
+        let Some(precise) = self.build_context.git().get_precise(&dist.git) else {
+            return Ok(Vec::default());
+        };
+
         // Store the index entries in a cache, to avoid redundant fetches.
         let index = IndexUrl::from(
             VerbatimUrl::parse_url(format!(
-                "http://localhost:8000/v1/git/{workspace}/{}/{}",
+                "http://localhost:8000/v1/git/{workspace}/{}/{}/{precise}",
                 repo.owner, repo.repo
             ))
             .unwrap(),

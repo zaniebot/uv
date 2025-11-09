@@ -1690,19 +1690,6 @@ impl<'a, T: BuildContext> SourceDistributionBuilder<'a, T> {
                 .await
             {
                 Ok(Some(precise)) => {
-                    // STOPSHIP(charlie): Here, we should check if a pre-built wheel or source
-                    // distribution exists in pyx. If a wheel exists, we can always get the PEP 653
-                    // metadata.
-
-                    // let result = self
-                    //     .client
-                    //     .managed(|client| {
-                    //         client
-                    //             .wheel_metadata(dist, self.build_context.capabilities())
-                    //             .boxed_local()
-                    //     })
-                    //     .await;
-
                     // There's no need to check the cache, since we can't use cached metadata if there are
                     // sources, and we can't know if there are sources without fetching the
                     // `pyproject.toml`.

@@ -10,7 +10,7 @@ use tempfile::TempDir;
 use tokio::io::{AsyncRead, AsyncSeekExt, ReadBuf};
 use tokio::sync::Semaphore;
 use tokio_util::compat::FuturesAsyncReadCompatExt;
-use tracing::{Instrument, info_span, instrument, warn};
+use tracing::{Instrument, info_span, instrument, warn, debug};
 use url::Url;
 
 use uv_cache::{ArchiveId, CacheBucket, CacheEntry, WheelCache};
@@ -543,6 +543,9 @@ impl<'a, Context: BuildContext> DistributionDatabase<'a, Context> {
         source: &BuildableSource<'_>,
         hashes: HashPolicy<'_>,
     ) -> Result<ArchiveMetadata, Error> {
+        // Resolve the source distribution to a precise revision (i.e., a specific Git commit).
+        self.builder.resolve_revision(source, &self.client).await?;
+
         // If the metadata was provided by the user directly, prefer it.
         if let Some(dist) = source.as_dist() {
             if let Some(metadata) = self
@@ -550,10 +553,6 @@ impl<'a, Context: BuildContext> DistributionDatabase<'a, Context> {
                 .dependency_metadata()
                 .get(dist.name(), dist.version())
             {
-                // If we skipped the build, we should still resolve any Git dependencies to precise
-                // commits.
-                self.builder.resolve_revision(source, &self.client).await?;
-
                 return Ok(ArchiveMetadata::from_metadata23(metadata.clone()));
             }
         }
@@ -606,11 +605,13 @@ impl<'a, Context: BuildContext> DistributionDatabase<'a, Context> {
             match compatible_dist {
                 CompatibleDist::InstalledDist(..) => {}
                 CompatibleDist::SourceDist { sdist, .. } => {
+                    debug!("Found cached remote source distribution for: {dist}");
                     let dist = SourceDist::Registry(sdist.clone());
                     return self.build_wheel_inner(&dist, tags, hashes).await.map(Some);
                 }
                 CompatibleDist::CompatibleWheel { wheel, .. }
                 | CompatibleDist::IncompatibleWheel { wheel, .. } => {
+                    debug!("Found cached remote built distribution for: {dist}");
                     let dist = BuiltDist::Registry(RegistryBuiltDist {
                         wheels: vec![wheel.clone()],
                         best_wheel_index: 0,
@@ -652,6 +653,7 @@ impl<'a, Context: BuildContext> DistributionDatabase<'a, Context> {
             match compatible_dist {
                 CompatibleDist::InstalledDist(..) => {}
                 CompatibleDist::SourceDist { sdist, .. } => {
+                    debug!("Found cached remote source distribution for: {dist}");
                     let dist = SourceDist::Registry(sdist.clone());
                     return self
                         .build_wheel_metadata_inner(&BuildableSource::Dist(&dist), hashes)
@@ -660,6 +662,7 @@ impl<'a, Context: BuildContext> DistributionDatabase<'a, Context> {
                 }
                 CompatibleDist::CompatibleWheel { wheel, .. }
                 | CompatibleDist::IncompatibleWheel { wheel, .. } => {
+                    debug!("Found cached remote built distribution for: {dist}");
                     let dist = BuiltDist::Registry(RegistryBuiltDist {
                         wheels: vec![wheel.clone()],
                         best_wheel_index: 0,
