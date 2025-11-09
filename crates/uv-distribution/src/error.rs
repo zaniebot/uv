@@ -100,7 +100,7 @@ pub enum Error {
     UnsupportedScheme(String),
     #[error(transparent)]
     MetadataLowering(#[from] MetadataError),
-    #[error("Distribution not founyd at: {0}")]
+    #[error("Distribution not found at: {0}")]
     NotFound(DisplaySafeUrl),
     #[error("Attempted to re-extract the source distribution for `{}`, but the {} hash didn't match. Run `{}` to clear the cache.", _0, _1, "uv cache clean".green())]
     CacheHeal(String, HashAlgorithm),

@@ -15,7 +15,7 @@ pub enum Error {
     #[error("Could not extract path segments from URL: {0}")]
     MissingPathSegments(String),
 
-    #[error("Distribution not fxound at: {0}")]
+    #[error("Distribution not found at: {0}")]
     NotFound(DisplaySafeUrl),
 
     #[error("Requested package name `{0}` does not match `{1}` in the distribution filename: {2}")]

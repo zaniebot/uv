@@ -10,18 +10,21 @@ use tempfile::TempDir;
 use tokio::io::{AsyncRead, AsyncSeekExt, ReadBuf};
 use tokio::sync::Semaphore;
 use tokio_util::compat::FuturesAsyncReadCompatExt;
-use tracing::{Instrument, info_span, instrument, warn, debug};
+use tracing::{Instrument, info_span, instrument, warn};
 use url::Url;
-use uv_auth::PyxTokenStore;
+
 use uv_cache::{ArchiveId, CacheBucket, CacheEntry, WheelCache};
 use uv_cache_info::{CacheInfo, Timestamp};
-use uv_client::{CacheControl, CachedClientError, Connectivity, DataWithCachePolicy, MetadataFormat, RegistryClient, VersionFiles};
-use uv_distribution_filename::{DistFilename, WheelFilename};
-use uv_distribution_types::{BuildInfo, BuildableSource, BuiltDist, Dist, File, HashPolicy, Hashed, IndexFormat, IndexMetadata, IndexUrl, InstalledDist, Name, RegistryBuiltDist, RegistryBuiltWheel, SourceDist, ToUrlError};
+use uv_client::{
+    CacheControl, CachedClientError, Connectivity, DataWithCachePolicy, RegistryClient,
+};
+use uv_distribution_filename::WheelFilename;
+use uv_distribution_types::{
+    BuildInfo, BuildableSource, BuiltDist, CompatibleDist, Dist, File, HashPolicy, Hashed,
+    IndexUrl, InstalledDist, Name, RegistryBuiltDist, SourceDist, ToUrlError,
+};
 use uv_extract::hash::Hasher;
 use uv_fs::write_atomic;
-use uv_git_types::GitHubRepository;
-use uv_pep508::VerbatimUrl;
 use uv_platform_tags::Tags;
 use uv_pypi_types::{HashDigest, HashDigests, PyProjectToml};
 use uv_redacted::DisplaySafeUrl;
@@ -29,6 +32,7 @@ use uv_types::{BuildContext, BuildStack};
 
 use crate::archive::Archive;
 use crate::metadata::{ArchiveMetadata, Metadata};
+use crate::remote::RemoteCacheResolver;
 use crate::source::SourceDistributionBuilder;
 use crate::{Error, LocalWheel, Reporter, RequiresDist};
 
@@ -47,6 +51,7 @@ use crate::{Error, LocalWheel, Reporter, RequiresDist};
 pub struct DistributionDatabase<'a, Context: BuildContext> {
     build_context: &'a Context,
     builder: SourceDistributionBuilder<'a, Context>,
+    resolver: RemoteCacheResolver<'a, Context>,
     client: ManagedClient<'a>,
     reporter: Option<Arc<dyn Reporter>>,
 }
@@ -60,6 +65,7 @@ impl<'a, Context: BuildContext> DistributionDatabase<'a, Context> {
         Self {
             build_context,
             builder: SourceDistributionBuilder::new(build_context),
+            resolver: RemoteCacheResolver::new(build_context),
             client: ManagedClient::new(client, concurrent_downloads),
             reporter: None,
         }
@@ -376,59 +382,23 @@ impl<'a, Context: BuildContext> DistributionDatabase<'a, Context> {
         tags: &Tags,
         hashes: HashPolicy<'_>,
     ) -> Result<LocalWheel, Error> {
-        // If this is a Git distribution, look for cached wheels.
-        if let SourceDist::Git(dist) = dist {
-            if dist.subdirectory.is_none() {
-                if let Some(repo) = GitHubRepository::parse(dist.git.repository()) {
-                    if let Ok(store) = PyxTokenStore::from_settings() {
-                        // let url = store.api().join(&format!("v1/git/astral-sh/{}/{}", repo.owner, repo.repo)).unwrap();
-                        let url = VerbatimUrl::parse_url(&format!("http://localhost:8000/v1/git/astral-sh/{}/{}", repo.owner, repo.repo)).unwrap();
-                        let index = IndexMetadata {
-                            // url: IndexUrl::from(VerbatimUrl::from(url)),
-                            url: IndexUrl::from(url.clone()),
-                            format: IndexFormat::Simple,
-                        };
-                        let archives = self.client
-                            .manual(|client, semaphore| {
-                                client.package_metadata(
-                                    dist.name(), Some(index.as_ref()), self.build_context.capabilities(), semaphore,
-                                )
-                            })
-                            .await?;
-
-                        // TODO(charlie): This needs to prefer wheels to sdists (but allow sdists),
-                        // etc., filter by tags, filter by `requires-python`, etc.
-                        for (_, archive) in archives {
-                            let MetadataFormat::Simple(archive) = archive else {
-                                continue;
-                            };
-                            for datum in archive.iter().rev() {
-                                let files = rkyv::deserialize::<VersionFiles, rkyv::rancor::Error>(&datum.files)
-                                    .expect("archived version files always deserializes");
-                                for (filename, file) in files.all() {
-                                    if let DistFilename::WheelFilename(filename) = filename {
-                                        debug!("Found cached wheel {filename} for Git distribution: {dist}");
-                                        let dist = BuiltDist::Registry(RegistryBuiltDist {
-                                            wheels: vec![
-                                                RegistryBuiltWheel {
-                                                    filename,
-                                                    file: Box::new(file),
-                                                    index: IndexUrl::from(VerbatimUrl::from(url)),
-                                                }
-                                            ],
-                                            best_wheel_index: 0,
-                                            sdist: None,
-                                        });
-                                        return self.get_wheel(&dist, hashes).await;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+        // If the metadata is available in a remote cache, fetch it.
+        if let Some(wheel) = self.get_remote_wheel(dist, tags, hashes).await? {
+            return Ok(wheel);
         }
 
+        // Otherwise, build the wheel locally.
+        self.build_wheel_inner(dist, tags, hashes).await
+    }
+
+    /// Convert a source distribution into a wheel, fetching it from the cache or building it if
+    /// necessary.
+    async fn build_wheel_inner(
+        &self,
+        dist: &SourceDist,
+        tags: &Tags,
+        hashes: HashPolicy<'_>,
+    ) -> Result<LocalWheel, Error> {
         let built_wheel = self
             .builder
             .download_and_build(&BuildableSource::Dist(dist), tags, hashes, &self.client)
@@ -588,65 +558,21 @@ impl<'a, Context: BuildContext> DistributionDatabase<'a, Context> {
             }
         }
 
-        // If this is a Git distribution, look for cached wheels.
-        // TODO(charlie): What if this is unnamed? How can we infer the package name? Maybe we make
-        // the whole thing content-addressed, and assume that the registry contains at most one
-        // package?
-        if let BuildableSource::Dist(SourceDist::Git(dist)) = source {
-            // TODO(charlie): Make this more efficient.
-            self.builder.resolve_revision(source, &self.client).await?;
-
-            if dist.subdirectory.is_none() {
-                if let Some(repo) = GitHubRepository::parse(dist.git.repository()) {
-                    if let Ok(store) = PyxTokenStore::from_settings() {
-                        // let url = store.api().join(&format!("v1/git/astral-sh/{}/{}", repo.owner, repo.repo)).unwrap();
-                        let url = VerbatimUrl::parse_url(&format!("http://localhost:8000/v1/git/astral-sh/{}/{}", repo.owner, repo.repo)).unwrap();
-                        let index = IndexMetadata {
-                            // url: IndexUrl::from(VerbatimUrl::from(url)),
-                            url: IndexUrl::from(url.clone()),
-                            format: IndexFormat::Simple,
-                        };
-                        let archives = self.client
-                            .manual(|client, semaphore| {
-                                client.package_metadata(
-                                    dist.name(), Some(index.as_ref()), self.build_context.capabilities(),semaphore
-                                )
-                            })
-                            .await?;
-
-                        // TODO(charlie): This needs to prefer wheels to sdists (but allow sdists),
-                        // etc.
-                        for (_, archive) in archives {
-                            let MetadataFormat::Simple(archive) = archive else {
-                                continue;
-                            };
-                            for datum in archive.iter().rev() {
-                                let files = rkyv::deserialize::<VersionFiles, rkyv::rancor::Error>(&datum.files)
-                                    .expect("archived version files always deserializes");
-                                for (filename, file) in files.all() {
-                                    if let DistFilename::WheelFilename(filename) = filename {
-                                        debug!("Found cached wheel {filename} for Git distribution: {dist}");
-                                        let dist = BuiltDist::Registry(RegistryBuiltDist {
-                                            wheels: vec![
-                                                RegistryBuiltWheel {
-                                                    filename,
-                                                    file: Box::new(file),
-                                                    index: IndexUrl::from(VerbatimUrl::from(url)),
-                                                }
-                                            ],
-                                            best_wheel_index: 0,
-                                            sdist: None,
-                                        });
-                                        return self.get_wheel_metadata(&dist, hashes).await;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+        // If the metadata is available in a remote cache, fetch it.
+        if let Some(metadata) = self.get_remote_metadata(source, hashes).await? {
+            return Ok(metadata);
         }
 
+        // Otherwise, retrieve the metadata from the source distribution.
+        self.build_wheel_metadata_inner(source, hashes).await
+    }
+
+    /// Build the wheel metadata for a source distribution, or fetch it from the cache if possible.
+    async fn build_wheel_metadata_inner(
+        &self,
+        source: &BuildableSource<'_>,
+        hashes: HashPolicy<'_>,
+    ) -> Result<ArchiveMetadata, Error> {
         let metadata = self
             .builder
             .download_and_build_metadata(source, hashes, &self.client)
@@ -654,6 +580,96 @@ impl<'a, Context: BuildContext> DistributionDatabase<'a, Context> {
             .await?;
 
         Ok(metadata)
+    }
+
+    /// Fetch a wheel from a remote cache, if available.
+    async fn get_remote_wheel(
+        &self,
+        dist: &SourceDist,
+        tags: &Tags,
+        hashes: HashPolicy<'_>,
+    ) -> Result<Option<LocalWheel>, Error> {
+        let Some(index) = self
+            .resolver
+            .get_cached_distribution(dist, Some(tags), &self.client)
+            .await?
+        else {
+            return Ok(None);
+        };
+        let Some(entries) = index.get(dist.name()) else {
+            return Ok(None);
+        };
+        for (.., prioritized_dist) in entries.iter() {
+            let Some(compatible_dist) = prioritized_dist.get() else {
+                continue;
+            };
+            match compatible_dist {
+                CompatibleDist::InstalledDist(..) => {}
+                CompatibleDist::SourceDist { sdist, .. } => {
+                    let dist = SourceDist::Registry(sdist.clone());
+                    return self.build_wheel_inner(&dist, tags, hashes).await.map(Some);
+                }
+                CompatibleDist::CompatibleWheel { wheel, .. }
+                | CompatibleDist::IncompatibleWheel { wheel, .. } => {
+                    let dist = BuiltDist::Registry(RegistryBuiltDist {
+                        wheels: vec![wheel.clone()],
+                        best_wheel_index: 0,
+                        sdist: None,
+                    });
+                    return self.get_wheel(&dist, hashes).await.map(Some);
+                }
+            }
+        }
+        Ok(None)
+    }
+
+    /// Fetch the wheel metadata from a remote cache, if available.
+    async fn get_remote_metadata(
+        &self,
+        source: &BuildableSource<'_>,
+        hashes: HashPolicy<'_>,
+    ) -> Result<Option<ArchiveMetadata>, Error> {
+        // TODO(charlie): If the distribution is unnamed, we should be able to infer the name
+        // from the list of available distributions in the index, since we expect exactly one
+        // package name per cache entry.
+        let BuildableSource::Dist(dist) = source else {
+            return Ok(None);
+        };
+        let Some(index) = self
+            .resolver
+            .get_cached_distribution(dist, None, &self.client)
+            .await?
+        else {
+            return Ok(None);
+        };
+        let Some(entries) = index.get(dist.name()) else {
+            return Ok(None);
+        };
+        for (.., prioritized_dist) in entries.iter() {
+            let Some(compatible_dist) = prioritized_dist.get() else {
+                continue;
+            };
+            match compatible_dist {
+                CompatibleDist::InstalledDist(..) => {}
+                CompatibleDist::SourceDist { sdist, .. } => {
+                    let dist = SourceDist::Registry(sdist.clone());
+                    return self
+                        .build_wheel_metadata_inner(&BuildableSource::Dist(&dist), hashes)
+                        .await
+                        .map(Some);
+                }
+                CompatibleDist::CompatibleWheel { wheel, .. }
+                | CompatibleDist::IncompatibleWheel { wheel, .. } => {
+                    let dist = BuiltDist::Registry(RegistryBuiltDist {
+                        wheels: vec![wheel.clone()],
+                        best_wheel_index: 0,
+                        sdist: None,
+                    });
+                    return self.get_wheel_metadata(&dist, hashes).await.map(Some);
+                }
+            }
+        }
+        Ok(None)
     }
 
     /// Return the [`RequiresDist`] from a `pyproject.toml`, if it can be statically extracted.

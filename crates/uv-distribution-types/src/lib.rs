@@ -409,11 +409,10 @@ impl Dist {
         // Normalize the path.
         let install_path = normalize_absolute_path(&install_path)?;
 
-        // // Validate that the path exists.
-        // if !install_path.exists() {
-        //     println!("foo");
-        //     return Err(Error::NotFound(url.to_url()));
-        // }
+        // Validate that the path exists.
+        if !install_path.exists() {
+            return Err(Error::NotFound(url.to_url()));
+        }
 
         // Determine whether the path represents a built or source distribution.
         match ext {
@@ -470,7 +469,6 @@ impl Dist {
 
         // Validate that the path exists.
         if !install_path.exists() {
-            println!("bar");
             return Err(Error::NotFound(url.to_url()));
         }
 
