@@ -10,7 +10,7 @@ use tempfile::TempDir;
 use tokio::io::{AsyncRead, AsyncSeekExt, ReadBuf};
 use tokio::sync::Semaphore;
 use tokio_util::compat::FuturesAsyncReadCompatExt;
-use tracing::{Instrument, info_span, instrument, warn};
+use tracing::{Instrument, info_span, instrument, warn, debug};
 use url::Url;
 use uv_auth::PyxTokenStore;
 use uv_cache::{ArchiveId, CacheBucket, CacheEntry, WheelCache};
@@ -377,29 +377,24 @@ impl<'a, Context: BuildContext> DistributionDatabase<'a, Context> {
         hashes: HashPolicy<'_>,
     ) -> Result<LocalWheel, Error> {
         // If this is a Git distribution, look for cached wheels.
-        // TODO(charlie): What if this is unnamed? How can we infer the package name? Maybe we make
-        // the whole thing content-addressed, and assume that the registry contains at most one
-        // package?
-        if let BuildableSource::Dist(SourceDist::Git(dist)) = dist {
+        if let SourceDist::Git(dist) = dist {
             if dist.subdirectory.is_none() {
                 if let Some(repo) = GitHubRepository::parse(dist.git.repository()) {
                     if let Ok(store) = PyxTokenStore::from_settings() {
-                        let url = store.api().join(&format!("v1/git/astral-sh/{}/{}", repo.owner, repo.repo)).unwrap();
+                        // let url = store.api().join(&format!("v1/git/astral-sh/{}/{}", repo.owner, repo.repo)).unwrap();
+                        let url = VerbatimUrl::parse_url(&format!("http://localhost:8000/v1/git/astral-sh/{}/{}", repo.owner, repo.repo)).unwrap();
                         let index = IndexMetadata {
-                            url: IndexUrl::from(VerbatimUrl::from(url)),
+                            // url: IndexUrl::from(VerbatimUrl::from(url)),
+                            url: IndexUrl::from(url.clone()),
                             format: IndexFormat::Simple,
                         };
                         let archives = self.client
-                            .managed(|client| {
+                            .manual(|client, semaphore| {
                                 client.package_metadata(
-                                    dist.name(), Some(index.as_ref()), self.build_context.capabilities(), self.build_context
+                                    dist.name(), Some(index.as_ref()), self.build_context.capabilities(), semaphore,
                                 )
                             })
-                            .await
-                            .map_err(|err| match err {
-                                CachedClientError::Callback { err, .. } => err,
-                                CachedClientError::Client { err, .. } => Error::Client(err),
-                            })?;
+                            .await?;
 
                         // TODO(charlie): This needs to prefer wheels to sdists (but allow sdists),
                         // etc., filter by tags, filter by `requires-python`, etc.
@@ -412,6 +407,7 @@ impl<'a, Context: BuildContext> DistributionDatabase<'a, Context> {
                                     .expect("archived version files always deserializes");
                                 for (filename, file) in files.all() {
                                     if let DistFilename::WheelFilename(filename) = filename {
+                                        debug!("Found cached wheel {filename} for Git distribution: {dist}");
                                         let dist = BuiltDist::Registry(RegistryBuiltDist {
                                             wheels: vec![
                                                 RegistryBuiltWheel {
@@ -597,25 +593,26 @@ impl<'a, Context: BuildContext> DistributionDatabase<'a, Context> {
         // the whole thing content-addressed, and assume that the registry contains at most one
         // package?
         if let BuildableSource::Dist(SourceDist::Git(dist)) = source {
+            // TODO(charlie): Make this more efficient.
+            self.builder.resolve_revision(source, &self.client).await?;
+
             if dist.subdirectory.is_none() {
                 if let Some(repo) = GitHubRepository::parse(dist.git.repository()) {
                     if let Ok(store) = PyxTokenStore::from_settings() {
-                        let url = store.api().join(&format!("v1/git/astral-sh/{}/{}", repo.owner, repo.repo)).unwrap();
+                        // let url = store.api().join(&format!("v1/git/astral-sh/{}/{}", repo.owner, repo.repo)).unwrap();
+                        let url = VerbatimUrl::parse_url(&format!("http://localhost:8000/v1/git/astral-sh/{}/{}", repo.owner, repo.repo)).unwrap();
                         let index = IndexMetadata {
-                            url: IndexUrl::from(VerbatimUrl::from(url)),
+                            // url: IndexUrl::from(VerbatimUrl::from(url)),
+                            url: IndexUrl::from(url.clone()),
                             format: IndexFormat::Simple,
                         };
                         let archives = self.client
-                            .managed(|client| {
+                            .manual(|client, semaphore| {
                                 client.package_metadata(
-                                    dist.name(), Some(index.as_ref()), self.build_context.capabilities(), self.build_context
+                                    dist.name(), Some(index.as_ref()), self.build_context.capabilities(),semaphore
                                 )
                             })
-                            .await
-                            .map_err(|err| match err {
-                                CachedClientError::Callback { err, .. } => err,
-                                CachedClientError::Client { err, .. } => Error::Client(err),
-                            })?;
+                            .await?;
 
                         // TODO(charlie): This needs to prefer wheels to sdists (but allow sdists),
                         // etc.
@@ -628,6 +625,7 @@ impl<'a, Context: BuildContext> DistributionDatabase<'a, Context> {
                                     .expect("archived version files always deserializes");
                                 for (filename, file) in files.all() {
                                     if let DistFilename::WheelFilename(filename) = filename {
+                                        debug!("Found cached wheel {filename} for Git distribution: {dist}");
                                         let dist = BuiltDist::Registry(RegistryBuiltDist {
                                             wheels: vec![
                                                 RegistryBuiltWheel {

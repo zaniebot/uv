@@ -213,6 +213,7 @@ impl GitResolver {
     /// [`resolve_precise`], and will return `None` for URLs that have not been resolved _or_
     /// already have a precise reference.
     pub fn precise(&self, url: GitUrl) -> Option<GitUrl> {
+        println!("Resolving precise Git URL for: {url}");
         let reference = RepositoryReference::from(&url);
         let precise = self.get(&reference)?;
         Some(url.with_precise(*precise))
