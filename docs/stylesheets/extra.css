@@ -150,9 +150,8 @@ This is a consequence of the reduced nav spacing below. */
 /* Add a border to separate the meta footer from the other
 We do this because the background color is the same but the theme expects it to differ */
 .md-footer-meta {
-  border-top: .05rem solid rgba(0, 0, 0, 0.08);
+  border-top: 0.05rem solid rgba(0, 0, 0, 0.08);
 }
-
 
 /* Omits the nav title "uv" entirely unless on a small screen, in which case
 the nav title is needed for backwards navigation in the collapsible
@@ -177,7 +176,9 @@ because the nav is in a hamburger menu anyway
 }
 
 /* See: https://mkdocstrings.github.io/recipes/#prevent-selection-of-prompts-and-output-in-python-code-blocks */
-.highlight .gp, .highlight .go { /* Generic.Prompt, Generic.Output */
+.highlight .gp,
+.highlight .go {
+  /* Generic.Prompt, Generic.Output */
   user-select: none;
 }
 
@@ -252,7 +253,7 @@ modifications */
 @media screen and (min-width: 76.25em) {
   /* Increase the font size of the section headings */
   .md-nav__item--section > .md-nav__link {
-      font-size: 0.85rem;
+    font-size: 0.85rem;
   }
   /* Increase the size of the first nav item to match the sections
   It has no children, so it is not considered a section */
@@ -365,7 +366,6 @@ modifications */
   justify-content: flex-end;
   margin-left: auto;
 }
-
 
 /* Make search field more prominent and centered */
 @media screen and (min-width: 60em) {
@@ -551,7 +551,6 @@ modifications */
 }
 
 @media screen and (min-width: 76.25em) {
-
   /* Hide the search modal's button that appears in the header */
   .md-search__button {
     display: none;
@@ -627,7 +626,7 @@ modifications */
   /* Remove gaps, we'll space these manually next */
   .md-header__inner {
     gap: 0rem;
-  }  
+  }
 
   /* Nav links aligned to the right */
   .md-header__nav-links {
@@ -676,20 +675,26 @@ modifications */
   }
 
   /* Dark mode mobile search button */
-  [data-md-color-scheme="astral-dark"] .md-header__button.md-icon[for="__search"] {
+  [data-md-color-scheme="astral-dark"]
+    .md-header__button.md-icon[for="__search"] {
     border-color: rgba(255, 255, 255, 0.1);
   }
 
-  [data-md-color-scheme="astral-dark"] .md-header__button.md-icon[for="__search"]:hover {
+  [data-md-color-scheme="astral-dark"]
+    .md-header__button.md-icon[for="__search"]:hover {
     background-color: rgba(255, 255, 255, 0.05);
     border-color: rgba(255, 255, 255, 0.2);
   }
 
-  [data-md-color-scheme="astral-dark"] .md-header__button.md-icon[for="__search"] svg {
+  [data-md-color-scheme="astral-dark"]
+    .md-header__button.md-icon[for="__search"]
+    svg {
     color: rgba(255, 255, 255, 0.6);
   }
 
-  [data-md-color-scheme="astral-dark"] .md-header__button.md-icon[for="__search"]:hover svg {
+  [data-md-color-scheme="astral-dark"]
+    .md-header__button.md-icon[for="__search"]:hover
+    svg {
     color: rgba(255, 255, 255, 0.85);
   }
 }
