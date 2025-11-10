@@ -56,6 +56,12 @@ document$.subscribe(function () {
   if (brandingText && brandingText.textContent === 'uv Documentation') {
     brandingText.innerHTML = '<span class="md-header__branding-name">uv</span> Documentation';
   }
+
+  // Reset search modal state on navigation to prevent it from reopening
+  const searchCheckbox = document.getElementById('__search');
+  if (searchCheckbox) {
+    searchCheckbox.checked = false;
+  }
 });
 
 // Use client-side redirects for anchors that have moved.
