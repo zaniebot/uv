@@ -656,6 +656,7 @@ modifications */
     order: 9;
     margin-left: 0.5rem;
     margin-right: 0.75rem; /* Extra spacing from Discord/GitHub */
+    flex-shrink: 0; /* Prevent button from squishing */
     transition: all 0.15s ease;
   }
 
