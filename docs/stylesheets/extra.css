@@ -207,24 +207,34 @@ h3 + p:has(> small.added-in) {
   margin: 0;
 }
 
-/* Styling for anchor link headers */
-.toclink {
-  color: unset !important;
+/* Styling for anchor link headers - using higher specificity instead of !important */
+.md-typeset .toclink,
+.md-typeset a.toclink {
+  color: unset;
+  text-decoration: none;
 }
 
-.toclink:hover {
-  color: var(--md-accent-fg-color) !important;
+.md-typeset .toclink:hover,
+.md-typeset a.toclink:hover {
+  color: var(--md-accent-fg-color);
+  text-decoration: none;
 }
 
-/* Remove underlines from heading links */
-.md-typeset h1 a,
-.md-typeset h2 a,
-.md-typeset h3 a,
-.md-typeset h4 a,
-.md-typeset h5 a,
-.md-typeset h6 a {
-  text-decoration: none !important;
-  border-bottom: none !important;
+/* Remove underlines from heading links - using higher specificity */
+.md-typeset h1 > a,
+.md-typeset h2 > a,
+.md-typeset h3 > a,
+.md-typeset h4 > a,
+.md-typeset h5 > a,
+.md-typeset h6 > a,
+.md-typeset h1 a.toclink,
+.md-typeset h2 a.toclink,
+.md-typeset h3 a.toclink,
+.md-typeset h4 a.toclink,
+.md-typeset h5 a.toclink,
+.md-typeset h6 a.toclink {
+  text-decoration: none;
+  border-bottom: none;
 }
 
 /* Omit the first breadcrumb item, which is the "Introduction" */
@@ -271,8 +281,14 @@ modifications */
 
 /* Styling for the custom header */
 
-/* Discord icon-only button */
+/* Base icon button styles with CSS custom properties */
 .md-header__nav-link--icon {
+  --button-border-color: rgba(0, 0, 0, 0.08);
+  --button-hover-bg: rgba(0, 0, 0, 0.03);
+  --button-hover-border: rgba(0, 0, 0, 0.15);
+  --button-icon-color: rgba(0, 0, 0, 0.6);
+  --button-icon-hover-color: rgba(0, 0, 0, 0.85);
+
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -280,25 +296,25 @@ modifications */
   height: 1.75rem;
   padding: 0;
   background-color: transparent;
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  border: 1px solid var(--button-border-color);
   border-radius: 0.5rem;
   text-decoration: none;
   transition: all 0.15s ease;
 }
 
 .md-header__nav-link--icon:hover {
-  background-color: rgba(0, 0, 0, 0.03);
-  border-color: rgba(0, 0, 0, 0.15);
+  background-color: var(--button-hover-bg);
+  border-color: var(--button-hover-border);
 }
 
 .md-header__nav-link--icon svg {
   width: 16px;
   height: 16px;
-  color: rgba(0, 0, 0, 0.6);
+  color: var(--button-icon-color);
 }
 
 .md-header__nav-link--icon:hover svg {
-  color: rgba(0, 0, 0, 0.85);
+  color: var(--button-icon-hover-color);
 }
 
 /* GitHub icon-only button with colored background */
@@ -358,15 +374,6 @@ modifications */
   margin-left: 0.4rem;
 }
 
-/* Ensure proper stacking of header elements */
-.md-header__source:first-of-type {
-  order: 1;
-  flex: 1;
-  display: flex;
-  justify-content: flex-end;
-  margin-left: auto;
-}
-
 /* Make search field more prominent and centered */
 @media screen and (min-width: 60em) {
   .md-search__form {
@@ -399,7 +406,7 @@ modifications */
 }
 
 /* Improve header responsiveness */
-@media screen and (max-width: 76.24em) {
+@media screen and (max-width: 76.24999em) {
   .md-header__title {
     flex-shrink: 1;
   }
@@ -420,22 +427,13 @@ modifications */
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
 }
 
-/* Dark mode adjustments for Discord icon button */
+/* Dark mode adjustments for icon buttons - using CSS custom properties */
 [data-md-color-scheme="astral-dark"] .md-header__nav-link--icon {
-  border-color: rgba(255, 255, 255, 0.1);
-}
-
-[data-md-color-scheme="astral-dark"] .md-header__nav-link--icon:hover {
-  background-color: rgba(255, 255, 255, 0.05);
-  border-color: rgba(255, 255, 255, 0.2);
-}
-
-[data-md-color-scheme="astral-dark"] .md-header__nav-link--icon svg {
-  color: rgba(255, 255, 255, 0.6);
-}
-
-[data-md-color-scheme="astral-dark"] .md-header__nav-link--icon:hover svg {
-  color: rgba(255, 255, 255, 0.85);
+  --button-border-color: rgba(255, 255, 255, 0.1);
+  --button-hover-bg: rgba(255, 255, 255, 0.05);
+  --button-hover-border: rgba(255, 255, 255, 0.2);
+  --button-icon-color: rgba(255, 255, 255, 0.6);
+  --button-icon-hover-color: rgba(255, 255, 255, 0.85);
 }
 
 /* Dark mode GitHub button */
@@ -457,7 +455,6 @@ modifications */
   align-items: center;
   flex: 1;
   max-width: none;
-  order: 5;
 }
 
 .md-header__search-input {
@@ -574,19 +571,17 @@ modifications */
   /* Logo and branding - compact and left */
   .md-header__button.md-logo {
     flex-shrink: 0;
-    order: 1;
     margin-right: 0;
   }
 
   .md-header__branding {
     flex-shrink: 0;
     margin-left: 0.4rem;
-    order: 2;
   }
 
   /* Search container - centered with max width */
   .md-header__search-container {
-    order: 5;
+    order: 1; /* Move search to middle by putting it after other elements */
     flex: 1;
     display: flex;
     justify-content: center;
@@ -600,13 +595,13 @@ modifications */
   /* Nav links aligned to the right */
   .md-header__nav-links {
     margin-left: auto;
-    order: 10;
+    order: 2; /* After search */
     flex-shrink: 0;
   }
 
   /* Position color palette toggle */
   .md-header__option {
-    order: 11;
+    order: 2; /* Same as nav links, will appear after them in DOM order */
     margin-left: 0.5rem;
     flex-shrink: 0;
   }
@@ -618,32 +613,37 @@ modifications */
 }
 
 /* Mobile layout adjustments */
-@media screen and (max-width: 76.24em) {
+@media screen and (max-width: 76.24999em) {
   .md-header__search-container {
     display: none;
   }
 
-  /* Remove gaps, we'll space these manually next */
+  /* Remove gaps for manual spacing */
   .md-header__inner {
-    gap: 0rem;
+    gap: 0;
   }
 
   /* Nav links aligned to the right */
   .md-header__nav-links {
     margin-left: auto;
-    order: 10;
     flex-shrink: 0;
   }
 
   /* Position color palette toggle */
   .md-header__option {
-    order: 11;
     margin-left: 0.5rem;
     flex-shrink: 0;
   }
 
-  /* Show and style mobile search button */
+  /* Show and style mobile search button - inherits from icon button styles */
   .md-header__button.md-icon[for="__search"] {
+    /* Inherits CSS custom properties from .md-header__nav-link--icon */
+    --button-border-color: rgba(0, 0, 0, 0.08);
+    --button-hover-bg: rgba(0, 0, 0, 0.03);
+    --button-hover-border: rgba(0, 0, 0, 0.15);
+    --button-icon-color: rgba(0, 0, 0, 0.6);
+    --button-icon-hover-color: rgba(0, 0, 0, 0.85);
+
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -651,9 +651,8 @@ modifications */
     height: 1.75rem;
     padding: 0;
     background-color: transparent;
-    border: 1px solid rgba(0, 0, 0, 0.08);
+    border: 1px solid var(--button-border-color);
     border-radius: 0.5rem;
-    order: 9;
     margin-left: 0.5rem;
     margin-right: 0.75rem; /* Extra spacing from Discord/GitHub */
     flex-shrink: 0; /* Prevent button from squishing */
@@ -661,41 +660,27 @@ modifications */
   }
 
   .md-header__button.md-icon[for="__search"]:hover {
-    background-color: rgba(0, 0, 0, 0.03);
-    border-color: rgba(0, 0, 0, 0.15);
+    background-color: var(--button-hover-bg);
+    border-color: var(--button-hover-border);
   }
 
   .md-header__button.md-icon[for="__search"] svg {
     width: 16px;
     height: 16px;
-    color: rgba(0, 0, 0, 0.6);
+    color: var(--button-icon-color);
   }
 
   .md-header__button.md-icon[for="__search"]:hover svg {
-    color: rgba(0, 0, 0, 0.85);
+    color: var(--button-icon-hover-color);
   }
 
-  /* Dark mode mobile search button */
+  /* Dark mode mobile search button - just override the CSS custom properties */
   [data-md-color-scheme="astral-dark"]
     .md-header__button.md-icon[for="__search"] {
-    border-color: rgba(255, 255, 255, 0.1);
-  }
-
-  [data-md-color-scheme="astral-dark"]
-    .md-header__button.md-icon[for="__search"]:hover {
-    background-color: rgba(255, 255, 255, 0.05);
-    border-color: rgba(255, 255, 255, 0.2);
-  }
-
-  [data-md-color-scheme="astral-dark"]
-    .md-header__button.md-icon[for="__search"]
-    svg {
-    color: rgba(255, 255, 255, 0.6);
-  }
-
-  [data-md-color-scheme="astral-dark"]
-    .md-header__button.md-icon[for="__search"]:hover
-    svg {
-    color: rgba(255, 255, 255, 0.85);
+    --button-border-color: rgba(255, 255, 255, 0.1);
+    --button-hover-bg: rgba(255, 255, 255, 0.05);
+    --button-hover-border: rgba(255, 255, 255, 0.2);
+    --button-icon-color: rgba(255, 255, 255, 0.6);
+    --button-icon-hover-color: rgba(255, 255, 255, 0.85);
   }
 }
