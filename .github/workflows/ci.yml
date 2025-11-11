@@ -331,6 +331,9 @@ jobs:
       - name: "Install required Python versions"
         run: uv python install
 
+      - name: "Add uv Python to PATH"
+        run: echo "$env:USERPROFILE\.local\bin" >> $env:GITHUB_PATH
+
       - uses: Swatinem/rust-cache@98c8021b550208e191a6a3145459bfc9fb29c4c0 # v2.8.0
         with:
           workspaces: ${{ env.UV_WORKSPACE }}
