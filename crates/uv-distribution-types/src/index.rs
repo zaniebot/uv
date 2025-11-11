@@ -444,6 +444,11 @@ impl FromStr for Index {
             }
         }
 
+        // Check if it's a known URL
+        if let Some(known) = KnownIndexUrl::try_from_str(s) {
+            return Ok(known);
+        }
+
         // Otherwise, assume the source is a URL.
         let url = IndexUrl::from_str(s)?;
         Ok(Self {
@@ -458,6 +463,29 @@ impl FromStr for Index {
             ignore_error_codes: None,
             cache_control: None,
         })
+    }
+}
+
+struct KnownIndexUrl(IndexUrl);
+
+impl KnownIndexUrl {
+    fn try_from_str(s: &str) -> Option<Self> {
+        // e.g., a pyx workspace
+        let parts = s.split("/");
+        let first = parts.next()?;
+
+        if !first.eq_ignore_ascii_case("pyx") {
+            return None;
+        }
+
+        let workspace = parts.next()?;
+        let view = parts.next()?;
+        let url = format!(
+            "https://pyx.astral.sh/{workspace}/+simple/{view}/",
+            workspace = workspace,
+            view = view
+        );
+        return Some(Self(IndexUrl::from_str(&url).ok()?));
     }
 }
 
