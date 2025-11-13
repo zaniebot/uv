@@ -271,9 +271,9 @@ pub(crate) async fn install(
                     "Found Python version file at: {}",
                     file.path().user_display()
                 );
+                is_from_python_version_file = Some(file.is_global());
             })
             .map(PythonVersionFile::into_versions)
-            .inspect(|_| is_from_python_version_file = true)
             .unwrap_or_else(|| {
                 // If no version file is found and no requests were made
                 // TODO(zanieb): We should consider differentiating between a global Python version
@@ -334,6 +334,30 @@ pub(crate) async fn install(
         if let Some(request) = requests.iter().find(|request| {
             request.request.includes_patch() || request.request.includes_prerelease()
         }) {
+            if let Ok(mut downloads) = request
+                .download_request
+                .clone()
+                .without_patch()
+                .iter_downloads(python_downloads_json_url.as_deref())
+                && let Some(download) = downloads.next()
+            {
+                if let Some(is_from_global_version_file) = is_from_python_version_file {
+                    writeln!(
+                        printer.stderr(),
+                        "{}{} Your Python version is pinned to {}; use `uv python pin {}{}` to upgrade instead",
+                        "error".bold().red(),
+                        ":".bold(),
+                        if is_from_global_version_file {
+                            "--global "
+                        } else {
+                            ""
+                        },
+                        request.request.to_canonical_string(),
+                        download.key().version(),
+                    )?;
+                    return Ok(ExitStatus::Failure);
+                }
+            }
             writeln!(
                 printer.stderr(),
                 "error: `{source}` only accepts minor versions, got: {}",

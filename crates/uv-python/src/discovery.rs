@@ -1964,6 +1964,33 @@ impl PythonRequest {
         }
     }
 
+    /// Change the patch version for this request, if applicable.
+    ///
+    /// If not applicable, e.g., there's not a version in the request, returns [`None`].
+    pub fn with_patch(self, patch: u8) -> Option<Self> {
+        match self {
+            Self::Default => None,
+            Self::Any => None,
+            Self::Version(version_request) => Self::Version(version_request.with_patch(patch)),
+            Self::Directory(..) => None,
+            Self::File(..) => None,
+            Self::ExecutableName(..) => None,
+            Self::Implementation(..) => None,
+            Self::ImplementationVersion(implementation, version) => {
+                Self::ImplementationVersion(implementation, version.with_patch(patch))
+            }
+            Self::Key(request) => {
+                if let Some(version_request) = request.version {
+                    let mut new_request = request.clone();
+                    new_request.version = Some(version_request.with_patch(patch));
+                    Some(Self::Key(new_request))
+                } else {
+                    None
+                }
+            }
+        }
+    }
+
     /// Check if this request includes a specific prerelease version.
     pub fn includes_prerelease(&self) -> bool {
         match self {
