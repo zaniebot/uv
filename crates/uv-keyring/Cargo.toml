@@ -20,7 +20,7 @@ default = ["apple-native", "secret-service", "windows-native"]
 native-auth = []
 
 ## Use the built-in Keychain Services on macOS
-apple-native = ["dep:security-framework"]
+apple-native = ["dep:security-framework", "dep:security-framework-sys", "dep:core-foundation"]
 ## Use the secret-service on *nix.
 secret-service = ["dep:secret-service"]
 ## Use the built-in credential store on Windows
@@ -30,9 +30,12 @@ windows-native = ["dep:windows", "dep:byteorder"]
 async-trait = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
+uv-static = { workspace = true }
 
 [target.'cfg(target_os = "macos")'.dependencies]
+core-foundation = { version = "0.10", optional = true }
 security-framework = { workspace = true, optional = true }
+security-framework-sys = { version = "2.14", optional = true }
 
 [target.'cfg(any(target_os = "linux",target_os = "freebsd", target_os = "openbsd"))'.dependencies]
 secret-service = { workspace = true, features = ["rt-tokio-crypto-rust"], optional = true }

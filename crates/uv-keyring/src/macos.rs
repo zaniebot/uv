@@ -35,6 +35,18 @@ use crate::error::{Error as ErrorCode, Result, decode_password};
 use security_framework::base::Error;
 use security_framework::os::macos::keychain::{SecKeychain, SecPreferencesDomain};
 use security_framework::os::macos::passwords::find_generic_password;
+use std::sync::OnceLock;
+use uv_static::EnvVars;
+
+/// Check if unsafe development mode is enabled via environment variable.
+///
+/// In development mode, keychain items are created with "allow all applications" access
+/// to avoid repeated password prompts when the binary changes. This significantly reduces
+/// the security of stored credentials and should only be used during local development.
+fn is_unsafe_dev_mode() -> bool {
+    static DEV_MODE: OnceLock<bool> = OnceLock::new();
+    *DEV_MODE.get_or_init(|| std::env::var(EnvVars::UV_KEYRING_UNSAFE_DEV_MODE).is_ok())
+}
 
 /// The representation of a generic Keychain credential.
 ///
@@ -60,13 +72,22 @@ impl CredentialApi for MacCredential {
         let account = self.account.clone();
         let domain = self.domain;
         let password = password.to_string();
-        crate::blocking::spawn_blocking(move || {
-            get_keychain(domain)?
-                .set_generic_password(&service, &account, password.as_bytes())
-                .map_err(decode_error)
-        })
-        .await?;
-        Ok(())
+
+        if is_unsafe_dev_mode() {
+            crate::blocking::spawn_blocking(move || {
+                set_password_with_access(&service, &account, password.as_bytes(), domain)
+            })
+            .await?;
+            Ok(())
+        } else {
+            crate::blocking::spawn_blocking(move || {
+                get_keychain(domain)?
+                    .set_generic_password(&service, &account, password.as_bytes())
+                    .map_err(decode_error)
+            })
+            .await?;
+            Ok(())
+        }
     }
 
     /// Create and write a credential with secret for this entry.
@@ -79,13 +100,22 @@ impl CredentialApi for MacCredential {
         let account = self.account.clone();
         let domain = self.domain;
         let secret = secret.to_vec();
-        crate::blocking::spawn_blocking(move || {
-            get_keychain(domain)?
-                .set_generic_password(&service, &account, &secret)
-                .map_err(decode_error)
-        })
-        .await?;
-        Ok(())
+
+        if is_unsafe_dev_mode() {
+            crate::blocking::spawn_blocking(move || {
+                set_password_with_access(&service, &account, &secret, domain)
+            })
+            .await?;
+            Ok(())
+        } else {
+            crate::blocking::spawn_blocking(move || {
+                get_keychain(domain)?
+                    .set_generic_password(&service, &account, &secret)
+                    .map_err(decode_error)
+            })
+            .await?;
+            Ok(())
+        }
     }
 
     /// Look up the password for this entry, if any.
@@ -313,6 +343,73 @@ fn get_keychain(domain: MacKeychainDomain) -> Result<SecKeychain> {
     match SecKeychain::default_for_domain(domain) {
         Ok(keychain) => Ok(keychain),
         Err(err) => Err(decode_error(err)),
+    }
+}
+
+/// Set a password with "allow all applications" access control for development.
+///
+/// This uses the legacy `SecKeychainAddGenericPassword` API which creates items
+/// with more permissive default access control than the modern `SecItemAdd` API.
+/// This allows the keychain item to be accessed by different versions of the same
+/// application without prompting, which is useful during development when the binary
+/// frequently changes.
+#[allow(unsafe_code)]
+fn set_password_with_access(
+    service: &str,
+    account: &str,
+    password: &[u8],
+    domain: MacKeychainDomain,
+) -> Result<()> {
+    use core_foundation::base::TCFType;
+    use security_framework_sys::base::{errSecDuplicateItem, errSecSuccess};
+    use security_framework_sys::keychain::SecKeychainAddGenericPassword;
+    use std::ptr;
+
+    let keychain = get_keychain(domain)?;
+
+    // Convert lengths to u32, validating they fit (security APIs use u32 lengths)
+    let service_len = u32::try_from(service.len()).map_err(|_| {
+        ErrorCode::Invalid("service".to_string(), "length exceeds u32::MAX".to_string())
+    })?;
+    let account_len = u32::try_from(account.len()).map_err(|_| {
+        ErrorCode::Invalid("account".to_string(), "length exceeds u32::MAX".to_string())
+    })?;
+    let password_len = u32::try_from(password.len()).map_err(|_| {
+        ErrorCode::Invalid("password".to_string(), "length exceeds u32::MAX".to_string())
+    })?;
+
+    // Try to create the password. If it already exists, this will fail with
+    // errSecDuplicateItem, which we handle below by updating the existing item.
+    // We intentionally don't try to update first because we want to ensure
+    // new items are created with the permissive access control of the legacy API.
+    //
+    // SAFETY: Calling macOS Security framework API. `keychain` is a valid `SecKeychain`,
+    // string pointers and lengths are derived from valid Rust slices, and `null` is valid
+    // for the output `item_ref` parameter.
+    let status = unsafe {
+        SecKeychainAddGenericPassword(
+            keychain.as_concrete_TypeRef(),
+            service_len,
+            service.as_ptr().cast::<i8>(),
+            account_len,
+            account.as_ptr().cast::<i8>(),
+            password_len,
+            password.as_ptr().cast(),
+            ptr::null_mut(),
+        )
+    };
+
+    if status == errSecSuccess {
+        Ok(())
+    } else if status == errSecDuplicateItem {
+        // Item already exists, try to update it
+        // We need to find it first, then update it
+        let (_, mut item) = find_generic_password(Some(&[keychain]), service, account)
+            .map_err(decode_error)?;
+
+        item.set_password(password).map_err(decode_error)
+    } else {
+        Err(decode_error(Error::from_code(status)))
     }
 }
 

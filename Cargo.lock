@@ -6270,13 +6270,16 @@ version = "0.0.5"
 dependencies = [
  "async-trait",
  "byteorder",
+ "core-foundation 0.10.1",
  "doc-comment",
  "env_logger",
  "fastrand",
  "secret-service",
  "security-framework",
+ "security-framework-sys",
  "thiserror 2.0.17",
  "tokio",
+ "uv-static",
  "windows 0.59.0",
  "zeroize",
 ]

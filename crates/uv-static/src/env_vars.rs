@@ -1271,4 +1271,14 @@ impl EnvVars {
     /// of build failures.
     #[attr_added_in("0.9.15")]
     pub const UV_HIDE_BUILD_OUTPUT: &'static str = "UV_HIDE_BUILD_OUTPUT";
+
+    /// Enable unsafe development mode for the keyring credential store.
+    ///
+    /// WARNING: When set, keychain items are created with "allow all applications" access control,
+    /// which avoids repeated password prompts when the binary changes during development. This
+    /// significantly reduces the security of stored credentials and should only be used during
+    /// local development.
+    #[attr_hidden]
+    #[attr_added_in("next version")]
+    pub const UV_KEYRING_UNSAFE_DEV_MODE: &'static str = "UV_KEYRING_UNSAFE_DEV_MODE";
 }
