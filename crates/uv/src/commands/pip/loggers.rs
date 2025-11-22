@@ -467,3 +467,55 @@ impl ResolveLogger for SummaryResolveLogger {
         Ok(())
     }
 }
+
+/// A logger that doesn't show any output.
+#[derive(Debug, Default, Clone, Copy)]
+pub(crate) struct NoOpResolveLogger;
+
+impl ResolveLogger for NoOpResolveLogger {
+    fn on_complete(
+        &self,
+        _count: usize,
+        _start: std::time::Instant,
+        _printer: Printer,
+    ) -> fmt::Result {
+        Ok(())
+    }
+}
+
+/// A logger that doesn't show any output.
+#[derive(Debug, Default, Clone, Copy)]
+pub(crate) struct NoOpInstallLogger;
+
+impl InstallLogger for NoOpInstallLogger {
+    fn on_audit(&self, _count: usize, _start: std::time::Instant, _printer: Printer) -> fmt::Result {
+        Ok(())
+    }
+
+    fn on_prepare(
+        &self,
+        _count: usize,
+        _suffix: Option<&str>,
+        _start: std::time::Instant,
+        _printer: Printer,
+    ) -> fmt::Result {
+        Ok(())
+    }
+
+    fn on_uninstall(
+        &self,
+        _count: usize,
+        _start: std::time::Instant,
+        _printer: Printer,
+    ) -> fmt::Result {
+        Ok(())
+    }
+
+    fn on_install(&self, _count: usize, _start: std::time::Instant, _printer: Printer) -> fmt::Result {
+        Ok(())
+    }
+
+    fn on_complete(&self, _changelog: &Changelog, _printer: Printer) -> fmt::Result {
+        Ok(())
+    }
+}

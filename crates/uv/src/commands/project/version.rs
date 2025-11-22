@@ -474,6 +474,7 @@ async fn print_frozen_version(
             &WorkspaceCache::default(),
             printer,
             preview,
+            None,
         )
         .execute((&target).into()),
     )
@@ -616,6 +617,7 @@ async fn lock_and_sync(
             &workspace_cache,
             printer,
             preview,
+            None,
         )
         .execute((&target).into()),
     )
@@ -677,6 +679,7 @@ async fn lock_and_sync(
         DryRun::Disabled,
         printer,
         preview,
+        None,
     )
     .await
     {

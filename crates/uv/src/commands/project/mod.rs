@@ -2024,6 +2024,7 @@ pub(crate) async fn resolve_environment(
         options,
         logger,
         printer,
+        None,
     )
     .await?)
 }
@@ -2157,6 +2158,7 @@ pub(crate) async fn sync_environment(
         dry_run,
         printer,
         preview,
+        None,
     )
     .await?;
 
@@ -2395,6 +2397,7 @@ pub(crate) async fn update_environment(
         options,
         resolve,
         printer,
+        None,
     )
     .await
     {
@@ -2425,6 +2428,7 @@ pub(crate) async fn update_environment(
         dry_run,
         printer,
         preview,
+        None,
     )
     .await?;
 

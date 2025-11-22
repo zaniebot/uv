@@ -499,6 +499,7 @@ pub(crate) async fn pip_sync(
             options,
             Box::new(DefaultResolveLogger),
             printer,
+            None,
         )
         .await
         {
@@ -567,6 +568,7 @@ pub(crate) async fn pip_sync(
         dry_run,
         printer,
         preview,
+        None,
     )
     .await
     {

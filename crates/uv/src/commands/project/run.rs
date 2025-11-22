@@ -287,6 +287,7 @@ hint: If you are running a script with `{}` in the shebang, you may need to incl
                     &workspace_cache,
                     printer,
                     preview,
+                    None,
                 )
                 .execute(target),
             )
@@ -336,6 +337,7 @@ hint: If you are running a script with `{}` in the shebang, you may need to incl
                 DryRun::Disabled,
                 printer,
                 preview,
+                None,
             )
             .await
             {
@@ -766,6 +768,7 @@ hint: If you are running a script with `{}` in the shebang, you may need to incl
                         &workspace_cache,
                         printer,
                         preview,
+                        None,
                     )
                     .execute(project.workspace().into()),
                 )
@@ -856,6 +859,7 @@ hint: If you are running a script with `{}` in the shebang, you may need to incl
                     DryRun::Disabled,
                     printer,
                     preview,
+                    None,
                 )
                 .await
                 {

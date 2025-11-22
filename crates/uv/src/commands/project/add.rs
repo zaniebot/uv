@@ -57,6 +57,7 @@ use crate::commands::reporters::{PythonDownloadReporter, ResolverReporter};
 use crate::commands::{ExitStatus, ScriptPath, diagnostics, project};
 use crate::printer::Printer;
 use crate::settings::{LockCheck, ResolverInstallerSettings};
+use uv_cli::SyncFormat;
 
 /// Add one or more packages to the project requirements.
 #[allow(clippy::fn_params_excessive_bools)]
@@ -1020,6 +1021,7 @@ async fn lock_and_sync(
             &WorkspaceCache::default(),
             printer,
             preview,
+            None,
         )
         .with_constraints(constraints)
         .execute((&target).into()),
@@ -1143,6 +1145,7 @@ async fn lock_and_sync(
                     &WorkspaceCache::default(),
                     printer,
                     preview,
+                    None,
                 )
                 .execute((&target).into()),
             )
@@ -1203,6 +1206,7 @@ async fn lock_and_sync(
         DryRun::Disabled,
         printer,
         preview,
+        None,
     )
     .await?;
 

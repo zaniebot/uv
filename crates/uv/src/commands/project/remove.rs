@@ -313,6 +313,7 @@ pub(crate) async fn remove(
             &WorkspaceCache::default(),
             printer,
             preview,
+            None,
         )
         .execute((&target).into()),
     )
@@ -372,6 +373,7 @@ pub(crate) async fn remove(
         DryRun::Disabled,
         printer,
         preview,
+        None,
     )
     .await
     {

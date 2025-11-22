@@ -343,6 +343,7 @@ pub(crate) async fn sync(
             &workspace_cache,
             printer,
             preview,
+            Some(output_format),
         )
         .execute(lock_target),
     )
@@ -418,6 +419,7 @@ pub(crate) async fn sync(
         dry_run,
         printer,
         preview,
+        Some(output_format),
     )
     .await
     {
@@ -605,6 +607,7 @@ pub(super) async fn do_sync(
     dry_run: DryRun,
     printer: Printer,
     preview: Preview,
+    output_format: Option<SyncFormat>,
 ) -> Result<(), ProjectError> {
     // Extract the project settings.
     let InstallerSettingsRef {
@@ -833,6 +836,7 @@ pub(super) async fn do_sync(
         dry_run,
         printer,
         preview,
+        output_format,
     )
     .await?;
 
@@ -1253,7 +1257,7 @@ impl SyncReport {
     fn format(&self, output_format: SyncFormat) -> Option<String> {
         match output_format {
             // This is an intermediate report, when using JSON, it's only rendered at the end
-            SyncFormat::Json => None,
+            SyncFormat::Json | SyncFormat::JsonLines => None,
             SyncFormat::Text => self.to_human_readable_string(),
         }
     }
@@ -1323,7 +1327,7 @@ impl From<(&LockTarget<'_>, &LockMode<'_>, &Outcome)> for LockReport {
 impl LockReport {
     fn format(&self, output_format: SyncFormat) -> Option<String> {
         match output_format {
-            SyncFormat::Json => None,
+            SyncFormat::Json | SyncFormat::JsonLines => None,
             SyncFormat::Text => self.to_human_readable_string(),
         }
     }
@@ -1353,6 +1357,7 @@ impl Report {
     fn format(&self, output_format: SyncFormat) -> Option<String> {
         match output_format {
             SyncFormat::Json => serde_json::to_string_pretty(self).ok(),
+            SyncFormat::JsonLines => None,
             SyncFormat::Text => None,
         }
     }

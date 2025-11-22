@@ -46,10 +46,11 @@ use crate::commands::project::{
     ProjectError, ProjectInterpreter, ScriptInterpreter, UniversalState,
     init_script_python_requirement, script_extra_build_requires,
 };
-use crate::commands::reporters::{PythonDownloadReporter, ResolverReporter};
+use crate::commands::reporters::{JsonReporter, PythonDownloadReporter, ResolverReporter};
 use crate::commands::{ExitStatus, ScriptPath, diagnostics, pip};
 use crate::printer::Printer;
 use crate::settings::{LockCheck, LockCheckSource, ResolverSettings};
+use uv_cli::SyncFormat;
 
 /// The result of running a lock operation.
 #[derive(Debug, Clone)]
@@ -97,6 +98,7 @@ pub(crate) async fn lock(
     cache: &Cache,
     printer: Printer,
     preview: Preview,
+    output_format: Option<SyncFormat>,
 ) -> anyhow::Result<ExitStatus> {
     // If necessary, initialize the PEP 723 script.
     let script = match script {
@@ -202,6 +204,7 @@ pub(crate) async fn lock(
             &workspace_cache,
             printer,
             preview,
+            output_format,
         )
         .with_refresh(&refresh)
         .execute(target),
@@ -278,6 +281,7 @@ pub(super) struct LockOperation<'env> {
     workspace_cache: &'env WorkspaceCache,
     printer: Printer,
     preview: Preview,
+    output_format: Option<SyncFormat>,
 }
 
 impl<'env> LockOperation<'env> {
@@ -293,6 +297,7 @@ impl<'env> LockOperation<'env> {
         workspace_cache: &'env WorkspaceCache,
         printer: Printer,
         preview: Preview,
+        output_format: Option<SyncFormat>,
     ) -> Self {
         Self {
             mode,
@@ -307,6 +312,7 @@ impl<'env> LockOperation<'env> {
             workspace_cache,
             printer,
             preview,
+            output_format,
         }
     }
 
@@ -372,6 +378,7 @@ impl<'env> LockOperation<'env> {
                     self.workspace_cache,
                     self.printer,
                     self.preview,
+                    self.output_format,
                 ))
                 .await?;
 
@@ -416,6 +423,7 @@ impl<'env> LockOperation<'env> {
                     self.workspace_cache,
                     self.printer,
                     self.preview,
+                    self.output_format,
                 ))
                 .await?;
 
@@ -448,6 +456,7 @@ async fn do_lock(
     workspace_cache: &WorkspaceCache,
     printer: Printer,
     preview: Preview,
+    output_format: Option<SyncFormat>,
 ) -> Result<LockResult, ProjectError> {
     let start = std::time::Instant::now();
 
@@ -864,9 +873,16 @@ async fn do_lock(
             );
 
             // Resolve the requirements.
+            let reporter: Arc<dyn uv_distribution::Reporter> =
+                if let Some(SyncFormat::JsonLines) = output_format {
+                    Arc::new(JsonReporter::from(printer))
+                } else {
+                    Arc::new(ResolverReporter::from(printer))
+                };
+
             let resolution = pip::operations::resolve(
                 ExtrasResolver::new(&hasher, state.index(), database)
-                    .with_reporter(Arc::new(ResolverReporter::from(printer)))
+                    .with_reporter(reporter)
                     .resolve(target.members_requirements())
                     .await
                     .map_err(|err| ProjectError::Operation(err.into()))?
@@ -916,6 +932,7 @@ async fn do_lock(
                 options,
                 Box::new(SummaryResolveLogger),
                 printer,
+                output_format,
             )
             .await?;
 

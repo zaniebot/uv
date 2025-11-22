@@ -594,6 +594,7 @@ pub(crate) async fn pip_install(
             options,
             Box::new(DefaultResolveLogger),
             printer,
+            None,
         )
         .await
         {
@@ -662,6 +663,7 @@ pub(crate) async fn pip_install(
         dry_run,
         printer,
         preview,
+        None,
     )
     .await
     {

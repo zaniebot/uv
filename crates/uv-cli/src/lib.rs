@@ -65,6 +65,9 @@ pub enum SyncFormat {
     Text,
     /// Display the result in JSON format.
     Json,
+    /// Display the result in JSON lines format.
+    #[value(alias = "json-lines")]
+    JsonLines,
 }
 
 #[derive(Debug, Default, Clone, clap::ValueEnum)]

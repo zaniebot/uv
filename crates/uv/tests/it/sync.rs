@@ -3524,6 +3524,46 @@ fn sync_exclude_group() -> Result<()> {
 }
 
 #[test]
+fn sync_json_output_format() -> Result<()> {
+    let context = TestContext::new("3.12");
+
+    let pyproject_toml = context.temp_dir.child("pyproject.toml");
+    pyproject_toml.write_str(
+        r#"
+        [project]
+        name = "project"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        dependencies = ["iniconfig"]
+        "#,
+    )?;
+
+    // Running `uv sync` with json-lines output.
+    uv_snapshot!(context.filters(), context.sync()
+        .arg("--output-format")
+        .arg("json-lines"), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    {"type":"resolve_start","total":1}
+    {"type":"package_resolve","name":"project","version":"0.1.0","url":null}
+    {"type":"package_resolve","name":"iniconfig","version":"2.0.0","url":null}
+    {"type":"resolve_complete"}
+    {"type":"download_start","id":1,"name":"iniconfig","size":5892}
+    {"type":"download_progress","id":1,"name":"iniconfig","bytes":5892,"total_bytes":5892,"downloaded_bytes":5892}
+    {"type":"download_progress","id":1,"name":"iniconfig","bytes":0,"total_bytes":5892,"downloaded_bytes":5892}
+    {"type":"download_complete","id":1,"name":"iniconfig"}
+    {"type":"install_start","total":1}
+    {"type":"package_install","name":"iniconfig","version":"2.0.0"}
+
+    ----- stderr -----
+    Resolved 2 packages in [TIME]
+    "###);
+
+    Ok(())
+}
+
+#[test]
 fn sync_exclude_group_with_environment_variable() -> Result<()> {
     let context = TestContext::new("3.12");
 

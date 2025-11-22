@@ -1,13 +1,15 @@
 use std::env;
-use std::fmt::Write;
+use std::io::Write as IoWrite;
 use std::ops::Deref;
 use std::sync::LazyLock;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
+use std::fmt::Write;
 
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use owo_colors::OwoColorize;
 use rustc_hash::FxHashMap;
+use serde::Serialize;
 
 use crate::commands::human_readable_bytes;
 use crate::printer::Printer;
@@ -851,5 +853,291 @@ impl uv_bin_install::Reporter for BinaryDownloadReporter {
 
     fn on_download_complete(&self, id: usize) {
         self.reporter.on_request_complete(Direction::Download, id);
+    }
+}
+
+#[derive(Serialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub(crate) enum JsonEvent {
+    DownloadProgress {
+        id: usize,
+        name: String,
+        bytes: u64,
+        total_bytes: Option<u64>,
+        downloaded_bytes: u64,
+    },
+    DownloadComplete {
+        id: usize,
+        name: String,
+    },
+    DownloadStart {
+        id: usize,
+        name: String,
+        size: Option<u64>,
+    },
+    BuildStart {
+        id: usize,
+        source: String,
+    },
+    BuildComplete {
+        id: usize,
+        source: String,
+    },
+    CheckoutStart {
+        id: usize,
+        url: String,
+        rev: String,
+    },
+    CheckoutComplete {
+        id: usize,
+        url: String,
+        rev: String,
+    },
+    InstallStart {
+        total: usize,
+    },
+    PackageInstall {
+        name: String,
+        version: String,
+    },
+    InstallComplete,
+    ResolveStart {
+        total: usize,
+    },
+    PackageResolve {
+        name: String,
+        version: Option<String>,
+        url: Option<String>,
+    },
+    ResolveComplete,
+}
+
+#[derive(Debug, Default)]
+struct DownloadState {
+    name: String,
+    size: Option<u64>,
+    downloaded: u64,
+}
+
+#[derive(Debug, Default)]
+struct JsonState {
+    id: usize,
+    downloads: FxHashMap<usize, DownloadState>,
+}
+
+#[derive(Debug)]
+pub(crate) struct JsonReporter {
+    printer: Printer,
+    state: Arc<Mutex<JsonState>>,
+}
+
+impl From<Printer> for JsonReporter {
+    fn from(printer: Printer) -> Self {
+        Self {
+            printer,
+            state: Arc::default(),
+        }
+    }
+}
+
+impl JsonReporter {
+    fn emit(&self, event: JsonEvent) {
+        if let Ok(mut output) = serde_json::to_string(&event) {
+            output.push('\n');
+            let _ = self.printer.stdout().write_str(&output);
+        }
+    }
+
+    fn next_id(&self) -> usize {
+        let mut state = self.state.lock().unwrap();
+        state.id += 1;
+        state.id
+    }
+
+    #[must_use]
+    pub(crate) fn with_resolve_count(self, count: usize) -> Self {
+        self.emit(JsonEvent::ResolveStart { total: count });
+        self
+    }
+
+    #[must_use]
+    pub(crate) fn with_install_count(self, count: usize) -> Self {
+        self.emit(JsonEvent::InstallStart { total: count });
+        self
+    }
+}
+
+impl uv_installer::PrepareReporter for JsonReporter {
+    fn on_progress(&self, _dist: &CachedDist) {}
+
+    fn on_complete(&self) {}
+
+    fn on_build_start(&self, source: &BuildableSource) -> usize {
+        let id = self.next_id();
+        self.emit(JsonEvent::BuildStart {
+            id,
+            source: source.to_string(),
+        });
+        id
+    }
+
+    fn on_build_complete(&self, source: &BuildableSource, id: usize) {
+        self.emit(JsonEvent::BuildComplete {
+            id,
+            source: source.to_string(),
+        });
+    }
+
+    fn on_download_start(&self, name: &PackageName, size: Option<u64>) -> usize {
+        let id = self.next_id();
+        let name = name.to_string();
+
+        let mut state = self.state.lock().unwrap();
+        state.downloads.insert(
+            id,
+            DownloadState {
+                name: name.clone(),
+                size,
+                downloaded: 0,
+            },
+        );
+
+        self.emit(JsonEvent::DownloadStart { id, name, size });
+        id
+    }
+
+    fn on_download_progress(&self, id: usize, bytes: u64) {
+        let mut state = self.state.lock().unwrap();
+        let Some(download) = state.downloads.get_mut(&id) else {
+            return;
+        };
+        download.downloaded += bytes;
+        self.emit(JsonEvent::DownloadProgress {
+            id,
+            name: download.name.clone(),
+            bytes,
+            total_bytes: download.size,
+            downloaded_bytes: download.downloaded,
+        });
+    }
+
+    fn on_download_complete(&self, name: &PackageName, id: usize) {
+        let mut state = self.state.lock().unwrap();
+        state.downloads.remove(&id);
+        self.emit(JsonEvent::DownloadComplete {
+            id,
+            name: name.to_string(),
+        });
+    }
+
+    fn on_checkout_start(&self, url: &DisplaySafeUrl, rev: &str) -> usize {
+        let id = self.next_id();
+        self.emit(JsonEvent::CheckoutStart {
+            id,
+            url: url.to_string(),
+            rev: rev.to_string(),
+        });
+        id
+    }
+
+    fn on_checkout_complete(&self, url: &DisplaySafeUrl, rev: &str, id: usize) {
+        self.emit(JsonEvent::CheckoutComplete {
+            id,
+            url: url.to_string(),
+            rev: rev.to_string(),
+        });
+    }
+}
+
+impl uv_installer::InstallReporter for JsonReporter {
+    fn on_install_progress(&self, wheel: &CachedDist) {
+        let (name, version) = match wheel {
+            CachedDist::Registry(dist) => (
+                dist.filename.name.to_string(),
+                dist.filename.version.to_string(),
+            ),
+            CachedDist::Url(dist) => (dist.name().to_string(), dist.version_id().to_string()),
+        };
+        self.emit(JsonEvent::PackageInstall { name, version });
+    }
+
+    fn on_install_complete(&self) {
+        self.emit(JsonEvent::InstallComplete);
+    }
+}
+
+impl uv_resolver::ResolverReporter for JsonReporter {
+    fn on_progress(&self, name: &PackageName, version_or_url: &VersionOrUrlRef) {
+        let (version, url) = match version_or_url {
+            VersionOrUrlRef::Version(v) => (Some(v.to_string()), None),
+            VersionOrUrlRef::Url(u) => (None, Some(u.to_string())),
+        };
+        self.emit(JsonEvent::PackageResolve {
+            name: name.to_string(),
+            version,
+            url,
+        });
+    }
+
+    fn on_complete(&self) {
+        self.emit(JsonEvent::ResolveComplete);
+    }
+    
+    fn on_build_start(&self, source: &BuildableSource) -> usize {
+        uv_installer::PrepareReporter::on_build_start(self, source)
+    }
+
+    fn on_build_complete(&self, source: &BuildableSource, id: usize) {
+        uv_installer::PrepareReporter::on_build_complete(self, source, id)
+    }
+
+    fn on_checkout_start(&self, url: &DisplaySafeUrl, rev: &str) -> usize {
+        uv_installer::PrepareReporter::on_checkout_start(self, url, rev)
+    }
+
+    fn on_checkout_complete(&self, url: &DisplaySafeUrl, rev: &str, id: usize) {
+        uv_installer::PrepareReporter::on_checkout_complete(self, url, rev, id)
+    }
+
+    fn on_download_start(&self, name: &PackageName, size: Option<u64>) -> usize {
+        uv_installer::PrepareReporter::on_download_start(self, name, size)
+    }
+
+    fn on_download_progress(&self, id: usize, bytes: u64) {
+        uv_installer::PrepareReporter::on_download_progress(self, id, bytes)
+    }
+
+    fn on_download_complete(&self, name: &PackageName, id: usize) {
+        uv_installer::PrepareReporter::on_download_complete(self, name, id)
+    }
+}
+
+impl uv_distribution::Reporter for JsonReporter {
+    fn on_build_start(&self, source: &BuildableSource) -> usize {
+        uv_installer::PrepareReporter::on_build_start(self, source)
+    }
+
+    fn on_build_complete(&self, source: &BuildableSource, id: usize) {
+        uv_installer::PrepareReporter::on_build_complete(self, source, id)
+    }
+
+    fn on_checkout_start(&self, url: &DisplaySafeUrl, rev: &str) -> usize {
+        uv_installer::PrepareReporter::on_checkout_start(self, url, rev)
+    }
+
+    fn on_checkout_complete(&self, url: &DisplaySafeUrl, rev: &str, id: usize) {
+        uv_installer::PrepareReporter::on_checkout_complete(self, url, rev, id)
+    }
+
+    fn on_download_start(&self, name: &PackageName, size: Option<u64>) -> usize {
+        uv_installer::PrepareReporter::on_download_start(self, name, size)
+    }
+
+    fn on_download_progress(&self, id: usize, bytes: u64) {
+        uv_installer::PrepareReporter::on_download_progress(self, id, bytes)
+    }
+
+    fn on_download_complete(&self, name: &PackageName, id: usize) {
+        uv_installer::PrepareReporter::on_download_complete(self, name, id)
     }
 }

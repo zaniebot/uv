@@ -44,10 +44,14 @@ use uv_tool::InstalledTools;
 use uv_types::{BuildContext, HashStrategy, InFlight, InstalledPackagesProvider};
 use uv_warnings::warn_user;
 
-use crate::commands::pip::loggers::{DefaultInstallLogger, InstallLogger, ResolveLogger};
-use crate::commands::reporters::{InstallReporter, PrepareReporter, ResolverReporter};
+use crate::commands::pip::loggers::{
+    DefaultInstallLogger, DefaultResolveLogger, InstallLogger, NoOpInstallLogger, NoOpResolveLogger,
+    ResolveLogger,
+};
+use crate::commands::reporters::{InstallReporter, JsonReporter, PrepareReporter, ResolverReporter};
 use crate::commands::{ChangeEventKind, DryRunEvent, compile_bytecode};
 use crate::printer::Printer;
+use uv_cli::SyncFormat;
 
 /// Consolidate the requirements for an installation.
 pub(crate) async fn read_requirements(
@@ -129,8 +133,16 @@ pub(crate) async fn resolve<InstalledPackages: InstalledPackagesProvider>(
     options: Options,
     logger: Box<dyn ResolveLogger>,
     printer: Printer,
+    output_format: Option<SyncFormat>,
 ) -> Result<ResolverOutput, Error> {
     let start = std::time::Instant::now();
+
+    // If `JsonLines` is requested, use a no-op logger to suppress summary output.
+    let logger = if matches!(output_format, Some(SyncFormat::JsonLines)) {
+        Box::new(NoOpResolveLogger) as Box<dyn ResolveLogger>
+    } else {
+        logger
+    };
 
     // Resolve the requirements from the provided sources.
     let requirements = {
@@ -149,13 +161,20 @@ pub(crate) async fn resolve<InstalledPackages: InstalledPackagesProvider>(
 
         // Resolve any unnamed requirements.
         if !unnamed.is_empty() {
+            let reporter: Arc<dyn uv_distribution::Reporter> =
+                if let Some(SyncFormat::JsonLines) = output_format {
+                    Arc::new(JsonReporter::from(printer).with_resolve_count(unnamed.len()))
+                } else {
+                    Arc::new(ResolverReporter::from(printer))
+                };
+
             requirements.extend(
                 NamedRequirementsResolver::new(
                     hasher,
                     index,
                     DistributionDatabase::new(client, build_dispatch, concurrency.downloads),
                 )
-                .with_reporter(Arc::new(ResolverReporter::from(printer)))
+                .with_reporter(reporter)
                 .resolve(unnamed.into_iter())
                 .await?,
             );
@@ -163,13 +182,20 @@ pub(crate) async fn resolve<InstalledPackages: InstalledPackagesProvider>(
 
         // Resolve any source trees into requirements.
         if !source_trees.is_empty() {
+            let reporter: Arc<dyn uv_distribution::Reporter> =
+                if let Some(SyncFormat::JsonLines) = output_format {
+                    Arc::new(JsonReporter::from(printer).with_resolve_count(source_trees.len()))
+                } else {
+                    Arc::new(ResolverReporter::from(printer))
+                };
+
             let resolutions = SourceTreeResolver::new(
                 extras,
                 hasher,
                 index,
                 DistributionDatabase::new(client, build_dispatch, concurrency.downloads),
             )
-            .with_reporter(Arc::new(ResolverReporter::from(printer)))
+            .with_reporter(reporter)
             .resolve(source_trees.iter())
             .await?;
 
@@ -270,13 +296,20 @@ pub(crate) async fn resolve<InstalledPackages: InstalledPackagesProvider>(
 
         // Resolve any unnamed overrides.
         if !unnamed.is_empty() {
+            let reporter: Arc<dyn uv_distribution::Reporter> =
+                if let Some(SyncFormat::JsonLines) = output_format {
+                    Arc::new(JsonReporter::from(printer).with_resolve_count(unnamed.len()))
+                } else {
+                    Arc::new(ResolverReporter::from(printer))
+                };
+
             overrides.extend(
                 NamedRequirementsResolver::new(
                     hasher,
                     index,
                     DistributionDatabase::new(client, build_dispatch, concurrency.downloads),
                 )
-                .with_reporter(Arc::new(ResolverReporter::from(printer)))
+                .with_reporter(reporter)
                 .resolve(unnamed.into_iter())
                 .await?,
             );
@@ -299,6 +332,13 @@ pub(crate) async fn resolve<InstalledPackages: InstalledPackagesProvider>(
     // Determine any lookahead requirements.
     let lookaheads = match options.dependency_mode {
         DependencyMode::Transitive => {
+            let reporter: Arc<dyn uv_distribution::Reporter> =
+                if let Some(SyncFormat::JsonLines) = output_format {
+                    Arc::new(JsonReporter::from(printer))
+                } else {
+                    Arc::new(ResolverReporter::from(printer))
+                };
+
             LookaheadResolver::new(
                 &requirements,
                 &constraints,
@@ -307,7 +347,7 @@ pub(crate) async fn resolve<InstalledPackages: InstalledPackagesProvider>(
                 index,
                 DistributionDatabase::new(client, build_dispatch, concurrency.downloads),
             )
-            .with_reporter(Arc::new(ResolverReporter::from(printer)))
+            .with_reporter(reporter)
             .resolve(&resolver_env)
             .await?
         }
@@ -333,12 +373,18 @@ pub(crate) async fn resolve<InstalledPackages: InstalledPackagesProvider>(
     // Resolve the dependencies.
     let resolution = {
         // If possible, create a bound on the progress bar.
-        let reporter = match options.dependency_mode {
-            DependencyMode::Transitive => ResolverReporter::from(printer),
-            DependencyMode::Direct => {
-                ResolverReporter::from(printer).with_length(manifest.num_requirements() as u64)
-            }
-        };
+        let reporter: Arc<dyn uv_resolver::ResolverReporter> =
+            if let Some(SyncFormat::JsonLines) = output_format {
+                Arc::new(JsonReporter::from(printer).with_resolve_count(manifest.num_requirements()))
+            } else {
+                match options.dependency_mode {
+                    DependencyMode::Transitive => Arc::new(ResolverReporter::from(printer)),
+                    DependencyMode::Direct => Arc::new(
+                        ResolverReporter::from(printer)
+                            .with_length(manifest.num_requirements() as u64),
+                    ),
+                }
+            };
 
         let resolver = Resolver::new(
             manifest,
@@ -355,7 +401,7 @@ pub(crate) async fn resolve<InstalledPackages: InstalledPackagesProvider>(
             installed_packages,
             DistributionDatabase::new(client, build_dispatch, concurrency.downloads),
         )?
-        .with_reporter(Arc::new(reporter));
+        .with_reporter(reporter);
 
         resolver.resolve().await?
     };
@@ -460,8 +506,16 @@ pub(crate) async fn install(
     dry_run: DryRun,
     printer: Printer,
     preview: Preview,
+    output_format: Option<SyncFormat>,
 ) -> Result<Changelog, Error> {
     let start = std::time::Instant::now();
+
+    // If `JsonLines` is requested, use a no-op logger to suppress summary output.
+    let logger = if matches!(output_format, Some(SyncFormat::JsonLines)) {
+        Box::new(NoOpInstallLogger) as Box<dyn InstallLogger>
+    } else {
+        logger
+    };
 
     // Partition into those that should be linked from the cache (`local`), those that need to be
     // downloaded (`remote`), and those that should be removed (`extraneous`).
@@ -549,6 +603,7 @@ pub(crate) async fn install(
             installer_metadata,
             printer,
             preview,
+            output_format,
         )
         .await?;
         installs.extend(isolated_installs);
@@ -578,6 +633,7 @@ pub(crate) async fn install(
             installer_metadata,
             printer,
             preview,
+            output_format,
         )
         .await?;
         installs.extend(shared_installs);
@@ -630,6 +686,7 @@ async fn execute_plan(
     installer_metadata: bool,
     printer: Printer,
     preview: Preview,
+    output_format: Option<SyncFormat>,
 ) -> Result<(Vec<CachedDist>, Vec<InstalledDist>), Error> {
     let Plan {
         cached,
@@ -644,6 +701,13 @@ async fn execute_plan(
     } else {
         let start = std::time::Instant::now();
 
+        let reporter: Arc<dyn uv_installer::PrepareReporter> =
+            if let Some(SyncFormat::JsonLines) = output_format {
+                Arc::new(JsonReporter::from(printer))
+            } else {
+                Arc::new(PrepareReporter::from(printer).with_length(remote.len() as u64))
+            };
+
         let preparer = Preparer::new(
             cache,
             tags,
@@ -651,9 +715,7 @@ async fn execute_plan(
             build_options,
             DistributionDatabase::new(client, build_dispatch, concurrency.downloads),
         )
-        .with_reporter(Arc::new(
-            PrepareReporter::from(printer).with_length(remote.len() as u64),
-        ));
+        .with_reporter(reporter);
 
         let wheels = preparer
             .prepare(remote.clone(), in_flight, resolution)
@@ -708,13 +770,18 @@ async fn execute_plan(
     let mut installs = wheels.into_iter().chain(cached).collect::<Vec<_>>();
     if !installs.is_empty() {
         let start = std::time::Instant::now();
+        let reporter: Arc<dyn uv_installer::InstallReporter> =
+            if let Some(SyncFormat::JsonLines) = output_format {
+                Arc::new(JsonReporter::from(printer).with_install_count(installs.len()))
+            } else {
+                Arc::new(InstallReporter::from(printer).with_length(installs.len() as u64))
+            };
+
         installs = uv_installer::Installer::new(venv, preview)
             .with_link_mode(link_mode)
             .with_cache(cache)
             .with_installer_metadata(installer_metadata)
-            .with_reporter(Arc::new(
-                InstallReporter::from(printer).with_length(installs.len() as u64),
-            ))
+            .with_reporter(reporter)
             // This technically can block the runtime, but we are on the main thread and
             // have no other running tasks at this point, so this lets us avoid spawning a blocking
             // task.

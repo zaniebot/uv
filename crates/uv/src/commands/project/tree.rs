@@ -151,6 +151,7 @@ pub(crate) async fn tree(
             &WorkspaceCache::default(),
             printer,
             preview,
+            None,
         )
         .execute(target),
     )
