@@ -863,6 +863,134 @@ impl LockedFile {
             .create(true)
             .open(path.as_ref())
     }
+
+    /// Try to identify which process is holding a lock on the given file.
+    ///
+    /// Returns a string describing the blocking process (e.g., "uv (PID 1234)") if detected,
+    /// or `None` if the process cannot be determined.
+    ///
+    /// This uses platform-specific methods:
+    /// - On Linux: Parses `/proc/locks` to find the lock holder
+    /// - On macOS: Uses `lsof` command to find the process
+    pub fn blocking_process(path: impl AsRef<Path>) -> Option<String> {
+        let path = path.as_ref();
+
+        #[cfg(target_os = "linux")]
+        {
+            Self::blocking_process_linux(path)
+        }
+
+        #[cfg(target_os = "macos")]
+        {
+            Self::blocking_process_macos(path)
+        }
+
+        #[cfg(not(any(target_os = "linux", target_os = "macos")))]
+        {
+            let _ = path;
+            None
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    fn blocking_process_linux(path: &Path) -> Option<String> {
+        use std::os::unix::fs::MetadataExt;
+
+        // Get the inode of the lock file
+        let metadata = path.metadata().ok()?;
+        let inode = metadata.ino();
+
+        // Parse /proc/locks to find which process holds a lock on this inode
+        let locks_content = std::fs::read_to_string("/proc/locks").ok()?;
+
+        for line in locks_content.lines() {
+            // /proc/locks format:
+            // 1: FLOCK  ADVISORY  WRITE 1234 08:01:123456 0 EOF
+            // Fields: lock_id, type, mode, access, pid, major:minor:inode, start, end
+            let fields: Vec<&str> = line.split_whitespace().collect();
+            if fields.len() < 6 {
+                continue;
+            }
+
+            // Check if this lock entry matches our inode
+            if let Some(inode_field) = fields.get(5) {
+                if let Some(file_inode) = inode_field.split(':').nth(2) {
+                    if file_inode.parse::<u64>().ok()? == inode {
+                        // Found the lock! Get the PID from field 4
+                        if let Some(pid_str) = fields.get(4) {
+                            if let Ok(pid) = pid_str.parse::<u32>() {
+                                // Try to get the full command line from /proc/<pid>/cmdline
+                                let cmdline_path = format!("/proc/{}/cmdline", pid);
+                                if let Ok(cmdline_bytes) = std::fs::read(&cmdline_path) {
+                                    // cmdline is null-separated, convert to space-separated
+                                    let cmdline = String::from_utf8_lossy(&cmdline_bytes)
+                                        .split('\0')
+                                        .filter(|s| !s.is_empty())
+                                        .collect::<Vec<_>>()
+                                        .join(" ");
+
+                                    if !cmdline.is_empty() {
+                                        return Some(format!("`{}` (PID {})", cmdline, pid));
+                                    }
+                                }
+
+                                // Fallback to process name from /proc/<pid>/comm
+                                let comm_path = format!("/proc/{}/comm", pid);
+                                if let Ok(comm) = std::fs::read_to_string(&comm_path) {
+                                    let comm = comm.trim();
+                                    return Some(format!("{} (PID {})", comm, pid));
+                                }
+                                return Some(format!("PID {}", pid));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        None
+    }
+
+    #[cfg(target_os = "macos")]
+    fn blocking_process_macos(path: &Path) -> Option<String> {
+        // Use lsof to find which process has the file open
+        // lsof -F p <path> outputs: p<pid>
+        let output = std::process::Command::new("lsof")
+            .arg("-F")
+            .arg("p")
+            .arg(path)
+            .output()
+            .ok()?;
+
+        if !output.status.success() {
+            return None;
+        }
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let pid = stdout
+            .lines()
+            .find_map(|line| line.strip_prefix('p'))?
+            .to_string();
+
+        // Use ps to get the full command line
+        let ps_output = std::process::Command::new("ps")
+            .arg("-p")
+            .arg(&pid)
+            .arg("-o")
+            .arg("command=")
+            .output()
+            .ok()?;
+
+        if ps_output.status.success() {
+            let command = String::from_utf8_lossy(&ps_output.stdout).trim().to_string();
+            if !command.is_empty() {
+                return Some(format!("`{}` (PID {})", command, pid));
+            }
+        }
+
+        // Fallback to just PID if ps fails
+        Some(format!("PID {}", pid))
+    }
 }
 
 impl Drop for LockedFile {

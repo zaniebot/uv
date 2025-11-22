@@ -5,7 +5,7 @@ use owo_colors::OwoColorize;
 use tracing::debug;
 
 use uv_cache::{Cache, Removal};
-use uv_fs::Simplified;
+use uv_fs::{LockedFile, Simplified};
 use uv_normalize::PackageName;
 
 use crate::commands::reporters::{CleaningDirectoryReporter, CleaningPackageReporter};
@@ -35,10 +35,19 @@ pub(crate) fn cache_clean(
             cache
         }
         Err(cache) => {
-            writeln!(
-                printer.stderr(),
-                "Cache is currently in-use, waiting for other uv processes to finish (use `--force` to override)"
-            )?;
+            let lock_path = cache.root().join(".lock");
+            let mut message = String::from(
+                "Cache is currently in-use, waiting for other uv processes to finish",
+            );
+
+            // Try to identify the blocking process
+            if let Some(blocking) = LockedFile::blocking_process(&lock_path) {
+                message.push_str(&format!(" (held by {})", blocking));
+            }
+
+            message.push_str(" (use `--force` to override)");
+            writeln!(printer.stderr(), "{}", message)?;
+
             cache.with_exclusive_lock()?
         }
     };
