@@ -521,6 +521,9 @@ impl std::fmt::Display for NoSolutionError {
             // Continue collapsing until no more redundant nodes are found
         }
 
+        // Fix terms when Custom nodes cover complementary ranges
+        fix_terms_for_complementary_custom_nodes(&mut tree);
+
         if should_display_tree {
             display_tree(&tree, "Resolver derivation tree after reduction");
         }
@@ -651,19 +654,36 @@ fn collapse_redundant_no_versions(
                         return;
                     };
 
-                    let versions = versions.complement();
+                    // `versions` is the no-versions range (gaps between available versions)
+                    // `versions.complement()` would be the available versions (tried singletons)
 
                     // If we're disqualifying a single version, this is important to retain, e.g,
                     // for `only foo==1.0.0 is available`
-                    if versions.as_singleton().is_some() {
+                    if versions.complement().as_singleton().is_some() {
                         return;
                     }
 
-                    // If the range in the conclusion (terms) matches the range of no versions,
-                    // then we'll drop this node. If the range is "all versions", then there's no
-                    // also no need to enumerate the available versions.
-                    if *term != Range::full() && *term != versions {
+                    // Check if the term intersected with the no-versions range still has many
+                    // segments. If so, listing all the gaps is unhelpful (e.g., nightly packages
+                    // where each version is a singleton separated by gaps).
+                    let no_versions_in_term = versions.intersection(term);
+                    let segment_count = no_versions_in_term.iter().count();
+
+                    // If the term is the full range, there's no need to enumerate available versions.
+                    // If the no-versions range within the term has many segments (lots of gaps),
+                    // it's also unhelpful to list them all - just drop this node.
+                    if *term != Range::full() && segment_count <= 10 {
                         return;
+                    }
+
+                    // When collapsing, we need to update the terms to reflect that we're now
+                    // covering the full range (since we collapsed the NoVersions node that was
+                    // explaining the gaps).
+                    if let DerivationTree::Derived(other_derived) = other {
+                        // If other is Derived, update its term for this package to be the full range
+                        other_derived
+                            .terms
+                            .insert(package.clone(), Term::Positive(Range::full()));
                     }
 
                     *tree = other.clone();
@@ -672,6 +692,48 @@ fn collapse_redundant_no_versions(
                 _ => {
                     collapse_redundant_no_versions(Arc::make_mut(&mut derived.cause1));
                     collapse_redundant_no_versions(Arc::make_mut(&mut derived.cause2));
+                }
+            }
+        }
+    }
+}
+
+/// Given a [`DerivationTree`], update terms when two `Custom` nodes for the same package
+/// (but potentially different reasons) cover complementary version ranges. For example:
+///
+/// ```text
+/// term package>=0.16.0
+///   package>=0.16.0 no wheels with a matching platform tag
+///   package<=0.15.2 no wheels with a matching Python ABI tag
+/// ```
+///
+/// The term `package>=0.16.0` is incorrect - it should be `package*` (full range) because
+/// the two Custom nodes together cover all available versions. This function updates the
+/// term to reflect the union of the ranges.
+fn fix_terms_for_complementary_custom_nodes(
+    tree: &mut DerivationTree<PubGrubPackage, Range<Version>, UnavailableReason>,
+) {
+    match tree {
+        DerivationTree::External(_) => {}
+        DerivationTree::Derived(derived) => {
+            // First recursively process children
+            fix_terms_for_complementary_custom_nodes(Arc::make_mut(&mut derived.cause1));
+            fix_terms_for_complementary_custom_nodes(Arc::make_mut(&mut derived.cause2));
+
+            // Check if both children are Custom nodes for the same package
+            if let (
+                DerivationTree::External(External::Custom(package1, versions1, _)),
+                DerivationTree::External(External::Custom(package2, versions2, _)),
+            ) = (derived.cause1.as_ref(), derived.cause2.as_ref())
+            {
+                if package1 == package2 {
+                    // Union the version ranges from both Custom nodes
+                    let combined = versions1.union(versions2);
+
+                    // Update the term to be the combined range
+                    derived
+                        .terms
+                        .insert(package1.clone(), Term::Positive(combined));
                 }
             }
         }

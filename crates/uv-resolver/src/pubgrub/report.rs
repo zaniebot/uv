@@ -184,7 +184,19 @@ impl ReportFormatter<PubGrubPackage, Range<Version>, UnavailableReason>
                 if let Some(member) = self.format_workspace_member(package) {
                     format!("{member}'s requirements are unsatisfiable")
                 } else {
-                    format!("{} cannot be used", self.compatible_range(package, range))
+                    // If the range has multiple segments but covers all available versions,
+                    // simplify to "all versions of X cannot be used" for clarity
+                    let covers_all = range.iter().count() > 1
+                        && package.name().is_some_and(|name| {
+                            self.available_versions.get(name).is_some_and(|versions| {
+                                versions.iter().all(|v| range.contains(v))
+                            })
+                        });
+                    if covers_all {
+                        format!("all versions of {package} cannot be used")
+                    } else {
+                        format!("{} cannot be used", self.compatible_range(package, range))
+                    }
                 }
             }
             [(package, Term::Negative(range))]
