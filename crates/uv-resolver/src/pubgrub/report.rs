@@ -98,7 +98,14 @@ impl ReportFormatter<PubGrubPackage, Range<Version>, UnavailableReason>
                     if range.is_empty() {
                         return format!("there are no versions of {package}");
                     }
-                    if range.iter().count() == 1 {
+                    let segment_count = range.iter().count();
+                    if segment_count == 1 {
+                        format!(
+                            "only {} is available",
+                            self.availability_range(package, &range)
+                        )
+                    } else if segment_count > 10 {
+                        // Too many segments to list - PackageRange::fmt will simplify to bounds
                         format!(
                             "only {} is available",
                             self.availability_range(package, &range)
@@ -516,6 +523,39 @@ impl PubGrubReportFormatter<'_> {
                     && self.is_single_project_workspace_member(dependency) =>
             {
                 self.format_external(external2)
+            }
+            // Two Custom nodes for the same package - check if they cover all available versions
+            (
+                External::Custom(package1, range1, _),
+                External::Custom(package2, range2, _),
+            ) if package1 == package2 => {
+                let external1_str = self.format_external(external1);
+                let external2_str = self.format_external(external2);
+
+                // Check if the combined ranges cover all available versions
+                let combined = range1.union(range2);
+                let covers_all = package1.name().is_some_and(|name| {
+                    self.available_versions.get(name).is_some_and(|versions| {
+                        versions.iter().all(|v| combined.contains(v))
+                    })
+                });
+
+                if covers_all {
+                    // Add explicit "only X and Y are available" clause
+                    format!(
+                        "{}, {}, and only {} and {} are available",
+                        external1_str,
+                        &external2_str,
+                        self.compatible_range(package1, range1),
+                        self.compatible_range(package2, range2),
+                    )
+                } else {
+                    format!(
+                        "{}and {}",
+                        Padded::from_string("", &external1_str, " "),
+                        &external2_str,
+                    )
+                }
             }
             _ => {
                 let external1 = self.format_external(external1);
@@ -2030,6 +2070,44 @@ impl std::fmt::Display for PackageRange<'_> {
         }
 
         let segments: Vec<_> = self.range.iter().collect();
+
+        // If there are too many segments, simplify to just show the bounds
+        if segments.len() > 10 {
+            // Find overall bounds
+            let first_lower = segments.first().map(|(l, _)| l);
+            let last_upper = segments.last().map(|(_, u)| u);
+
+            match (first_lower, last_upper) {
+                (Some(Bound::Included(lower)), Some(Bound::Included(upper))) => {
+                    return write!(f, "{package}>={lower},<={upper}");
+                }
+                (Some(Bound::Included(lower)), Some(Bound::Excluded(upper))) => {
+                    return write!(f, "{package}>={lower},<{upper}");
+                }
+                (Some(Bound::Included(lower)), Some(Bound::Unbounded)) => {
+                    return write!(f, "{package}>={lower}");
+                }
+                (Some(Bound::Excluded(lower)), Some(Bound::Included(upper))) => {
+                    return write!(f, "{package}>{lower},<={upper}");
+                }
+                (Some(Bound::Excluded(lower)), Some(Bound::Excluded(upper))) => {
+                    return write!(f, "{package}>{lower},<{upper}");
+                }
+                (Some(Bound::Excluded(lower)), Some(Bound::Unbounded)) => {
+                    return write!(f, "{package}>{lower}");
+                }
+                (Some(Bound::Unbounded), Some(Bound::Included(upper))) => {
+                    return write!(f, "{package}<={upper}");
+                }
+                (Some(Bound::Unbounded), Some(Bound::Excluded(upper))) => {
+                    return write!(f, "{package}<{upper}");
+                }
+                _ => {
+                    return write!(f, "{package}");
+                }
+            }
+        }
+
         if segments.len() > 1 {
             match self.kind {
                 PackageRangeKind::Dependency => write!(f, "one of:")?,
