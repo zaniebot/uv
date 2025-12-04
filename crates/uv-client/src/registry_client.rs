@@ -1,3 +1,4 @@
+use uv_warnings::owo_colors::OwoColorize;
 use std::collections::BTreeMap;
 use std::fmt::Debug;
 use std::path::PathBuf;
@@ -1209,7 +1210,10 @@ impl RegistryClient {
             std::io::Error::new(
                 std::io::ErrorKind::TimedOut,
                 format!(
-                    "Failed to download distribution due to network timeout ({current_timeout}s).\nTry increasing ``UV_HTTP_TIMEOUT`` to a larger value, e.g., ``UV_HTTP_TIMEOUT={suggested_timeout}``"
+                    "Failed to download distribution due to network timeout ({current_timeout}s).\n\n\
+                     {}{} Try increasing `UV_HTTP_TIMEOUT` to a larger value, e.g., `UV_HTTP_TIMEOUT={suggested_timeout}`",
+                    "hint".bold().cyan(),
+                    ": ".bold(),
                 ),
             )
         } else {

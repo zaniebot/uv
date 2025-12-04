@@ -1,3 +1,4 @@
+use owo_colors::OwoColorize;
 use std::future::Future;
 use std::io;
 use std::path::Path;
@@ -95,7 +96,10 @@ impl<'a, Context: BuildContext> DistributionDatabase<'a, Context> {
             io::Error::new(
                 io::ErrorKind::TimedOut,
                 format!(
-                    "Failed to download distribution due to network timeout ({current_timeout}s).\nTry increasing ``UV_HTTP_TIMEOUT`` to a larger value, e.g., ``UV_HTTP_TIMEOUT={suggested_timeout}``"
+                    "Failed to download distribution due to network timeout ({current_timeout}s).\n\n\
+                     {}{} Try increasing `UV_HTTP_TIMEOUT` to a larger value, e.g., `UV_HTTP_TIMEOUT={suggested_timeout}`",
+                    "hint".bold().cyan(),
+                    ": ".bold(),
                 ),
             )
         } else {
@@ -1347,6 +1351,30 @@ fn add_tar_zst_extension(mut url: DisplaySafeUrl) -> DisplaySafeUrl {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Test that the timeout error message format string compiles correctly.
+    /// This ensures the multiline string concatenation with format arguments works.
+    #[test]
+    fn test_timeout_error_message_format() {
+        use owo_colors::OwoColorize;
+
+        let current_timeout: u64 = 30;
+        let suggested_timeout = current_timeout * 2;
+
+        // This format! call will fail to compile if the string is malformed
+        let message = format!(
+            "Failed to download distribution due to network timeout ({current_timeout}s).\n\n\
+             {}{} Try increasing `UV_HTTP_TIMEOUT` to a larger value, e.g., `UV_HTTP_TIMEOUT={suggested_timeout}`",
+            "hint".bold().cyan(),
+            ": ".bold(),
+        );
+
+        // Basic sanity check - the message should contain key parts
+        // (ANSI codes are embedded but the text is still there)
+        assert!(message.contains("Failed to download distribution due to network timeout (30s)."));
+        assert!(message.contains("hint"));
+        assert!(message.contains("UV_HTTP_TIMEOUT=60"));
+    }
 
     #[test]
     fn test_add_tar_zst_extension() {

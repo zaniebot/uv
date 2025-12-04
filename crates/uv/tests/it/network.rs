@@ -1,8 +1,11 @@
+use std::time::Duration;
 use std::{env, io};
 
 use assert_fs::fixture::{ChildPath, FileWriteStr, PathChild};
 use http::StatusCode;
 use serde_json::json;
+use tokio::io::AsyncWriteExt;
+use tokio::net::TcpListener;
 use uv_static::EnvVars;
 use wiremock::matchers::method;
 use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -420,4 +423,119 @@ async fn rfc9457_problem_details_license_violation() {
       ├─▶ Server message: License Compliance Issue, This package version has a license that violates organizational policy.
       ╰─▶ HTTP status client error (403 Forbidden) for url ([SERVER]/packages/tqdm-4.67.1-py3-none-any.whl)
     ");
+}
+
+/// Check the error message when a request times out during the initial connection phase.
+/// Note: This tests the connection timeout path, not the streaming timeout path which goes
+/// through `handle_response_errors` and shows the UV_HTTP_TIMEOUT hint.
+#[tokio::test]
+async fn direct_url_timeout() {
+    let context = TestContext::new("3.12");
+
+    let server = MockServer::start().await;
+
+    // Create a server that delays longer than our timeout
+    Mock::given(method("GET"))
+        .respond_with(ResponseTemplate::new(StatusCode::OK).set_delay(Duration::from_secs(10)))
+        .mount(&server)
+        .await;
+
+    // Also mock HEAD requests which may be made first
+    Mock::given(method("HEAD"))
+        .respond_with(ResponseTemplate::new(StatusCode::OK).set_delay(Duration::from_secs(10)))
+        .mount(&server)
+        .await;
+
+    let mock_server_uri = server.uri();
+    let tqdm_url = format!(
+        "{mock_server_uri}/packages/d0/30/dc54f88dd4a2b5dc8a0279bdd7270e735851848b762aeb1c1184ed1f6b14/tqdm-4.67.1-py3-none-any.whl"
+    );
+    let filters = vec![(mock_server_uri.as_str(), "[SERVER]")];
+    uv_snapshot!(filters, context
+        .pip_install()
+        .arg(format!("tqdm @ {tqdm_url}"))
+        // Set a very short timeout (1 second) so it times out quickly
+        .env(EnvVars::UV_HTTP_TIMEOUT, "1")
+        // Disable retries to speed up the test
+        .env(EnvVars::UV_HTTP_RETRIES, "0"), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+
+    ----- stderr -----
+      × Failed to download `tqdm @ [SERVER]/packages/d0/30/dc54f88dd4a2b5dc8a0279bdd7270e735851848b762aeb1c1184ed1f6b14/tqdm-4.67.1-py3-none-any.whl`
+      ├─▶ Failed to fetch: `[SERVER]/packages/d0/30/dc54f88dd4a2b5dc8a0279bdd7270e735851848b762aeb1c1184ed1f6b14/tqdm-4.67.1-py3-none-any.whl`
+      ├─▶ error sending request for url ([SERVER]/packages/d0/30/dc54f88dd4a2b5dc8a0279bdd7270e735851848b762aeb1c1184ed1f6b14/tqdm-4.67.1-py3-none-any.whl)
+      ╰─▶ operation timed out
+    ");
+}
+
+/// Check the error message when a download times out during streaming (after headers are received).
+/// This tests the `handle_response_errors` code path which shows the UV_HTTP_TIMEOUT hint.
+#[tokio::test]
+async fn direct_url_streaming_timeout() {
+    let context = TestContext::new("3.12");
+
+    // Create a raw TCP server that sends headers immediately but then stalls on the body
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+
+    // Spawn the server in a background task
+    let server_handle = tokio::spawn(async move {
+        loop {
+            // Accept connection
+            if let Ok((mut stream, _)) = listener.accept().await {
+                // Read the request (we don't care about content, just drain it)
+                let mut buf = [0u8; 4096];
+                let _ = tokio::io::AsyncReadExt::read(&mut stream, &mut buf).await;
+
+                // Send HTTP headers with chunked transfer encoding, then stall
+                // Chunked encoding allows us to start sending and then stall mid-stream
+                let headers = "HTTP/1.1 200 OK\r\n\
+                               Content-Type: application/zip\r\n\
+                               Transfer-Encoding: chunked\r\n\r\n";
+
+                let _ = stream.write_all(headers.as_bytes()).await;
+                let _ = stream.flush().await;
+
+                // Send a small chunk to start the body
+                let chunk = "5\r\nhello\r\n";
+                let _ = stream.write_all(chunk.as_bytes()).await;
+                let _ = stream.flush().await;
+
+                // Now stall - keep the connection open but don't send more data
+                // This should trigger a read timeout during streaming
+                tokio::time::sleep(Duration::from_secs(30)).await;
+            }
+        }
+    });
+
+    // Give the server a moment to start listening
+    tokio::time::sleep(Duration::from_millis(50)).await;
+
+    let mock_server_uri = format!("http://{addr}");
+    let tqdm_url = format!(
+        "{mock_server_uri}/packages/d0/30/dc54f88dd4a2b5dc8a0279bdd7270e735851848b762aeb1c1184ed1f6b14/tqdm-4.67.1-py3-none-any.whl"
+    );
+    let filters = vec![(mock_server_uri.as_str(), "[SERVER]")];
+    uv_snapshot!(filters, context
+        .pip_install()
+        .arg(format!("tqdm @ {tqdm_url}"))
+        // Set a short timeout (2 seconds) so it times out during streaming
+        .env(EnvVars::UV_HTTP_TIMEOUT, "2")
+        // Disable retries to speed up the test
+        .env(EnvVars::UV_HTTP_RETRIES, "0"), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+
+    ----- stderr -----
+      × Failed to download `tqdm @ [SERVER]/packages/d0/30/dc54f88dd4a2b5dc8a0279bdd7270e735851848b762aeb1c1184ed1f6b14/tqdm-4.67.1-py3-none-any.whl`
+      ╰─▶ Failed to download distribution due to network timeout (2s).
+
+          hint: Try increasing `UV_HTTP_TIMEOUT` to a larger value, e.g., `UV_HTTP_TIMEOUT=4`
+    ");
+
+    // Clean up the server task
+    server_handle.abort();
 }
