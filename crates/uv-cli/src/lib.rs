@@ -88,6 +88,21 @@ fn extra_name_with_clap_error(arg: &str) -> Result<ExtraName> {
     })
 }
 
+/// Format an error with its full chain for display in clap error messages.
+///
+/// Since clap's `Error::raw()` only accepts a message string and `set_source()` is private,
+/// we format the entire error chain into the message itself.
+fn format_error_chain<E: std::error::Error>(err: E) -> String {
+    use std::fmt::Write;
+    let mut msg = err.to_string();
+    let mut source = err.source();
+    while let Some(cause) = source {
+        write!(&mut msg, "\n  Caused by: {cause}").unwrap();
+        source = cause.source();
+    }
+    msg
+}
+
 // Configures Clap v3-style help menu colors
 const STYLES: Styles = Styles::styled()
     .header(AnsiColor::Green.on_default().effects(Effects::BOLD))
@@ -1212,7 +1227,7 @@ fn parse_index_url(input: &str) -> Result<Maybe<PipIndex>, String> {
             })
             .map(PipIndex::from)
             .map(Maybe::Some)
-            .map_err(|err| err.to_string())
+            .map_err(format_error_chain)
     }
 }
 
@@ -1229,7 +1244,7 @@ fn parse_extra_index_url(input: &str) -> Result<Maybe<PipExtraIndex>, String> {
             })
             .map(PipExtraIndex::from)
             .map(Maybe::Some)
-            .map_err(|err| err.to_string())
+            .map_err(format_error_chain)
     }
 }
 
@@ -1246,7 +1261,7 @@ fn parse_find_links(input: &str) -> Result<Maybe<PipFindLinks>, String> {
             })
             .map(PipFindLinks::from)
             .map(Maybe::Some)
-            .map_err(|err| err.to_string())
+            .map_err(format_error_chain)
     }
 }
 
@@ -1267,7 +1282,7 @@ fn parse_indices(input: &str) -> Result<Vec<Maybe<Index>>, String> {
                 origin: Some(Origin::Cli),
                 ..index
             })),
-            Err(e) => return Err(e.to_string()),
+            Err(e) => return Err(format_error_chain(e)),
         }
     }
     Ok(indices)
@@ -1284,7 +1299,7 @@ fn parse_default_index(input: &str) -> Result<Maybe<Index>, String> {
                 origin: Some(Origin::Cli),
                 ..index
             })),
-            Err(err) => Err(err.to_string()),
+            Err(err) => Err(format_error_chain(err)),
         }
     }
 }
@@ -1296,7 +1311,7 @@ fn parse_insecure_host(input: &str) -> Result<Maybe<TrustedHost>, String> {
     } else {
         match TrustedHost::from_str(input) {
             Ok(host) => Ok(Maybe::Some(host)),
-            Err(err) => Err(err.to_string()),
+            Err(err) => Err(format_error_chain(err)),
         }
     }
 }
@@ -1307,7 +1322,7 @@ fn parse_file_path(input: &str) -> Result<PathBuf, String> {
     if input.starts_with("file://") {
         let url = match url::Url::from_str(input) {
             Ok(url) => url,
-            Err(err) => return Err(err.to_string()),
+            Err(err) => return Err(format_error_chain(err)),
         };
         url.to_file_path()
             .map_err(|()| "invalid file URL".to_string())
