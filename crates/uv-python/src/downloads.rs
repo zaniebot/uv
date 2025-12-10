@@ -26,7 +26,7 @@ use url::Url;
 use uv_client::{BaseClient, WrappedReqwestError, is_transient_network_error};
 use uv_distribution_filename::{ExtensionError, SourceDistExtension};
 use uv_extract::hash::Hasher;
-use uv_fs::{Simplified, rename_with_retry};
+use uv_fs::{LockedFile, LockedFileMode, Simplified, rename_with_retry};
 use uv_platform::{self as platform, Arch, Libc, Os, Platform};
 use uv_pypi_types::{HashAlgorithm, HashDigest};
 use uv_redacted::{DisplaySafeUrl, DisplaySafeUrlError};
@@ -117,6 +117,8 @@ pub enum Error {
     },
     #[error(transparent)]
     BuildVersion(#[from] BuildVersionError),
+    #[error(transparent)]
+    Lock(#[from] uv_fs::LockedFileError),
 }
 
 impl Error {
@@ -1341,7 +1343,7 @@ impl ManagedPythonDownload {
             .map_err(|err| Error::MissingExtension(url.to_string(), err))?;
 
         // Track the unpacked cache path if caching is enabled
-        let (target_unpacked, temp_dir) = if let Some(python_builds_dir) =
+        let (target_unpacked, temp_dir, _lock) = if let Some(python_builds_dir) =
             env::var_os(EnvVars::UV_PYTHON_CACHE_DIR).filter(|s| !s.is_empty())
         {
             let python_builds_dir = PathBuf::from(python_builds_dir);
@@ -1361,7 +1363,13 @@ impl ManagedPythonDownload {
                 .expect("filename was parsed with this extension");
             let target_unpacked = python_builds_dir.join(format!("{hash_prefix}-{basename}"));
 
+            // Acquire a lock for this specific Python distribution to prevent concurrent
+            // downloads/extractions of the same archive
+            let lock_path = python_builds_dir.join(format!("{hash_prefix}-{basename}.lock"));
+            let lock = LockedFile::acquire(lock_path, LockedFileMode::Exclusive, &basename).await?;
+
             // Check if unpacked cache exists first - if so, hard link from it directly
+            // (Another process may have created it while we were waiting for the lock)
             if target_unpacked.is_dir() {
                 debug!(
                     "Using unpacked cache at `{}`",
@@ -1439,7 +1447,7 @@ impl ManagedPythonDownload {
             )
             .await?;
 
-            (Some(target_unpacked), temp_dir)
+            (Some(target_unpacked), temp_dir, Some(lock))
         } else {
             let temp_dir = tempfile::tempdir_in(scratch_dir).map_err(Error::DownloadDirError)?;
 
@@ -1462,7 +1470,7 @@ impl ManagedPythonDownload {
             )
             .await?;
 
-            (None, temp_dir)
+            (None, temp_dir, None)
         };
 
         // Extract the top-level directory.
