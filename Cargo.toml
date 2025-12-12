@@ -9,7 +9,7 @@ resolver = "2"
 
 [workspace.package]
 edition = "2024"
-rust-version = "1.89"
+rust-version = "1.90"
 homepage = "https://pypi.org/project/uv/"
 repository = "https://github.com/astral-sh/uv"
 authors = ["uv"]
@@ -177,7 +177,7 @@ tar = { version = "0.4.43" }
 target-lexicon = { version = "0.13.0" }
 tempfile = { version = "3.14.0" }
 textwrap = { version = "0.16.1" }
-thiserror = { version = "2.0.0" }
+thiserror = { version = "2.0.17" }
 astral-tl = { version = "0.7.11" }
 tokio = { version = "1.40.0", features = ["fs", "io-util", "macros", "process", "rt", "signal", "sync", "time"] }
 tokio-stream = { version = "0.1.16" }
@@ -339,3 +339,8 @@ codegen-units = 1
 # The profile that 'cargo dist' will build with.
 [profile.dist]
 inherits = "release"
+
+# Patch miette to fix unused_assignments lint warnings in Rust 1.92+
+# See: https://github.com/zkat/miette/pull/459
+[patch.crates-io]
+miette = { git = "https://github.com/gmryuuko/miette", rev = "a523c1888e7b5ff18d6bb2410333edd2d6bde528" }

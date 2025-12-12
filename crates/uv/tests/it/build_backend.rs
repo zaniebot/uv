@@ -5,7 +5,6 @@ use assert_fs::fixture::{FileTouch, FileWriteBin, FileWriteStr, PathChild, PathC
 use flate2::bufread::GzDecoder;
 use fs_err::File;
 use indoc::{formatdoc, indoc};
-use std::env;
 use std::io::BufReader;
 use std::path::Path;
 use std::process::Command;

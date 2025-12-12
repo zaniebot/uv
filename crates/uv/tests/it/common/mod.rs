@@ -1877,10 +1877,12 @@ pub fn run_and_format_with_status<T: AsRef<str>>(
 
     // Support profiling test run commands with traces.
     if let Ok(root) = env::var(EnvVars::TRACING_DURATIONS_TEST_ROOT) {
-        assert!(
-            cfg!(feature = "tracing-durations-export"),
-            "You need to enable the tracing-durations-export feature to use `TRACING_DURATIONS_TEST_ROOT`"
-        );
+        const {
+            assert!(
+                cfg!(feature = "tracing-durations-export"),
+                "You need to enable the tracing-durations-export feature to use `TRACING_DURATIONS_TEST_ROOT`"
+            );
+        }
         command.borrow_mut().env(
             EnvVars::TRACING_DURATIONS_FILE,
             Path::new(&root).join(function_name).with_extension("jsonl"),
