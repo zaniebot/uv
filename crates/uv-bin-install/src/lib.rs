@@ -145,7 +145,7 @@ pub enum Error {
     #[error("Attempt failed after {retries} {subject}", subject = if *retries > 1 { "retries" } else { "retry" })]
     RetriedError {
         #[source]
-        err: Box<Error>,
+        err: Box<Self>,
         retries: u32,
     },
 }

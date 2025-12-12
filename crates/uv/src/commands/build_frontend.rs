@@ -48,8 +48,22 @@ use crate::commands::ExitStatus;
 use crate::commands::pip::operations;
 use crate::commands::project::{ProjectError, find_requires_python};
 use crate::commands::reporters::PythonDownloadReporter;
+
 use crate::printer::Printer;
 use crate::settings::ResolverSettings;
+
+/// A diagnostic error for a build failure.
+#[allow(unused_assignments)]
+#[derive(Debug, miette::Diagnostic, thiserror::Error)]
+#[error("Failed to build `{src}`", src = src.cyan())]
+#[diagnostic()]
+struct BuildDiagnostic {
+    src: String,
+    #[source]
+    err: anyhow::Error,
+    #[help]
+    help: Option<String>,
+}
 
 #[derive(Debug, Error)]
 enum Error {
@@ -385,17 +399,6 @@ async fn build_impl(
                 }
             }
             Err(err) => {
-                #[derive(Debug, miette::Diagnostic, thiserror::Error)]
-                #[error("Failed to build `{source}`", source = source.cyan())]
-                #[diagnostic()]
-                struct Diagnostic {
-                    source: String,
-                    #[source]
-                    cause: anyhow::Error,
-                    #[help]
-                    help: Option<String>,
-                }
-
                 let help = if let Error::Extract(uv_extract::Error::Tar(err)) = &err {
                     // TODO(konsti): astral-tokio-tar should use a proper error instead of
                     // encoding everything in strings
@@ -421,9 +424,9 @@ async fn build_impl(
                     None
                 };
 
-                let report = miette::Report::new(Diagnostic {
-                    source: source.to_string(),
-                    cause: err.into(),
+                let report = miette::Report::new(BuildDiagnostic {
+                    src: source.to_string(),
+                    err: err.into(),
                     help,
                 });
                 anstream::eprint!("{report:?}");
