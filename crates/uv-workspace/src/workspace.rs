@@ -7,6 +7,7 @@ use std::sync::{Arc, Mutex};
 use glob::{GlobError, PatternError, glob};
 use itertools::Itertools;
 use rustc_hash::{FxHashMap, FxHashSet};
+use serde::Deserialize;
 use tracing::{debug, trace, warn};
 
 use uv_configuration::DependencyGroupsWithDefaults;
@@ -41,6 +42,72 @@ struct WorkspaceCacheKey {
 /// workspace members by their workspace root.
 #[derive(Debug, Default, Clone)]
 pub struct WorkspaceCache(Arc<Mutex<FxHashMap<WorkspaceCacheKey, WorkspaceMembers>>>);
+
+/// Configuration from uv-workspace.toml file
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub struct WorkspaceConfig {
+    /// Path to the workspace root, relative to the uv-workspace.toml file
+    pub workspace_root: PathBuf,
+}
+
+impl WorkspaceConfig {
+    /// Load from a specific file path
+    pub fn from_file(path: &Path) -> Result<Self, WorkspaceConfigError> {
+        let content = fs_err::read_to_string(path)
+            .map_err(|err| WorkspaceConfigError::Io(path.to_path_buf(), err))?;
+
+        let config: Self = toml::from_str(&content)
+            .map_err(|err| WorkspaceConfigError::Toml(path.to_path_buf(), err))?;
+
+        Ok(config)
+    }
+
+    /// Resolve the workspace_root path relative to the config file's directory
+    pub fn resolve_root(&self, config_path: &Path) -> Result<PathBuf, WorkspaceConfigError> {
+        let config_dir = config_path.parent().expect("config file has parent");
+        let workspace_root = config_dir.join(&self.workspace_root);
+        let workspace_root = std::path::absolute(&workspace_root)
+            .map_err(|err| WorkspaceConfigError::Io(config_path.to_path_buf(), err))?;
+        let workspace_root = uv_fs::normalize_path(&workspace_root).into_owned();
+
+        // Validate that the directory exists
+        if !workspace_root.is_dir() {
+            return Err(WorkspaceConfigError::InvalidWorkspaceRoot {
+                config: config_path.to_path_buf(),
+                target: workspace_root,
+            });
+        }
+
+        // Validate that it contains a pyproject.toml (basic workspace validation)
+        if !workspace_root.join("pyproject.toml").is_file() {
+            return Err(WorkspaceConfigError::NotAWorkspace {
+                config: config_path.to_path_buf(),
+                target: workspace_root,
+            });
+        }
+
+        Ok(workspace_root)
+    }
+}
+
+/// Error type for workspace config operations
+#[derive(thiserror::Error, Debug)]
+pub enum WorkspaceConfigError {
+    #[error("Failed to read `uv-workspace.toml`: `{0}`")]
+    Io(PathBuf, #[source] std::io::Error),
+
+    #[error("Failed to parse `uv-workspace.toml`: `{0}`")]
+    Toml(PathBuf, #[source] toml::de::Error),
+
+    #[error("`workspace-root` in `{config}` points to non-existent directory: `{target}`")]
+    InvalidWorkspaceRoot { config: PathBuf, target: PathBuf },
+
+    #[error(
+        "`workspace-root` in `{config}` points to `{target}`, which is not a valid workspace (no pyproject.toml found)"
+    )]
+    NotAWorkspace { config: PathBuf, target: PathBuf },
+}
 
 #[derive(thiserror::Error, Debug)]
 pub enum WorkspaceError {
@@ -81,6 +148,34 @@ pub enum WorkspaceError {
     Toml(PathBuf, #[source] Box<PyprojectTomlError>),
     #[error("Failed to normalize workspace member path")]
     Normalize(#[source] std::io::Error),
+    #[error(transparent)]
+    WorkspaceConfig(#[from] WorkspaceConfigError),
+}
+
+/// Find a uv-workspace.toml file by walking up from the given path
+pub fn find_workspace_config(
+    start_path: &Path,
+    stop_at: Option<&Path>,
+) -> Result<Option<(PathBuf, WorkspaceConfig)>, WorkspaceConfigError> {
+    for ancestor in start_path.ancestors() {
+        // Check stop condition
+        if let Some(stop) = stop_at {
+            if ancestor == stop {
+                break;
+            }
+        }
+
+        let config_path = ancestor.join("uv-workspace.toml");
+        if config_path.is_file() {
+            debug!(
+                "Found workspace config at: `{}`",
+                config_path.simplified_display()
+            );
+            let config = WorkspaceConfig::from_file(&config_path)?;
+            return Ok(Some((config_path, config)));
+        }
+    }
+    Ok(None)
 }
 
 #[derive(Debug, Default, Clone, Hash, PartialEq, Eq)]
@@ -205,6 +300,22 @@ impl Workspace {
         let path = uv_fs::normalize_path(&path);
         // Trim trailing slashes.
         let path = path.components().collect::<PathBuf>();
+
+        // Check for workspace config redirection
+        let path = if let Some((config_path, config)) =
+            find_workspace_config(&path, options.stop_discovery_at.as_deref())?
+        {
+            let resolved = config.resolve_root(&config_path)?;
+            debug!(
+                "Workspace redirected from `{}` to `{}` via `{}`",
+                path.simplified_display(),
+                resolved.simplified_display(),
+                config_path.simplified_display()
+            );
+            resolved
+        } else {
+            path
+        };
 
         let project_path = path
             .ancestors()

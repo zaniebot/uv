@@ -2091,3 +2091,229 @@ fn workspace_members_with_complex_relative_paths() -> Result<()> {
 
     Ok(())
 }
+
+/// Test that uv-workspace.toml can redirect to a different workspace root
+#[test]
+fn workspace_config_redirect() -> Result<()> {
+    let context = TestContext::new("3.12");
+
+    // Create the actual workspace in a subdirectory
+    let backend = context.temp_dir.child("backend");
+    backend.child("pyproject.toml").write_str(indoc! {r#"
+        [project]
+        name = "backend"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        dependencies = []
+    "#})?;
+
+    // Create a frontend directory with uv-workspace.toml pointing to backend
+    let frontend = context.temp_dir.child("frontend");
+    fs_err::create_dir_all(&frontend)?;
+    frontend.child("uv-workspace.toml").write_str(indoc! {r#"
+        workspace-root = "../backend"
+    "#})?;
+
+    // Run a command from the frontend directory - it should discover the backend workspace
+    uv_snapshot!(context.filters(), context.lock().current_dir(&frontend), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Using CPython 3.12.[X] interpreter at: [PYTHON-3.12]
+    Resolved 1 package in [TIME]
+    "###);
+
+    // The lock file should be created in the backend workspace
+    context.assert_file(backend.join("uv.lock"));
+
+    Ok(())
+}
+
+/// Test that uv-workspace.toml is discovered in parent directories
+#[test]
+fn workspace_config_parent_directory() -> Result<()> {
+    let context = TestContext::new("3.12");
+
+    // Create the actual workspace
+    let workspace = context.temp_dir.child("workspace");
+    workspace.child("pyproject.toml").write_str(indoc! {r#"
+        [project]
+        name = "workspace"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        dependencies = []
+    "#})?;
+
+    // Create a nested directory with uv-workspace.toml in parent
+    let nested = context.temp_dir.child("nested").child("dir");
+    fs_err::create_dir_all(&nested)?;
+    context
+        .temp_dir
+        .child("uv-workspace.toml")
+        .write_str(indoc! {r#"
+        workspace-root = "workspace"
+    "#})?;
+
+    // Run from the nested directory - should find the config in parent and redirect
+    uv_snapshot!(context.filters(), context.lock().current_dir(&nested), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Using CPython 3.12.[X] interpreter at: [PYTHON-3.12]
+    Resolved 1 package in [TIME]
+    "###);
+
+    context.assert_file(workspace.join("uv.lock"));
+
+    Ok(())
+}
+
+/// Test that uv-workspace.toml errors on non-existent directory
+#[test]
+fn workspace_config_invalid_path() -> Result<()> {
+    let context = TestContext::new("3.12");
+
+    let project = context.temp_dir.child("project");
+    fs_err::create_dir_all(&project)?;
+    project.child("uv-workspace.toml").write_str(indoc! {r#"
+        workspace-root = "nonexistent"
+    "#})?;
+
+    uv_snapshot!(context.filters(), context.lock().current_dir(&project), @r###"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    error: `workspace-root` in `[TEMP_DIR]/project/uv-workspace.toml` points to non-existent directory: `[TEMP_DIR]/project/nonexistent`
+    "###);
+
+    Ok(())
+}
+
+/// Test that uv-workspace.toml errors when target is not a valid workspace
+#[test]
+fn workspace_config_not_a_workspace() -> Result<()> {
+    let context = TestContext::new("3.12");
+
+    // Create a directory without pyproject.toml
+    let empty = context.temp_dir.child("empty");
+    fs_err::create_dir_all(&empty)?;
+
+    let project = context.temp_dir.child("project");
+    fs_err::create_dir_all(&project)?;
+    project.child("uv-workspace.toml").write_str(indoc! {r#"
+        workspace-root = "../empty"
+    "#})?;
+
+    uv_snapshot!(context.filters(), context.lock().current_dir(&project), @r###"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    error: `workspace-root` in `[TEMP_DIR]/project/uv-workspace.toml` points to `[TEMP_DIR]/empty`, which is not a valid workspace (no pyproject.toml found)
+    "###);
+
+    Ok(())
+}
+
+/// Test that absolute paths work in uv-workspace.toml
+#[test]
+fn workspace_config_absolute_path() -> Result<()> {
+    let context = TestContext::new("3.12");
+
+    // Create the actual workspace
+    let workspace = context.temp_dir.child("workspace");
+    workspace.child("pyproject.toml").write_str(indoc! {r#"
+        [project]
+        name = "workspace"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        dependencies = []
+    "#})?;
+
+    // Create a directory with absolute path in config
+    let project = context.temp_dir.child("project");
+    fs_err::create_dir_all(&project)?;
+    let workspace_path = workspace.to_path_buf();
+    project.child("uv-workspace.toml").write_str(&format!(
+        "workspace-root = \"{}\"\n",
+        workspace_path.display()
+    ))?;
+
+    uv_snapshot!(context.filters(), context.lock().current_dir(&project), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Using CPython 3.12.[X] interpreter at: [PYTHON-3.12]
+    Resolved 1 package in [TIME]
+    "###);
+
+    context.assert_file(workspace.join("uv.lock"));
+
+    Ok(())
+}
+
+/// Test that only the first (deepest) uv-workspace.toml is used
+#[test]
+fn workspace_config_first_found() -> Result<()> {
+    let context = TestContext::new("3.12");
+
+    // Create two workspaces
+    let workspace1 = context.temp_dir.child("workspace1");
+    workspace1.child("pyproject.toml").write_str(indoc! {r#"
+        [project]
+        name = "workspace1"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        dependencies = []
+    "#})?;
+
+    let workspace2 = context.temp_dir.child("workspace2");
+    workspace2.child("pyproject.toml").write_str(indoc! {r#"
+        [project]
+        name = "workspace2"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        dependencies = []
+    "#})?;
+
+    // Create nested directories with configs at different levels
+    let nested = context.temp_dir.child("nested").child("project");
+    fs_err::create_dir_all(&nested)?;
+
+    // Parent config points to workspace2
+    context
+        .temp_dir
+        .child("uv-workspace.toml")
+        .write_str(indoc! {r#"
+        workspace-root = "workspace2"
+    "#})?;
+
+    // Nested config points to workspace1 (should take precedence)
+    nested.child("uv-workspace.toml").write_str(indoc! {r#"
+        workspace-root = "../../workspace1"
+    "#})?;
+
+    uv_snapshot!(context.filters(), context.lock().current_dir(&nested), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Using CPython 3.12.[X] interpreter at: [PYTHON-3.12]
+    Resolved 1 package in [TIME]
+    "###);
+
+    // Should use workspace1 (from the deepest config)
+    context.assert_file(workspace1.join("uv.lock"));
+
+    Ok(())
+}
