@@ -6700,7 +6700,7 @@ pub struct BuildOptionsArgs {
         long,
         help_heading = "Build options",
         env = EnvVars::UV_NO_BUILD_PACKAGE,
-        value_delimiter = ' ',
+        value_delimiter = ',',
         value_hint = ValueHint::Other,
     )]
     pub no_build_package: Vec<PackageName>,
@@ -6731,7 +6731,7 @@ pub struct BuildOptionsArgs {
         long,
         help_heading = "Build options",
         env = EnvVars::UV_NO_BINARY_PACKAGE,
-        value_delimiter = ' ',
+        value_delimiter = ',',
         value_hint = ValueHint::Other,
     )]
     pub no_binary_package: Vec<PackageName>,

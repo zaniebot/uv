@@ -7690,6 +7690,76 @@ fn no_build_error() -> Result<()> {
     Ok(())
 }
 
+/// Test comma-separated `--no-build-package` syntax.
+#[test]
+fn no_build_package_comma_separated() -> Result<()> {
+    let context = TestContext::new("3.12");
+
+    let pyproject_toml = context.temp_dir.child("pyproject.toml");
+    pyproject_toml.write_str(
+        r#"
+        [project]
+        name = "project"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        dependencies = ["iniconfig", "typing-extensions"]
+        "#,
+    )?;
+
+    context.lock().assert().success();
+
+    // Use comma-separated package names
+    uv_snapshot!(context.filters(), context.sync().arg("--no-build-package=iniconfig,typing-extensions"), @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Resolved 3 packages in [TIME]
+    Prepared 2 packages in [TIME]
+    Installed 2 packages in [TIME]
+     + iniconfig==2.0.0
+     + typing-extensions==4.10.0
+    ");
+
+    Ok(())
+}
+
+/// Test comma-separated `--no-binary-package` syntax.
+#[test]
+fn no_binary_package_comma_separated() -> Result<()> {
+    let context = TestContext::new("3.12");
+
+    let pyproject_toml = context.temp_dir.child("pyproject.toml");
+    pyproject_toml.write_str(
+        r#"
+        [project]
+        name = "project"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        dependencies = ["iniconfig", "typing-extensions"]
+        "#,
+    )?;
+
+    context.lock().assert().success();
+
+    // Use comma-separated package names
+    uv_snapshot!(context.filters(), context.sync().arg("--no-binary-package=iniconfig,typing-extensions"), @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Resolved 3 packages in [TIME]
+    Prepared 2 packages in [TIME]
+    Installed 2 packages in [TIME]
+     + iniconfig==2.0.0
+     + typing-extensions==4.10.0
+    ");
+
+    Ok(())
+}
+
 #[test]
 fn sync_wheel_url_source_error() -> Result<()> {
     let context = TestContext::new("3.12");
