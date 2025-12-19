@@ -13,15 +13,15 @@ use tracing::debug;
 use uv_cache::Cache;
 use uv_client::{BaseClientBuilder, RegistryClient};
 use uv_configuration::{
-    BuildOptions, Concurrency, Constraints, DependencyGroups, DryRun, Excludes,
+    BuildOptions, Concurrency, Constraints, DependencyGroups, DryRun, EditableMode, Excludes,
     ExtrasSpecification, Overrides, Reinstall, Upgrade,
 };
 use uv_dispatch::BuildDispatch;
 use uv_distribution::{DistributionDatabase, SourcedDependencyGroups};
 use uv_distribution_types::{
-    CachedDist, Diagnostic, Dist, InstalledDist, InstalledVersion, LocalDist,
-    NameRequirementSpecification, Requirement, ResolutionDiagnostic, UnresolvedRequirement,
-    UnresolvedRequirementSpecification, VersionOrUrlRef,
+    CachedDist, Diagnostic, DirectorySourceDist, Dist, InstalledDist, InstalledVersion, LocalDist,
+    NameRequirementSpecification, Requirement, ResolutionDiagnostic, ResolvedDist, SourceDist,
+    UnresolvedRequirement, UnresolvedRequirementSpecification, VersionOrUrlRef,
 };
 use uv_distribution_types::{DistributionMetadata, InstalledMetadata, Name, Resolution};
 use uv_fs::Simplified;
@@ -1053,6 +1053,42 @@ pub(crate) fn diagnose_environment(
         }
     }
     Ok(())
+}
+
+/// If necessary, convert any editable requirements to non-editable.
+pub(crate) fn apply_editable_mode(resolution: Resolution, editable: EditableMode) -> Resolution {
+    match editable {
+        // No modifications are necessary for editable mode; retain any editable distributions.
+        EditableMode::Editable => resolution,
+
+        // Filter out any editable distributions.
+        EditableMode::NonEditable => resolution.map(|dist| {
+            let ResolvedDist::Installable { dist, version } = dist else {
+                return None;
+            };
+            let Dist::Source(SourceDist::Directory(DirectorySourceDist {
+                name,
+                install_path,
+                editable: None | Some(true),
+                r#virtual,
+                url,
+            })) = dist.as_ref()
+            else {
+                return None;
+            };
+
+            Some(ResolvedDist::Installable {
+                dist: Arc::new(Dist::Source(SourceDist::Directory(DirectorySourceDist {
+                    name: name.clone(),
+                    install_path: install_path.clone(),
+                    editable: Some(false),
+                    r#virtual: *r#virtual,
+                    url: url.clone(),
+                }))),
+                version: version.clone(),
+            })
+        }),
+    }
 }
 
 #[derive(thiserror::Error, Debug)]

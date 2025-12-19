@@ -737,6 +737,7 @@ async fn run(mut cli: Cli) -> Result<ExitStatus> {
                 globals.concurrency,
                 cache,
                 args.dry_run,
+                args.editable,
                 printer,
                 globals.preview,
             )
@@ -890,6 +891,7 @@ async fn run(mut cli: Cli) -> Result<ExitStatus> {
                 globals.concurrency,
                 cache,
                 args.dry_run,
+                args.editable,
                 printer,
                 globals.preview,
             ))

@@ -8,8 +8,8 @@ use tracing::{debug, warn};
 use uv_cache::Cache;
 use uv_client::{BaseClientBuilder, FlatIndexClient, RegistryClientBuilder};
 use uv_configuration::{
-    BuildIsolation, BuildOptions, Concurrency, Constraints, DryRun, ExtrasSpecification,
-    HashCheckingMode, IndexStrategy, Reinstall, SourceStrategy, Upgrade,
+    BuildIsolation, BuildOptions, Concurrency, Constraints, DryRun, EditableMode,
+    ExtrasSpecification, HashCheckingMode, IndexStrategy, Reinstall, SourceStrategy, Upgrade,
 };
 use uv_configuration::{KeyringProviderType, TargetTriple};
 use uv_dispatch::{BuildDispatch, SharedState};
@@ -90,6 +90,7 @@ pub(crate) async fn pip_sync(
     concurrency: Concurrency,
     cache: Cache,
     dry_run: DryRun,
+    editable: EditableMode,
     printer: Printer,
     preview: Preview,
 ) -> Result<ExitStatus> {
@@ -514,6 +515,9 @@ pub(crate) async fn pip_sync(
 
         (resolution, hasher)
     };
+
+    // Apply the editable mode to the resolution.
+    let resolution = operations::apply_editable_mode(resolution, editable);
 
     // Constrain any build requirements marked as `match-runtime = true`.
     let extra_build_requires = extra_build_requires.match_runtime(&resolution)?;

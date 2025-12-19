@@ -2447,6 +2447,7 @@ pub(crate) struct PipSyncSettings {
     pub(crate) constraints: Vec<PathBuf>,
     pub(crate) build_constraints: Vec<PathBuf>,
     pub(crate) dry_run: DryRun,
+    pub(crate) editable: EditableMode,
     pub(crate) refresh: Refresh,
     pub(crate) settings: PipSettings,
 }
@@ -2491,6 +2492,7 @@ impl PipSyncSettings {
             no_strict,
             dry_run,
             torch_backend,
+            no_editable,
             compat_args: _,
         } = *args;
 
@@ -2505,6 +2507,11 @@ impl PipSyncSettings {
                 .filter_map(Maybe::into_option)
                 .collect(),
             dry_run: DryRun::from_args(dry_run),
+            editable: if no_editable {
+                EditableMode::NonEditable
+            } else {
+                EditableMode::Editable
+            },
             refresh: Refresh::from(refresh),
             settings: PipSettings::combine(
                 PipOptions {
@@ -2554,6 +2561,7 @@ pub(crate) struct PipInstallSettings {
     pub(crate) excludes: Vec<PathBuf>,
     pub(crate) build_constraints: Vec<PathBuf>,
     pub(crate) dry_run: DryRun,
+    pub(crate) editable: EditableMode,
     pub(crate) constraints_from_workspace: Vec<Requirement>,
     pub(crate) overrides_from_workspace: Vec<Requirement>,
     pub(crate) excludes_from_workspace: Vec<uv_normalize::PackageName>,
@@ -2609,6 +2617,7 @@ impl PipInstallSettings {
             no_strict,
             dry_run,
             torch_backend,
+            no_editable,
             compat_args: _,
         } = args;
 
@@ -2684,6 +2693,11 @@ impl PipInstallSettings {
                 .filter_map(Maybe::into_option)
                 .collect(),
             dry_run: DryRun::from_args(dry_run),
+            editable: if no_editable {
+                EditableMode::NonEditable
+            } else {
+                EditableMode::Editable
+            },
             constraints_from_workspace,
             overrides_from_workspace,
             excludes_from_workspace,

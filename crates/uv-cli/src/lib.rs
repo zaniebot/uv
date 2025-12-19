@@ -2049,6 +2049,10 @@ pub struct PipSyncArgs {
     #[arg(long, value_enum, env = EnvVars::UV_TORCH_BACKEND)]
     pub torch_backend: Option<TorchMode>,
 
+    /// Install any editable dependencies as non-editable.
+    #[arg(long, value_parser = clap::builder::BoolishValueParser::new(), env = EnvVars::UV_NO_EDITABLE)]
+    pub no_editable: bool,
+
     #[command(flatten)]
     pub compat_args: compat::PipSyncCompatArgs,
 }
@@ -2430,6 +2434,14 @@ pub struct PipInstallArgs {
     /// This option is in preview and may change in any future release.
     #[arg(long, value_enum, env = EnvVars::UV_TORCH_BACKEND)]
     pub torch_backend: Option<TorchMode>,
+
+    /// Install any editable dependencies, including those specified in a `requirements.txt`
+    /// file, as non-editable.
+    ///
+    /// This option conflicts with `-e` / `--editable` since those explicitly request editable
+    /// installations on the command line.
+    #[arg(long, conflicts_with = "editable", value_parser = clap::builder::BoolishValueParser::new(), env = EnvVars::UV_NO_EDITABLE)]
+    pub no_editable: bool,
 
     #[command(flatten)]
     pub compat_args: compat::PipInstallCompatArgs,

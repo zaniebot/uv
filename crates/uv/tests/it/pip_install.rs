@@ -13520,3 +13520,155 @@ fn build_backend_wrong_wheel_platform() -> Result<()> {
 
     Ok(())
 }
+
+/// Test that `-e` and `--no-editable` conflict on the command line.
+#[test]
+fn install_no_editable_conflict() {
+    let context = TestContext::new("3.12");
+
+    uv_snapshot!(context.filters(), context.pip_install().arg("-e").arg(".").arg("--no-editable"), @r###"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    error: the argument '--editable <EDITABLE>' cannot be used with '--no-editable'
+
+    Usage: uv pip install --editable <EDITABLE> <PACKAGE|--requirements <REQUIREMENTS>|--group <GROUP>>
+
+    For more information, try '--help'.
+    "###);
+}
+
+/// Test installing an editable package as non-editable using `--no-editable` via requirements file.
+#[test]
+fn install_no_editable() -> Result<()> {
+    let context = TestContext::new("3.12");
+
+    // Create a simple package.
+    let pyproject_toml = context.temp_dir.child("pyproject.toml");
+    pyproject_toml.write_str(
+        r#"
+        [project]
+        name = "test-package"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+
+        [build-system]
+        requires = ["setuptools>=42"]
+        build-backend = "setuptools.build_meta"
+        "#,
+    )?;
+
+    let src = context.temp_dir.child("src").child("test_package");
+    src.create_dir_all()?;
+    let init = src.child("__init__.py");
+    init.touch()?;
+
+    // Create a requirements file with an editable install.
+    let requirements_txt = context.temp_dir.child("requirements.txt");
+    requirements_txt.write_str(&format!("-e {}", context.temp_dir.path().display()))?;
+
+    // Install as editable (default).
+    uv_snapshot!(context.filters(), context.pip_install().arg("-r").arg("requirements.txt"), @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Resolved 1 package in [TIME]
+    Prepared 1 package in [TIME]
+    Installed 1 package in [TIME]
+     + test-package==0.1.0 (from file://[TEMP_DIR]/)
+    ");
+
+    // Reinstall as non-editable using `--no-editable`.
+    uv_snapshot!(context.filters(), context.pip_install().arg("-r").arg("requirements.txt").arg("--no-editable").arg("--reinstall"), @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Resolved 1 package in [TIME]
+    Prepared 1 package in [TIME]
+    Uninstalled 1 package in [TIME]
+    Installed 1 package in [TIME]
+     - test-package==0.1.0 (from file://[TEMP_DIR]/)
+     + test-package==0.1.0 (from file://[TEMP_DIR]/)
+    ");
+
+    // Remove the source directory.
+    fs::remove_dir_all(context.temp_dir.child("src"))?;
+
+    // Since it was installed as non-editable, we should still be able to import it.
+    uv_snapshot!(context.filters(), Command::new(venv_bin_path(&context.venv, "python"))
+        .arg("-c")
+        .arg("import test_package"), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    "###);
+
+    Ok(())
+}
+
+/// Test that the `UV_NO_EDITABLE` environment variable works with `pip install`.
+#[test]
+fn install_no_editable_env_var() -> Result<()> {
+    let context = TestContext::new("3.12");
+
+    // Create a simple package.
+    let pyproject_toml = context.temp_dir.child("pyproject.toml");
+    pyproject_toml.write_str(
+        r#"
+        [project]
+        name = "test-package"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+
+        [build-system]
+        requires = ["setuptools>=42"]
+        build-backend = "setuptools.build_meta"
+        "#,
+    )?;
+
+    let src = context.temp_dir.child("src").child("test_package");
+    src.create_dir_all()?;
+    let init = src.child("__init__.py");
+    init.touch()?;
+
+    // Create a requirements file with an editable install.
+    let requirements_txt = context.temp_dir.child("requirements.txt");
+    requirements_txt.write_str(&format!("-e {}", context.temp_dir.path().display()))?;
+
+    // Install as non-editable using the environment variable.
+    uv_snapshot!(context.filters(), context.pip_install().arg("-r").arg("requirements.txt").env(EnvVars::UV_NO_EDITABLE, "1"), @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Resolved 1 package in [TIME]
+    Prepared 1 package in [TIME]
+    Installed 1 package in [TIME]
+     + test-package==0.1.0 (from file://[TEMP_DIR]/)
+    ");
+
+    // Remove the source directory.
+    fs::remove_dir_all(context.temp_dir.child("src"))?;
+
+    // Since it was installed as non-editable, we should still be able to import it.
+    uv_snapshot!(context.filters(), Command::new(venv_bin_path(&context.venv, "python"))
+        .arg("-c")
+        .arg("import test_package"), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    "###);
+
+    Ok(())
+}
