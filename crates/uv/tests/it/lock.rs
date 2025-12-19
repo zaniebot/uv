@@ -32837,3 +32837,93 @@ fn lock_upgrade_group_transitive() -> Result<()> {
 
     Ok(())
 }
+
+/// Verify that `--upgrade-package` and `--upgrade-group` can be combined.
+///
+/// When both flags are specified, packages from both should be upgraded:
+/// - Packages explicitly listed via `--upgrade-package`
+/// - Direct dependencies of groups listed via `--upgrade-group`
+#[test]
+fn lock_upgrade_package_and_group() -> Result<()> {
+    let context = TestContext::new("3.12");
+
+    // Create a pyproject.toml with:
+    // - A constrained regular dependency (`anyio<=2`)
+    // - A constrained regular dependency (`typing-extensions<=4.0.0`)
+    // - A dependency group with a constrained package (`idna<=3`)
+    //
+    // When we use `--upgrade-package anyio --upgrade-group lint`:
+    // - `anyio` should be upgraded (explicitly specified via --upgrade-package)
+    // - `idna` should be upgraded (direct dependency of lint group)
+    // - `typing-extensions` should NOT be upgraded (not in upgrade flags)
+    let pyproject_toml = context.temp_dir.child("pyproject.toml");
+    pyproject_toml.write_str(
+        r#"
+        [project]
+        name = "project"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        dependencies = ["anyio<=2", "typing-extensions<=4.0.0"]
+
+        [dependency-groups]
+        lint = ["idna<=3"]
+        "#,
+    )?;
+
+    // Lock the root package.
+    uv_snapshot!(context.filters(), context.lock(), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Resolved 5 packages in [TIME]
+    "###);
+
+    // Verify initial lock versions
+    let lock = context.read("uv.lock");
+    assert!(lock.contains("name = \"anyio\"\nversion = \"2.0.0\""));
+    assert!(lock.contains("name = \"idna\"\nversion = \"3.0\""));
+    assert!(lock.contains("name = \"typing-extensions\"\nversion = \"4.0.0\""));
+
+    // Remove the constraints
+    let pyproject_toml = context.temp_dir.child("pyproject.toml");
+    pyproject_toml.write_str(
+        r#"
+        [project]
+        name = "project"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        dependencies = ["anyio", "typing-extensions"]
+
+        [dependency-groups]
+        lint = ["idna"]
+        "#,
+    )?;
+
+    // Upgrade both a specific package and the lint group
+    uv_snapshot!(context.filters(), context.lock()
+        .arg("--upgrade-package").arg("anyio")
+        .arg("--upgrade-group").arg("lint"), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Resolved 5 packages in [TIME]
+    Updated anyio v2.0.0 -> v4.3.0
+    Updated idna v3.0 -> v3.6
+    "###);
+
+    let lock = context.read("uv.lock");
+
+    // Verify:
+    // - `anyio` was upgraded (explicitly via --upgrade-package)
+    // - `idna` was upgraded (direct dep of lint group)
+    // - `typing-extensions` still at v4.0.0 (not in upgrade flags)
+    assert!(lock.contains("name = \"anyio\"\nversion = \"4.3.0\""));
+    assert!(lock.contains("name = \"idna\"\nversion = \"3.6\""));
+    assert!(lock.contains("name = \"typing-extensions\"\nversion = \"4.0.0\""));
+
+    Ok(())
+}

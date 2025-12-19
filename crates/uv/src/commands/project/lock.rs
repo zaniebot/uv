@@ -1074,7 +1074,7 @@ impl ValidatedLock {
                 debug!("Ignoring existing lockfile due to `--upgrade`");
                 return Ok(Self::Unusable(lock));
             }
-            Upgrade::Packages(_) | Upgrade::Groups(_) => {
+            Upgrade::Packages(_) | Upgrade::Groups(_) | Upgrade::PackagesAndGroups { .. } => {
                 // This is handled below, after some checks regarding fork
                 // markers. In particular, we'd like to return `Preferable`
                 // here, but we shouldn't if the fork markers cannot be
@@ -1187,10 +1187,13 @@ impl ValidatedLock {
             return Ok(Self::Preferable(lock));
         }
 
-        // If the user specified `--upgrade-package`, then at best we can prefer some of
-        // the existing versions.
-        if let Upgrade::Packages(_) = upgrade {
-            debug!("Resolving despite existing lockfile due to `--upgrade-package`");
+        // If the user specified `--upgrade-package` or `--upgrade-group`, then at best we can
+        // prefer some of the existing versions.
+        if matches!(
+            upgrade,
+            Upgrade::Packages(_) | Upgrade::Groups(_) | Upgrade::PackagesAndGroups { .. }
+        ) {
+            debug!("Resolving despite existing lockfile due to `--upgrade-package` or `--upgrade-group`");
             return Ok(Self::Preferable(lock));
         }
 

@@ -21,7 +21,10 @@ use uv_cli::{
 use uv_cli::{
     AuthorFrom, BuildArgs, ExportArgs, FormatArgs, PublishArgs, PythonDirArgs,
     ResolverInstallerArgs, ToolUpgradeArgs,
-    options::{flag, resolver_installer_options, resolver_options},
+    options::{
+        flag, resolver_installer_options, resolver_installer_options_with_upgrade_group,
+        resolver_options, resolver_options_with_upgrade_group,
+    },
 };
 use uv_client::Connectivity;
 use uv_configuration::{
@@ -866,7 +869,6 @@ impl ToolUpgradeSettings {
             upgrade: upgrade_package.is_empty(),
             no_upgrade: false,
             upgrade_package,
-            upgrade_group: vec![],
             reinstall,
             no_reinstall,
             reinstall_package,
@@ -1435,6 +1437,7 @@ impl SyncSettings {
             active,
             no_active,
             dry_run,
+            upgrade_group,
             installer,
             build,
             refresh,
@@ -1453,7 +1456,7 @@ impl SyncSettings {
             .unwrap_or_default();
 
         let settings = ResolverInstallerSettings::combine(
-            resolver_installer_options(installer, build),
+            resolver_installer_options_with_upgrade_group(installer, build, upgrade_group),
             filesystem,
         );
 
@@ -1552,6 +1555,7 @@ impl LockSettings {
             check_exists,
             dry_run,
             script,
+            upgrade_group,
             resolver,
             build,
             refresh,
@@ -1578,7 +1582,10 @@ impl LockSettings {
             script,
             python: python.and_then(Maybe::into_option),
             refresh: Refresh::from(refresh),
-            settings: ResolverSettings::combine(resolver_options(resolver, build), filesystem),
+            settings: ResolverSettings::combine(
+                resolver_options_with_upgrade_group(resolver, build, upgrade_group),
+                filesystem,
+            ),
             install_mirrors: environment
                 .install_mirrors
                 .combine(filesystem_install_mirrors),
@@ -1655,6 +1662,7 @@ impl AddSettings {
             frozen,
             active,
             no_active,
+            upgrade_group,
             installer,
             build,
             refresh,
@@ -1791,7 +1799,7 @@ impl AddSettings {
             refresh: Refresh::from(refresh),
             indexes,
             settings: ResolverInstallerSettings::combine(
-                resolver_installer_options(installer, build),
+                resolver_installer_options_with_upgrade_group(installer, build, upgrade_group),
                 filesystem,
             ),
             install_mirrors: environment
@@ -1837,6 +1845,7 @@ impl RemoveSettings {
             frozen,
             active,
             no_active,
+            upgrade_group,
             installer,
             build,
             refresh,
@@ -1881,7 +1890,7 @@ impl RemoveSettings {
             python: python.and_then(Maybe::into_option),
             refresh: Refresh::from(refresh),
             settings: ResolverInstallerSettings::combine(
-                resolver_installer_options(installer, build),
+                resolver_installer_options_with_upgrade_group(installer, build, upgrade_group),
                 filesystem,
             ),
             install_mirrors: environment

@@ -61,6 +61,12 @@ pub async fn read_requirements_txt(
         // For groups, we can't determine group membership in requirements.txt context,
         // so we respect all pinned versions (groups are only meaningful for uv.lock).
         Upgrade::Groups(_) => preferences,
+        // For packages and groups, filter the explicitly specified packages.
+        // Groups can't be resolved in requirements.txt context.
+        Upgrade::PackagesAndGroups { packages, .. } => preferences
+            .into_iter()
+            .filter(|preference| !packages.contains_key(preference.name()))
+            .collect(),
     })
 }
 

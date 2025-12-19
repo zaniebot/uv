@@ -147,6 +147,12 @@ pub enum Upgrade {
 
     /// Allow package upgrades for all direct dependencies of the specified groups.
     Groups(FxHashSet<GroupName>),
+
+    /// Allow package upgrades for both specified packages and direct dependencies of specified groups.
+    PackagesAndGroups {
+        packages: FxHashMap<PackageName, Vec<Requirement>>,
+        groups: FxHashSet<GroupName>,
+    },
 }
 
 impl Upgrade {
@@ -178,10 +184,18 @@ impl Upgrade {
             )),
             None => {
                 // Both upgrade_package and upgrade_group are specified.
-                // Convert groups to packages (will need to be resolved later with lock file context).
-                // For now, just use upgrade_package and store groups separately.
-                // We'll handle this by combining them in the Groups variant.
-                Some(Self::Groups(upgrade_group.into_iter().collect()))
+                Some(Self::PackagesAndGroups {
+                    packages: upgrade_package.into_iter().fold(
+                        FxHashMap::default(),
+                        |mut map, requirement| {
+                            map.entry(requirement.name.clone())
+                                .or_default()
+                                .push(requirement);
+                            map
+                        },
+                    ),
+                    groups: upgrade_group.into_iter().collect(),
+                })
             }
         }
     }
@@ -205,24 +219,26 @@ impl Upgrade {
         matches!(self, Self::All)
     }
 
-    /// Returns `true` if the specified package should be upgraded.
+    /// Returns `true` if the specified package should be upgraded based on explicit package selection.
     ///
-    /// Note: For the `Groups` variant, this returns `false` because we can't determine
-    /// group membership without the lock file context. Use `groups()` to get the group
-    /// names and check against the lock file's dependency groups.
+    /// Note: This only checks packages explicitly specified via `--upgrade-package`. For group-based
+    /// upgrades (`--upgrade-group`), use `groups()` to get the group names and check against the
+    /// lock file's dependency groups. The `PackagesAndGroups` variant returns `true` only for
+    /// explicitly specified packages; group membership must be checked separately.
     pub fn contains(&self, package_name: &PackageName) -> bool {
         match self {
             Self::None => false,
             Self::All => true,
             Self::Packages(packages) => packages.contains_key(package_name),
             Self::Groups(_) => false,
+            Self::PackagesAndGroups { packages, .. } => packages.contains_key(package_name),
         }
     }
 
     /// Returns the groups to upgrade, if any.
     pub fn groups(&self) -> Option<&FxHashSet<GroupName>> {
         match self {
-            Self::Groups(groups) => Some(groups),
+            Self::Groups(groups) | Self::PackagesAndGroups { groups, .. } => Some(groups),
             _ => None,
         }
     }
@@ -231,14 +247,13 @@ impl Upgrade {
     ///
     /// When upgrading, users can provide bounds on the upgrade (e.g., `--upgrade-package flask<3`).
     pub fn constraints(&self) -> impl Iterator<Item = &Requirement> {
-        if let Self::Packages(packages) = self {
-            Either::Right(
+        match self {
+            Self::Packages(packages) | Self::PackagesAndGroups { packages, .. } => Either::Right(
                 packages
                     .values()
                     .flat_map(|requirements| requirements.iter()),
-            )
-        } else {
-            Either::Left(std::iter::empty())
+            ),
+            _ => Either::Left(std::iter::empty()),
         }
     }
 
@@ -249,11 +264,8 @@ impl Upgrade {
             // Setting `--upgrade` or `--no-upgrade` should clear previous `--upgrade-package` and `--upgrade-group` selections.
             Self::All | Self::None => self,
             Self::Packages(self_packages) => match other {
-                // If `--upgrade` was enabled previously, `--upgrade-package` is subsumed by upgrading all packages.
                 Self::All => other,
-                // If `--no-upgrade` was enabled previously, then `--upgrade-package` enables an explicit upgrade of those packages.
                 Self::None => Self::Packages(self_packages),
-                // If `--upgrade-package` was included twice, combine the requirements.
                 Self::Packages(other_packages) => {
                     let mut combined = self_packages;
                     for (package, requirements) in other_packages {
@@ -261,21 +273,94 @@ impl Upgrade {
                     }
                     Self::Packages(combined)
                 }
-                // If `--upgrade-group` was specified after `--upgrade-package`, keep the packages.
-                Self::Groups(_) => Self::Packages(self_packages),
+                // Combine packages with groups into PackagesAndGroups.
+                Self::Groups(other_groups) => Self::PackagesAndGroups {
+                    packages: self_packages,
+                    groups: other_groups,
+                },
+                Self::PackagesAndGroups {
+                    packages: other_packages,
+                    groups: other_groups,
+                } => {
+                    let mut combined = self_packages;
+                    for (package, requirements) in other_packages {
+                        combined.entry(package).or_default().extend(requirements);
+                    }
+                    Self::PackagesAndGroups {
+                        packages: combined,
+                        groups: other_groups,
+                    }
+                }
             },
             Self::Groups(self_groups) => match other {
-                // If `--upgrade` was enabled previously, `--upgrade-group` is subsumed by upgrading all packages.
                 Self::All => other,
-                // If `--no-upgrade` was enabled previously, then `--upgrade-group` enables an explicit upgrade of those groups.
                 Self::None => Self::Groups(self_groups),
-                // If `--upgrade-package` was specified after `--upgrade-group`, keep the groups.
-                Self::Packages(_) => Self::Groups(self_groups),
-                // If `--upgrade-group` was included twice, combine the groups.
+                // Combine groups with packages into PackagesAndGroups.
+                Self::Packages(other_packages) => Self::PackagesAndGroups {
+                    packages: other_packages,
+                    groups: self_groups,
+                },
                 Self::Groups(other_groups) => {
                     let mut combined = self_groups;
                     combined.extend(other_groups);
                     Self::Groups(combined)
+                }
+                Self::PackagesAndGroups {
+                    packages: other_packages,
+                    groups: other_groups,
+                } => {
+                    let mut combined_groups = self_groups;
+                    combined_groups.extend(other_groups);
+                    Self::PackagesAndGroups {
+                        packages: other_packages,
+                        groups: combined_groups,
+                    }
+                }
+            },
+            Self::PackagesAndGroups {
+                packages: self_packages,
+                groups: self_groups,
+            } => match other {
+                Self::All => other,
+                Self::None => Self::PackagesAndGroups {
+                    packages: self_packages,
+                    groups: self_groups,
+                },
+                Self::Packages(other_packages) => {
+                    let mut combined = self_packages;
+                    for (package, requirements) in other_packages {
+                        combined.entry(package).or_default().extend(requirements);
+                    }
+                    Self::PackagesAndGroups {
+                        packages: combined,
+                        groups: self_groups,
+                    }
+                }
+                Self::Groups(other_groups) => {
+                    let mut combined = self_groups;
+                    combined.extend(other_groups);
+                    Self::PackagesAndGroups {
+                        packages: self_packages,
+                        groups: combined,
+                    }
+                }
+                Self::PackagesAndGroups {
+                    packages: other_packages,
+                    groups: other_groups,
+                } => {
+                    let mut combined_packages = self_packages;
+                    for (package, requirements) in other_packages {
+                        combined_packages
+                            .entry(package)
+                            .or_default()
+                            .extend(requirements);
+                    }
+                    let mut combined_groups = self_groups;
+                    combined_groups.extend(other_groups);
+                    Self::PackagesAndGroups {
+                        packages: combined_packages,
+                        groups: combined_groups,
+                    }
                 }
             },
         }
@@ -297,6 +382,13 @@ impl From<Upgrade> for Refresh {
             // so we use a conservative refresh policy (no refresh).
             // The actual refresh will be handled by the lock command.
             Upgrade::Groups(_) => Self::None(Timestamp::now()),
+            // For packages and groups, we can at least refresh the explicitly specified packages.
+            // The group-based packages will be handled by the lock command.
+            Upgrade::PackagesAndGroups { packages, .. } => Self::Packages(
+                packages.into_keys().collect::<Vec<_>>(),
+                Vec::new(),
+                Timestamp::now(),
+            ),
         }
     }
 }

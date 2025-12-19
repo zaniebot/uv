@@ -56,7 +56,6 @@ impl From<ResolverArgs> for PipOptions {
             upgrade,
             no_upgrade,
             upgrade_package,
-            upgrade_group,
             index_strategy,
             keyring_provider,
             resolution,
@@ -73,9 +72,6 @@ impl From<ResolverArgs> for PipOptions {
             no_sources,
             exclude_newer_package,
         } = args;
-
-        // Note: upgrade_group is not supported in pip compat mode, so we ignore it here
-        let _ = upgrade_group;
 
         Self {
             upgrade: flag(upgrade, no_upgrade, "no-upgrade"),
@@ -158,7 +154,6 @@ impl From<ResolverInstallerArgs> for PipOptions {
             upgrade,
             no_upgrade,
             upgrade_package,
-            upgrade_group,
             reinstall,
             no_reinstall,
             reinstall_package,
@@ -180,9 +175,6 @@ impl From<ResolverInstallerArgs> for PipOptions {
             no_sources,
             exclude_newer_package,
         } = args;
-
-        // Note: upgrade_group is not supported in pip compat mode, so we ignore it here
-        let _ = upgrade_group;
 
         Self {
             upgrade: flag(upgrade, no_upgrade, "upgrade"),
@@ -281,12 +273,20 @@ pub fn resolver_options(
     resolver_args: ResolverArgs,
     build_args: BuildOptionsArgs,
 ) -> ResolverOptions {
+    resolver_options_with_upgrade_group(resolver_args, build_args, vec![])
+}
+
+/// Construct the [`ResolverOptions`] from the [`ResolverArgs`], [`BuildOptionsArgs`], and upgrade groups.
+pub fn resolver_options_with_upgrade_group(
+    resolver_args: ResolverArgs,
+    build_args: BuildOptionsArgs,
+    upgrade_group: Vec<uv_normalize::GroupName>,
+) -> ResolverOptions {
     let ResolverArgs {
         index_args,
         upgrade,
         no_upgrade,
         upgrade_package,
-        upgrade_group,
         index_strategy,
         keyring_provider,
         resolution,
@@ -390,12 +390,20 @@ pub fn resolver_installer_options(
     resolver_installer_args: ResolverInstallerArgs,
     build_args: BuildOptionsArgs,
 ) -> ResolverInstallerOptions {
+    resolver_installer_options_with_upgrade_group(resolver_installer_args, build_args, vec![])
+}
+
+/// Construct the [`ResolverInstallerOptions`] from the [`ResolverInstallerArgs`], [`BuildOptionsArgs`], and upgrade groups.
+pub fn resolver_installer_options_with_upgrade_group(
+    resolver_installer_args: ResolverInstallerArgs,
+    build_args: BuildOptionsArgs,
+    upgrade_group: Vec<uv_normalize::GroupName>,
+) -> ResolverInstallerOptions {
     let ResolverInstallerArgs {
         index_args,
         upgrade,
         no_upgrade,
         upgrade_package,
-        upgrade_group,
         reinstall,
         no_reinstall,
         reinstall_package,
