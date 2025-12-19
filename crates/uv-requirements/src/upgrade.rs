@@ -58,6 +58,9 @@ pub async fn read_requirements_txt(
             .into_iter()
             .filter(|preference| !packages.contains_key(preference.name()))
             .collect(),
+        // For groups, we can't determine group membership in requirements.txt context,
+        // so we respect all pinned versions (groups are only meaningful for uv.lock).
+        Upgrade::Groups(_) => preferences,
     })
 }
 
@@ -72,6 +75,29 @@ pub fn read_lock_requirements(
         return Ok(LockedRequirements::default());
     }
 
+    // If upgrading by group, collect the package names from the specified groups.
+    // We look at both the manifest-level dependency groups and the package-level
+    // dependency groups (from all packages in the lock, typically the root package).
+    let group_packages: Option<rustc_hash::FxHashSet<_>> = upgrade.groups().map(|groups| {
+        // First, check manifest-level dependency groups (for projects without [project] table).
+        let manifest_packages = lock
+            .dependency_groups()
+            .iter()
+            .filter(|(group, _)| groups.contains(group))
+            .flat_map(|(_, requirements)| requirements.iter().map(|req| req.name.clone()));
+
+        // Then, check package-level dependency groups (the standard case).
+        let package_packages = lock.packages().iter().flat_map(|package| {
+            package
+                .dependency_groups()
+                .iter()
+                .filter(|(group, _)| groups.contains(group))
+                .flat_map(|(_, requirements)| requirements.iter().map(|req| req.name.clone()))
+        });
+
+        manifest_packages.chain(package_packages).collect()
+    });
+
     let mut preferences = Vec::new();
     let mut git = Vec::new();
 
@@ -79,6 +105,13 @@ pub fn read_lock_requirements(
         // Skip the distribution if it's not included in the upgrade strategy.
         if upgrade.contains(package.name()) {
             continue;
+        }
+
+        // If upgrading by group, skip packages that are direct dependencies of the specified groups.
+        if let Some(ref group_pkgs) = group_packages {
+            if group_pkgs.contains(package.name()) {
+                continue;
+            }
         }
 
         // Map each entry in the lockfile to a preference.

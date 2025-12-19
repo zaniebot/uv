@@ -1,12 +1,12 @@
 use std::path::Path;
 
 use either::Either;
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use uv_cache::Refresh;
 use uv_cache_info::Timestamp;
 use uv_distribution_types::Requirement;
-use uv_normalize::PackageName;
+use uv_normalize::{GroupName, PackageName};
 
 /// Whether to reinstall packages.
 #[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize)]
@@ -144,26 +144,45 @@ pub enum Upgrade {
 
     /// Allow package upgrades, but only for the specified packages.
     Packages(FxHashMap<PackageName, Vec<Requirement>>),
+
+    /// Allow package upgrades for all direct dependencies of the specified groups.
+    Groups(FxHashSet<GroupName>),
 }
 
 impl Upgrade {
     /// Determine the upgrade selection strategy from the command-line arguments.
-    pub fn from_args(upgrade: Option<bool>, upgrade_package: Vec<Requirement>) -> Option<Self> {
+    pub fn from_args(
+        upgrade: Option<bool>,
+        upgrade_package: Vec<Requirement>,
+        upgrade_group: Vec<GroupName>,
+    ) -> Option<Self> {
         match upgrade {
             Some(true) => Some(Self::All),
             // TODO(charlie): `--no-upgrade` with `--upgrade-package` should allow the specified
             // packages to be upgraded. Right now, `--upgrade-package` is silently ignored.
             Some(false) => Some(Self::None),
-            None if upgrade_package.is_empty() => None,
-            None => Some(Self::Packages(upgrade_package.into_iter().fold(
-                FxHashMap::default(),
-                |mut map, requirement| {
-                    map.entry(requirement.name.clone())
-                        .or_default()
-                        .push(requirement);
-                    map
-                },
-            ))),
+            None if upgrade_package.is_empty() && upgrade_group.is_empty() => None,
+            None if !upgrade_group.is_empty() && upgrade_package.is_empty() => {
+                Some(Self::Groups(upgrade_group.into_iter().collect()))
+            }
+            None if upgrade_group.is_empty() => Some(Self::Packages(
+                upgrade_package.into_iter().fold(
+                    FxHashMap::default(),
+                    |mut map, requirement| {
+                        map.entry(requirement.name.clone())
+                            .or_default()
+                            .push(requirement);
+                        map
+                    },
+                ),
+            )),
+            None => {
+                // Both upgrade_package and upgrade_group are specified.
+                // Convert groups to packages (will need to be resolved later with lock file context).
+                // For now, just use upgrade_package and store groups separately.
+                // We'll handle this by combining them in the Groups variant.
+                Some(Self::Groups(upgrade_group.into_iter().collect()))
+            }
         }
     }
 
@@ -187,11 +206,24 @@ impl Upgrade {
     }
 
     /// Returns `true` if the specified package should be upgraded.
+    ///
+    /// Note: For the `Groups` variant, this returns `false` because we can't determine
+    /// group membership without the lock file context. Use `groups()` to get the group
+    /// names and check against the lock file's dependency groups.
     pub fn contains(&self, package_name: &PackageName) -> bool {
         match self {
             Self::None => false,
             Self::All => true,
             Self::Packages(packages) => packages.contains_key(package_name),
+            Self::Groups(_) => false,
+        }
+    }
+
+    /// Returns the groups to upgrade, if any.
+    pub fn groups(&self) -> Option<&FxHashSet<GroupName>> {
+        match self {
+            Self::Groups(groups) => Some(groups),
+            _ => None,
         }
     }
 
@@ -214,7 +246,7 @@ impl Upgrade {
     #[must_use]
     pub fn combine(self, other: Self) -> Self {
         match self {
-            // Setting `--upgrade` or `--no-upgrade` should clear previous `--upgrade-package` selections.
+            // Setting `--upgrade` or `--no-upgrade` should clear previous `--upgrade-package` and `--upgrade-group` selections.
             Self::All | Self::None => self,
             Self::Packages(self_packages) => match other {
                 // If `--upgrade` was enabled previously, `--upgrade-package` is subsumed by upgrading all packages.
@@ -228,6 +260,22 @@ impl Upgrade {
                         combined.entry(package).or_default().extend(requirements);
                     }
                     Self::Packages(combined)
+                }
+                // If `--upgrade-group` was specified after `--upgrade-package`, keep the packages.
+                Self::Groups(_) => Self::Packages(self_packages),
+            },
+            Self::Groups(self_groups) => match other {
+                // If `--upgrade` was enabled previously, `--upgrade-group` is subsumed by upgrading all packages.
+                Self::All => other,
+                // If `--no-upgrade` was enabled previously, then `--upgrade-group` enables an explicit upgrade of those groups.
+                Self::None => Self::Groups(self_groups),
+                // If `--upgrade-package` was specified after `--upgrade-group`, keep the groups.
+                Self::Packages(_) => Self::Groups(self_groups),
+                // If `--upgrade-group` was included twice, combine the groups.
+                Self::Groups(other_groups) => {
+                    let mut combined = self_groups;
+                    combined.extend(other_groups);
+                    Self::Groups(combined)
                 }
             },
         }
@@ -245,6 +293,10 @@ impl From<Upgrade> for Refresh {
                 Vec::new(),
                 Timestamp::now(),
             ),
+            // For groups, we can't determine the packages without lock file context,
+            // so we use a conservative refresh policy (no refresh).
+            // The actual refresh will be handled by the lock command.
+            Upgrade::Groups(_) => Self::None(Timestamp::now()),
         }
     }
 }

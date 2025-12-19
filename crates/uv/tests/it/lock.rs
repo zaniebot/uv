@@ -32674,3 +32674,166 @@ fn lock_check_multiple_default_indexes_explicit_assignment_dependency_group() ->
 
     Ok(())
 }
+
+/// Upgrade packages in a specific dependency group with `--upgrade-group`.
+///
+/// This test verifies that:
+/// 1. Direct dependencies of the specified group are upgraded
+/// 2. Regular project dependencies are NOT upgraded
+/// 3. Transitive dependencies are NOT upgraded (only direct deps of the group)
+#[test]
+fn lock_upgrade_group() -> Result<()> {
+    let context = TestContext::new("3.12");
+
+    // Create a pyproject.toml with:
+    // - A constrained regular dependency (`anyio<=2` which depends on `sniffio`)
+    // - A dependency group with a constrained package (`idna<=3`)
+    //
+    // When we use `--upgrade-group lint`:
+    // - `idna` (direct dependency of lint group) should be upgraded
+    // - `anyio` (regular dependency) should NOT be upgraded
+    // - `sniffio` (transitive dependency of anyio) should NOT be upgraded
+    let pyproject_toml = context.temp_dir.child("pyproject.toml");
+    pyproject_toml.write_str(
+        r#"
+        [project]
+        name = "project"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        dependencies = ["anyio<=2"]
+
+        [dependency-groups]
+        lint = ["idna<=3"]
+        "#,
+    )?;
+
+    // Lock the root package.
+    uv_snapshot!(context.filters(), context.lock(), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Resolved 4 packages in [TIME]
+    "###);
+
+    // Verify initial lock has idna at v3.0 and anyio at v2.0.0
+    let lock = context.read("uv.lock");
+    assert!(lock.contains("name = \"idna\"\nversion = \"3.0\""));
+    assert!(lock.contains("name = \"anyio\"\nversion = \"2.0.0\""));
+    assert!(lock.contains("name = \"sniffio\"\nversion = \"1.3.1\""));
+
+    // Remove the constraints.
+    let pyproject_toml = context.temp_dir.child("pyproject.toml");
+    pyproject_toml.write_str(
+        r#"
+        [project]
+        name = "project"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        dependencies = ["anyio"]
+
+        [dependency-groups]
+        lint = ["idna"]
+        "#,
+    )?;
+
+    // Upgrade the `lint` group, but nothing else.
+    // This should upgrade `idna` (which is a direct dependency of the `lint` group)
+    // but NOT `anyio` (which is a regular dependency) or `sniffio` (transitive dep).
+    uv_snapshot!(context.filters(), context.lock().arg("--upgrade-group").arg("lint"), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Resolved 4 packages in [TIME]
+    Updated idna v3.0 -> v3.6
+    "###);
+
+    let lock = context.read("uv.lock");
+
+    // Verify:
+    // - `idna` was upgraded to v3.6 (direct dep of lint group)
+    // - `anyio` still at v2.0.0 (not in upgrade group)
+    // - `sniffio` still at v1.3.1 (transitive dep, not a direct dep of lint group)
+    assert!(lock.contains("name = \"idna\"\nversion = \"3.6\""));
+    assert!(lock.contains("name = \"anyio\"\nversion = \"2.0.0\""));
+    assert!(lock.contains("name = \"sniffio\"\nversion = \"1.3.1\""));
+
+    Ok(())
+}
+
+/// Verify that only direct dependencies of a group are upgraded, not transitive dependencies.
+///
+/// When a dependency group contains a package with transitive dependencies,
+/// only the direct dependency should be upgraded. The transitive dependencies
+/// may be updated as a natural consequence of resolution (if the new version
+/// requires different versions), but they are not explicitly targeted for upgrade.
+#[test]
+fn lock_upgrade_group_transitive() -> Result<()> {
+    let context = TestContext::new("3.12");
+
+    // Create a dependency group with `anyio` which has transitive deps (idna, sniffio).
+    // When upgrading the group, only `anyio` should be upgraded.
+    let pyproject_toml = context.temp_dir.child("pyproject.toml");
+    pyproject_toml.write_str(
+        r#"
+        [project]
+        name = "project"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        dependencies = []
+
+        [dependency-groups]
+        test = ["anyio<=2"]
+        "#,
+    )?;
+
+    // Lock the root package.
+    uv_snapshot!(context.filters(), context.lock(), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Resolved 4 packages in [TIME]
+    "###);
+
+    // Verify initial versions - anyio 2.0.0, with its transitive deps
+    let lock = context.read("uv.lock");
+    assert!(lock.contains("name = \"anyio\"\nversion = \"2.0.0\""));
+
+    // Remove the constraint
+    let pyproject_toml = context.temp_dir.child("pyproject.toml");
+    pyproject_toml.write_str(
+        r#"
+        [project]
+        name = "project"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        dependencies = []
+
+        [dependency-groups]
+        test = ["anyio"]
+        "#,
+    )?;
+
+    // Upgrade only the test group
+    uv_snapshot!(context.filters(), context.lock().arg("--upgrade-group").arg("test"), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Resolved 4 packages in [TIME]
+    Updated anyio v2.0.0 -> v4.3.0
+    "###);
+
+    let lock = context.read("uv.lock");
+
+    // `anyio` should be upgraded (direct dep of test group)
+    assert!(lock.contains("name = \"anyio\"\nversion = \"4.3.0\""));
+
+    Ok(())
+}

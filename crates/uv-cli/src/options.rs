@@ -56,6 +56,7 @@ impl From<ResolverArgs> for PipOptions {
             upgrade,
             no_upgrade,
             upgrade_package,
+            upgrade_group,
             index_strategy,
             keyring_provider,
             resolution,
@@ -72,6 +73,9 @@ impl From<ResolverArgs> for PipOptions {
             no_sources,
             exclude_newer_package,
         } = args;
+
+        // Note: upgrade_group is not supported in pip compat mode, so we ignore it here
+        let _ = upgrade_group;
 
         Self {
             upgrade: flag(upgrade, no_upgrade, "no-upgrade"),
@@ -154,6 +158,7 @@ impl From<ResolverInstallerArgs> for PipOptions {
             upgrade,
             no_upgrade,
             upgrade_package,
+            upgrade_group,
             reinstall,
             no_reinstall,
             reinstall_package,
@@ -175,6 +180,9 @@ impl From<ResolverInstallerArgs> for PipOptions {
             no_sources,
             exclude_newer_package,
         } = args;
+
+        // Note: upgrade_group is not supported in pip compat mode, so we ignore it here
+        let _ = upgrade_group;
 
         Self {
             upgrade: flag(upgrade, no_upgrade, "upgrade"),
@@ -278,6 +286,7 @@ pub fn resolver_options(
         upgrade,
         no_upgrade,
         upgrade_package,
+        upgrade_group,
         index_strategy,
         keyring_provider,
         resolution,
@@ -337,6 +346,7 @@ pub fn resolver_options(
         upgrade: Upgrade::from_args(
             flag(upgrade, no_upgrade, "no-upgrade"),
             upgrade_package.into_iter().map(Requirement::from).collect(),
+            upgrade_group,
         ),
         index_strategy,
         keyring_provider,
@@ -385,6 +395,7 @@ pub fn resolver_installer_options(
         upgrade,
         no_upgrade,
         upgrade_package,
+        upgrade_group,
         reinstall,
         no_reinstall,
         reinstall_package,
@@ -451,6 +462,7 @@ pub fn resolver_installer_options(
         upgrade: Upgrade::from_args(
             flag(upgrade, no_upgrade, "upgrade"),
             upgrade_package.into_iter().map(Requirement::from).collect(),
+            upgrade_group,
         ),
         reinstall: Reinstall::from_args(
             flag(reinstall, no_reinstall, "reinstall"),

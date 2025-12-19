@@ -866,6 +866,7 @@ impl ToolUpgradeSettings {
             upgrade: upgrade_package.is_empty(),
             no_upgrade: false,
             upgrade_package,
+            upgrade_group: vec![],
             reinstall,
             no_reinstall,
             reinstall_package,
@@ -3766,6 +3767,7 @@ impl PipSettings {
                     .flatten()
                     .map(Requirement::from)
                     .collect(),
+                vec![],
             )
             .combine(Upgrade::from_args(
                 upgrade,
@@ -3774,6 +3776,7 @@ impl PipSettings {
                     .flatten()
                     .map(Requirement::from)
                     .collect(),
+                vec![],
             ))
             .unwrap_or_default(),
             reinstall: Reinstall::from_args(

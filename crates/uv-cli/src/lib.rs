@@ -6948,6 +6948,11 @@ pub struct ResolverArgs {
     #[arg(long, short = 'P', help_heading = "Resolver options")]
     pub upgrade_package: Vec<Requirement<VerbatimParsedUrl>>,
 
+    /// Allow upgrades for all packages in a specific dependency group, ignoring pinned versions
+    /// in any existing output file. May be provided multiple times.
+    #[arg(long, help_heading = "Resolver options")]
+    pub upgrade_group: Vec<GroupName>,
+
     /// The strategy to use when resolving against multiple index URLs.
     ///
     /// By default, uv will stop at the first index on which a given package is available, and limit
@@ -7154,6 +7159,11 @@ pub struct ResolverInstallerArgs {
     /// Implies `--refresh-package`.
     #[arg(long, short = 'P', help_heading = "Resolver options", value_hint = ValueHint::Other)]
     pub upgrade_package: Vec<Requirement<VerbatimParsedUrl>>,
+
+    /// Allow upgrades for all packages in a specific dependency group, ignoring pinned versions
+    /// in any existing output file. May be provided multiple times.
+    #[arg(long, help_heading = "Resolver options")]
+    pub upgrade_group: Vec<GroupName>,
 
     /// Reinstall all packages, regardless of whether they're already installed. Implies
     /// `--refresh`.

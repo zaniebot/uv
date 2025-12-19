@@ -1074,7 +1074,7 @@ impl ValidatedLock {
                 debug!("Ignoring existing lockfile due to `--upgrade`");
                 return Ok(Self::Unusable(lock));
             }
-            Upgrade::Packages(_) => {
+            Upgrade::Packages(_) | Upgrade::Groups(_) => {
                 // This is handled below, after some checks regarding fork
                 // markers. In particular, we'd like to return `Preferable`
                 // here, but we shouldn't if the fork markers cannot be
