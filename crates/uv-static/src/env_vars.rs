@@ -221,6 +221,12 @@ impl EnvVars {
     #[attr_added_in("0.7.22")]
     pub const UV_COMPILE_BYTECODE_TIMEOUT: &'static str = "UV_COMPILE_BYTECODE_TIMEOUT";
 
+    /// Equivalent to the `--editable` command-line argument. If set, uv
+    /// will install any non-editable dependencies, including the project, workspace members, and
+    /// path dependencies, as editable.
+    #[attr_added_in("next release")]
+    pub const UV_EDITABLE: &'static str = "UV_EDITABLE";
+
     /// Equivalent to the `--no-editable` command-line argument. If set, uv
     /// installs or exports any editable dependencies, including the project and any workspace
     /// members, as non-editable.

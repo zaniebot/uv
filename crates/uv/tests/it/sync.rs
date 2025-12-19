@@ -8205,6 +8205,115 @@ fn sync_no_editable() -> Result<()> {
     Ok(())
 }
 
+/// Test that `--editable` forces all path dependencies to be installed as editable.
+#[test]
+fn sync_editable() -> Result<()> {
+    let context = TestContext::new("3.12");
+
+    let pyproject_toml = context.temp_dir.child("pyproject.toml");
+    pyproject_toml.write_str(
+        r#"
+        [project]
+        name = "root"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        dependencies = ["child"]
+
+        [build-system]
+        requires = ["setuptools>=42"]
+        build-backend = "setuptools.build_meta"
+
+        [tool.uv.sources]
+        child = { path = "child", editable = false }
+        "#,
+    )?;
+
+    let src = context.temp_dir.child("src").child("root");
+    src.create_dir_all()?;
+
+    let init = src.child("__init__.py");
+    init.touch()?;
+
+    let child = context.temp_dir.child("child");
+    fs_err::create_dir_all(&child)?;
+
+    let pyproject_toml = child.child("pyproject.toml");
+    pyproject_toml.write_str(
+        r#"
+        [project]
+        name = "child"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+
+        [build-system]
+        requires = ["setuptools>=42"]
+        build-backend = "setuptools.build_meta"
+        "#,
+    )?;
+
+    let src = child.child("src").child("child");
+    src.create_dir_all()?;
+
+    let init = src.child("__init__.py");
+    init.touch()?;
+
+    // First sync without --editable to install as non-editable (wheel)
+    uv_snapshot!(context.filters(), context.sync(), @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Resolved 2 packages in [TIME]
+    Prepared 2 packages in [TIME]
+    Installed 2 packages in [TIME]
+     + child==0.1.0 (from file://[TEMP_DIR]/child)
+     + root==0.1.0 (from file://[TEMP_DIR]/)
+    ");
+
+    // Now sync with --editable to force editable installation
+    uv_snapshot!(context.filters(), context.sync().arg("--editable"), @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Resolved 2 packages in [TIME]
+    Prepared 1 package in [TIME]
+    Uninstalled 1 package in [TIME]
+    Installed 1 package in [TIME]
+     ~ child==0.1.0 (from file://[TEMP_DIR]/child)
+    ");
+
+    // Test with UV_EDITABLE env var
+    uv_snapshot!(context.filters(), context.sync().env(EnvVars::UV_EDITABLE, "1"), @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Resolved 2 packages in [TIME]
+    Audited 2 packages in [TIME]
+    ");
+
+    // Remove the child project.
+    fs_err::remove_dir_all(&child)?;
+
+    // Verify that importing the package now fails (because it's editable)
+    uv_snapshot!(context.filters(), context.run().arg("--no-sync").arg("python").arg("-c").arg("import child"), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+
+    ----- stderr -----
+    Traceback (most recent call last):
+      File "<string>", line 1, in <module>
+    ModuleNotFoundError: No module named 'child'
+    "###);
+
+    Ok(())
+}
+
 #[test]
 /// Check warning message for <https://github.com/astral-sh/uv/issues/6998>
 /// if no `build-system` section is defined.

@@ -3551,9 +3551,9 @@ pub struct RunArgs {
     #[arg(long, conflicts_with_all = ["group", "all_groups", "no_dev"])]
     pub only_dev: bool,
 
-    /// Install any non-editable dependencies, including the project and any workspace members, as
-    /// editable.
-    #[arg(long, overrides_with = "no_editable", hide = true)]
+    /// Install any non-editable dependencies, including the project, workspace members, and path
+    /// dependencies, as editable.
+    #[arg(long, overrides_with = "no_editable", value_parser = clap::builder::BoolishValueParser::new(), env = EnvVars::UV_EDITABLE)]
     pub editable: bool,
 
     /// Install any editable dependencies, including the project and any workspace members, as
@@ -3873,9 +3873,9 @@ pub struct SyncArgs {
     #[arg(long, conflicts_with_all = ["only_group", "only_dev"])]
     pub all_groups: bool,
 
-    /// Install any non-editable dependencies, including the project and any workspace members, as
-    /// editable.
-    #[arg(long, overrides_with = "no_editable", hide = true)]
+    /// Install any non-editable dependencies, including the project, workspace members, and path
+    /// dependencies, as editable.
+    #[arg(long, overrides_with = "no_editable", value_parser = clap::builder::BoolishValueParser::new(), env = EnvVars::UV_EDITABLE)]
     pub editable: bool,
 
     /// Install any editable dependencies, including the project and any workspace members, as
@@ -4879,9 +4879,9 @@ pub struct ExportArgs {
     #[arg(long, overrides_with("no_header"), hide = true)]
     pub header: bool,
 
-    /// Export any non-editable dependencies, including the project and any workspace members, as
-    /// editable.
-    #[arg(long, overrides_with = "no_editable", hide = true)]
+    /// Export any non-editable dependencies, including the project, workspace members, and path
+    /// dependencies, as editable.
+    #[arg(long, overrides_with = "no_editable", value_parser = clap::builder::BoolishValueParser::new(), env = EnvVars::UV_EDITABLE)]
     pub editable: bool,
 
     /// Export any editable dependencies, including the project and any workspace members, as
