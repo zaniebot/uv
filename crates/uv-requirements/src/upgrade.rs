@@ -1,12 +1,105 @@
 use std::path::Path;
 
 use anyhow::Result;
+use rustc_hash::FxHashMap;
 
 use uv_configuration::Upgrade;
+use uv_distribution_types::Requirement;
 use uv_fs::CWD;
 use uv_git::ResolvedRepositoryReference;
+use uv_normalize::PackageName;
 use uv_requirements_txt::RequirementsTxt;
 use uv_resolver::{Lock, LockError, Preference, PreferenceError, PylockToml, PylockTomlErrorKind};
+
+/// The "lowered" upgrade specification after resolving groups to packages.
+///
+/// This is the result of "lowering" an [`Upgrade`] once we have access to the lock file.
+/// Groups are resolved to their constituent packages, making it simpler for consumers
+/// to determine which packages should be upgraded.
+#[derive(Debug, Default, Clone)]
+pub enum LoweredUpgrade {
+    /// Prefer pinned versions from the existing lockfile, if possible.
+    #[default]
+    None,
+
+    /// Allow package upgrades for all packages, ignoring the existing lockfile.
+    All,
+
+    /// Allow package upgrades, but only for the specified packages.
+    /// The map contains optional version constraints for each package.
+    Packages(FxHashMap<PackageName, Vec<Requirement>>),
+}
+
+impl LoweredUpgrade {
+    /// Lower an [`Upgrade`] to a [`LoweredUpgrade`] by resolving groups to packages.
+    ///
+    /// This requires access to the lock file to determine which packages belong to which groups.
+    pub fn from_upgrade(upgrade: &Upgrade, lock: &Lock) -> Self {
+        match upgrade {
+            Upgrade::None => Self::None,
+            Upgrade::All => Self::All,
+            Upgrade::Packages(packages) => Self::Packages(packages.clone()),
+            Upgrade::Groups(groups) => {
+                let packages = resolve_groups_to_packages(lock, groups);
+                Self::Packages(packages.into_iter().map(|p| (p, vec![])).collect())
+            }
+            Upgrade::PackagesAndGroups { packages, groups } => {
+                let group_packages = resolve_groups_to_packages(lock, groups);
+                let mut all_packages = packages.clone();
+                for pkg in group_packages {
+                    all_packages.entry(pkg).or_default();
+                }
+                Self::Packages(all_packages)
+            }
+        }
+    }
+
+    /// Returns `true` if no packages should be upgraded.
+    pub fn is_none(&self) -> bool {
+        matches!(self, Self::None)
+    }
+
+    /// Returns `true` if all packages should be upgraded.
+    pub fn is_all(&self) -> bool {
+        matches!(self, Self::All)
+    }
+
+    /// Returns `true` if the specified package should be upgraded.
+    pub fn contains(&self, package_name: &PackageName) -> bool {
+        match self {
+            Self::None => false,
+            Self::All => true,
+            Self::Packages(packages) => packages.contains_key(package_name),
+        }
+    }
+}
+
+/// Resolve group names to package names using the lock file.
+///
+/// Looks at both manifest-level dependency groups (for projects without [project] table)
+/// and package-level dependency groups (the standard case).
+fn resolve_groups_to_packages(
+    lock: &Lock,
+    groups: &rustc_hash::FxHashSet<uv_normalize::GroupName>,
+) -> rustc_hash::FxHashSet<PackageName> {
+    // First, check manifest-level dependency groups (for projects without [project] table).
+    let manifest_packages = lock
+        .dependency_groups()
+        .iter()
+        .filter(|(group, _)| groups.contains(group))
+        .flat_map(|(_, requirements)| requirements.iter().map(|req| req.name.clone()));
+
+    // Then, check package-level dependency groups (the standard case).
+    let package_packages = lock.packages().iter().flat_map(|package| {
+        package
+            .dependency_groups()
+            .iter()
+            .filter(|(group, _)| groups.contains(group))
+            .flat_map(|(_, requirements)| requirements.iter().map(|req| req.name.clone()))
+    });
+
+    manifest_packages.chain(package_packages).collect()
+}
 
 #[derive(Debug, Default)]
 pub struct LockedRequirements {
@@ -76,48 +169,21 @@ pub fn read_lock_requirements(
     install_path: &Path,
     upgrade: &Upgrade,
 ) -> Result<LockedRequirements, LockError> {
-    // As an optimization, skip iterating over the lockfile is we're upgrading all packages anyway.
-    if upgrade.is_all() {
+    // Lower the upgrade specification by resolving groups to packages.
+    let lowered = LoweredUpgrade::from_upgrade(upgrade, lock);
+
+    // As an optimization, skip iterating over the lockfile if we're upgrading all packages anyway.
+    if lowered.is_all() {
         return Ok(LockedRequirements::default());
     }
-
-    // If upgrading by group, collect the package names from the specified groups.
-    // We look at both the manifest-level dependency groups and the package-level
-    // dependency groups (from all packages in the lock, typically the root package).
-    let group_packages: Option<rustc_hash::FxHashSet<_>> = upgrade.groups().map(|groups| {
-        // First, check manifest-level dependency groups (for projects without [project] table).
-        let manifest_packages = lock
-            .dependency_groups()
-            .iter()
-            .filter(|(group, _)| groups.contains(group))
-            .flat_map(|(_, requirements)| requirements.iter().map(|req| req.name.clone()));
-
-        // Then, check package-level dependency groups (the standard case).
-        let package_packages = lock.packages().iter().flat_map(|package| {
-            package
-                .dependency_groups()
-                .iter()
-                .filter(|(group, _)| groups.contains(group))
-                .flat_map(|(_, requirements)| requirements.iter().map(|req| req.name.clone()))
-        });
-
-        manifest_packages.chain(package_packages).collect()
-    });
 
     let mut preferences = Vec::new();
     let mut git = Vec::new();
 
     for package in lock.packages() {
-        // Skip the distribution if it's not included in the upgrade strategy.
-        if upgrade.contains(package.name()) {
+        // Skip the distribution if it should be upgraded.
+        if lowered.contains(package.name()) {
             continue;
-        }
-
-        // If upgrading by group, skip packages that are direct dependencies of the specified groups.
-        if let Some(ref group_pkgs) = group_packages {
-            if group_pkgs.contains(package.name()) {
-                continue;
-            }
         }
 
         // Map each entry in the lockfile to a preference.
