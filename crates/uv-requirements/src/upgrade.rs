@@ -1,87 +1,112 @@
 use std::path::Path;
 
 use anyhow::Result;
-use rustc_hash::FxHashMap;
+use rustc_hash::FxHashSet;
+use thiserror::Error;
 
-use uv_configuration::Upgrade;
-use uv_distribution_types::Requirement;
+use uv_configuration::{LoweredUpgrade, Upgrade};
 use uv_fs::CWD;
 use uv_git::ResolvedRepositoryReference;
-use uv_normalize::PackageName;
+use uv_normalize::{GroupName, PackageName};
 use uv_requirements_txt::RequirementsTxt;
 use uv_resolver::{Lock, LockError, Preference, PreferenceError, PylockToml, PylockTomlErrorKind};
+use uv_workspace::dependency_groups::FlatDependencyGroups;
 
-/// The "lowered" upgrade specification after resolving groups to packages.
-///
-/// This is the result of "lowering" an [`Upgrade`] once we have access to the lock file.
-/// Groups are resolved to their constituent packages, making it simpler for consumers
-/// to determine which packages should be upgraded.
-#[derive(Debug, Default, Clone)]
-pub enum LoweredUpgrade {
-    /// Prefer pinned versions from the existing lockfile, if possible.
-    #[default]
-    None,
-
-    /// Allow package upgrades for all packages, ignoring the existing lockfile.
-    All,
-
-    /// Allow package upgrades, but only for the specified packages.
-    /// The map contains optional version constraints for each package.
-    Packages(FxHashMap<PackageName, Vec<Requirement>>),
+/// Error returned when upgrade groups are specified but cannot be resolved.
+#[derive(Debug, Error)]
+#[error("`--upgrade-group` requires a project with dependency groups defined in `pyproject.toml`")]
+pub struct UpgradeGroupError {
+    /// The groups that were specified.
+    pub groups: FxHashSet<GroupName>,
 }
 
-impl LoweredUpgrade {
-    /// Lower an [`Upgrade`] to a [`LoweredUpgrade`] by resolving groups to packages.
-    ///
-    /// This requires access to the lock file to determine which packages belong to which groups.
-    pub fn from_upgrade(upgrade: &Upgrade, lock: &Lock) -> Self {
-        match upgrade {
-            Upgrade::None => Self::None,
-            Upgrade::All => Self::All,
-            Upgrade::Packages(packages) => Self::Packages(packages.clone()),
-            Upgrade::Groups(groups) => {
-                let packages = resolve_groups_to_packages(lock, groups);
-                Self::Packages(packages.into_iter().map(|p| (p, vec![])).collect())
+/// Lower an [`Upgrade`] to a [`LoweredUpgrade`] by resolving groups to packages
+/// using the dependency groups from pyproject.toml.
+///
+/// This is the preferred method for lowering upgrades, as it uses the source of
+/// truth for dependency groups.
+pub fn lower_upgrade(upgrade: &Upgrade, dependency_groups: &FlatDependencyGroups) -> LoweredUpgrade {
+    match upgrade {
+        Upgrade::None => LoweredUpgrade::None,
+        Upgrade::All => LoweredUpgrade::All,
+        Upgrade::Packages(packages) => LoweredUpgrade::Packages(packages.clone()),
+        Upgrade::Groups(groups) => {
+            let packages = resolve_groups_from_pyproject(dependency_groups, groups);
+            LoweredUpgrade::Packages(packages.into_iter().map(|p| (p, vec![])).collect())
+        }
+        Upgrade::PackagesAndGroups { packages, groups } => {
+            let group_packages = resolve_groups_from_pyproject(dependency_groups, groups);
+            let mut all_packages = packages.clone();
+            for pkg in group_packages {
+                all_packages.entry(pkg).or_default();
             }
-            Upgrade::PackagesAndGroups { packages, groups } => {
-                let group_packages = resolve_groups_to_packages(lock, groups);
-                let mut all_packages = packages.clone();
-                for pkg in group_packages {
-                    all_packages.entry(pkg).or_default();
-                }
-                Self::Packages(all_packages)
-            }
+            LoweredUpgrade::Packages(all_packages)
         }
     }
+}
 
-    /// Returns `true` if no packages should be upgraded.
-    pub fn is_none(&self) -> bool {
-        matches!(self, Self::None)
-    }
-
-    /// Returns `true` if all packages should be upgraded.
-    pub fn is_all(&self) -> bool {
-        matches!(self, Self::All)
-    }
-
-    /// Returns `true` if the specified package should be upgraded.
-    pub fn contains(&self, package_name: &PackageName) -> bool {
-        match self {
-            Self::None => false,
-            Self::All => true,
-            Self::Packages(packages) => packages.contains_key(package_name),
+/// Lower an [`Upgrade`] to a [`LoweredUpgrade`] by resolving groups to packages
+/// using the lock file's dependency group information.
+///
+/// This is useful when pyproject.toml is not available, but a lock file is.
+pub fn lower_upgrade_with_lock(upgrade: &Upgrade, lock: &Lock) -> LoweredUpgrade {
+    match upgrade {
+        Upgrade::None => LoweredUpgrade::None,
+        Upgrade::All => LoweredUpgrade::All,
+        Upgrade::Packages(packages) => LoweredUpgrade::Packages(packages.clone()),
+        Upgrade::Groups(groups) => {
+            let packages = resolve_groups_from_lock(lock, groups);
+            LoweredUpgrade::Packages(packages.into_iter().map(|p| (p, vec![])).collect())
+        }
+        Upgrade::PackagesAndGroups { packages, groups } => {
+            let group_packages = resolve_groups_from_lock(lock, groups);
+            let mut all_packages = packages.clone();
+            for pkg in group_packages {
+                all_packages.entry(pkg).or_default();
+            }
+            LoweredUpgrade::Packages(all_packages)
         }
     }
+}
+
+/// Lower an [`Upgrade`] to a [`LoweredUpgrade`] without group resolution.
+///
+/// This is used for contexts where dependency groups are not available (e.g., pip
+/// commands without a pyproject.toml). Returns an error if the upgrade specification
+/// contains groups.
+pub fn lower_upgrade_without_groups(
+    upgrade: &Upgrade,
+) -> std::result::Result<LoweredUpgrade, UpgradeGroupError> {
+    match upgrade {
+        Upgrade::None => Ok(LoweredUpgrade::None),
+        Upgrade::All => Ok(LoweredUpgrade::All),
+        Upgrade::Packages(packages) => Ok(LoweredUpgrade::Packages(packages.clone())),
+        Upgrade::Groups(groups) => Err(UpgradeGroupError {
+            groups: groups.clone(),
+        }),
+        Upgrade::PackagesAndGroups { groups, .. } => Err(UpgradeGroupError {
+            groups: groups.clone(),
+        }),
+    }
+}
+
+/// Resolve group names to package names using pyproject.toml's dependency groups.
+fn resolve_groups_from_pyproject(
+    dependency_groups: &FlatDependencyGroups,
+    groups: &FxHashSet<GroupName>,
+) -> FxHashSet<PackageName> {
+    groups
+        .iter()
+        .filter_map(|group| dependency_groups.get(group))
+        .flat_map(|group| group.requirements.iter().map(|req| req.name.clone()))
+        .collect()
 }
 
 /// Resolve group names to package names using the lock file.
 ///
 /// Looks at both manifest-level dependency groups (for projects without [project] table)
 /// and package-level dependency groups (the standard case).
-fn resolve_groups_to_packages(
-    lock: &Lock,
-    groups: &rustc_hash::FxHashSet<uv_normalize::GroupName>,
-) -> rustc_hash::FxHashSet<PackageName> {
+fn resolve_groups_from_lock(lock: &Lock, groups: &FxHashSet<GroupName>) -> FxHashSet<PackageName> {
     // First, check manifest-level dependency groups (for projects without [project] table).
     let manifest_packages = lock
         .dependency_groups()
@@ -170,7 +195,7 @@ pub fn read_lock_requirements(
     upgrade: &Upgrade,
 ) -> Result<LockedRequirements, LockError> {
     // Lower the upgrade specification by resolving groups to packages.
-    let lowered = LoweredUpgrade::from_upgrade(upgrade, lock);
+    let lowered = lower_upgrade_with_lock(upgrade, lock);
 
     // As an optimization, skip iterating over the lockfile if we're upgrading all packages anyway.
     if lowered.is_all() {
@@ -205,8 +230,12 @@ pub async fn read_pylock_toml_requirements(
     output_file: &Path,
     upgrade: &Upgrade,
 ) -> Result<LockedRequirements, PylockTomlErrorKind> {
-    // As an optimization, skip iterating over the lockfile is we're upgrading all packages anyway.
-    if upgrade.is_all() {
+    // Lower the upgrade specification. Groups are not supported in pylock.toml context.
+    let lowered = lower_upgrade_without_groups(upgrade)
+        .expect("--upgrade-group is not supported with pylock.toml");
+
+    // As an optimization, skip iterating over the lockfile if we're upgrading all packages anyway.
+    if lowered.is_all() {
         return Ok(LockedRequirements::default());
     }
 
@@ -218,8 +247,8 @@ pub async fn read_pylock_toml_requirements(
     let mut git = Vec::new();
 
     for package in &lock.packages {
-        // Skip the distribution if it's not included in the upgrade strategy.
-        if upgrade.contains(&package.name) {
+        // Skip the distribution if it should be upgraded.
+        if lowered.contains(&package.name) {
             continue;
         }
 

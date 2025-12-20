@@ -219,30 +219,6 @@ impl Upgrade {
         matches!(self, Self::All)
     }
 
-    /// Returns `true` if the specified package should be upgraded based on explicit package selection.
-    ///
-    /// Note: This only checks packages explicitly specified via `--upgrade-package`. For group-based
-    /// upgrades (`--upgrade-group`), use `groups()` to get the group names and check against the
-    /// lock file's dependency groups. The `PackagesAndGroups` variant returns `true` only for
-    /// explicitly specified packages; group membership must be checked separately.
-    pub fn contains(&self, package_name: &PackageName) -> bool {
-        match self {
-            Self::None => false,
-            Self::All => true,
-            Self::Packages(packages) => packages.contains_key(package_name),
-            Self::Groups(_) => false,
-            Self::PackagesAndGroups { packages, .. } => packages.contains_key(package_name),
-        }
-    }
-
-    /// Returns the groups to upgrade, if any.
-    pub fn groups(&self) -> Option<&FxHashSet<GroupName>> {
-        match self {
-            Self::Groups(groups) | Self::PackagesAndGroups { groups, .. } => Some(groups),
-            _ => None,
-        }
-    }
-
     /// Returns an iterator over the constraints.
     ///
     /// When upgrading, users can provide bounds on the upgrade (e.g., `--upgrade-package flask<3`).
@@ -367,7 +343,84 @@ impl Upgrade {
     }
 }
 
+/// The "lowered" upgrade specification after resolving groups to packages.
+///
+/// This is the result of "lowering" an [`Upgrade`] once we have access to dependency
+/// group information (from pyproject.toml or a lock file). Groups are resolved to their
+/// constituent packages, making it simpler for consumers to determine which packages
+/// should be upgraded.
+///
+/// Use the conversion methods in `uv_requirements::upgrade` to create a `LoweredUpgrade`
+/// from an `Upgrade`.
+#[derive(Debug, Default, Clone)]
+pub enum LoweredUpgrade {
+    /// Prefer pinned versions from the existing lockfile, if possible.
+    #[default]
+    None,
+
+    /// Allow package upgrades for all packages, ignoring the existing lockfile.
+    All,
+
+    /// Allow package upgrades, but only for the specified packages.
+    /// The map contains optional version constraints for each package.
+    Packages(FxHashMap<PackageName, Vec<Requirement>>),
+}
+
+impl LoweredUpgrade {
+    /// Returns `true` if no packages should be upgraded.
+    pub fn is_none(&self) -> bool {
+        matches!(self, Self::None)
+    }
+
+    /// Returns `true` if all packages should be upgraded.
+    pub fn is_all(&self) -> bool {
+        matches!(self, Self::All)
+    }
+
+    /// Returns `true` if the specified package should be upgraded.
+    pub fn contains(&self, package_name: &PackageName) -> bool {
+        match self {
+            Self::None => false,
+            Self::All => true,
+            Self::Packages(packages) => packages.contains_key(package_name),
+        }
+    }
+
+    /// Returns an iterator over the constraints.
+    ///
+    /// When upgrading, users can provide bounds on the upgrade (e.g., `--upgrade-package flask<3`).
+    pub fn constraints(&self) -> impl Iterator<Item = &Requirement> {
+        match self {
+            Self::Packages(packages) => Either::Right(
+                packages
+                    .values()
+                    .flat_map(|requirements| requirements.iter()),
+            ),
+            _ => Either::Left(std::iter::empty()),
+        }
+    }
+}
+
+/// Create a [`Refresh`] policy by integrating the [`LoweredUpgrade`] policy.
+impl From<LoweredUpgrade> for Refresh {
+    fn from(value: LoweredUpgrade) -> Self {
+        match value {
+            LoweredUpgrade::None => Self::None(Timestamp::now()),
+            LoweredUpgrade::All => Self::All(Timestamp::now()),
+            LoweredUpgrade::Packages(packages) => Self::Packages(
+                packages.into_keys().collect::<Vec<_>>(),
+                Vec::new(),
+                Timestamp::now(),
+            ),
+        }
+    }
+}
+
 /// Create a [`Refresh`] policy by integrating the [`Upgrade`] policy.
+///
+/// Note: For group-based upgrades, this uses a conservative refresh policy since
+/// we can't resolve groups without dependency group information. Use
+/// `From<LoweredUpgrade>` when possible for more accurate refresh behavior.
 impl From<Upgrade> for Refresh {
     fn from(value: Upgrade) -> Self {
         match value {
@@ -378,12 +431,12 @@ impl From<Upgrade> for Refresh {
                 Vec::new(),
                 Timestamp::now(),
             ),
-            // For groups, we can't determine the packages without lock file context,
-            // so we use a conservative refresh policy (no refresh).
-            // The actual refresh will be handled by the lock command.
-            Upgrade::Groups(_) => Self::None(Timestamp::now()),
-            // For packages and groups, we can at least refresh the explicitly specified packages.
-            // The group-based packages will be handled by the lock command.
+            // For groups, we can't determine the packages without dependency group context,
+            // so we use a conservative refresh policy (refresh all).
+            // The actual group resolution happens during lock/sync.
+            Upgrade::Groups(_) => Self::All(Timestamp::now()),
+            // For packages and groups, refresh at least the explicitly specified packages.
+            // Groups will be resolved and refreshed during lock/sync.
             Upgrade::PackagesAndGroups { packages, .. } => Self::Packages(
                 packages.into_keys().collect::<Vec<_>>(),
                 Vec::new(),

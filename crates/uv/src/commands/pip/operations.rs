@@ -14,7 +14,7 @@ use uv_cache::Cache;
 use uv_client::{BaseClientBuilder, RegistryClient};
 use uv_configuration::{
     BuildOptions, Concurrency, Constraints, DependencyGroups, DryRun, Excludes,
-    ExtrasSpecification, Overrides, Reinstall, Upgrade,
+    ExtrasSpecification, LoweredUpgrade, Overrides, Reinstall,
 };
 use uv_dispatch::BuildDispatch;
 use uv_distribution::{DistributionDatabase, SourcedDependencyGroups};
@@ -117,7 +117,7 @@ pub(crate) async fn resolve<InstalledPackages: InstalledPackagesProvider>(
     installed_packages: InstalledPackages,
     hasher: &HashStrategy,
     reinstall: &Reinstall,
-    upgrade: &Upgrade,
+    upgrade: &LoweredUpgrade,
     tags: Option<&Tags>,
     resolver_env: ResolverEnvironment,
     python_requirement: PythonRequirement,

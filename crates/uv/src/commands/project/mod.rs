@@ -13,7 +13,7 @@ use uv_cache_key::cache_digest;
 use uv_client::{BaseClientBuilder, FlatIndexClient, RegistryClientBuilder};
 use uv_configuration::{
     Concurrency, Constraints, DependencyGroupsWithDefaults, DryRun, ExtrasSpecification,
-    GitLfsSetting, Reinstall, TargetTriple, Upgrade,
+    GitLfsSetting, LoweredUpgrade, Reinstall, TargetTriple, Upgrade,
 };
 use uv_dispatch::{BuildDispatch, SharedState};
 use uv_distribution::{DistributionDatabase, LoweredExtraBuildDependencies, LoweredRequirement};
@@ -34,7 +34,9 @@ use uv_python::{
     PythonInstallation, PythonPreference, PythonRequest, PythonSource, PythonVariant,
     PythonVersionFile, VersionFileDiscoveryOptions, VersionRequest, satisfies_python_preference,
 };
-use uv_requirements::upgrade::{LockedRequirements, read_lock_requirements};
+use uv_requirements::upgrade::{
+    LockedRequirements, lower_upgrade_without_groups, read_lock_requirements,
+};
 use uv_requirements::{NamedRequirementsResolver, RequirementsSpecification};
 use uv_resolver::{
     FlatIndex, Installable, Lock, OptionsBuilder, Preference, PythonRequirement,
@@ -2050,6 +2052,9 @@ pub(crate) async fn resolve_environment(
     );
 
     // Resolve the requirements.
+    // Lower the upgrade specification for the resolver.
+    let lowered_upgrade = LoweredUpgrade::default();
+
     Ok(pip::operations::resolve(
         requirements,
         constraints,
@@ -2064,7 +2069,7 @@ pub(crate) async fn resolve_environment(
         EmptyInstalledPackages,
         &hasher,
         &reinstall,
-        &upgrade,
+        &lowered_upgrade,
         Some(&tags),
         ResolverEnvironment::specific(marker_env),
         python_requirement,
@@ -2444,6 +2449,12 @@ pub(crate) async fn update_environment(
         preview,
     );
 
+    // Lower the upgrade specification for the resolver.
+    // Since update_environment doesn't have access to dependency groups,
+    // we error if groups are specified.
+    let lowered_upgrade = lower_upgrade_without_groups(upgrade)
+        .expect("--upgrade-group is not supported in update_environment");
+
     // Resolve the requirements.
     let resolution = match pip::operations::resolve(
         requirements,
@@ -2459,7 +2470,7 @@ pub(crate) async fn update_environment(
         site_packages.clone(),
         &hasher,
         reinstall,
-        upgrade,
+        &lowered_upgrade,
         Some(&tags),
         ResolverEnvironment::specific(marker_env.clone()),
         python_requirement,

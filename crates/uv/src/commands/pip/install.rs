@@ -29,6 +29,7 @@ use uv_python::{
     EnvironmentPreference, Prefix, PythonDownloads, PythonEnvironment, PythonInstallation,
     PythonPreference, PythonRequest, PythonVersion, Target,
 };
+use uv_requirements::upgrade::lower_upgrade_without_groups;
 use uv_requirements::{GroupsSpecification, RequirementsSource, RequirementsSpecification};
 use uv_resolver::{
     DependencyMode, ExcludeNewer, FlatIndex, OptionsBuilder, PrereleaseMode, PylockToml,
@@ -579,6 +580,10 @@ pub(crate) async fn pip_install(
             .build_options(build_options.clone())
             .build();
 
+        // Lower the upgrade specification (pip install doesn't support --upgrade-group).
+        let lowered_upgrade = lower_upgrade_without_groups(&upgrade)
+            .expect("--upgrade-group is not supported in pip install");
+
         // Resolve the requirements.
         let resolution = match operations::resolve(
             requirements,
@@ -594,7 +599,7 @@ pub(crate) async fn pip_install(
             site_packages.clone(),
             &hasher,
             &reinstall,
-            &upgrade,
+            &lowered_upgrade,
             Some(&tags),
             ResolverEnvironment::specific(marker_env.clone()),
             python_requirement,

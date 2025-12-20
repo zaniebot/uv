@@ -1,15 +1,15 @@
-use uv_configuration::{Reinstall, Upgrade};
+use uv_configuration::{LoweredUpgrade, Reinstall};
 use uv_normalize::PackageName;
 
 /// Tracks locally installed packages that should not be selected during resolution.
 #[derive(Debug, Default, Clone)]
 pub struct Exclusions {
     reinstall: Reinstall,
-    upgrade: Upgrade,
+    upgrade: LoweredUpgrade,
 }
 
 impl Exclusions {
-    pub fn new(reinstall: Reinstall, upgrade: Upgrade) -> Self {
+    pub fn new(reinstall: Reinstall, upgrade: LoweredUpgrade) -> Self {
         Self { reinstall, upgrade }
     }
 

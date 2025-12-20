@@ -29,7 +29,8 @@ use uv_preview::{Preview, PreviewFeatures};
 use uv_pypi_types::{ConflictKind, Conflicts, SupportedEnvironments};
 use uv_python::{Interpreter, PythonDownloads, PythonEnvironment, PythonPreference, PythonRequest};
 use uv_requirements::ExtrasResolver;
-use uv_requirements::upgrade::{LockedRequirements, read_lock_requirements};
+use uv_requirements::upgrade::{LockedRequirements, lower_upgrade, read_lock_requirements};
+use uv_workspace::dependency_groups::FlatDependencyGroups;
 use uv_resolver::{
     FlatIndex, InMemoryIndex, Lock, Options, OptionsBuilder, Package, PythonRequirement,
     ResolverEnvironment, ResolverManifest, SatisfiesResult, UniversalMarker,
@@ -494,6 +495,11 @@ async fn do_lock(
     let dependency_groups = target.dependency_groups()?;
     let source_trees = vec![];
 
+    // Lower the upgrade specification by resolving groups to packages.
+    let flat_dependency_groups: FlatDependencyGroups =
+        dependency_groups.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
+    let lowered_upgrade = lower_upgrade(upgrade, &flat_dependency_groups);
+
     // If necessary, lower the overrides and constraints.
     let requirements = target.lower(
         requirements,
@@ -929,7 +935,7 @@ async fn do_lock(
                 EmptyInstalledPackages,
                 &hasher,
                 &Reinstall::default(),
-                upgrade,
+                &lowered_upgrade,
                 None,
                 resolver_env,
                 python_requirement,

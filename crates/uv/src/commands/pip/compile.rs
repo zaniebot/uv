@@ -37,10 +37,12 @@ use uv_python::{
     EnvironmentPreference, PythonEnvironment, PythonInstallation, PythonPreference, PythonRequest,
     PythonVersion, VersionRequest,
 };
-use uv_requirements::upgrade::{LockedRequirements, read_pylock_toml_requirements};
+use uv_requirements::upgrade::{
+    LockedRequirements, lower_upgrade_without_groups, read_pylock_toml_requirements,
+    read_requirements_txt,
+};
 use uv_requirements::{
     GroupsSpecification, RequirementsSource, RequirementsSpecification, is_pylock_toml,
-    upgrade::read_requirements_txt,
 };
 use uv_resolver::{
     AnnotationStyle, DependencyMode, DisplayResolutionGraph, ExcludeNewer, FlatIndex, ForkStrategy,
@@ -557,6 +559,10 @@ pub(crate) async fn pip_compile(
         .build_options(build_options.clone())
         .build();
 
+    // Lower the upgrade specification (pip compile doesn't support --upgrade-group).
+    let lowered_upgrade = lower_upgrade_without_groups(&upgrade)
+        .expect("--upgrade-group is not supported in pip compile");
+
     // Resolve the requirements.
     let resolution = match operations::resolve(
         requirements,
@@ -572,7 +578,7 @@ pub(crate) async fn pip_compile(
         EmptyInstalledPackages,
         &hasher,
         &Reinstall::None,
-        &upgrade,
+        &lowered_upgrade,
         tags.as_deref(),
         resolver_env.clone(),
         python_requirement,
