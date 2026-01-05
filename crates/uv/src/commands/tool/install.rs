@@ -709,6 +709,15 @@ pub(crate) async fn install(
         }
     };
 
+    // Extract the version from the request if a specific version was specified
+    let version = match &request {
+        ToolRequest::Package {
+            target: Target::Version(.., version),
+            ..
+        } => Some(version),
+        _ => None,
+    };
+
     finalize_tool_install(
         &environment,
         package_name,
@@ -721,6 +730,8 @@ pub(crate) async fn install(
         constraints,
         overrides,
         build_constraints,
+        version,
+        preview,
         printer,
     )?;
 

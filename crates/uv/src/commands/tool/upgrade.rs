@@ -435,6 +435,9 @@ async fn upgrade_tool(
             .collect();
 
         // If we modified the target tool, reinstall the entrypoints.
+        // Note: We don't create versioned executables during upgrade since the user
+        // didn't explicitly specify a version. If they want versioned executables,
+        // they should reinstall with `uv tool install <tool>@version`.
         finalize_tool_install(
             &environment,
             name,
@@ -447,6 +450,8 @@ async fn upgrade_tool(
             existing_tool_receipt.constraints().to_vec(),
             existing_tool_receipt.overrides().to_vec(),
             existing_tool_receipt.build_constraints().to_vec(),
+            None,
+            preview,
             printer,
         )?;
     }

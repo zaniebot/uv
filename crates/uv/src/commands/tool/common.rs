@@ -18,7 +18,7 @@ use uv_fs::replace_symlink;
 use uv_installer::SitePackages;
 use uv_normalize::PackageName;
 use uv_pep440::{Version, VersionSpecifier, VersionSpecifiers};
-use uv_preview::Preview;
+use uv_preview::{Preview, PreviewFeatures};
 use uv_python::{
     EnvironmentPreference, Interpreter, PythonDownloads, PythonEnvironment, PythonInstallation,
     PythonPreference, PythonRequest, PythonVariant, VersionRequest,
@@ -181,6 +181,8 @@ pub(crate) fn finalize_tool_install(
     constraints: Vec<Requirement>,
     overrides: Vec<Requirement>,
     build_constraints: Vec<Requirement>,
+    version: Option<&Version>,
+    preview: Preview,
     printer: Printer,
 ) -> anyhow::Result<()> {
     let executable_directory = uv_tool::tool_executable_dir()?;
@@ -299,20 +301,51 @@ pub(crate) fn finalize_tool_install(
             debug!("Installing executable: `{name}`");
 
             #[cfg(unix)]
-            replace_symlink(src, &target).context("Failed to install executable")?;
+            replace_symlink(&src, &target).context("Failed to install executable")?;
 
             #[cfg(windows)]
             if itself.as_ref().is_some_and(|itself| {
                 std::path::absolute(&target).is_ok_and(|target| *itself == target)
             }) {
-                self_replace::self_replace(src).context("Failed to install entrypoint")?;
+                self_replace::self_replace(&src).context("Failed to install entrypoint")?;
             } else {
-                fs_err::copy(src, &target).context("Failed to install entrypoint")?;
+                fs_err::copy(&src, &target).context("Failed to install entrypoint")?;
             }
 
             let tool_entry = ToolEntrypoint::new(&name, target, package.to_string());
             names.insert(tool_entry.name.clone());
             installed_entrypoints.push(tool_entry);
+
+            // Create versioned executable if the preview flag is enabled and a version was specified
+            if let Some(version) = version {
+                if preview.is_enabled(PreviewFeatures::VERSIONED_TOOL_EXECUTABLES) {
+                    let versioned_name = format!("{name}-{version}");
+                    let versioned_target = executable_directory
+                        .join(format!("{versioned_name}{}", std::env::consts::EXE_SUFFIX));
+
+                    debug!("Installing versioned executable: `{versioned_name}`");
+
+                    #[cfg(unix)]
+                    replace_symlink(&src, &versioned_target)
+                        .context("Failed to install versioned executable")?;
+
+                    #[cfg(windows)]
+                    if itself.as_ref().is_some_and(|itself| {
+                        std::path::absolute(&versioned_target).is_ok_and(|target| *itself == target)
+                    }) {
+                        self_replace::self_replace(&src)
+                            .context("Failed to install versioned entrypoint")?;
+                    } else {
+                        fs_err::copy(&src, &versioned_target)
+                            .context("Failed to install versioned entrypoint")?;
+                    }
+
+                    let versioned_entry =
+                        ToolEntrypoint::new(&versioned_name, versioned_target, package.to_string());
+                    names.insert(versioned_entry.name.clone());
+                    installed_entrypoints.push(versioned_entry);
+                }
+            }
         }
 
         let s = if names.len() == 1 { "" } else { "s" };
