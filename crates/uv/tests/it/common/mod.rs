@@ -1250,6 +1250,7 @@ impl TestContext {
     }
 
     /// Create a `uv python install` command with options shared across scenarios.
+    #[cfg(feature = "python-managed")]
     pub fn python_install(&self) -> Command {
         let mut command = Self::new_command();
         self.add_shared_options(&mut command, true);
