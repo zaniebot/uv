@@ -1139,6 +1139,14 @@ impl EnvVars {
     #[attr_added_in("0.5.19")]
     pub const UV_GIT_LFS: &'static str = "UV_GIT_LFS";
 
+    /// Disables SSH connection multiplexing for Git operations over SSH.
+    ///
+    /// When the `git-ssh-multiplex` preview feature is enabled, uv sets `GIT_SSH_COMMAND`
+    /// with SSH ControlMaster settings to share connections. Set this variable to disable
+    /// that behavior.
+    #[attr_added_in("0.7.0")]
+    pub const UV_GIT_NO_SSH_MULTIPLEX: &'static str = "UV_GIT_NO_SSH_MULTIPLEX";
+
     /// Number of times that `uv run` has been recursively invoked. Used to guard against infinite
     /// recursion, e.g., when `uv run`` is used in a script shebang.
     #[attr_hidden]
