@@ -230,6 +230,11 @@ impl BuildContext for BuildDispatch<'_> {
         &self.workspace_cache
     }
 
+    fn ssh_multiplex(&self) -> bool {
+        self.preview
+            .is_enabled(uv_preview::PreviewFeatures::GIT_SSH_MULTIPLEX)
+    }
+
     fn extra_build_requires(&self) -> &ExtraBuildRequires {
         self.extra_build_requires
     }

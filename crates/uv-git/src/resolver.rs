@@ -148,6 +148,7 @@ impl GitResolver {
         url: &GitUrl,
         disable_ssl: bool,
         offline: bool,
+        ssh_multiplex: bool,
         cache: PathBuf,
         reporter: Option<Arc<dyn Reporter>>,
     ) -> Result<Fetch, GitResolverError> {
@@ -186,6 +187,13 @@ impl GitResolver {
         // If necessary, disable SSL.
         let source = if disable_ssl {
             source.dangerous()
+        } else {
+            source
+        };
+
+        // If enabled, use SSH connection multiplexing.
+        let source = if ssh_multiplex {
+            source.with_ssh_multiplex()
         } else {
             source
         };

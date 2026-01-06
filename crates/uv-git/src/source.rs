@@ -24,6 +24,8 @@ pub struct GitSource {
     disable_ssl: bool,
     /// Whether to operate without network connectivity.
     offline: bool,
+    /// Whether to enable SSH connection multiplexing.
+    ssh_multiplex: bool,
     /// The path to the Git source database.
     cache: PathBuf,
     /// The reporter to use for this source.
@@ -37,6 +39,7 @@ impl GitSource {
             git,
             disable_ssl: false,
             offline,
+            ssh_multiplex: false,
             cache: cache.into(),
             reporter: None,
         }
@@ -47,6 +50,15 @@ impl GitSource {
     pub fn dangerous(self) -> Self {
         Self {
             disable_ssl: true,
+            ..self
+        }
+    }
+
+    /// Enable SSH connection multiplexing for this [`GitSource`].
+    #[must_use]
+    pub fn with_ssh_multiplex(self) -> Self {
+        Self {
+            ssh_multiplex: true,
             ..self
         }
     }
@@ -140,6 +152,7 @@ impl GitSource {
                 self.git.precise(),
                 self.disable_ssl,
                 self.offline,
+                self.ssh_multiplex,
                 lfs_requested,
             )?;
 

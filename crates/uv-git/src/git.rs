@@ -46,37 +46,6 @@ pub static GIT: LazyLock<Result<PathBuf, GitError>> = LazyLock::new(|| {
     })
 });
 
-/// Check if SSH connection multiplexing is enabled via the `git-ssh-multiplex` preview feature.
-///
-/// Returns `true` if:
-/// - The `git-ssh-multiplex` preview feature is enabled (via `UV_PREVIEW` or `UV_PREVIEW_FEATURES`)
-/// - AND `UV_GIT_NO_SSH_MULTIPLEX` is not set
-static SSH_MULTIPLEX_ENABLED: LazyLock<bool> = LazyLock::new(|| {
-    // Check if disabled via UV_GIT_NO_SSH_MULTIPLEX
-    if std::env::var_os(EnvVars::UV_GIT_NO_SSH_MULTIPLEX).is_some() {
-        return false;
-    }
-
-    // Check if UV_PREVIEW is set (enables all preview features)
-    if let Some(value) = std::env::var_os(EnvVars::UV_PREVIEW) {
-        if let Some(s) = value.to_str() {
-            let s = s.to_lowercase();
-            if matches!(s.as_str(), "1" | "true" | "yes" | "on") {
-                return true;
-            }
-        }
-    }
-
-    // Check if git-ssh-multiplex is in UV_PREVIEW_FEATURES
-    if let Some(features) = std::env::var_os(EnvVars::UV_PREVIEW_FEATURES) {
-        if let Some(s) = features.to_str() {
-            return s.split(',').any(|f| f.trim() == "git-ssh-multiplex");
-        }
-    }
-
-    false
-});
-
 /// Strategy when fetching refspecs for a [`GitReference`]
 enum RefspecStrategy {
     /// All refspecs should be fetched, if any fail then the fetch will fail.
@@ -309,13 +278,14 @@ impl GitRemote {
         locked_rev: Option<GitOid>,
         disable_ssl: bool,
         offline: bool,
+        ssh_multiplex: bool,
         with_lfs: bool,
     ) -> Result<(GitDatabase, GitOid)> {
         let reference = locked_rev
             .map(ReferenceOrOid::Oid)
             .unwrap_or(ReferenceOrOid::Reference(reference));
         if let Some(mut db) = db {
-            fetch(&mut db.repo, &self.url, reference, disable_ssl, offline)
+            fetch(&mut db.repo, &self.url, reference, disable_ssl, offline, ssh_multiplex)
                 .with_context(|| format!("failed to fetch into: {}", into.user_display()))?;
 
             let resolved_commit_hash = match locked_rev {
@@ -325,7 +295,7 @@ impl GitRemote {
 
             if let Some(rev) = resolved_commit_hash {
                 if with_lfs {
-                    let lfs_ready = fetch_lfs(&mut db.repo, &self.url, &rev, disable_ssl)
+                    let lfs_ready = fetch_lfs(&mut db.repo, &self.url, &rev, disable_ssl, ssh_multiplex)
                         .with_context(|| format!("failed to fetch LFS objects at {rev}"))?;
                     db = db.with_lfs_ready(Some(lfs_ready));
                 }
@@ -344,7 +314,7 @@ impl GitRemote {
 
         fs_err::create_dir_all(into)?;
         let mut repo = GitRepository::init(into)?;
-        fetch(&mut repo, &self.url, reference, disable_ssl, offline)
+        fetch(&mut repo, &self.url, reference, disable_ssl, offline, ssh_multiplex)
             .with_context(|| format!("failed to clone into: {}", into.user_display()))?;
         let rev = match locked_rev {
             Some(rev) => rev,
@@ -352,7 +322,7 @@ impl GitRemote {
         };
         let lfs_ready = with_lfs
             .then(|| {
-                fetch_lfs(&mut repo, &self.url, &rev, disable_ssl)
+                fetch_lfs(&mut repo, &self.url, &rev, disable_ssl, ssh_multiplex)
                     .with_context(|| format!("failed to fetch LFS objects at {rev}"))
             })
             .transpose()?;
@@ -531,25 +501,15 @@ impl GitCheckout {
             .exec_with_output()?;
 
         // Update submodules (`git submodule update --recursive`).
-        let mut submodule_cmd = ProcessBuilder::new(GIT.as_ref()?);
-        submodule_cmd
+        ProcessBuilder::new(GIT.as_ref()?)
             .arg("submodule")
             .arg("update")
             .arg("--recursive")
             .arg("--init")
             .env(EnvVars::GIT_LFS_SKIP_SMUDGE, lfs_skip_smudge)
-            .cwd(&self.repo.path);
-
-        // Enable SSH connection multiplexing if the preview feature is enabled.
-        if *SSH_MULTIPLEX_ENABLED && std::env::var_os(EnvVars::GIT_SSH_COMMAND).is_none() {
-            debug!("Enabling SSH connection multiplexing via `GIT_SSH_COMMAND` for submodule update");
-            submodule_cmd.env(
-                EnvVars::GIT_SSH_COMMAND,
-                "ssh -o ControlMaster=auto -o ControlPath=~/.ssh/uv-ssh-%r@%h:%p -o ControlPersist=60",
-            );
-        }
-
-        submodule_cmd.exec_with_output().map(drop)?;
+            .cwd(&self.repo.path)
+            .exec_with_output()
+            .map(drop)?;
 
         // Validate Git LFS objects (if needed) after the reset.
         // See `fetch_lfs` why we do this.
@@ -584,6 +544,7 @@ fn fetch(
     reference: ReferenceOrOid<'_>,
     disable_ssl: bool,
     offline: bool,
+    ssh_multiplex: bool,
 ) -> Result<()> {
     let oid_to_fetch = if let ReferenceOrOid::Oid(rev) = reference {
         let local_object = reference.resolve(repo).ok();
@@ -671,6 +632,7 @@ fn fetch(
             tags,
             disable_ssl,
             offline,
+            ssh_multiplex,
         ),
         RefspecStrategy::First => {
             // Try each refspec
@@ -684,6 +646,7 @@ fn fetch(
                         tags,
                         disable_ssl,
                         offline,
+                        ssh_multiplex,
                     );
 
                     // Stop after the first success and log failures
@@ -731,6 +694,7 @@ fn fetch_with_cli(
     tags: bool,
     disable_ssl: bool,
     offline: bool,
+    ssh_multiplex: bool,
 ) -> Result<()> {
     let mut cmd = ProcessBuilder::new(GIT.as_ref()?);
     // Disable interactive prompts in the terminal, as they'll be erased by the progress bar
@@ -738,11 +702,11 @@ fn fetch_with_cli(
     // are still usable.
     cmd.env(EnvVars::GIT_TERMINAL_PROMPT, "0");
 
-    // Enable SSH connection multiplexing if the preview feature is enabled and the user
-    // hasn't set GIT_SSH_COMMAND themselves. This allows multiple SSH connections to the
-    // same host to share a single connection, which helps avoid connection throttling when
-    // fetching many git+ssh dependencies from the same host (e.g., GitHub).
-    if *SSH_MULTIPLEX_ENABLED && std::env::var_os(EnvVars::GIT_SSH_COMMAND).is_none() {
+    // Enable SSH connection multiplexing if enabled and the user hasn't set GIT_SSH_COMMAND
+    // themselves. This allows multiple SSH connections to the same host to share a single
+    // connection, which helps avoid connection throttling when fetching many git+ssh
+    // dependencies from the same host (e.g., GitHub).
+    if ssh_multiplex && std::env::var_os(EnvVars::GIT_SSH_COMMAND).is_none() {
         debug!("Enabling SSH connection multiplexing via `GIT_SSH_COMMAND`");
         cmd.env(
             EnvVars::GIT_SSH_COMMAND,
@@ -822,6 +786,7 @@ fn fetch_lfs(
     url: &Url,
     revision: &GitOid,
     disable_ssl: bool,
+    ssh_multiplex: bool,
 ) -> Result<bool> {
     let mut cmd = if let Ok(lfs) = GIT_LFS.as_ref() {
         debug!("Fetching Git LFS objects");
@@ -837,8 +802,8 @@ fn fetch_lfs(
         cmd.env(EnvVars::GIT_SSL_NO_VERIFY, "true");
     }
 
-    // Enable SSH connection multiplexing if the preview feature is enabled.
-    if *SSH_MULTIPLEX_ENABLED && std::env::var_os(EnvVars::GIT_SSH_COMMAND).is_none() {
+    // Enable SSH connection multiplexing if enabled.
+    if ssh_multiplex && std::env::var_os(EnvVars::GIT_SSH_COMMAND).is_none() {
         debug!("Enabling SSH connection multiplexing via `GIT_SSH_COMMAND` for LFS fetch");
         cmd.env(
             EnvVars::GIT_SSH_COMMAND,

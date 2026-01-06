@@ -1575,6 +1575,7 @@ impl<'a, T: BuildContext> SourceDistributionBuilder<'a, T> {
                 resource.git,
                 client.unmanaged.disable_ssl(resource.git.repository()),
                 client.unmanaged.connectivity() == Connectivity::Offline,
+                self.build_context.ssh_multiplex(),
                 self.build_context.cache().bucket(CacheBucket::Git),
                 self.reporter
                     .clone()
@@ -1790,6 +1791,7 @@ impl<'a, T: BuildContext> SourceDistributionBuilder<'a, T> {
                 resource.git,
                 client.unmanaged.disable_ssl(resource.git.repository()),
                 client.unmanaged.connectivity() == Connectivity::Offline,
+                self.build_context.ssh_multiplex(),
                 self.build_context.cache().bucket(CacheBucket::Git),
                 self.reporter
                     .clone()
@@ -2054,6 +2056,7 @@ impl<'a, T: BuildContext> SourceDistributionBuilder<'a, T> {
                 git,
                 client.unmanaged.disable_ssl(git.repository()),
                 client.unmanaged.connectivity() == Connectivity::Offline,
+                self.build_context.ssh_multiplex(),
                 self.build_context.cache().bucket(CacheBucket::Git),
                 self.reporter
                     .clone()

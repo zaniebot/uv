@@ -105,6 +105,9 @@ pub trait BuildContext {
     /// Workspace discovery caching.
     fn workspace_cache(&self) -> &WorkspaceCache;
 
+    /// Whether SSH connection multiplexing is enabled for Git operations.
+    fn ssh_multiplex(&self) -> bool;
+
     /// Get the extra build requirements.
     fn extra_build_requires(&self) -> &ExtraBuildRequires;
 
