@@ -48,22 +48,20 @@ pub static GIT: LazyLock<Result<PathBuf, GitError>> = LazyLock::new(|| {
 
 /// Returns the SSH command to use for Git operations.
 ///
-/// If the user has already set `GIT_SSH_COMMAND`, returns `None` to avoid overriding their
-/// configuration. If `ssh_multiplex` is enabled, returns an SSH command with connection
-/// multiplexing options that allow multiple SSH connections to the same host to share a
-/// single connection, helping avoid connection throttling when fetching many git+ssh
+/// If `ssh_multiplex` is disabled, returns `None`. Otherwise, returns the user's
+/// existing `GIT_SSH_COMMAND` if set, or an SSH command with connection multiplexing
+/// options that allow multiple SSH connections to the same host to share a single
+/// connection, helping avoid connection throttling when fetching many git+ssh
 /// dependencies from the same host (e.g., GitHub).
-fn git_ssh_command(ssh_multiplex: bool) -> Option<&'static str> {
-    if std::env::var_os(EnvVars::GIT_SSH_COMMAND).is_some() {
-        // User has already set GIT_SSH_COMMAND, don't override.
+fn git_ssh_command(ssh_multiplex: bool) -> Option<std::ffi::OsString> {
+    if !ssh_multiplex {
         return None;
     }
-    if ssh_multiplex {
-        return Some(
+    Some(std::env::var_os(EnvVars::GIT_SSH_COMMAND).unwrap_or_else(|| {
+        std::ffi::OsString::from(
             "ssh -o ControlMaster=auto -o ControlPath=~/.ssh/uv-ssh-%r@%h:%p -o ControlPersist=60",
-        );
-    }
-    None
+        )
+    }))
 }
 
 /// Strategy when fetching refspecs for a [`GitReference`]
