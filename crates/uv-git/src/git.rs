@@ -46,6 +46,26 @@ pub static GIT: LazyLock<Result<PathBuf, GitError>> = LazyLock::new(|| {
     })
 });
 
+/// Returns the SSH command to use for Git operations.
+///
+/// If the user has already set `GIT_SSH_COMMAND`, returns `None` to avoid overriding their
+/// configuration. If `ssh_multiplex` is enabled, returns an SSH command with connection
+/// multiplexing options that allow multiple SSH connections to the same host to share a
+/// single connection, helping avoid connection throttling when fetching many git+ssh
+/// dependencies from the same host (e.g., GitHub).
+fn git_ssh_command(ssh_multiplex: bool) -> Option<&'static str> {
+    if std::env::var_os(EnvVars::GIT_SSH_COMMAND).is_some() {
+        // User has already set GIT_SSH_COMMAND, don't override.
+        return None;
+    }
+    if ssh_multiplex {
+        return Some(
+            "ssh -o ControlMaster=auto -o ControlPath=~/.ssh/uv-ssh-%r@%h:%p -o ControlPersist=60",
+        );
+    }
+    None
+}
+
 /// Strategy when fetching refspecs for a [`GitReference`]
 enum RefspecStrategy {
     /// All refspecs should be fetched, if any fail then the fetch will fail.
@@ -702,16 +722,9 @@ fn fetch_with_cli(
     // are still usable.
     cmd.env(EnvVars::GIT_TERMINAL_PROMPT, "0");
 
-    // Enable SSH connection multiplexing if enabled and the user hasn't set GIT_SSH_COMMAND
-    // themselves. This allows multiple SSH connections to the same host to share a single
-    // connection, which helps avoid connection throttling when fetching many git+ssh
-    // dependencies from the same host (e.g., GitHub).
-    if ssh_multiplex && std::env::var_os(EnvVars::GIT_SSH_COMMAND).is_none() {
+    if let Some(ssh_cmd) = git_ssh_command(ssh_multiplex) {
         debug!("Enabling SSH connection multiplexing via `GIT_SSH_COMMAND`");
-        cmd.env(
-            EnvVars::GIT_SSH_COMMAND,
-            "ssh -o ControlMaster=auto -o ControlPath=~/.ssh/uv-ssh-%r@%h:%p -o ControlPersist=60",
-        );
+        cmd.env(EnvVars::GIT_SSH_COMMAND, ssh_cmd);
     }
 
     cmd.arg("fetch");
@@ -802,13 +815,9 @@ fn fetch_lfs(
         cmd.env(EnvVars::GIT_SSL_NO_VERIFY, "true");
     }
 
-    // Enable SSH connection multiplexing if enabled.
-    if ssh_multiplex && std::env::var_os(EnvVars::GIT_SSH_COMMAND).is_none() {
+    if let Some(ssh_cmd) = git_ssh_command(ssh_multiplex) {
         debug!("Enabling SSH connection multiplexing via `GIT_SSH_COMMAND` for LFS fetch");
-        cmd.env(
-            EnvVars::GIT_SSH_COMMAND,
-            "ssh -o ControlMaster=auto -o ControlPath=~/.ssh/uv-ssh-%r@%h:%p -o ControlPersist=60",
-        );
+        cmd.env(EnvVars::GIT_SSH_COMMAND, ssh_cmd);
     }
 
     cmd.arg("fetch")
