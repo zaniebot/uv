@@ -7587,6 +7587,20 @@ pub struct PublishArgs {
     #[arg(long)]
     pub dry_run: bool,
 
+    /// Check that distribution files are compatible with PyPI's limitations.
+    ///
+    /// This validates that the platform tags in wheel files are accepted by PyPI.
+    /// PyPI only accepts a subset of platform tags, such as manylinux, musllinux,
+    /// Windows, and macOS wheels with specific architectures and versions.
+    ///
+    /// Wheels with unsupported platform tags (e.g., FreeBSD, plain linux_x86_64,
+    /// or non-standard macOS versions) will be reported as incompatible.
+    ///
+    /// When combined with `--dry-run`, performs only the compatibility check without
+    /// any upload validation against the index.
+    #[arg(long)]
+    pub check: bool,
+
     /// Do not upload attestations for the published files.
     ///
     /// By default, uv attempts to upload matching PEP 740 attestations with each distribution

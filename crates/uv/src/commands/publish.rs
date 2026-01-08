@@ -14,8 +14,8 @@ use uv_client::{
 use uv_configuration::{KeyringProviderType, TrustedPublishing};
 use uv_distribution_types::{IndexCapabilities, IndexLocations, IndexUrl};
 use uv_publish::{
-    CheckUrlClient, FormMetadata, PublishError, TrustedPublishResult, check_trusted_publishing,
-    group_files_for_publishing, upload,
+    CheckUrlClient, FormMetadata, PublishError, TrustedPublishResult, check_pypi_compat,
+    check_trusted_publishing, group_files_for_publishing, upload,
 };
 use uv_redacted::DisplaySafeUrl;
 use uv_settings::EnvironmentOptions;
@@ -38,6 +38,7 @@ pub(crate) async fn publish(
     index: Option<String>,
     index_locations: IndexLocations,
     dry_run: bool,
+    check: bool,
     no_attestations: bool,
     cache: &Cache,
     printer: Printer,
@@ -91,8 +92,59 @@ pub(crate) async fn publish(
     };
 
     let groups = group_files_for_publishing(paths, no_attestations)?;
+    if groups.is_empty() {
+        bail!("No files found to publish");
+    }
+
+    // If --check is enabled, validate PyPI compatibility for all files.
+    if check {
+        writeln!(
+            printer.stderr(),
+            "{}",
+            "Checking PyPI compatibility...".bold().cyan()
+        )?;
+
+        let mut has_issues = false;
+        for group in &groups {
+            let result = check_pypi_compat(&group.filename);
+            if result.is_compatible() {
+                writeln!(
+                    printer.stderr(),
+                    "  {} {}",
+                    "✓".green(),
+                    group.filename.bold()
+                )?;
+            } else {
+                has_issues = true;
+                writeln!(
+                    printer.stderr(),
+                    "  {} {}",
+                    "✗".red(),
+                    group.filename.bold()
+                )?;
+                for issue in &result.issues {
+                    writeln!(printer.stderr(), "    {}", issue.to_string().red())?;
+                }
+            }
+        }
+
+        if has_issues {
+            bail!("Some distributions are not compatible with PyPI");
+        }
+
+        writeln!(
+            printer.stderr(),
+            "{}",
+            "All distributions are compatible with PyPI".green()
+        )?;
+
+        // If only checking, exit early with success
+        if dry_run {
+            return Ok(ExitStatus::Success);
+        }
+    }
+
     match groups.len() {
-        0 => bail!("No files found to publish"),
         1 => {
             if dry_run {
                 writeln!(printer.stderr(), "Checking 1 file against {publish_url}")?;

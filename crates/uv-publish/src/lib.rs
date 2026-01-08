@@ -1,4 +1,7 @@
+mod pypi_compat;
 mod trusted_publishing;
+
+pub use pypi_compat::{PypiCompatError, PypiCompatResult, check_pypi_compat, check_pypi_compat_path};
 
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
