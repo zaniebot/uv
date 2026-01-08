@@ -5224,6 +5224,17 @@ pub struct ToolRunArgs {
     #[arg(long, value_hint = ValueHint::Other)]
     pub from: Option<String>,
 
+    /// Run the tool using the version from the current project's lockfile.
+    ///
+    /// If `--from-project` is provided, uv will sync the project environment and use the package
+    /// version from the lockfile (if present). If the package is not found in the lockfile or
+    /// there is no project, the tool will be run as usual.
+    ///
+    /// This is useful for running tools at the version specified in a project's dependencies,
+    /// ensuring consistency across development environments.
+    #[arg(long, value_parser = clap::builder::BoolishValueParser::new(), conflicts_with = "from")]
+    pub from_project: bool,
+
     /// Run with the given packages installed.
     #[arg(short = 'w', long, value_hint = ValueHint::Other)]
     pub with: Vec<comma::CommaSeparatedRequirements>,

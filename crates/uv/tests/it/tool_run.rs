@@ -3506,3 +3506,182 @@ fn tool_run_windows_dotted_package_name() -> anyhow::Result<()> {
 
     Ok(())
 }
+
+/// Test `uvx --from-project` uses the package version from the project's lockfile.
+#[test]
+fn tool_run_from_project() -> anyhow::Result<()> {
+    let context = TestContext::new("3.12").with_filtered_counts();
+    let tool_dir = context.temp_dir.child("tools");
+    let bin_dir = context.temp_dir.child("bin");
+
+    // Create a pyproject.toml with pytest as a dependency
+    let pyproject_toml = context.temp_dir.child("pyproject.toml");
+    pyproject_toml.write_str(indoc! { r#"
+        [project]
+        name = "test-project"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        dependencies = ["pytest==8.0.0"]
+        "#
+    })?;
+
+    // Generate a lockfile
+    uv_snapshot!(context.filters(), context.lock(), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Resolved [N] packages in [TIME]
+    "###);
+
+    // Run pytest with --from-project, which should use version 8.0.0 from the lockfile
+    uv_snapshot!(context.filters(), context.tool_run()
+        .arg("--from-project")
+        .arg("pytest")
+        .arg("--version")
+        .env(EnvVars::UV_TOOL_DIR, tool_dir.as_os_str())
+        .env(EnvVars::XDG_BIN_HOME, bin_dir.as_os_str()), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    pytest 8.0.0
+
+    ----- stderr -----
+    Resolved [N] packages in [TIME]
+    Prepared [N] packages in [TIME]
+    Installed [N] packages in [TIME]
+     + iniconfig==2.0.0
+     + packaging==24.0
+     + pluggy==1.4.0
+     + pytest==8.0.0
+    "###);
+
+    Ok(())
+}
+
+/// Test `uvx --from-project` runs normally when the package is not in the lockfile.
+#[test]
+fn tool_run_from_project_not_in_lockfile() -> anyhow::Result<()> {
+    let context = TestContext::new("3.12").with_filtered_counts();
+    let tool_dir = context.temp_dir.child("tools");
+    let bin_dir = context.temp_dir.child("bin");
+
+    // Create a pyproject.toml without pytest
+    let pyproject_toml = context.temp_dir.child("pyproject.toml");
+    pyproject_toml.write_str(indoc! { r#"
+        [project]
+        name = "test-project"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        dependencies = ["anyio"]
+        "#
+    })?;
+
+    // Generate a lockfile
+    uv_snapshot!(context.filters(), context.lock(), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Resolved [N] packages in [TIME]
+    "###);
+
+    // Run pytest with --from-project, which should use the latest version (not in lockfile)
+    uv_snapshot!(context.filters(), context.tool_run()
+        .arg("--from-project")
+        .arg("pytest")
+        .arg("--version")
+        .env(EnvVars::UV_TOOL_DIR, tool_dir.as_os_str())
+        .env(EnvVars::XDG_BIN_HOME, bin_dir.as_os_str()), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    pytest 8.1.1
+
+    ----- stderr -----
+    Resolved [N] packages in [TIME]
+    Prepared [N] packages in [TIME]
+    Installed [N] packages in [TIME]
+     + iniconfig==2.0.0
+     + packaging==24.0
+     + pluggy==1.4.0
+     + pytest==8.1.1
+    "###);
+
+    Ok(())
+}
+
+/// Test `uvx --from-project` runs normally when there's no project.
+#[test]
+fn tool_run_from_project_no_project() {
+    let context = TestContext::new("3.12").with_filtered_counts();
+    let tool_dir = context.temp_dir.child("tools");
+    let bin_dir = context.temp_dir.child("bin");
+
+    // No pyproject.toml - should run normally
+    uv_snapshot!(context.filters(), context.tool_run()
+        .arg("--from-project")
+        .arg("pytest")
+        .arg("--version")
+        .env(EnvVars::UV_TOOL_DIR, tool_dir.as_os_str())
+        .env(EnvVars::XDG_BIN_HOME, bin_dir.as_os_str()), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    pytest 8.1.1
+
+    ----- stderr -----
+    Resolved [N] packages in [TIME]
+    Prepared [N] packages in [TIME]
+    Installed [N] packages in [TIME]
+     + iniconfig==2.0.0
+     + packaging==24.0
+     + pluggy==1.4.0
+     + pytest==8.1.1
+    "###);
+}
+
+/// Test `uvx --from-project` runs normally when there's no lockfile.
+#[test]
+fn tool_run_from_project_no_lockfile() -> anyhow::Result<()> {
+    let context = TestContext::new("3.12").with_filtered_counts();
+    let tool_dir = context.temp_dir.child("tools");
+    let bin_dir = context.temp_dir.child("bin");
+
+    // Create a pyproject.toml but don't generate a lockfile
+    let pyproject_toml = context.temp_dir.child("pyproject.toml");
+    pyproject_toml.write_str(indoc! { r#"
+        [project]
+        name = "test-project"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        dependencies = ["pytest==8.0.0"]
+        "#
+    })?;
+
+    // Run pytest with --from-project without a lockfile, should run normally
+    uv_snapshot!(context.filters(), context.tool_run()
+        .arg("--from-project")
+        .arg("pytest")
+        .arg("--version")
+        .env(EnvVars::UV_TOOL_DIR, tool_dir.as_os_str())
+        .env(EnvVars::XDG_BIN_HOME, bin_dir.as_os_str()), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    pytest 8.1.1
+
+    ----- stderr -----
+    Resolved [N] packages in [TIME]
+    Prepared [N] packages in [TIME]
+    Installed [N] packages in [TIME]
+     + iniconfig==2.0.0
+     + packaging==24.0
+     + pluggy==1.4.0
+     + pytest==8.1.1
+    "###);
+
+    Ok(())
+}

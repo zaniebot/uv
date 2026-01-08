@@ -539,6 +539,7 @@ impl RunSettings {
 pub(crate) struct ToolRunSettings {
     pub(crate) command: Option<ExternalCommand>,
     pub(crate) from: Option<String>,
+    pub(crate) from_project: bool,
     pub(crate) with: Vec<String>,
     pub(crate) with_requirements: Vec<PathBuf>,
     pub(crate) with_editable: Vec<String>,
@@ -570,6 +571,7 @@ impl ToolRunSettings {
         let ToolRunArgs {
             command,
             from,
+            from_project,
             with,
             with_editable,
             with_requirements,
@@ -639,6 +641,7 @@ impl ToolRunSettings {
         Self {
             command,
             from,
+            from_project,
             with: with
                 .into_iter()
                 .flat_map(CommaSeparatedRequirements::into_iter)

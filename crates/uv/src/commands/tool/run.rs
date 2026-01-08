@@ -41,7 +41,7 @@ use uv_static::EnvVars;
 use uv_tool::{InstalledTools, entrypoint_paths};
 use uv_warnings::warn_user;
 use uv_warnings::warn_user_once;
-use uv_workspace::WorkspaceCache;
+use uv_workspace::{DiscoveryOptions, VirtualProject, WorkspaceCache, WorkspaceError};
 
 use crate::child::run_to_completion;
 use crate::commands::ExitStatus;
@@ -54,6 +54,7 @@ use crate::commands::pip::operations;
 use crate::commands::project::{
     EnvironmentSpecification, PlatformState, ProjectError, resolve_names,
 };
+use uv_resolver::{Lock, VERSION};
 use crate::commands::reporters::PythonDownloadReporter;
 use crate::commands::tool::common::{matching_packages, refine_interpreter};
 use crate::commands::tool::{Target, ToolRequest};
@@ -99,6 +100,7 @@ fn find_verbose_flag(args: &[std::ffi::OsString]) -> Option<&str> {
 pub(crate) async fn run(
     command: Option<ExternalCommand>,
     from: Option<String>,
+    from_project: bool,
     with: &[RequirementsSource],
     constraints: &[RequirementsSource],
     overrides: &[RequirementsSource],
@@ -272,6 +274,110 @@ pub(crate) async fn run(
             }
         }
     }
+
+    // If `--from-project` is specified, try to look up the package version from the project's lockfile.
+    let from = if from_project && from.is_none() {
+        // Get the current working directory
+        let project_dir = std::env::current_dir().context("Failed to get current directory")?;
+
+        let workspace_cache = WorkspaceCache::default();
+
+        // Try to discover the workspace
+        match VirtualProject::discover(&project_dir, &DiscoveryOptions::default(), &workspace_cache)
+            .await
+        {
+            Ok(project) => {
+                // Read the lockfile if it exists
+                let lock_path = project.workspace().install_path().join("uv.lock");
+                match fs_err::tokio::read_to_string(&lock_path).await {
+                    Ok(encoded) => {
+                        match toml::from_str::<Lock>(&encoded) {
+                            Ok(lock) => {
+                                // Check version compatibility
+                                if lock.version() != VERSION {
+                                    debug!(
+                                        "Lockfile version mismatch (expected {}, got {}), running as normal",
+                                        VERSION,
+                                        lock.version()
+                                    );
+                                    None
+                                } else {
+                                    // Try to find the package by name (the target command name)
+                                    let package_name = PackageName::from_str(target).ok();
+                                    if let Some(package_name) = package_name {
+                                        match lock.find_by_name(&package_name) {
+                                            Ok(Some(package)) => {
+                                                // Found the package, use its version
+                                                if let Some(version) = package.version() {
+                                                    debug!(
+                                                        "Found `{}` version `{}` in lockfile at `{}`",
+                                                        package_name,
+                                                        version,
+                                                        lock_path.display()
+                                                    );
+                                                    Some(format!("{}=={}", package_name, version))
+                                                } else {
+                                                    debug!(
+                                                        "Package `{}` found in lockfile but has no version, running as normal",
+                                                        package_name
+                                                    );
+                                                    None
+                                                }
+                                            }
+                                            Ok(None) => {
+                                                debug!(
+                                                    "Package `{}` not found in lockfile, running as normal",
+                                                    package_name
+                                                );
+                                                None
+                                            }
+                                            Err(err) => {
+                                                debug!(
+                                                    "Multiple packages matching `{}` in lockfile: {}, running as normal",
+                                                    package_name, err
+                                                );
+                                                None
+                                            }
+                                        }
+                                    } else {
+                                        debug!(
+                                            "Could not parse `{}` as a package name, running as normal",
+                                            target
+                                        );
+                                        None
+                                    }
+                                }
+                            }
+                            Err(err) => {
+                                debug!("Failed to parse lockfile: {}, running as normal", err);
+                                None
+                            }
+                        }
+                    }
+                    Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
+                        debug!("No lockfile found at `{}`, running as normal", lock_path.display());
+                        None
+                    }
+                    Err(err) => {
+                        debug!("Failed to read lockfile: {}, running as normal", err);
+                        None
+                    }
+                }
+            }
+            Err(WorkspaceError::MissingProject(_))
+            | Err(WorkspaceError::MissingPyprojectToml)
+            | Err(WorkspaceError::NonWorkspace(_)) => {
+                debug!("No project found, running as normal");
+                None
+            }
+            Err(err) => {
+                debug!("Failed to discover project: {}, running as normal", err);
+                None
+            }
+        }
+    } else {
+        from
+    };
 
     let request = ToolRequest::parse(target, from.as_deref())?;
 

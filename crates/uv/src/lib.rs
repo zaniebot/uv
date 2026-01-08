@@ -1371,6 +1371,7 @@ async fn run(mut cli: Cli) -> Result<ExitStatus> {
             Box::pin(commands::tool_run(
                 args.command,
                 args.from,
+                args.from_project,
                 &requirements,
                 &constraints,
                 &overrides,
