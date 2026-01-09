@@ -1,6 +1,4 @@
 use std::ffi::{OsStr, OsString};
-#[cfg(target_os = "macos")]
-use std::io::Read as _;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::SystemTime;
@@ -199,7 +197,7 @@ enum Attempt {
     UseCopyFallback,
 }
 
-/// Mach-O magic numbers for detecting executable files on macOS.
+/// Check if a file is a macOS executable that benefits from hardlinking.
 ///
 /// On macOS, code signature verification is cached per-inode (vnode). When using reflinks
 /// (copy-on-write), each cloned file gets a new inode, requiring full signature re-validation
@@ -207,23 +205,6 @@ enum Attempt {
 ///
 /// To avoid this, we use hardlinks for executable files (which share the same inode as the
 /// cached original), allowing signature validation to be reused.
-#[cfg(target_os = "macos")]
-mod mach_o {
-    /// 32-bit Mach-O magic (big-endian)
-    pub const MH_MAGIC: [u8; 4] = [0xFE, 0xED, 0xFA, 0xCE];
-    /// 32-bit Mach-O magic (little-endian)
-    pub const MH_CIGAM: [u8; 4] = [0xCE, 0xFA, 0xED, 0xFE];
-    /// 64-bit Mach-O magic (big-endian)
-    pub const MH_MAGIC_64: [u8; 4] = [0xFE, 0xED, 0xFA, 0xCF];
-    /// 64-bit Mach-O magic (little-endian)
-    pub const MH_CIGAM_64: [u8; 4] = [0xCF, 0xFA, 0xED, 0xFE];
-    /// Universal binary magic (big-endian)
-    pub const FAT_MAGIC: [u8; 4] = [0xCA, 0xFE, 0xBA, 0xBE];
-    /// Universal binary magic (little-endian)
-    pub const FAT_CIGAM: [u8; 4] = [0xBE, 0xBA, 0xFE, 0xCA];
-}
-
-/// Check if a file is a macOS executable that benefits from hardlinking.
 ///
 /// This includes:
 /// - Dynamic libraries (*.dylib)
@@ -237,6 +218,8 @@ mod mach_o {
 /// - Data files, configs, resources
 #[cfg(target_os = "macos")]
 fn is_macos_executable(path: &Path) -> bool {
+    use std::io::Read;
+
     // Check by extension first (fast path)
     if let Some(ext) = path.extension() {
         if ext == "dylib" || ext == "so" {
@@ -248,7 +231,7 @@ fn is_macos_executable(path: &Path) -> bool {
         }
     }
 
-    // Check for Mach-O magic bytes
+    // Peek at magic bytes to detect Mach-O binaries
     let Ok(mut file) = std::fs::File::open(path) else {
         return false;
     };
@@ -258,14 +241,15 @@ fn is_macos_executable(path: &Path) -> bool {
         return false;
     }
 
+    // Mach-O magic bytes (big and little endian variants)
     matches!(
         magic,
-        mach_o::MH_MAGIC
-            | mach_o::MH_CIGAM
-            | mach_o::MH_MAGIC_64
-            | mach_o::MH_CIGAM_64
-            | mach_o::FAT_MAGIC
-            | mach_o::FAT_CIGAM
+        [0xFE, 0xED, 0xFA, 0xCE]    // MH_MAGIC (32-bit big-endian)
+            | [0xCE, 0xFA, 0xED, 0xFE] // MH_CIGAM (32-bit little-endian)
+            | [0xFE, 0xED, 0xFA, 0xCF] // MH_MAGIC_64 (64-bit big-endian)
+            | [0xCF, 0xFA, 0xED, 0xFE] // MH_CIGAM_64 (64-bit little-endian)
+            | [0xCA, 0xFE, 0xBA, 0xBE] // FAT_MAGIC (universal big-endian)
+            | [0xBE, 0xBA, 0xFE, 0xCA] // FAT_CIGAM (universal little-endian)
     )
 }
 
@@ -832,27 +816,27 @@ mod tests {
         let dir = TempDir::new().unwrap();
 
         // 64-bit Mach-O little-endian (most common on modern macOS)
-        let macho64_le = create_test_file(&dir, "binary64_le", &mach_o::MH_CIGAM_64);
+        let macho64_le = create_test_file(&dir, "binary64_le", b"\xCF\xFA\xED\xFE");
         assert!(is_macos_executable(&macho64_le));
 
         // 64-bit Mach-O big-endian
-        let macho64_be = create_test_file(&dir, "binary64_be", &mach_o::MH_MAGIC_64);
+        let macho64_be = create_test_file(&dir, "binary64_be", b"\xFE\xED\xFA\xCF");
         assert!(is_macos_executable(&macho64_be));
 
         // 32-bit Mach-O little-endian
-        let macho32_le = create_test_file(&dir, "binary32_le", &mach_o::MH_CIGAM);
+        let macho32_le = create_test_file(&dir, "binary32_le", b"\xCE\xFA\xED\xFE");
         assert!(is_macos_executable(&macho32_le));
 
         // 32-bit Mach-O big-endian
-        let macho32_be = create_test_file(&dir, "binary32_be", &mach_o::MH_MAGIC);
+        let macho32_be = create_test_file(&dir, "binary32_be", b"\xFE\xED\xFA\xCE");
         assert!(is_macos_executable(&macho32_be));
 
         // Universal (fat) binary big-endian
-        let fat_be = create_test_file(&dir, "universal_be", &mach_o::FAT_MAGIC);
+        let fat_be = create_test_file(&dir, "universal_be", b"\xCA\xFE\xBA\xBE");
         assert!(is_macos_executable(&fat_be));
 
         // Universal (fat) binary little-endian
-        let fat_le = create_test_file(&dir, "universal_le", &mach_o::FAT_CIGAM);
+        let fat_le = create_test_file(&dir, "universal_le", b"\xBE\xBA\xFE\xCA");
         assert!(is_macos_executable(&fat_le));
 
         // Random data should NOT be detected as executable
@@ -874,9 +858,7 @@ mod tests {
 
         // A binary without extension (like executables in bin/)
         // Should be detected by magic bytes
-        let mut content = mach_o::MH_CIGAM_64.to_vec();
-        content.extend_from_slice(b"rest of the binary data here");
-        let binary = create_test_file(&dir, "python3", &content);
+        let binary = create_test_file(&dir, "python3", b"\xCF\xFA\xED\xFErest of binary");
         assert!(is_macos_executable(&binary));
 
         // A text file without extension should NOT be detected
