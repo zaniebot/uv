@@ -3,6 +3,8 @@
 use std::str::FromStr;
 use std::{fmt, io};
 
+use serde::de::IntoDeserializer;
+use serde::Deserialize;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -159,21 +161,7 @@ impl FromStr for Arch {
     type Err = String;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "aarch64" => Ok(Self::Aarch64),
-            "armv5tel" => Ok(Self::Armv5TEL),
-            "armv6l" => Ok(Self::Armv6L),
-            "armv7l" => Ok(Self::Armv7L),
-            "ppc64le" => Ok(Self::Powerpc64Le),
-            "ppc64" => Ok(Self::Powerpc64),
-            "ppc" => Ok(Self::Powerpc),
-            "i686" => Ok(Self::X86),
-            "x86_64" => Ok(Self::X86_64),
-            "s390x" => Ok(Self::S390X),
-            "loongarch64" => Ok(Self::LoongArch64),
-            "riscv64" => Ok(Self::Riscv64),
-            _ => Err(format!("Unknown architecture: {s}")),
-        }
+        Self::deserialize(s.into_deserializer()).map_err(|err: serde::de::value::Error| err.to_string())
     }
 }
 
@@ -233,5 +221,39 @@ impl Arch {
             Self::S390X => "s390x",
             Self::LoongArch64 => "loongarch64",
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn arch_from_str() {
+        // Primary names (previously supported by manual FromStr)
+        assert_eq!("aarch64".parse::<Arch>().unwrap(), Arch::Aarch64);
+        assert_eq!("armv5tel".parse::<Arch>().unwrap(), Arch::Armv5TEL);
+        assert_eq!("armv6l".parse::<Arch>().unwrap(), Arch::Armv6L);
+        assert_eq!("armv7l".parse::<Arch>().unwrap(), Arch::Armv7L);
+        assert_eq!("ppc64le".parse::<Arch>().unwrap(), Arch::Powerpc64Le);
+        assert_eq!("ppc64".parse::<Arch>().unwrap(), Arch::Powerpc64);
+        assert_eq!("ppc".parse::<Arch>().unwrap(), Arch::Powerpc);
+        assert_eq!("i686".parse::<Arch>().unwrap(), Arch::X86);
+        assert_eq!("x86_64".parse::<Arch>().unwrap(), Arch::X86_64);
+        assert_eq!("s390x".parse::<Arch>().unwrap(), Arch::S390X);
+        assert_eq!("loongarch64".parse::<Arch>().unwrap(), Arch::LoongArch64);
+        assert_eq!("riscv64".parse::<Arch>().unwrap(), Arch::Riscv64);
+        assert_eq!("wasm32".parse::<Arch>().unwrap(), Arch::Wasm32);
+
+        // Aliases (via #[serde(alias = "...")])
+        assert_eq!("arm64".parse::<Arch>().unwrap(), Arch::Aarch64);
+        assert_eq!("armv8l".parse::<Arch>().unwrap(), Arch::Armv7L);
+        assert_eq!("amd64".parse::<Arch>().unwrap(), Arch::X86_64);
+        assert_eq!("i386".parse::<Arch>().unwrap(), Arch::X86);
+
+        // Invalid
+        assert!("unknown".parse::<Arch>().is_err());
+        assert!("ARM64".parse::<Arch>().is_err());
+        assert!("".parse::<Arch>().is_err());
     }
 }
