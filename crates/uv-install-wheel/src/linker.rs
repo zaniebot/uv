@@ -1,4 +1,6 @@
 use std::ffi::{OsStr, OsString};
+#[cfg(target_os = "macos")]
+use std::io::Read as _;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::SystemTime;
@@ -197,6 +199,176 @@ enum Attempt {
     UseCopyFallback,
 }
 
+/// Mach-O magic numbers for detecting executable files on macOS.
+///
+/// On macOS, code signature verification is cached per-inode (vnode). When using reflinks
+/// (copy-on-write), each cloned file gets a new inode, requiring full signature re-validation
+/// on first execution. This causes significant cold-start performance issues.
+///
+/// To avoid this, we use hardlinks for executable files (which share the same inode as the
+/// cached original), allowing signature validation to be reused.
+#[cfg(target_os = "macos")]
+mod mach_o {
+    /// 32-bit Mach-O magic (big-endian)
+    pub const MH_MAGIC: [u8; 4] = [0xFE, 0xED, 0xFA, 0xCE];
+    /// 32-bit Mach-O magic (little-endian)
+    pub const MH_CIGAM: [u8; 4] = [0xCE, 0xFA, 0xED, 0xFE];
+    /// 64-bit Mach-O magic (big-endian)
+    pub const MH_MAGIC_64: [u8; 4] = [0xFE, 0xED, 0xFA, 0xCF];
+    /// 64-bit Mach-O magic (little-endian)
+    pub const MH_CIGAM_64: [u8; 4] = [0xCF, 0xFA, 0xED, 0xFE];
+    /// Universal binary magic (big-endian)
+    pub const FAT_MAGIC: [u8; 4] = [0xCA, 0xFE, 0xBA, 0xBE];
+    /// Universal binary magic (little-endian)
+    pub const FAT_CIGAM: [u8; 4] = [0xBE, 0xBA, 0xFE, 0xCA];
+}
+
+/// Check if a file is a macOS executable that benefits from hardlinking.
+///
+/// This includes:
+/// - Dynamic libraries (*.dylib)
+/// - Shared objects (*.so)
+/// - Mach-O binaries (detected by magic bytes)
+///
+/// Files that are NOT considered executables (and should continue to use reflinks):
+/// - Python source files (*.py)
+/// - Bytecode files (*.pyc)
+/// - Static libraries (*.a)
+/// - Data files, configs, resources
+#[cfg(target_os = "macos")]
+fn is_macos_executable(path: &Path) -> bool {
+    // Check by extension first (fast path)
+    if let Some(ext) = path.extension() {
+        if ext == "dylib" || ext == "so" {
+            return true;
+        }
+        // Skip known non-executable extensions
+        if ext == "py" || ext == "pyc" || ext == "pyo" || ext == "pyd" || ext == "a" {
+            return false;
+        }
+    }
+
+    // Check for Mach-O magic bytes
+    let Ok(mut file) = std::fs::File::open(path) else {
+        return false;
+    };
+
+    let mut magic = [0u8; 4];
+    if file.read_exact(&mut magic).is_err() {
+        return false;
+    }
+
+    matches!(
+        magic,
+        mach_o::MH_MAGIC
+            | mach_o::MH_CIGAM
+            | mach_o::MH_MAGIC_64
+            | mach_o::MH_CIGAM_64
+            | mach_o::FAT_MAGIC
+            | mach_o::FAT_CIGAM
+    )
+}
+
+/// Clone or hardlink a file from `from` to `to` on macOS.
+///
+/// For executable files (Mach-O binaries, .dylib, .so), we use hardlinks to preserve the
+/// inode and benefit from cached code signature validation. For non-executable files,
+/// we use reflinks (copy-on-write) for space efficiency.
+///
+/// Returns `Ok(true)` if the file was successfully linked/cloned, `Ok(false)` if we should
+/// fall back to copy, or an error if the operation failed irrecoverably.
+#[cfg(target_os = "macos")]
+fn clone_or_hardlink_file(
+    from: &Path,
+    to: &Path,
+    site_packages: &Path,
+    locks: &Locks,
+    attempt: &mut Attempt,
+) -> Result<bool, Error> {
+    // For executable files, prefer hardlinks to preserve inode for cached signature validation
+    if is_macos_executable(from) {
+        match fs::hard_link(from, to) {
+            Ok(()) => {
+                trace!("Hardlinked executable {} to {}", from.display(), to.display());
+                return Ok(true);
+            }
+            Err(err) if err.kind() == std::io::ErrorKind::AlreadyExists => {
+                // File already exists, try to overwrite via temp file
+                let tempdir = tempdir_in(site_packages)?;
+                let tempfile = tempdir.path().join(from.file_name().unwrap());
+                if fs::hard_link(from, &tempfile).is_ok() {
+                    fs::rename(&tempfile, to)?;
+                    trace!("Hardlinked executable (overwrite) {} to {}", from.display(), to.display());
+                    return Ok(true);
+                }
+                // Fall through to try reflink
+            }
+            Err(err) => {
+                // Hardlink failed (e.g., cross-device), fall back to reflink
+                debug!(
+                    "Failed to hardlink executable `{}` to `{}` ({}), falling back to reflink",
+                    from.display(),
+                    to.display(),
+                    err
+                );
+            }
+        }
+    }
+
+    // For non-executable files or if hardlink failed, use reflink
+    match attempt {
+        Attempt::Initial | Attempt::Subsequent => {
+            match reflink::reflink(from, to) {
+                Ok(()) => Ok(true),
+                Err(err) if err.kind() == std::io::ErrorKind::AlreadyExists => {
+                    // File already exists, try to overwrite via temp file
+                    let tempdir = tempdir_in(site_packages)?;
+                    let tempfile = tempdir.path().join(from.file_name().unwrap());
+                    match reflink::reflink(from, &tempfile) {
+                        Ok(()) => {
+                            fs::rename(&tempfile, to)?;
+                            Ok(true)
+                        }
+                        Err(_) if *attempt == Attempt::Initial => {
+                            debug!(
+                                "Failed to clone `{}` to temporary location `{}`, falling back to copy",
+                                from.display(),
+                                tempfile.display(),
+                            );
+                            *attempt = Attempt::UseCopyFallback;
+                            synchronized_copy(from, to, locks)?;
+                            Ok(true)
+                        }
+                        Err(err) => Err(Error::Reflink {
+                            from: from.to_path_buf(),
+                            to: to.to_path_buf(),
+                            err,
+                        }),
+                    }
+                }
+                Err(_) if *attempt == Attempt::Initial => {
+                    debug!(
+                        "Failed to clone `{}` to `{}`, falling back to copy",
+                        from.display(),
+                        to.display()
+                    );
+                    *attempt = Attempt::UseCopyFallback;
+                    Ok(false)
+                }
+                Err(err) => Err(Error::Reflink {
+                    from: from.to_path_buf(),
+                    to: to.to_path_buf(),
+                    err,
+                }),
+            }
+        }
+        Attempt::UseCopyFallback => {
+            synchronized_copy(from, to, locks)?;
+            Ok(true)
+        }
+    }
+}
+
 /// Recursively clone the contents of `from` into `to`.
 ///
 /// Note the behavior here is platform-dependent.
@@ -204,7 +376,9 @@ enum Attempt {
 /// On macOS, directories can be recursively copied with a single `clonefile` call. So we only
 /// need to iterate over the top-level of the directory, and copy each file or subdirectory
 /// unless the subdirectory exists already in which case we'll need to recursively merge its
-/// contents with the existing directory.
+/// contents with the existing directory. For executable files (Mach-O binaries, .dylib, .so),
+/// we use hardlinks instead of reflinks to preserve the inode and benefit from cached code
+/// signature validation.
 ///
 /// On Linux, we need to always reflink recursively, as `FICLONE` ioctl does not support
 /// directories. Also note, that reflink is only supported on certain filesystems (btrfs, xfs,
@@ -233,6 +407,24 @@ fn clone_recursive(
         fs::create_dir_all(&to)?;
         for entry in fs::read_dir(from)? {
             clone_recursive(site_packages, wheel, locks, &entry?, attempt)?;
+        }
+        return Ok(());
+    }
+
+    // On macOS, use the optimized clone_or_hardlink_file for files
+    #[cfg(target_os = "macos")]
+    if !entry.file_type()?.is_dir() {
+        let success = clone_or_hardlink_file(&from, &to, site_packages, locks, attempt)?;
+        if !success {
+            // Retry with copy fallback
+            clone_recursive(site_packages, wheel, locks, entry, attempt)?;
+        } else if *attempt == Attempt::UseCopyFallback {
+            warn_user_once!(
+                "Failed to clone files; falling back to full copy. This may lead to degraded performance.\n         If the cache and target directories are on different filesystems, reflinking may not be supported.\n         If this is intentional, set `export UV_LINK_MODE=copy` or use `--link-mode=copy` to suppress this warning."
+            );
+        }
+        if *attempt == Attempt::Initial {
+            *attempt = Attempt::Subsequent;
         }
         return Ok(());
     }
@@ -593,5 +785,109 @@ fn create_symlink<P: AsRef<Path>, Q: AsRef<Path>>(original: P, link: Q) -> std::
         fs_err::os::windows::fs::symlink_dir(original, link)
     } else {
         fs_err::os::windows::fs::symlink_file(original, link)
+    }
+}
+
+#[cfg(all(test, target_os = "macos"))]
+mod tests {
+    use super::*;
+    use std::io::Write;
+    use tempfile::TempDir;
+
+    /// Create a test file with the given content
+    fn create_test_file(dir: &TempDir, name: &str, content: &[u8]) -> PathBuf {
+        let path = dir.path().join(name);
+        let mut file = std::fs::File::create(&path).unwrap();
+        file.write_all(content).unwrap();
+        path
+    }
+
+    #[test]
+    fn test_is_macos_executable_by_extension() {
+        let dir = TempDir::new().unwrap();
+
+        // .dylib files should be detected as executables
+        let dylib = create_test_file(&dir, "lib.dylib", b"not real content");
+        assert!(is_macos_executable(&dylib));
+
+        // .so files should be detected as executables
+        let so = create_test_file(&dir, "lib.so", b"not real content");
+        assert!(is_macos_executable(&so));
+
+        // .py files should NOT be detected as executables
+        let py = create_test_file(&dir, "script.py", b"print('hello')");
+        assert!(!is_macos_executable(&py));
+
+        // .pyc files should NOT be detected as executables
+        let pyc = create_test_file(&dir, "script.pyc", b"\x00\x00\x00\x00");
+        assert!(!is_macos_executable(&pyc));
+
+        // .a files (static libraries) should NOT be detected as executables
+        let a = create_test_file(&dir, "lib.a", b"not real content");
+        assert!(!is_macos_executable(&a));
+    }
+
+    #[test]
+    fn test_is_macos_executable_by_magic_bytes() {
+        let dir = TempDir::new().unwrap();
+
+        // 64-bit Mach-O little-endian (most common on modern macOS)
+        let macho64_le = create_test_file(&dir, "binary64_le", &mach_o::MH_CIGAM_64);
+        assert!(is_macos_executable(&macho64_le));
+
+        // 64-bit Mach-O big-endian
+        let macho64_be = create_test_file(&dir, "binary64_be", &mach_o::MH_MAGIC_64);
+        assert!(is_macos_executable(&macho64_be));
+
+        // 32-bit Mach-O little-endian
+        let macho32_le = create_test_file(&dir, "binary32_le", &mach_o::MH_CIGAM);
+        assert!(is_macos_executable(&macho32_le));
+
+        // 32-bit Mach-O big-endian
+        let macho32_be = create_test_file(&dir, "binary32_be", &mach_o::MH_MAGIC);
+        assert!(is_macos_executable(&macho32_be));
+
+        // Universal (fat) binary big-endian
+        let fat_be = create_test_file(&dir, "universal_be", &mach_o::FAT_MAGIC);
+        assert!(is_macos_executable(&fat_be));
+
+        // Universal (fat) binary little-endian
+        let fat_le = create_test_file(&dir, "universal_le", &mach_o::FAT_CIGAM);
+        assert!(is_macos_executable(&fat_le));
+
+        // Random data should NOT be detected as executable
+        let random = create_test_file(&dir, "random", b"\x00\x01\x02\x03more data");
+        assert!(!is_macos_executable(&random));
+
+        // Empty file should NOT be detected as executable
+        let empty = create_test_file(&dir, "empty", b"");
+        assert!(!is_macos_executable(&empty));
+
+        // File too short should NOT be detected as executable
+        let short = create_test_file(&dir, "short", b"\xCF\xFA");
+        assert!(!is_macos_executable(&short));
+    }
+
+    #[test]
+    fn test_is_macos_executable_extensionless_binary() {
+        let dir = TempDir::new().unwrap();
+
+        // A binary without extension (like executables in bin/)
+        // Should be detected by magic bytes
+        let mut content = mach_o::MH_CIGAM_64.to_vec();
+        content.extend_from_slice(b"rest of the binary data here");
+        let binary = create_test_file(&dir, "python3", &content);
+        assert!(is_macos_executable(&binary));
+
+        // A text file without extension should NOT be detected
+        let text = create_test_file(&dir, "README", b"This is a readme file");
+        assert!(!is_macos_executable(&text));
+    }
+
+    #[test]
+    fn test_is_macos_executable_nonexistent_file() {
+        // Non-existent file should return false, not error
+        let path = PathBuf::from("/nonexistent/path/to/file");
+        assert!(!is_macos_executable(&path));
     }
 }
