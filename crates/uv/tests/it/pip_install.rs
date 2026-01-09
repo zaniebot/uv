@@ -2125,6 +2125,31 @@ fn install_git_public_https() {
     context.assert_installed("uv_public_pypackage", "0.1.0");
 }
 
+/// Install a package from a public GitHub repository over SSH
+#[test]
+#[cfg(feature = "git")]
+fn install_git_public_ssh() {
+    let context = TestContext::new(DEFAULT_PYTHON_VERSION);
+
+    uv_snapshot!(
+        context
+        .pip_install()
+        .arg("uv-public-pypackage @ git+ssh://git@github.com/astral-test/uv-public-pypackage@0.0.1"),
+        @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Resolved 1 package in [TIME]
+    Prepared 1 package in [TIME]
+    Installed 1 package in [TIME]
+     + uv-public-pypackage==0.1.0 (from git+ssh://git@github.com/astral-test/uv-public-pypackage@0dacfd662c64cb4ceb16e6cf65a157a8b715b979)
+    "###);
+
+    context.assert_installed("uv_public_pypackage", "0.1.0");
+}
+
 /// Install a package from a public GitHub repository, omitting the `git+` prefix
 #[test]
 #[cfg(feature = "git")]
