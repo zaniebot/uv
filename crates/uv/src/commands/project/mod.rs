@@ -329,6 +329,9 @@ pub(crate) enum ProjectError {
     Fmt(#[from] std::fmt::Error),
 
     #[error(transparent)]
+    Cache(#[from] uv_cache::Error),
+
+    #[error(transparent)]
     Io(#[from] std::io::Error),
 
     #[error(transparent)]

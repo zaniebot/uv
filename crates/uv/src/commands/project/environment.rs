@@ -180,6 +180,19 @@ impl CachedEnvironment {
             }
         }
 
+        // Acquire a lock on the cache shard to prevent concurrent environment creation.
+        // This avoids a race condition where multiple processes could try to create the
+        // same environment simultaneously, leading to errors like "directory exists but
+        // is not a virtual environment".
+        let _lock = cache_entry.shard().lock().await?;
+
+        // Double-check if the environment was created while we were waiting for the lock.
+        if let Ok(root) = cache.resolve_link(cache_entry.path()) {
+            if let Ok(environment) = PythonEnvironment::from_root(root, cache) {
+                return Ok(Self(environment));
+            }
+        }
+
         // Create the environment in the cache, then relocate it to its content-addressed location.
         let temp_dir = cache.venv_dir()?;
         let venv = uv_virtualenv::create_venv(
