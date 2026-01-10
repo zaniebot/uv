@@ -129,6 +129,12 @@ By default, Python versions managed by uv are stored in a `python/` subdirectory
 
 Use `uv python dir` to show the Python installation directory.
 
+!!! note
+
+    `uv python dir` shows where managed Python installations are stored, not the interpreter
+    that uv will use for your project. To find which Python interpreter uv will use, run
+    `uv python find` instead. See [Finding a Python executable](../concepts/python-versions.md#finding-a-python-executable) for details.
+
 Use the `UV_PYTHON_INSTALL_DIR` environment variable to override the installation directory.
 
 !!! note
