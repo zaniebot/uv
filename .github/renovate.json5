@@ -111,6 +111,11 @@
       matchDepNames: ["maturin"],
       commitMessageTopic: "maturin",
     },
+    {
+      groupName: "container image digests",
+      matchDatasources: ["docker"],
+      description: "Weekly update of container image digests",
+    },
   ],
   customManagers: [
     // Update major GitHub actions references in documentation.
