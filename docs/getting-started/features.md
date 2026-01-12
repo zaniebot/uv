@@ -99,7 +99,7 @@ self-update:
 - `uv cache prune`: Remove outdated cache entries.
 - `uv cache dir`: Show the uv cache directory path.
 - `uv tool dir`: Show the uv tool directory path.
-- `uv python dir`: Show where uv stores managed Python installations.
+- `uv python dir`: Show the uv installed Python versions path.
 - `uv self update`: Update uv to the latest version.
 
 ## Next steps

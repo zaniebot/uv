@@ -295,37 +295,6 @@ To ignore virtual environments, use the `--system` flag:
 $ uv python find --system
 ```
 
-## Viewing the Python installation directory
-
-To see where uv stores managed Python installations (from `uv python install`), use the
-`uv python dir` command:
-
-```console
-$ uv python dir
-/home/user/.local/share/uv/python
-```
-
-!!! tip
-
-    `uv python dir` shows where managed Python installations are stored, not the interpreter
-    that uv will use for your project. To find which Python interpreter uv will use, run
-    [`uv python find`](#finding-a-python-executable) instead.
-
-For example, if you want to know which Python uv will use in your project:
-
-```console
-# Which Python interpreter uv will use for your project:
-$ uv python find
-/home/user/myproject/.venv/bin/python3
-
-# Where uv stores managed Python installations:
-$ uv python dir
-/home/user/.local/share/uv/python
-```
-
-See the [storage documentation](../reference/storage.md#python-versions) for more details about
-Python version storage and how to configure the installation directory.
-
 ## Discovery of Python versions
 
 When searching for a Python version, the following locations are checked:
