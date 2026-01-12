@@ -239,8 +239,13 @@ impl LockedFile {
         use std::{fs::File, os::unix::fs::PermissionsExt};
         use tempfile::NamedTempFile;
 
-        /// The permissions the lockfile should end up with
-        const DESIRED_MODE: u32 = 0o666;
+        /// The permissions the lockfile should end up with.
+        ///
+        /// We use 0o644 (owner read/write, group/others read) to avoid security
+        /// scanners flagging world-writable files. File locking via flock() works
+        /// on read-only file descriptors, so other users can still acquire locks
+        /// by opening the file in read-only mode.
+        const DESIRED_MODE: u32 = 0o644;
 
         #[allow(clippy::disallowed_types)]
         fn try_set_permissions(file: &File, path: &Path) {
@@ -252,16 +257,17 @@ impl LockedFile {
             }
         }
 
-        // If path already exists, return it.
-        if let Ok(file) = fs_err::OpenOptions::new()
-            .read(true)
-            .write(true)
-            .open(path.as_ref())
-        {
-            return Ok(file);
+        // If path already exists, open it in read-only mode.
+        // flock() works on read-only file descriptors, so we don't need write access.
+        match fs_err::OpenOptions::new().read(true).open(path.as_ref()) {
+            Ok(file) => return Ok(file),
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
+                // File doesn't exist, continue to create it
+            }
+            Err(err) => return Err(err.into()),
         }
 
-        // Otherwise, create a temporary file with 666 permissions. We must set
+        // Otherwise, create a temporary file with 644 permissions. We must set
         // permissions _after_ creating the file, to override the `umask`.
         let file = if let Some(parent) = path.as_ref().parent() {
             NamedTempFile::new_in(parent)
@@ -276,9 +282,9 @@ impl LockedFile {
             Ok(file) => Ok(fs_err::File::from_parts(file, path.as_ref())),
             Err(err) => {
                 if err.error.kind() == std::io::ErrorKind::AlreadyExists {
+                    // File was created by another process, open read-only
                     fs_err::OpenOptions::new()
                         .read(true)
-                        .write(true)
                         .open(path.as_ref())
                         .map_err(Into::into)
                 } else if matches!(
@@ -291,30 +297,21 @@ impl LockedFile {
                     // there isn't an ErrorKind we can use here, and in fact on MacOS `ENOTSUP` gets
                     // mapped to `ErrorKind::Other`
 
-                    // There is a race here where another process has just created the file, and we
-                    // try to open it and get permission errors because the other process hasn't set
-                    // the permission bits yet. This will lead to a transient failure, but unlike
-                    // alternative approaches it won't ever lead to a situation where two processes
-                    // are locking two different files. Also, since `persist_noclobber` is more
-                    // likely to not be supported on special filesystems which don't have permission
-                    // bits, it's less likely to ever matter.
-                    let file = fs_err::OpenOptions::new()
-                        .read(true)
-                        .write(true)
-                        .create(true)
-                        .open(path.as_ref())?;
-
-                    // We don't want to `try_set_permissions` in cases where another user's process
-                    // has already created the lockfile and changed its permissions because we might
-                    // not have permission to change the permissions which would produce a confusing
-                    // warning.
-                    if file
-                        .metadata()
-                        .is_ok_and(|metadata| metadata.permissions().mode() != DESIRED_MODE)
-                    {
-                        try_set_permissions(file.file(), path.as_ref());
+                    // Try read-only first (for existing files created by another process)
+                    match fs_err::OpenOptions::new().read(true).open(path.as_ref()) {
+                        Ok(file) => Ok(file),
+                        Err(open_err) if open_err.kind() == std::io::ErrorKind::NotFound => {
+                            // File doesn't exist, create it with write access to set permissions
+                            let file = fs_err::OpenOptions::new()
+                                .read(true)
+                                .write(true)
+                                .create_new(true)
+                                .open(path.as_ref())?;
+                            try_set_permissions(file.file(), path.as_ref());
+                            Ok(file)
+                        }
+                        Err(open_err) => Err(open_err.into()),
                     }
-                    Ok(file)
                 } else {
                     let temp_path = err.file.into_temp_path();
                     Err(LockedFileError::PersistTemporary {
