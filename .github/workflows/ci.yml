@@ -28,6 +28,8 @@ jobs:
       test-publish: ${{ steps.changed.outputs.publish_changed == 'true' || github.ref == 'refs/heads/main' }}
       # Run trampoline checks if trampoline-related code changed
       test-windows-trampoline: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && (steps.changed.outputs.trampoline_any_changed == 'true' || github.ref == 'refs/heads/main') }}
+      # Run benchmarks only if Rust code changed
+      run-bench: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && (steps.changed.outputs.rust_code_changed == 'true' || github.ref == 'refs/heads/main') }}
     steps:
       - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
@@ -45,6 +47,7 @@ jobs:
           RELEASE_BUILD_CHANGED=false
           PUBLISH_CHANGED=false
           TRAMPOLINE_CHANGED=false
+          RUST_CODE_CHANGED=false
 
           while IFS= read -r file; do
             # Check if the schema file changed (e.g., in a release PR)
@@ -69,6 +72,12 @@ jobs:
             if [[ "${file}" =~ ^crates/uv-trampoline/ ]] || [[ "${file}" =~ ^crates/uv-trampoline-builder/ ]]; then
               echo "Detected trampoline change: ${file}"
               TRAMPOLINE_CHANGED=true
+            fi
+
+            # Check if Rust code changed (for benchmarks)
+            if [[ "${file}" =~ \.rs$ ]] || [[ "${file}" =~ Cargo\.toml$ ]] || [[ "${file}" == "Cargo.lock" ]] || [[ "${file}" == "rust-toolchain.toml" ]] || [[ "${file}" =~ ^\.cargo/ ]]; then
+              echo "Detected Rust code change: ${file}"
+              RUST_CODE_CHANGED=true
             fi
 
             if [[ "${file}" =~ ^docs/ ]]; then
@@ -101,6 +110,7 @@ jobs:
           echo "release_build_changed=${RELEASE_BUILD_CHANGED}" >> "${GITHUB_OUTPUT}"
           echo "publish_changed=${PUBLISH_CHANGED}" >> "${GITHUB_OUTPUT}"
           echo "trampoline_any_changed=${TRAMPOLINE_CHANGED}" >> "${GITHUB_OUTPUT}"
+          echo "rust_code_changed=${RUST_CODE_CHANGED}" >> "${GITHUB_OUTPUT}"
 
   check-fmt:
     uses: ./.github/workflows/check-fmt.yml
@@ -192,7 +202,7 @@ jobs:
 
   bench:
     needs: plan
-    if: ${{ needs.plan.outputs.test-code == 'true' }}
+    if: ${{ needs.plan.outputs.run-bench == 'true' }}
     uses: ./.github/workflows/bench.yml
     secrets: inherit
 
