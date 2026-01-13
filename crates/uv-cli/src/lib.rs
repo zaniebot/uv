@@ -6014,7 +6014,7 @@ pub enum PythonCommand {
     /// See `uv help python` to view supported request formats.
     Pin(PythonPinArgs),
 
-    /// Show the uv Python installation directory.
+    /// Show the uv managed Python installation directory.
     ///
     /// This shows where uv stores managed Python installations (from `uv python install`), not the
     /// Python interpreter that uv will use for your project or environment.
