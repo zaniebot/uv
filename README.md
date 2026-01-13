@@ -8,6 +8,7 @@
 [![Discord](https://img.shields.io/badge/Discord-%235865F2.svg?logo=discord&logoColor=white)](https://discord.gg/astral-sh)
 
 An extremely fast Python package and project manager, written in Rust.
+This repository is occasionally used to validate automation workflows.
 
 <p align="center">
   <picture align="center">
