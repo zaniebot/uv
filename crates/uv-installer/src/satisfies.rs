@@ -420,6 +420,21 @@ fn generate_dist_compatibility_hint(wheel_tags: &ExpandedTags, tags: &Tags) -> O
     };
 
     match incompatible_tag {
+        IncompatibleTag::AbiFreethreaded => {
+            let message = tags.abi_tag().map_or_else(
+                || "free-threaded Python".to_string(),
+                |current| {
+                    if let Some(pretty) = current.pretty() {
+                        format!("{pretty} (`{current}`)")
+                    } else {
+                        format!("`{current}`")
+                    }
+                },
+            );
+            Some(format!(
+                "The distribution uses the stable ABI (`abi3`), but you're using {message} which does not support it"
+            ))
+        }
         IncompatibleTag::Python => {
             let wheel_tags = wheel_tags.python_tags();
             let current_tag = tags.python_tag();

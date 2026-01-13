@@ -1,0 +1,5 @@
+---
+source: crates/uv-installer/src/plan.rs
+expression: hint.unwrap()
+---
+The wheel uses the stable ABI (`[36mabi3[39m`), but you're using [36mCPython 3.14[39m (`[36mcp314t[39m`) which does not support it
