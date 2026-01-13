@@ -549,8 +549,13 @@ pub enum JwtError {
 }
 
 fn is_known_url(url: &Url, api: &DisplaySafeUrl, cdn: &str) -> bool {
-    // Determine whether the URL matches the API realm.
-    if Realm::from(url) == Realm::from(&**api) {
+    // Determine whether the URL matches the API realm (or the HTTP equivalent).
+    // We accept both HTTP and HTTPS for the API domain, treating `http://api.pyx.dev`
+    // as a valid realm like `https://api.pyx.dev`.
+    if matches!(url.scheme(), "http" | "https")
+        && url.host_str() == api.host_str()
+        && url.port() == api.port()
+    {
         return true;
     }
 
@@ -608,6 +613,20 @@ mod tests {
             cdn_domain
         ));
 
+        // HTTP on API domain (treated as valid realm like HTTPS).
+        assert!(is_known_url(
+            &Url::parse("http://api.pyx.dev/simple/").unwrap(),
+            &api_url,
+            cdn_domain
+        ));
+
+        // HTTP on different path on API domain.
+        assert!(is_known_url(
+            &Url::parse("http://api.pyx.dev/v1/").unwrap(),
+            &api_url,
+            cdn_domain
+        ));
+
         // CDN domain.
         assert!(is_known_url(
             &Url::parse("https://astralhosted.com/packages/").unwrap(),
@@ -652,6 +671,13 @@ mod tests {
         // Same realm as API.
         assert!(is_known_domain(
             &Url::parse("https://api.pyx.dev/simple/").unwrap(),
+            &api_url,
+            cdn_domain
+        ));
+
+        // HTTP on API domain (treated as valid realm like HTTPS).
+        assert!(is_known_domain(
+            &Url::parse("http://api.pyx.dev/simple/").unwrap(),
             &api_url,
             cdn_domain
         ));
