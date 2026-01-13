@@ -36,8 +36,24 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libsasl2-dev libldap2-dev libkrb5-dev
           cargo run --bin uv -- venv --cache-dir .cache
-          cargo run --bin uv -- pip compile test/requirements/jupyter.in --universal --exclude-newer 2024-08-08 --cache-dir .cache
-          cargo run --bin uv -- pip compile test/requirements/airflow.in --universal --exclude-newer 2024-08-08 --cache-dir .cache
+          # Existing benchmarks
+          cargo run --bin uv -- pip compile test/requirements/jupyter.in --universal --exclude-newer 2024-09-01 --cache-dir .cache
+          cargo run --bin uv -- pip compile test/requirements/airflow.in --universal --exclude-newer 2024-09-01 --cache-dir .cache
+          # Lightweight packages
+          echo "ruff>=0.4.0" | cargo run --bin uv -- pip compile - --universal --exclude-newer 2024-09-01 --cache-dir .cache
+          echo "black>=24.0.0" | cargo run --bin uv -- pip compile - --universal --exclude-newer 2024-09-01 --cache-dir .cache
+          echo "pytest>=8.0.0" | cargo run --bin uv -- pip compile - --universal --exclude-newer 2024-09-01 --cache-dir .cache
+          echo "trio>=0.25.0" | cargo run --bin uv -- pip compile - --universal --exclude-newer 2024-09-01 --cache-dir .cache
+          # Web frameworks
+          echo "django>=5.0" | cargo run --bin uv -- pip compile - --universal --exclude-newer 2024-09-01 --cache-dir .cache
+          echo -e "fastapi>=0.111.0\nuvicorn[standard]>=0.29.0" | cargo run --bin uv -- pip compile - --universal --exclude-newer 2024-09-01 --cache-dir .cache
+          # Data science packages
+          echo "numpy>=1.26.0" | cargo run --bin uv -- pip compile - --universal --exclude-newer 2024-09-01 --cache-dir .cache
+          echo "pandas>=2.2.0" | cargo run --bin uv -- pip compile - --universal --exclude-newer 2024-09-01 --cache-dir .cache
+          echo "scipy>=1.13.0" | cargo run --bin uv -- pip compile - --universal --exclude-newer 2024-09-01 --cache-dir .cache
+          echo -e "numpy>=1.26.0\npandas>=2.2.0\nscikit-learn>=1.4.0\nmatplotlib>=3.8.0" | cargo run --bin uv -- pip compile - --universal --exclude-newer 2024-09-01 --cache-dir .cache
+          # Incremental benchmark
+          echo -e "trio>=0.25.0\nhttpx>=0.27.0" | cargo run --bin uv -- pip compile - --universal --exclude-newer 2024-09-01 --cache-dir .cache
 
       - name: "Build benchmarks"
         run: cargo codspeed build -m walltime --profile profiling -p uv-bench
@@ -112,8 +128,24 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libsasl2-dev libldap2-dev libkrb5-dev
           cargo run --bin uv -- venv --cache-dir .cache
-          cargo run --bin uv -- pip compile test/requirements/jupyter.in --universal --exclude-newer 2024-08-08 --cache-dir .cache
-          cargo run --bin uv -- pip compile test/requirements/airflow.in --universal --exclude-newer 2024-08-08 --cache-dir .cache
+          # Existing benchmarks
+          cargo run --bin uv -- pip compile test/requirements/jupyter.in --universal --exclude-newer 2024-09-01 --cache-dir .cache
+          cargo run --bin uv -- pip compile test/requirements/airflow.in --universal --exclude-newer 2024-09-01 --cache-dir .cache
+          # Lightweight packages
+          echo "ruff>=0.4.0" | cargo run --bin uv -- pip compile - --universal --exclude-newer 2024-09-01 --cache-dir .cache
+          echo "black>=24.0.0" | cargo run --bin uv -- pip compile - --universal --exclude-newer 2024-09-01 --cache-dir .cache
+          echo "pytest>=8.0.0" | cargo run --bin uv -- pip compile - --universal --exclude-newer 2024-09-01 --cache-dir .cache
+          echo "trio>=0.25.0" | cargo run --bin uv -- pip compile - --universal --exclude-newer 2024-09-01 --cache-dir .cache
+          # Web frameworks
+          echo "django>=5.0" | cargo run --bin uv -- pip compile - --universal --exclude-newer 2024-09-01 --cache-dir .cache
+          echo -e "fastapi>=0.111.0\nuvicorn[standard]>=0.29.0" | cargo run --bin uv -- pip compile - --universal --exclude-newer 2024-09-01 --cache-dir .cache
+          # Data science packages
+          echo "numpy>=1.26.0" | cargo run --bin uv -- pip compile - --universal --exclude-newer 2024-09-01 --cache-dir .cache
+          echo "pandas>=2.2.0" | cargo run --bin uv -- pip compile - --universal --exclude-newer 2024-09-01 --cache-dir .cache
+          echo "scipy>=1.13.0" | cargo run --bin uv -- pip compile - --universal --exclude-newer 2024-09-01 --cache-dir .cache
+          echo -e "numpy>=1.26.0\npandas>=2.2.0\nscikit-learn>=1.4.0\nmatplotlib>=3.8.0" | cargo run --bin uv -- pip compile - --universal --exclude-newer 2024-09-01 --cache-dir .cache
+          # Incremental benchmark
+          echo -e "trio>=0.25.0\nhttpx>=0.27.0" | cargo run --bin uv -- pip compile - --universal --exclude-newer 2024-09-01 --cache-dir .cache
 
       - name: "Build benchmarks"
         run: cargo codspeed build --profile profiling -p uv-bench

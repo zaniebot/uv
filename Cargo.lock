@@ -5571,6 +5571,7 @@ dependencies = [
  "uv-python",
  "uv-resolver",
  "uv-types",
+ "uv-virtualenv",
  "uv-workspace",
 ]
 
