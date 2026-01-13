@@ -801,6 +801,10 @@ async fn get_or_create_environment(
     let state = PlatformState::default();
     let workspace_cache = WorkspaceCache::default();
 
+    // Configure the client builder with keyring settings to ensure authentication works
+    // for private indexes. This is done early so all subsequent operations benefit from it.
+    let client_builder = client_builder.clone().keyring(settings.resolver.keyring_provider);
+
     let from = match request {
         ToolRequest::Python {
             executable: request_executable,
@@ -836,7 +840,7 @@ async fn get_or_create_environment(
                         vec![spec],
                         &interpreter,
                         settings,
-                        client_builder,
+                        &client_builder,
                         &state,
                         concurrency,
                         cache,
@@ -974,7 +978,7 @@ async fn get_or_create_environment(
         overrides,
         &[],
         None,
-        client_builder,
+        &client_builder,
     )
     .await?;
 
@@ -990,7 +994,7 @@ async fn get_or_create_environment(
                 spec.requirements.clone(),
                 &interpreter,
                 settings,
-                client_builder,
+                &client_builder,
                 &state,
                 concurrency,
                 cache,
@@ -1017,7 +1021,7 @@ async fn get_or_create_environment(
         spec.overrides.clone(),
         &interpreter,
         settings,
-        client_builder,
+        &client_builder,
         &state,
         concurrency,
         cache,
@@ -1118,7 +1122,7 @@ async fn get_or_create_environment(
 
     // Read the `--build-constraints` requirements.
     let build_constraints = Constraints::from_requirements(
-        operations::read_constraints(build_constraints, client_builder)
+        operations::read_constraints(build_constraints, &client_builder)
             .await?
             .into_iter()
             .map(|constraint| constraint.requirement),
@@ -1133,7 +1137,7 @@ async fn get_or_create_environment(
         &interpreter,
         python_platform.as_ref(),
         settings,
-        client_builder,
+        &client_builder,
         &state,
         if show_resolution {
             Box::new(DefaultResolveLogger)
@@ -1167,7 +1171,7 @@ async fn get_or_create_environment(
                     &interpreter,
                     python_request.as_ref(),
                     &err,
-                    client_builder,
+                    &client_builder,
                     &reporter,
                     &install_mirrors,
                     python_preference,
@@ -1193,7 +1197,7 @@ async fn get_or_create_environment(
                     &interpreter,
                     python_platform.as_ref(),
                     settings,
-                    client_builder,
+                    &client_builder,
                     &state,
                     if show_resolution {
                         Box::new(DefaultResolveLogger)

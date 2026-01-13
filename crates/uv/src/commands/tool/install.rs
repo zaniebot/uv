@@ -108,6 +108,10 @@ pub(crate) async fn install(
     let state = PlatformState::default();
     let workspace_cache = WorkspaceCache::default();
 
+    // Configure the client builder with keyring settings to ensure authentication works
+    // for private indexes. This is done early so all subsequent operations benefit from it.
+    let client_builder = client_builder.keyring(settings.resolver.keyring_provider);
+
     // Parse the input requirement.
     let request = ToolRequest::parse(&package, from.as_deref())?;
 
