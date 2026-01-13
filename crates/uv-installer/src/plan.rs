@@ -18,7 +18,7 @@ use uv_distribution_types::{
 };
 use uv_fs::Simplified;
 use uv_normalize::PackageName;
-use uv_platform_tags::{IncompatibleTag, TagCompatibility, Tags};
+use uv_platform_tags::{AbiTag, IncompatibleTag, TagCompatibility, Tags};
 use uv_pypi_types::VerbatimParsedUrl;
 use uv_python::PythonEnvironment;
 use uv_types::HashStrategy;
@@ -544,21 +544,6 @@ fn generate_wheel_compatibility_hint(filename: &WheelFilename, tags: &Tags) -> O
     };
 
     match incompatible_tag {
-        IncompatibleTag::AbiFreethreaded => {
-            let message = if let Some(current) = tags.abi_tag() {
-                if let Some(pretty) = current.pretty() {
-                    format!("{} (`{}`)", pretty.cyan(), current.cyan())
-                } else {
-                    format!("`{}`", current.cyan())
-                }
-            } else {
-                "free-threaded Python".to_string()
-            };
-            Some(format!(
-                "The wheel uses the stable ABI (`{abi3}`), but you're using {message} which does not support it",
-                abi3 = "abi3".cyan()
-            ))
-        }
         IncompatibleTag::Python => {
             let wheel_tags = filename.python_tags();
             let current_tag = tags.python_tag();
@@ -600,8 +585,26 @@ fn generate_wheel_compatibility_hint(filename: &WheelFilename, tags: &Tags) -> O
         }
         IncompatibleTag::Abi => {
             let wheel_tags = filename.abi_tags();
-            let current_tag = tags.abi_tag();
 
+            // Check if this is abi3 on free-threaded Python
+            let is_abi3_wheel = wheel_tags.iter().any(|tag| matches!(tag, AbiTag::Abi3));
+            if is_abi3_wheel && tags.is_freethreaded() {
+                let message = if let Some(current) = tags.abi_tag() {
+                    if let Some(pretty) = current.pretty() {
+                        format!("{} (`{}`)", pretty.cyan(), current.cyan())
+                    } else {
+                        format!("`{}`", current.cyan())
+                    }
+                } else {
+                    "free-threaded Python".to_string()
+                };
+                return Some(format!(
+                    "The wheel uses the stable ABI (`{abi3}`), but you're using {message} which does not support it",
+                    abi3 = "abi3".cyan()
+                ));
+            }
+
+            let current_tag = tags.abi_tag();
             if let Some(current) = current_tag {
                 let message = if let Some(pretty) = current.pretty() {
                     format!("{} (`{}`)", pretty.cyan(), current.cyan())

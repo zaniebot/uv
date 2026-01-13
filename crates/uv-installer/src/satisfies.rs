@@ -16,7 +16,7 @@ use uv_distribution_types::{
 use uv_git_types::{GitLfs, GitOid};
 use uv_normalize::PackageName;
 use uv_pep440::Version;
-use uv_platform_tags::{IncompatibleTag, TagCompatibility, Tags};
+use uv_platform_tags::{AbiTag, IncompatibleTag, TagCompatibility, Tags};
 use uv_pypi_types::{DirInfo, DirectUrl, VcsInfo, VcsKind};
 
 use crate::InstallationStrategy;
@@ -420,20 +420,6 @@ fn generate_dist_compatibility_hint(wheel_tags: &ExpandedTags, tags: &Tags) -> O
     };
 
     match incompatible_tag {
-        IncompatibleTag::AbiFreethreaded => {
-            let message = if let Some(current) = tags.abi_tag() {
-                if let Some(pretty) = current.pretty() {
-                    format!("{pretty} (`{current}`)")
-                } else {
-                    format!("`{current}`")
-                }
-            } else {
-                "free-threaded Python".to_string()
-            };
-            Some(format!(
-                "The distribution uses the stable ABI (`abi3`), but you're using {message} which does not support it"
-            ))
-        }
         IncompatibleTag::Python => {
             let wheel_tags = wheel_tags.python_tags();
             let current_tag = tags.python_tag();
@@ -472,9 +458,26 @@ fn generate_dist_compatibility_hint(wheel_tags: &ExpandedTags, tags: &Tags) -> O
             }
         }
         IncompatibleTag::Abi => {
-            let wheel_tags = wheel_tags.abi_tags();
-            let current_tag = tags.abi_tag();
+            let wheel_abi_tags: Vec<_> = wheel_tags.abi_tags().collect();
 
+            // Check if this is abi3 on free-threaded Python
+            let is_abi3_wheel = wheel_abi_tags.iter().any(|tag| matches!(tag, AbiTag::Abi3));
+            if is_abi3_wheel && tags.is_freethreaded() {
+                let message = if let Some(current) = tags.abi_tag() {
+                    if let Some(pretty) = current.pretty() {
+                        format!("{pretty} (`{current}`)")
+                    } else {
+                        format!("`{current}`")
+                    }
+                } else {
+                    "free-threaded Python".to_string()
+                };
+                return Some(format!(
+                    "The distribution uses the stable ABI (`abi3`), but you're using {message} which does not support it"
+                ));
+            }
+
+            let current_tag = tags.abi_tag();
             if let Some(current) = current_tag {
                 let message = if let Some(pretty) = current.pretty() {
                     format!("{pretty} (`{current}`)")
@@ -483,7 +486,8 @@ fn generate_dist_compatibility_hint(wheel_tags: &ExpandedTags, tags: &Tags) -> O
                 };
                 Some(format!(
                     "The distribution is compatible with {}, but you're using {}",
-                    wheel_tags
+                    wheel_abi_tags
+                        .iter()
                         .map(|tag| if let Some(pretty) = tag.pretty() {
                             format!("{pretty} (`{tag}`)")
                         } else {
@@ -496,7 +500,8 @@ fn generate_dist_compatibility_hint(wheel_tags: &ExpandedTags, tags: &Tags) -> O
             } else {
                 Some(format!(
                     "The distribution requires {}",
-                    wheel_tags
+                    wheel_abi_tags
+                        .iter()
                         .map(|tag| if let Some(pretty) = tag.pretty() {
                             format!("{pretty} (`{tag}`)")
                         } else {
