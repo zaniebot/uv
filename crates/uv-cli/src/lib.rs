@@ -6016,11 +6016,6 @@ pub enum PythonCommand {
 
     /// Show the uv managed Python installation directory.
     ///
-    /// This shows where uv stores managed Python installations (from `uv python install`), not the
-    /// Python interpreter that uv will use for your project or environment.
-    ///
-    /// To find which Python interpreter uv will use, use `uv python find` instead.
-    ///
     /// By default, Python installations are stored in the uv data directory at
     /// `$XDG_DATA_HOME/uv/python` or `$HOME/.local/share/uv/python` on Unix and
     /// `%APPDATA%\uv\data\python` on Windows.
@@ -6030,6 +6025,8 @@ pub enum PythonCommand {
     /// To view the directory where uv installs Python executables instead, use the `--bin` flag.
     /// The Python executable directory may be overridden with `$UV_PYTHON_BIN_DIR`. Note that
     /// Python executables are only installed when preview mode is enabled.
+    ///
+    /// To see which Python interpreter uv will use, use `uv python find` instead.
     Dir(PythonDirArgs),
 
     /// Uninstall Python versions.
