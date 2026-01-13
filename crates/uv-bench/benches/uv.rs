@@ -158,12 +158,35 @@ fn resolve_warm_trio_incremental(c: &mut Criterion<WallTime>) {
 }
 
 // =============================================================================
-// Venv creation benchmark
+// Venv creation benchmark (CLI-based)
 // =============================================================================
 
 fn venv_create(c: &mut Criterion<WallTime>) {
-    let run = setup_venv_create();
+    let run = setup_cli_venv();
     c.bench_function("venv_create", |b| b.iter(|| run()));
+}
+
+// =============================================================================
+// Installation benchmarks (CLI-based, warm cache)
+// =============================================================================
+
+fn install_warm_ruff(c: &mut Criterion<WallTime>) {
+    let run = setup_cli_install(&["ruff>=0.4.0"]);
+    c.bench_function("install_warm_ruff", |b| b.iter(|| run()));
+}
+
+fn install_warm_trio(c: &mut Criterion<WallTime>) {
+    let run = setup_cli_install(&["trio>=0.25.0"]);
+    c.bench_function("install_warm_trio", |b| b.iter(|| run()));
+}
+
+// =============================================================================
+// Tool run benchmark (CLI-based, cached tool execution)
+// =============================================================================
+
+fn tool_run_ruff_cached(c: &mut Criterion<WallTime>) {
+    let run = setup_cli_tool_run("ruff", &["--version"]);
+    c.bench_function("tool_run_ruff_cached", |b| b.iter(|| run()));
 }
 
 // =============================================================================
@@ -222,13 +245,30 @@ criterion_group!(
         venv_create
 );
 
+criterion_group!(
+    name = install_benchmarks;
+    config = Criterion::default();
+    targets =
+        install_warm_ruff,
+        install_warm_trio
+);
+
+criterion_group!(
+    name = tool_benchmarks;
+    config = Criterion::default();
+    targets =
+        tool_run_ruff_cached
+);
+
 criterion_main!(
     existing_benchmarks,
     lightweight_benchmarks,
     webframework_benchmarks,
     datascience_benchmarks,
     incremental_benchmarks,
-    venv_benchmarks
+    venv_benchmarks,
+    install_benchmarks,
+    tool_benchmarks
 );
 
 fn setup_resolver(manifest: Manifest) -> impl Fn(bool) {
@@ -261,38 +301,100 @@ fn setup_resolver(manifest: Manifest) -> impl Fn(bool) {
     }
 }
 
-fn setup_venv_create() -> impl Fn() {
+// =============================================================================
+// CLI-based setup functions
+// =============================================================================
+
+/// Path to the uv binary (relative to benchmark directory)
+const UV_BIN: &str = "../../target/debug/uv";
+const CACHE_DIR: &str = "../../.cache";
+
+fn setup_cli_venv() -> impl Fn() {
+    use std::process::Command;
     use std::sync::atomic::{AtomicU64, Ordering};
-    use uv_virtualenv::{Prompt, create_venv};
 
     let counter = AtomicU64::new(0);
-
-    let cache = Cache::from_path("../../.cache")
-        .init_no_wait()
-        .expect("No cache contention when running benchmarks")
-        .unwrap();
-    let interpreter = PythonEnvironment::from_root("../../.venv", &cache)
-        .unwrap()
-        .into_interpreter();
 
     move || {
         let n = counter.fetch_add(1, Ordering::SeqCst);
         let venv_dir = std::env::temp_dir().join(format!("uv-bench-venv-{}", n));
 
-        let _ = black_box(create_venv(
-            &venv_dir,
-            interpreter.clone(),
-            Prompt::None,
-            false, // system_site_packages
-            uv_virtualenv::OnExisting::Allow,
-            false, // relocatable
-            false, // seed
-            false, // upgradeable
-            uv_preview::Preview::default(),
-        ));
+        let _ = black_box(
+            Command::new(UV_BIN)
+                .args(["venv", "--cache-dir", CACHE_DIR])
+                .arg(&venv_dir)
+                .output()
+        );
 
         // Clean up
         let _ = std::fs::remove_dir_all(&venv_dir);
+    }
+}
+
+fn setup_cli_install(packages: &'static [&'static str]) -> impl Fn() {
+    use std::process::Command;
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    let counter = AtomicU64::new(0);
+
+    // Prime the cache by resolving once during setup
+    let _ = Command::new(UV_BIN)
+        .args(["pip", "compile", "--cache-dir", CACHE_DIR, "-"])
+        .args(["--exclude-newer", "2024-09-01"])
+        .stdin(std::process::Stdio::piped())
+        .output();
+
+    move || {
+        let n = counter.fetch_add(1, Ordering::SeqCst);
+        let venv_dir = std::env::temp_dir().join(format!("uv-bench-install-{}", n));
+
+        // Create a fresh venv
+        let _ = Command::new(UV_BIN)
+            .args(["venv", "--cache-dir", CACHE_DIR])
+            .arg(&venv_dir)
+            .output();
+
+        // Install packages into the venv
+        let mut cmd = Command::new(UV_BIN);
+        cmd.args(["pip", "install", "--cache-dir", CACHE_DIR])
+            .args(["--exclude-newer", "2024-09-01"])
+            .arg("--python")
+            .arg(venv_dir.join("bin/python"));
+
+        for pkg in packages {
+            cmd.arg(*pkg);
+        }
+
+        let _ = black_box(cmd.output());
+
+        // Clean up
+        let _ = std::fs::remove_dir_all(&venv_dir);
+    }
+}
+
+fn setup_cli_tool_run(tool: &'static str, args: &'static [&'static str]) -> impl Fn() {
+    use std::process::Command;
+
+    // Prime the cache by running once during setup
+    let _ = Command::new(UV_BIN)
+        .args(["tool", "run", "--cache-dir", CACHE_DIR])
+        .args(["--exclude-newer", "2024-09-01"])
+        .arg(tool)
+        .arg("--")
+        .args(args)
+        .output();
+
+    move || {
+        let output = black_box(
+            Command::new(UV_BIN)
+                .args(["tool", "run", "--cache-dir", CACHE_DIR])
+                .args(["--exclude-newer", "2024-09-01"])
+                .arg(tool)
+                .arg("--")
+                .args(args)
+                .output()
+        );
+        let _ = output;
     }
 }
 

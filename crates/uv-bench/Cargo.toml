@@ -39,7 +39,6 @@ uv-pypi-types = { workspace = true }
 uv-python = { workspace = true }
 uv-resolver = { workspace = true }
 uv-types = { workspace = true }
-uv-virtualenv = { workspace = true }
 uv-workspace = { workspace = true }
 
 anyhow = { workspace = true }
