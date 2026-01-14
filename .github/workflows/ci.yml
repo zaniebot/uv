@@ -65,7 +65,7 @@ jobs:
             [[ "$file" =~ ^crates/uv-publish/ || "$file" =~ ^scripts/publish/ ]] && publish_code_changed=1
             [[ "$file" =~ ^crates/uv-trampoline/ || "$file" =~ ^crates/uv-trampoline-builder/ ]] && trampoline_changed=1
             [[ "$file" =~ ^crates/uv-build/ ]] && uv_build_changed=1
-            [[ "$file" =~ ^docs/ || "$file" =~ ^mkdocs.*\.yml$ || "$file" =~ \.md$ || "$file" =~ ^bin/ || "$file" =~ ^assets/ ]] && continue
+            [[ "$file" =~ ^docs/ || "$file" =~ ^mkdocs.*\.yml$ || "$file" =~ \.md$ || "$file" =~ ^bin/ || "$file" =~ ^assets/ || "$file" =~ ^\.github/workflows/(check-docs|publish-docs)\.yml$ ]] && continue
             any_code_changed=1
           done <<< "$(git diff --name-only "${BASE_SHA:-origin/main}...HEAD")"
 
