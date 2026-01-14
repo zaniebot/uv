@@ -115,6 +115,27 @@ mod show_settings;
 mod sync;
 
 #[cfg(all(feature = "python", feature = "pypi"))]
+mod sync_build;
+
+#[cfg(all(feature = "python", feature = "pypi"))]
+mod sync_environments;
+
+#[cfg(all(feature = "python", feature = "pypi"))]
+mod sync_extras;
+
+#[cfg(all(feature = "python", feature = "pypi"))]
+mod sync_groups;
+
+#[cfg(all(feature = "python", feature = "pypi"))]
+mod sync_legacy;
+
+#[cfg(all(feature = "python", feature = "pypi"))]
+mod sync_options;
+
+#[cfg(all(feature = "python", feature = "pypi"))]
+mod sync_scripts;
+
+#[cfg(all(feature = "python", feature = "pypi"))]
 mod tool_dir;
 
 #[cfg(all(feature = "python", feature = "pypi"))]
