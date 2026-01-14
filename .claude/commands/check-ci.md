@@ -4,16 +4,10 @@ Debug CI failures for the current branch using the GitHub CLI.
 
 ## Instructions
 
-1. First, get the current branch name and check for any running or failed CI checks:
+1. First, check the CI status for the current PR:
 
    ```
    gh pr checks
-   ```
-
-   If there's no PR yet, check the commit status:
-
-   ```
-   gh run list --branch $(git branch --show-current) --limit 5
    ```
 
 2. For any failed checks, get the detailed logs:
