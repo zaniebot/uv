@@ -15486,3 +15486,112 @@ fn sync_reinstalls_on_version_change() -> Result<()> {
 
     Ok(())
 }
+
+/// Test that changes to files inside a directory tracked via `cache-keys = [{ dir = "..." }]`
+/// trigger a rebuild. See: <https://github.com/astral-sh/uv/issues/17360>
+#[test]
+fn sync_cache_keys_dir_file_modification() -> Result<()> {
+    let context = TestContext::new("3.12");
+
+    let pyproject_toml = context.temp_dir.child("pyproject.toml");
+    pyproject_toml.write_str(
+        r#"
+        [project]
+        name = "test_uv"
+        version = "0.1.0"
+        description = "Test UV"
+        requires-python = ">=3.12"
+        dependencies = []
+
+        [build-system]
+        requires = ["setuptools"]
+        build-backend = "setuptools.build_meta"
+
+        [tool.setuptools]
+        packages = ["test_uv"]
+
+        [tool.setuptools.package-dir]
+        test_uv = "src/test_uv"
+
+        [tool.uv]
+        cache-keys = [{ dir = "csrc" }, { file = "setup.py" }, { file = "pyproject.toml" }]
+        "#,
+    )?;
+
+    // Create the package source directory.
+    context
+        .temp_dir
+        .child("src")
+        .child("test_uv")
+        .child("__init__.py")
+        .touch()?;
+
+    // Create a setup.py that prints markers to stderr so we can detect when it runs.
+    let setup_py = context.temp_dir.child("setup.py");
+    setup_py.write_str(indoc! {r#"
+        import sys
+        from setuptools import setup
+
+        print("****** Start setup.py ********", file=sys.stderr)
+
+        # Read a file from csrc to make the build depend on it
+        with open("csrc/data.txt") as f:
+            content = f.read().strip()
+            print(f"csrc/data.txt content: {content}", file=sys.stderr)
+
+        setup()
+
+        print("****** End setup.py ********", file=sys.stderr)
+    "#})?;
+
+    // Create the csrc directory with a data file.
+    let csrc = context.temp_dir.child("csrc");
+    csrc.create_dir_all()?;
+    csrc.child("data.txt").write_str("version1")?;
+
+    // Initial sync should build the package.
+    uv_snapshot!(context.filters(), context.sync(), @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Resolved 1 package in [TIME]
+    Prepared 1 package in [TIME]
+    Installed 1 package in [TIME]
+     + test-uv==0.1.0 (from file://[TEMP_DIR]/)
+    ");
+
+    // Syncing again without changes should not rebuild.
+    uv_snapshot!(context.filters(), context.sync(), @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Resolved 1 package in [TIME]
+    Audited 1 package in [TIME]
+    ");
+
+    // Modify a file inside the tracked csrc directory.
+    csrc.child("data.txt").write_str("version2")?;
+
+    // BUG #17360: Syncing after modifying a file in the tracked directory SHOULD rebuild,
+    // but currently it does NOT. The expected behavior would be:
+    //   - Prepared 1 package in [TIME]
+    //   - Uninstalled 1 package in [TIME]
+    //   - Installed 1 package in [TIME]
+    //   - ~ test-uv==0.1.0 (from file://[TEMP_DIR]/)
+    // Instead, it just audits without rebuilding:
+    uv_snapshot!(context.filters(), context.sync(), @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Resolved 1 package in [TIME]
+    Audited 1 package in [TIME]
+    ");
+
+    Ok(())
+}
