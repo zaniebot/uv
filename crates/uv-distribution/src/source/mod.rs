@@ -2470,7 +2470,7 @@ impl<'a, T: BuildContext> SourceDistributionBuilder<'a, T> {
                 source_root,
                 subdirectory,
                 temp_dir.path(),
-                source_strategy,
+                source_strategy.clone(),
                 if source.is_editable() {
                     BuildKind::Editable
                 } else {
@@ -2510,7 +2510,7 @@ impl<'a, T: BuildContext> SourceDistributionBuilder<'a, T> {
                 source_root: source_root.to_path_buf().into_boxed_path(),
                 subdirectory: subdirectory
                     .map(|subdirectory| subdirectory.to_path_buf().into_boxed_path()),
-                source_strategy,
+                source_strategy: source_strategy.clone(),
                 build_kind,
             };
 
@@ -2642,7 +2642,7 @@ impl<'a, T: BuildContext> SourceDistributionBuilder<'a, T> {
                 source_root,
                 Some(&source.to_string()),
                 source.as_dist(),
-                source_strategy,
+                source_strategy.clone(),
                 build_kind,
                 if uv_flags::contains(uv_flags::EnvironmentFlags::HIDE_BUILD_OUTPUT) {
                     BuildOutput::Quiet

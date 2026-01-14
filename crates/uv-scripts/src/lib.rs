@@ -112,7 +112,7 @@ impl Pep723ItemRef<'_> {
     /// Collect any `tool.uv.index` from the script.
     pub fn indexes(&self, source_strategy: SourceStrategy) -> &[uv_distribution_types::Index] {
         match source_strategy {
-            SourceStrategy::Enabled => self
+            SourceStrategy::Enabled | SourceStrategy::Packages(_) => self
                 .metadata()
                 .tool
                 .as_ref()
@@ -127,7 +127,7 @@ impl Pep723ItemRef<'_> {
     pub fn sources(&self, source_strategy: SourceStrategy) -> &BTreeMap<PackageName, Sources> {
         static EMPTY: BTreeMap<PackageName, Sources> = BTreeMap::new();
         match source_strategy {
-            SourceStrategy::Enabled => self
+            SourceStrategy::Enabled | SourceStrategy::Packages(_) => self
                 .metadata()
                 .tool
                 .as_ref()

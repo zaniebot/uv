@@ -55,6 +55,11 @@ impl EnvVars {
     #[attr_added_in("0.9.8")]
     pub const UV_NO_SOURCES: &'static str = "UV_NO_SOURCES";
 
+    /// Equivalent to the `--no-sources-package` command-line argument. If set, uv will
+    /// ignore `[tool.uv.sources]` annotations for the given space-delimited list of packages.
+    #[attr_added_in("next release")]
+    pub const UV_NO_SOURCES_PACKAGE: &'static str = "UV_NO_SOURCES_PACKAGE";
+
     /// Equivalent to the `--cache-dir` command-line argument. If set, uv will use this
     /// directory for caching instead of the default cache directory.
     #[attr_added_in("0.0.5")]

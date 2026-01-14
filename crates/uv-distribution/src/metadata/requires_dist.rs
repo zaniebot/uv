@@ -59,7 +59,9 @@ impl RequiresDist {
                     .to_path_buf()
             }),
             members: match sources {
-                SourceStrategy::Enabled => MemberDiscovery::default(),
+                SourceStrategy::Enabled | SourceStrategy::Packages(_) => {
+                    MemberDiscovery::default()
+                }
                 SourceStrategy::Disabled => MemberDiscovery::None,
             },
             ..DiscoveryOptions::default()
@@ -91,7 +93,7 @@ impl RequiresDist {
         // Collect any `tool.uv.index` entries.
         let empty = vec![];
         let project_indexes = match source_strategy {
-            SourceStrategy::Enabled => project_workspace
+            SourceStrategy::Enabled | SourceStrategy::Packages(_) => project_workspace
                 .current_project()
                 .pyproject_toml()
                 .tool
@@ -104,17 +106,29 @@ impl RequiresDist {
 
         // Collect any `tool.uv.sources` and `tool.uv.dev_dependencies` from `pyproject.toml`.
         let empty = BTreeMap::default();
-        let project_sources = match source_strategy {
-            SourceStrategy::Enabled => project_workspace
-                .current_project()
-                .pyproject_toml()
-                .tool
-                .as_ref()
-                .and_then(|tool| tool.uv.as_ref())
-                .and_then(|uv| uv.sources.as_ref())
-                .map(ToolUvSources::inner)
-                .unwrap_or(&empty),
+        let all_project_sources = project_workspace
+            .current_project()
+            .pyproject_toml()
+            .tool
+            .as_ref()
+            .and_then(|tool| tool.uv.as_ref())
+            .and_then(|uv| uv.sources.as_ref())
+            .map(ToolUvSources::inner)
+            .unwrap_or(&empty);
+
+        // For package-specific no-sources, filter out the specified packages from sources.
+        let filtered_sources: BTreeMap<PackageName, Sources>;
+        let project_sources: &BTreeMap<PackageName, Sources> = match &source_strategy {
+            SourceStrategy::Enabled => all_project_sources,
             SourceStrategy::Disabled => &empty,
+            SourceStrategy::Packages(no_sources_packages) => {
+                filtered_sources = all_project_sources
+                    .iter()
+                    .filter(|(name, _)| !no_sources_packages.contains(name))
+                    .map(|(name, sources)| (name.clone(), sources.clone()))
+                    .collect();
+                &filtered_sources
+            }
         };
 
         let dependency_groups = FlatDependencyGroups::from_pyproject_toml(
@@ -131,7 +145,7 @@ impl RequiresDist {
             .into_iter()
             .map(|(name, flat_group)| {
                 let requirements = match source_strategy {
-                    SourceStrategy::Enabled => flat_group
+                    SourceStrategy::Enabled | SourceStrategy::Packages(_) => flat_group
                         .requirements
                         .into_iter()
                         .flat_map(|requirement| {
@@ -176,7 +190,7 @@ impl RequiresDist {
         // Lower the requirements.
         let requires_dist = Box::into_iter(metadata.requires_dist);
         let requires_dist = match source_strategy {
-            SourceStrategy::Enabled => requires_dist
+            SourceStrategy::Enabled | SourceStrategy::Packages(_) => requires_dist
                 .flat_map(|requirement| {
                     let requirement_name = requirement.name.clone();
                     let extra = requirement.marker.top_level_extra_name();

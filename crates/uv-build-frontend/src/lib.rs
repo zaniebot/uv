@@ -309,7 +309,7 @@ impl SourceBuild {
             install_path,
             fallback_package_name,
             locations,
-            source_strategy,
+            source_strategy.clone(),
             workspace_cache,
             credentials_cache,
         )
@@ -575,7 +575,7 @@ impl SourceBuild {
                 let backend = if let Some(build_system) = pyproject_toml.build_system {
                     // If necessary, lower the requirements.
                     let requirements = match source_strategy {
-                        SourceStrategy::Enabled => {
+                        SourceStrategy::Enabled | SourceStrategy::Packages(_) => {
                             if let Some(name) = pyproject_toml
                                 .project
                                 .as_ref()
@@ -590,7 +590,7 @@ impl SourceBuild {
                                     build_requires,
                                     install_path,
                                     locations,
-                                    source_strategy,
+                                    source_strategy.clone(),
                                     workspace_cache,
                                     credentials_cache,
                                 )
@@ -1049,7 +1049,7 @@ async fn create_pep517_build_environment(
 
     // If necessary, lower the requirements.
     let extra_requires = match source_strategy {
-        SourceStrategy::Enabled => {
+        SourceStrategy::Enabled | SourceStrategy::Packages(_) => {
             let build_requires = uv_pypi_types::BuildRequires {
                 name: package_name.cloned(),
                 requires_dist: extra_requires,

@@ -219,7 +219,7 @@ impl BuildContext for BuildDispatch<'_> {
     }
 
     fn sources(&self) -> SourceStrategy {
-        self.sources
+        self.sources.clone()
     }
 
     fn locations(&self) -> &IndexLocations {

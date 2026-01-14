@@ -380,6 +380,7 @@ pub struct InstallerOptions {
     pub no_binary: Option<bool>,
     pub no_binary_package: Option<Vec<PackageName>>,
     pub no_sources: Option<bool>,
+    pub no_sources_package: Option<Vec<PackageName>>,
 }
 
 /// Settings relevant to all resolver operations.
@@ -410,6 +411,7 @@ pub struct ResolverOptions {
     pub extra_build_dependencies: Option<ExtraBuildDependencies>,
     pub extra_build_variables: Option<ExtraBuildVariables>,
     pub no_sources: Option<bool>,
+    pub no_sources_package: Option<Vec<PackageName>>,
 }
 
 /// Shared settings, relevant to all operations that must resolve and install dependencies. The
@@ -438,6 +440,7 @@ pub struct ResolverInstallerOptions {
     pub torch_backend: Option<TorchMode>,
     pub compile_bytecode: Option<bool>,
     pub no_sources: Option<bool>,
+    pub no_sources_package: Option<Vec<PackageName>>,
     pub upgrade: Option<Upgrade>,
     pub reinstall: Option<Reinstall>,
     pub no_build: Option<bool>,
@@ -472,6 +475,7 @@ impl From<ResolverInstallerSchema> for ResolverInstallerOptions {
             torch_backend,
             compile_bytecode,
             no_sources,
+            no_sources_package,
             upgrade,
             upgrade_package,
             reinstall,
@@ -507,6 +511,7 @@ impl From<ResolverInstallerSchema> for ResolverInstallerOptions {
             torch_backend,
             compile_bytecode,
             no_sources,
+            no_sources_package,
             upgrade: Upgrade::from_args(
                 upgrade,
                 upgrade_package
@@ -918,6 +923,17 @@ pub struct ResolverInstallerSchema {
         "#
     )]
     pub no_sources: Option<bool>,
+    /// Ignore the `tool.uv.sources` table for a specific package when resolving dependencies. Used
+    /// to lock against the standards-compliant, publishable package metadata for the given package,
+    /// as opposed to using any workspace, Git, URL, or local path sources.
+    #[option(
+        default = "[]",
+        value_type = "list[str]",
+        example = r#"
+            no-sources-package = ["ruff"]
+        "#
+    )]
+    pub no_sources_package: Option<Vec<PackageName>>,
     /// Allow package upgrades, ignoring pinned versions in any existing output file.
     #[option(
         default = "false",
@@ -1806,6 +1822,17 @@ pub struct PipOptions {
         "#
     )]
     pub no_sources: Option<bool>,
+    /// Ignore the `tool.uv.sources` table for a specific package when resolving dependencies. Used
+    /// to lock against the standards-compliant, publishable package metadata for the given package,
+    /// as opposed to using any workspace, Git, URL, or local path sources.
+    #[option(
+        default = "[]",
+        value_type = "list[str]",
+        example = r#"
+            no-sources-package = ["ruff"]
+        "#
+    )]
+    pub no_sources_package: Option<Vec<PackageName>>,
     /// Allow package upgrades, ignoring pinned versions in any existing output file.
     #[option(
         default = "false",
@@ -1956,6 +1983,7 @@ impl From<ResolverInstallerSchema> for ResolverOptions {
             extra_build_dependencies: value.extra_build_dependencies,
             extra_build_variables: value.extra_build_variables,
             no_sources: value.no_sources,
+            no_sources_package: value.no_sources_package,
             torch_backend: value.torch_backend,
         }
     }
@@ -1997,6 +2025,7 @@ impl From<ResolverInstallerSchema> for InstallerOptions {
             no_binary: value.no_binary,
             no_binary_package: value.no_binary_package,
             no_sources: value.no_sources,
+            no_sources_package: value.no_sources_package,
         }
     }
 }
@@ -2032,6 +2061,7 @@ pub struct ToolOptions {
     pub link_mode: Option<LinkMode>,
     pub compile_bytecode: Option<bool>,
     pub no_sources: Option<bool>,
+    pub no_sources_package: Option<Vec<PackageName>>,
     pub no_build: Option<bool>,
     pub no_build_package: Option<Vec<PackageName>>,
     pub no_binary: Option<bool>,
@@ -2063,6 +2093,7 @@ impl From<ResolverInstallerOptions> for ToolOptions {
             link_mode: value.link_mode,
             compile_bytecode: value.compile_bytecode,
             no_sources: value.no_sources,
+            no_sources_package: value.no_sources_package,
             no_build: value.no_build,
             no_build_package: value.no_build_package,
             no_binary: value.no_binary,
@@ -2096,6 +2127,7 @@ impl From<ToolOptions> for ResolverInstallerOptions {
             link_mode: value.link_mode,
             compile_bytecode: value.compile_bytecode,
             no_sources: value.no_sources,
+            no_sources_package: value.no_sources_package,
             upgrade: None,
             reinstall: None,
             no_build: value.no_build,
@@ -2154,6 +2186,7 @@ pub struct OptionsWire {
     link_mode: Option<LinkMode>,
     compile_bytecode: Option<bool>,
     no_sources: Option<bool>,
+    no_sources_package: Option<Vec<PackageName>>,
     upgrade: Option<bool>,
     upgrade_package: Option<Vec<Requirement<VerbatimParsedUrl>>>,
     reinstall: Option<bool>,
@@ -2250,6 +2283,7 @@ impl From<OptionsWire> for Options {
             link_mode,
             compile_bytecode,
             no_sources,
+            no_sources_package,
             upgrade,
             upgrade_package,
             reinstall,
@@ -2327,6 +2361,7 @@ impl From<OptionsWire> for Options {
                 link_mode,
                 compile_bytecode,
                 no_sources,
+                no_sources_package,
                 upgrade,
                 upgrade_package,
                 reinstall,

@@ -6,7 +6,7 @@ use uv_distribution_types::{
     ExtraBuildRequirement, ExtraBuildRequires, IndexLocations, Requirement,
 };
 use uv_normalize::PackageName;
-use uv_workspace::pyproject::{ExtraBuildDependencies, ExtraBuildDependency, ToolUvSources};
+use uv_workspace::pyproject::{ExtraBuildDependencies, ExtraBuildDependency, Sources, ToolUvSources};
 use uv_workspace::{
     DiscoveryOptions, MemberDiscovery, ProjectWorkspace, Workspace, WorkspaceCache,
 };
@@ -45,7 +45,7 @@ impl BuildRequires {
         credentials_cache: &CredentialsCache,
     ) -> Result<Self, MetadataError> {
         let discovery = match sources {
-            SourceStrategy::Enabled => DiscoveryOptions::default(),
+            SourceStrategy::Enabled | SourceStrategy::Packages(_) => DiscoveryOptions::default(),
             SourceStrategy::Disabled => DiscoveryOptions {
                 members: MemberDiscovery::None,
                 ..Default::default()
@@ -77,7 +77,7 @@ impl BuildRequires {
         // Collect any `tool.uv.index` entries.
         let empty = vec![];
         let project_indexes = match source_strategy {
-            SourceStrategy::Enabled => project_workspace
+            SourceStrategy::Enabled | SourceStrategy::Packages(_) => project_workspace
                 .current_project()
                 .pyproject_toml()
                 .tool
@@ -90,23 +90,35 @@ impl BuildRequires {
 
         // Collect any `tool.uv.sources` and `tool.uv.dev_dependencies` from `pyproject.toml`.
         let empty = BTreeMap::default();
-        let project_sources = match source_strategy {
-            SourceStrategy::Enabled => project_workspace
-                .current_project()
-                .pyproject_toml()
-                .tool
-                .as_ref()
-                .and_then(|tool| tool.uv.as_ref())
-                .and_then(|uv| uv.sources.as_ref())
-                .map(ToolUvSources::inner)
-                .unwrap_or(&empty),
+        let all_project_sources = project_workspace
+            .current_project()
+            .pyproject_toml()
+            .tool
+            .as_ref()
+            .and_then(|tool| tool.uv.as_ref())
+            .and_then(|uv| uv.sources.as_ref())
+            .map(ToolUvSources::inner)
+            .unwrap_or(&empty);
+
+        // For package-specific no-sources, filter out the specified packages from sources.
+        let filtered_sources: BTreeMap<PackageName, Sources>;
+        let project_sources: &BTreeMap<PackageName, Sources> = match &source_strategy {
+            SourceStrategy::Enabled => all_project_sources,
             SourceStrategy::Disabled => &empty,
+            SourceStrategy::Packages(no_sources_packages) => {
+                filtered_sources = all_project_sources
+                    .iter()
+                    .filter(|(name, _)| !no_sources_packages.contains(name))
+                    .map(|(name, sources)| (name.clone(), sources.clone()))
+                    .collect();
+                &filtered_sources
+            }
         };
 
         // Lower the requirements.
         let requires_dist = metadata.requires_dist.into_iter();
         let requires_dist = match source_strategy {
-            SourceStrategy::Enabled => requires_dist
+            SourceStrategy::Enabled | SourceStrategy::Packages(_) => requires_dist
                 .flat_map(|requirement| {
                     let requirement_name = requirement.name.clone();
                     let extra = requirement.marker.top_level_extra_name();
@@ -153,7 +165,7 @@ impl BuildRequires {
         // Collect any `tool.uv.index` entries.
         let empty = vec![];
         let project_indexes = match source_strategy {
-            SourceStrategy::Enabled => workspace
+            SourceStrategy::Enabled | SourceStrategy::Packages(_) => workspace
                 .pyproject_toml()
                 .tool
                 .as_ref()
@@ -165,22 +177,34 @@ impl BuildRequires {
 
         // Collect any `tool.uv.sources` and `tool.uv.dev_dependencies` from `pyproject.toml`.
         let empty = BTreeMap::default();
-        let project_sources = match source_strategy {
-            SourceStrategy::Enabled => workspace
-                .pyproject_toml()
-                .tool
-                .as_ref()
-                .and_then(|tool| tool.uv.as_ref())
-                .and_then(|uv| uv.sources.as_ref())
-                .map(ToolUvSources::inner)
-                .unwrap_or(&empty),
+        let all_project_sources = workspace
+            .pyproject_toml()
+            .tool
+            .as_ref()
+            .and_then(|tool| tool.uv.as_ref())
+            .and_then(|uv| uv.sources.as_ref())
+            .map(ToolUvSources::inner)
+            .unwrap_or(&empty);
+
+        // For package-specific no-sources, filter out the specified packages from sources.
+        let filtered_sources: BTreeMap<PackageName, Sources>;
+        let project_sources: &BTreeMap<PackageName, Sources> = match &source_strategy {
+            SourceStrategy::Enabled => all_project_sources,
             SourceStrategy::Disabled => &empty,
+            SourceStrategy::Packages(no_sources_packages) => {
+                filtered_sources = all_project_sources
+                    .iter()
+                    .filter(|(name, _)| !no_sources_packages.contains(name))
+                    .map(|(name, sources)| (name.clone(), sources.clone()))
+                    .collect();
+                &filtered_sources
+            }
         };
 
         // Lower the requirements.
         let requires_dist = metadata.requires_dist.into_iter();
         let requires_dist = match source_strategy {
-            SourceStrategy::Enabled => requires_dist
+            SourceStrategy::Enabled | SourceStrategy::Packages(_) => requires_dist
                 .flat_map(|requirement| {
                     let requirement_name = requirement.name.clone();
                     let extra = requirement.marker.top_level_extra_name();
@@ -239,7 +263,7 @@ impl LoweredExtraBuildDependencies {
         credentials_cache: &CredentialsCache,
     ) -> Result<Self, MetadataError> {
         match source_strategy {
-            SourceStrategy::Enabled => {
+            SourceStrategy::Enabled | SourceStrategy::Packages(_) => {
                 // Collect project sources and indexes
                 let project_indexes = workspace
                     .pyproject_toml()
@@ -250,7 +274,7 @@ impl LoweredExtraBuildDependencies {
                     .unwrap_or(&[]);
 
                 let empty_sources = BTreeMap::default();
-                let project_sources = workspace
+                let all_project_sources = workspace
                     .pyproject_toml()
                     .tool
                     .as_ref()
@@ -258,6 +282,21 @@ impl LoweredExtraBuildDependencies {
                     .and_then(|uv| uv.sources.as_ref())
                     .map(ToolUvSources::inner)
                     .unwrap_or(&empty_sources);
+
+                // For package-specific no-sources, filter out the specified packages from sources.
+                let filtered_sources: BTreeMap<PackageName, Sources>;
+                let project_sources: &BTreeMap<PackageName, Sources> = match &source_strategy {
+                    SourceStrategy::Enabled => all_project_sources,
+                    SourceStrategy::Disabled => &empty_sources,
+                    SourceStrategy::Packages(no_sources_packages) => {
+                        filtered_sources = all_project_sources
+                            .iter()
+                            .filter(|(name, _)| !no_sources_packages.contains(name))
+                            .map(|(name, sources)| (name.clone(), sources.clone()))
+                            .collect();
+                        &filtered_sources
+                    }
+                };
 
                 // Lower each package's extra build dependencies
                 let mut build_requires = ExtraBuildRequires::default();

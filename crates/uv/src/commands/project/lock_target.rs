@@ -376,7 +376,7 @@ impl<'lock> LockTarget<'lock> {
                 // Collect any `tool.uv.index` from the script.
                 let empty = Vec::default();
                 let indexes = match sources {
-                    SourceStrategy::Enabled => script
+                    SourceStrategy::Enabled | SourceStrategy::Packages(_) => script
                         .metadata
                         .tool
                         .as_ref()
@@ -389,7 +389,7 @@ impl<'lock> LockTarget<'lock> {
                 // Collect any `tool.uv.sources` from the script.
                 let empty = BTreeMap::default();
                 let sources = match sources {
-                    SourceStrategy::Enabled => script
+                    SourceStrategy::Enabled | SourceStrategy::Packages(_) => script
                         .metadata
                         .tool
                         .as_ref()

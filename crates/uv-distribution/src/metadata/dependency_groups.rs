@@ -75,7 +75,9 @@ impl SourcedDependencyGroups {
                     .to_path_buf()
             }),
             members: match source_strategy {
-                SourceStrategy::Enabled => MemberDiscovery::default(),
+                SourceStrategy::Enabled | SourceStrategy::Packages(_) => {
+                    MemberDiscovery::default()
+                }
                 SourceStrategy::Disabled => MemberDiscovery::None,
             },
             ..DiscoveryOptions::default()

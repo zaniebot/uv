@@ -442,7 +442,7 @@ pub(crate) async fn add(
                     settings.resolver.extra_build_dependencies.clone(),
                     project.workspace(),
                     &settings.resolver.index_locations,
-                    settings.resolver.sources,
+                    settings.resolver.sources.clone(),
                     client.credentials_cache(),
                 )?
             } else {
