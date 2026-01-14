@@ -5492,6 +5492,7 @@ dependencies = [
  "uv-torch",
  "uv-trampoline-builder",
  "uv-types",
+ "uv-unix",
  "uv-version",
  "uv-virtualenv",
  "uv-warnings",
@@ -6911,6 +6912,14 @@ dependencies = [
  "uv-python",
  "uv-redacted",
  "uv-workspace",
+]
+
+[[package]]
+name = "uv-unix"
+version = "0.0.14"
+dependencies = [
+ "nix",
+ "tracing",
 ]
 
 [[package]]
