@@ -44,7 +44,7 @@ impl NoSources {
         }
     }
 
-    /// Combine a set of [`SourceStrategy`] values.
+    /// Combine a set of [`NoSources`] values.
     #[must_use]
     pub fn combine(self, other: Self) -> Self {
         match (self, other) {
@@ -59,7 +59,7 @@ impl NoSources {
         }
     }
 
-    /// Extend a [`SourceStrategy`] value with another.
+    /// Extend a [`NoSources`] value with another.
     pub fn extend(&mut self, other: Self) {
         match (&mut *self, other) {
             (Self::All, _) | (_, Self::All) => *self = Self::All,
@@ -77,6 +77,50 @@ impl NoSources {
 
 impl NoSources {
     /// Returns `true` if all sources are allowed.
+    pub fn is_none(&self) -> bool {
+        matches!(self, Self::None)
+    }
+}
+
+/// Strategy for handling local sources (path and workspace dependencies).
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub enum NoSourcesLocal {
+    /// Use local `tool.uv.sources` when resolving dependencies.
+    #[default]
+    None,
+
+    /// Ignore local `tool.uv.sources` (path and workspace sources) when resolving dependencies.
+    All,
+}
+
+impl NoSourcesLocal {
+    /// Determine the no sources local strategy from the command-line argument.
+    pub fn from_args(no_sources_local: bool) -> Self {
+        if no_sources_local {
+            Self::All
+        } else {
+            Self::None
+        }
+    }
+
+    /// Returns `true` if local sources should be ignored.
+    pub fn no_sources_local(&self) -> bool {
+        matches!(self, Self::All)
+    }
+
+    /// Combine two [`NoSourcesLocal`] values.
+    #[must_use]
+    pub fn combine(self, other: Self) -> Self {
+        match (self, other) {
+            (Self::None, Self::None) => Self::None,
+            (Self::All, _) | (_, Self::All) => Self::All,
+        }
+    }
+}
+
+impl NoSourcesLocal {
+    /// Returns `true` if all local sources are allowed.
     pub fn is_none(&self) -> bool {
         matches!(self, Self::None)
     }

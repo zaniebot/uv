@@ -191,6 +191,11 @@ impl EnvVars {
     /// ignore the `tool.uv.sources` table for the given space-delimited list of packages.
     pub const UV_NO_SOURCES_PACKAGE: &'static str = "UV_NO_SOURCES_PACKAGE";
 
+    /// Equivalent to the `--no-sources-local` command-line argument. If set, uv will ignore
+    /// local `tool.uv.sources` annotations (path and workspace sources) when resolving
+    /// dependencies.
+    pub const UV_NO_SOURCES_LOCAL: &'static str = "UV_NO_SOURCES_LOCAL";
+
     /// Equivalent to the `--publish-url` command-line argument. The URL of the upload
     /// endpoint of the index to use with `uv publish`.
     pub const UV_PUBLISH_URL: &'static str = "UV_PUBLISH_URL";

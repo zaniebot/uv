@@ -1727,6 +1727,11 @@ impl Source {
             Source::Workspace { group, .. } => group.as_ref(),
         }
     }
+
+    /// Returns `true` if this source refers to a local path or workspace package.
+    pub fn is_local(&self) -> bool {
+        matches!(self, Self::Path { .. } | Self::Workspace { .. })
+    }
 }
 
 /// The type of a dependency in a `pyproject.toml`.

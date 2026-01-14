@@ -1697,6 +1697,7 @@ pub(crate) async fn resolve_names(
                 prerelease: _,
                 resolution: _,
                 sources,
+                sources_local: _,
                 upgrade: _,
             },
         compile_bytecode: _,
@@ -1856,6 +1857,7 @@ pub(crate) async fn resolve_environment(
         upgrade: _,
         build_options,
         sources,
+        sources_local: _,
     } = settings;
 
     // Respect all requirements from the provided sources.
@@ -2044,6 +2046,7 @@ pub(crate) async fn sync_environment(
         reinstall,
         build_options,
         sources,
+        sources_local: _,
     } = settings;
 
     let client_builder = BaseClientBuilder::new()
@@ -2212,6 +2215,7 @@ pub(crate) async fn update_environment(
                 prerelease,
                 resolution,
                 sources,
+                sources_local: _,
                 upgrade,
             },
         compile_bytecode,

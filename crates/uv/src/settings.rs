@@ -23,9 +23,9 @@ use uv_client::Connectivity;
 use uv_configuration::{
     BuildOptions, Concurrency, ConfigSettings, DependencyGroups, DryRun, EditableMode,
     ExportFormat, ExtrasSpecification, HashCheckingMode, IndexStrategy, InstallOptions,
-    KeyringProviderType, NoBinary, NoBuild, NoSources, PackageConfigSettings, Preview,
-    ProjectBuildBackend, Reinstall, RequiredVersion, TargetTriple, TrustedHost, TrustedPublishing,
-    Upgrade, VersionControlSystem,
+    KeyringProviderType, NoBinary, NoBuild, NoSources, NoSourcesLocal, PackageConfigSettings,
+    Preview, ProjectBuildBackend, Reinstall, RequiredVersion, TargetTriple, TrustedHost,
+    TrustedPublishing, Upgrade, VersionControlSystem,
 };
 use uv_distribution_types::{DependencyMetadata, Index, IndexLocations, IndexUrl, Requirement};
 use uv_install_wheel::LinkMode;
@@ -731,6 +731,7 @@ impl ToolUpgradeSettings {
             no_compile_bytecode,
             no_sources,
             no_sources_package,
+            no_sources_local,
             exclude_newer_package,
             build,
         } = args;
@@ -769,6 +770,7 @@ impl ToolUpgradeSettings {
             no_compile_bytecode,
             no_sources,
             no_sources_package,
+            no_sources_local,
         };
 
         let args = resolver_installer_options(installer, build);
@@ -2729,6 +2731,7 @@ pub(crate) struct InstallerSettingsRef<'a> {
     pub(crate) reinstall: &'a Reinstall,
     pub(crate) build_options: &'a BuildOptions,
     pub(crate) sources: NoSources,
+    pub(crate) sources_local: NoSourcesLocal,
 }
 
 /// The resolved settings to use for an invocation of the uv CLI when resolving dependencies.
@@ -2753,6 +2756,7 @@ pub(crate) struct ResolverSettings {
     pub(crate) prerelease: PrereleaseMode,
     pub(crate) resolution: ResolutionMode,
     pub(crate) sources: NoSources,
+    pub(crate) sources_local: NoSourcesLocal,
     pub(crate) upgrade: Upgrade,
 }
 
@@ -2809,6 +2813,7 @@ impl From<ResolverOptions> for ResolverSettings {
                 value.no_sources,
                 value.no_sources_package.unwrap_or_default(),
             ),
+            sources_local: NoSourcesLocal::from_args(value.no_sources_local.unwrap_or_default()),
             upgrade: Upgrade::from_args(
                 value.upgrade,
                 value
@@ -2910,6 +2915,7 @@ impl From<ResolverInstallerOptions> for ResolverInstallerSettings {
                     value.no_sources,
                     value.no_sources_package.unwrap_or_default(),
                 ),
+                sources_local: NoSourcesLocal::from_args(value.no_sources_local.unwrap_or_default()),
                 upgrade: Upgrade::from_args(
                     value.upgrade,
                     value
@@ -2981,6 +2987,7 @@ pub(crate) struct PipSettings {
     pub(crate) link_mode: LinkMode,
     pub(crate) compile_bytecode: bool,
     pub(crate) sources: NoSources,
+    pub(crate) sources_local: NoSourcesLocal,
     pub(crate) hash_checking: Option<HashCheckingMode>,
     pub(crate) upgrade: Upgrade,
     pub(crate) reinstall: Reinstall,
@@ -3055,6 +3062,7 @@ impl PipSettings {
             verify_hashes,
             no_sources,
             no_sources_package,
+            no_sources_local,
             upgrade,
             upgrade_package,
             reinstall,
@@ -3084,6 +3092,7 @@ impl PipSettings {
             compile_bytecode: top_level_compile_bytecode,
             no_sources: top_level_no_sources,
             no_sources_package: top_level_no_sources_package,
+            no_sources_local: top_level_no_sources_local,
             upgrade: top_level_upgrade,
             upgrade_package: top_level_upgrade_package,
             reinstall: top_level_reinstall,
@@ -3131,6 +3140,7 @@ impl PipSettings {
         let compile_bytecode = compile_bytecode.combine(top_level_compile_bytecode);
         let no_sources = no_sources.combine(top_level_no_sources);
         let no_sources_package = no_sources_package.combine(top_level_no_sources_package);
+        let no_sources_local = no_sources_local.combine(top_level_no_sources_local);
         let upgrade = upgrade.combine(top_level_upgrade);
         let upgrade_package = upgrade_package.combine(top_level_upgrade_package);
         let reinstall = reinstall.combine(top_level_reinstall);
@@ -3289,6 +3299,11 @@ impl PipSettings {
                     .combine(no_sources_package)
                     .unwrap_or_default(),
             ),
+            sources_local: NoSourcesLocal::from_args(
+                args.no_sources_local
+                    .combine(no_sources_local)
+                    .unwrap_or_default(),
+            ),
             strict: args.strict.combine(strict).unwrap_or_default(),
             upgrade: Upgrade::from_args(
                 args.upgrade.combine(upgrade),
@@ -3343,6 +3358,7 @@ impl<'a> From<&'a ResolverInstallerSettings> for InstallerSettingsRef<'a> {
             reinstall: &settings.reinstall,
             build_options: &settings.resolver.build_options,
             sources: settings.resolver.sources.clone(),
+            sources_local: settings.resolver.sources_local.clone(),
         }
     }
 }

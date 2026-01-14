@@ -324,6 +324,7 @@ fn warn_uv_toml_masked_fields(options: &Options) {
                 compile_bytecode,
                 no_sources,
                 no_sources_package: _,
+                no_sources_local,
                 upgrade,
                 upgrade_package,
                 reinstall,
@@ -464,6 +465,9 @@ fn warn_uv_toml_masked_fields(options: &Options) {
     }
     if no_sources.is_some() {
         masked_fields.push("no-sources");
+    }
+    if no_sources_local.is_some() {
+        masked_fields.push("no-sources-local");
     }
     if upgrade.is_some() {
         masked_fields.push("upgrade");

@@ -441,6 +441,7 @@ async fn do_lock(
         upgrade,
         build_options,
         sources,
+        sources_local,
     } = settings;
 
     if !preview.is_enabled(PreviewFeatures::EXTRA_BUILD_DEPENDENCIES)

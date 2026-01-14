@@ -144,6 +144,7 @@ impl RequiresDist {
                                 locations,
                                 project_workspace.workspace(),
                                 git_member,
+                                false, // TODO: Wire up no_sources_local from settings
                             )
                             .map(move |requirement| match requirement {
                                 Ok(requirement) => Ok(requirement.into_inner()),
@@ -185,6 +186,7 @@ impl RequiresDist {
                         locations,
                         project_workspace.workspace(),
                         git_member,
+                        false, // TODO: Wire up no_sources_local from settings
                     )
                     .map(move |requirement| match requirement {
                         Ok(requirement) => Ok(requirement.into_inner()),

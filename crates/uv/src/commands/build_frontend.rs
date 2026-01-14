@@ -207,6 +207,7 @@ async fn build_impl(
         upgrade: _,
         build_options,
         sources,
+        sources_local: _,
     } = settings;
 
     let client_builder = BaseClientBuilder::default()

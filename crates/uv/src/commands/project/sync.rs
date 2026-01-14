@@ -591,6 +591,7 @@ pub(super) async fn do_sync(
         reinstall,
         build_options,
         sources,
+        sources_local,
     } = settings;
 
     if !preview.is_enabled(PreviewFeatures::EXTRA_BUILD_DEPENDENCIES)
@@ -633,6 +634,7 @@ pub(super) async fn do_sync(
                 prerelease: PrereleaseMode::default(),
                 resolution: ResolutionMode::default(),
                 sources: sources.clone(),
+                sources_local: sources_local.clone(),
                 upgrade: Upgrade::default(),
             };
             script_extra_build_requires((*script).into(), &resolver_settings)?
