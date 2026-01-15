@@ -445,6 +445,7 @@ pub(crate) async fn pip_install(
         &build_hasher,
         exclude_newer.clone(),
         sources,
+        false,
         WorkspaceCache::default(),
         concurrency,
         preview,

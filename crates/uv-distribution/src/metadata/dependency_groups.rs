@@ -56,6 +56,7 @@ impl SourcedDependencyGroups {
         git_member: Option<&GitWorkspaceMember<'_>>,
         locations: &IndexLocations,
         no_sources: NoSources,
+        no_sources_local: bool,
         cache: &WorkspaceCache,
     ) -> Result<Self, MetadataError> {
         let discovery = DiscoveryOptions {
@@ -154,6 +155,7 @@ impl SourcedDependencyGroups {
                                 locations,
                                 project.workspace(),
                                 git_member,
+                                no_sources_local,
                             )
                             .map(move |requirement| match requirement {
                                 Ok(requirement) => Ok(requirement.into_inner()),

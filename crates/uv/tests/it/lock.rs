@@ -30682,3 +30682,124 @@ fn lock_required_intersection() -> Result<()> {
 
     Ok(())
 }
+
+/// Test that `--no-sources-local` ignores local path sources while keeping remote sources.
+#[test]
+#[cfg(feature = "git")]
+fn lock_no_sources_local() -> Result<()> {
+    let context = TestContext::new("3.12");
+
+    let pyproject_toml = context.temp_dir.child("pyproject.toml");
+    pyproject_toml.write_str(
+        r#"
+        [project]
+        name = "project"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        dependencies = [
+            "anyio",
+            "iniconfig"
+        ]
+
+        [tool.uv.sources]
+        anyio = { git = "https://github.com/agronholm/anyio", tag = "3.7.0" }
+        iniconfig = { path = "iniconfig" }
+        "#,
+    )?;
+
+    // Create a local iniconfig package
+    let local_iniconfig = context.temp_dir.child("iniconfig");
+    local_iniconfig.create_dir_all()?;
+    local_iniconfig.child("pyproject.toml").write_str(
+        r#"
+        [project]
+        name = "iniconfig"
+        version = "0.0.1"
+        requires-python = ">=3.12"
+        "#,
+    )?;
+
+    // Lock with --no-sources-local - local source should be ignored, git source should be kept
+    uv_snapshot!(context.filters(), context.lock().arg("--no-sources-local"), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Resolved 5 packages in [TIME]
+    "###);
+
+    let lock = context.read("uv.lock");
+
+    insta::with_settings!({
+        filters => context.filters(),
+    }, {
+        // Verify anyio comes from git (remote source kept)
+        assert!(lock.contains("source = { git = \"https://github.com/agronholm/anyio\""));
+        // Verify iniconfig comes from registry (local source ignored)
+        assert!(lock.contains("name = \"iniconfig\""));
+        assert!(lock.contains("source = { registry = \"https://pypi.org/simple\" }"));
+    });
+
+    Ok(())
+}
+
+/// Test that `UV_NO_SOURCES_LOCAL` environment variable works.
+#[test]
+#[cfg(feature = "git")]
+fn lock_no_sources_local_env_var() -> Result<()> {
+    let context = TestContext::new("3.12");
+
+    let pyproject_toml = context.temp_dir.child("pyproject.toml");
+    pyproject_toml.write_str(
+        r#"
+        [project]
+        name = "project"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        dependencies = [
+            "anyio",
+            "iniconfig"
+        ]
+
+        [tool.uv.sources]
+        anyio = { git = "https://github.com/agronholm/anyio", tag = "3.7.0" }
+        iniconfig = { path = "iniconfig" }
+        "#,
+    )?;
+
+    // Create a local iniconfig package
+    let local_iniconfig = context.temp_dir.child("iniconfig");
+    local_iniconfig.create_dir_all()?;
+    local_iniconfig.child("pyproject.toml").write_str(
+        r#"
+        [project]
+        name = "iniconfig"
+        version = "0.0.1"
+        requires-python = ">=3.12"
+        "#,
+    )?;
+
+    // Lock with UV_NO_SOURCES_LOCAL environment variable
+    uv_snapshot!(context.filters(), context.lock().env("UV_NO_SOURCES_LOCAL", "true"), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Resolved 5 packages in [TIME]
+    "###);
+
+    let lock = context.read("uv.lock");
+
+    insta::with_settings!({
+        filters => context.filters(),
+    }, {
+        // Verify anyio comes from git (remote source kept)
+        assert!(lock.contains("source = { git = \"https://github.com/agronholm/anyio\""));
+        // Verify iniconfig comes from registry (local source ignored)
+        assert!(lock.contains("name = \"iniconfig\""));
+    });
+
+    Ok(())
+}

@@ -1697,6 +1697,7 @@ pub(crate) async fn resolve_names(
                 prerelease: _,
                 resolution: _,
                 sources,
+                no_sources_local,
                 upgrade: _,
             },
         compile_bytecode: _,
@@ -1763,6 +1764,7 @@ pub(crate) async fn resolve_names(
         &build_hasher,
         exclude_newer.clone(),
         sources.clone(),
+        *no_sources_local,
         workspace_cache.clone(),
         concurrency,
         preview,
@@ -1856,6 +1858,7 @@ pub(crate) async fn resolve_environment(
         upgrade: _,
         build_options,
         sources,
+        no_sources_local,
     } = settings;
 
     // Respect all requirements from the provided sources.
@@ -1975,6 +1978,7 @@ pub(crate) async fn resolve_environment(
         &build_hasher,
         exclude_newer.clone(),
         sources.clone(),
+        *no_sources_local,
         workspace_cache,
         concurrency,
         preview,
@@ -2044,6 +2048,7 @@ pub(crate) async fn sync_environment(
         reinstall,
         build_options,
         sources,
+        no_sources_local,
     } = settings;
 
     let client_builder = BaseClientBuilder::new()
@@ -2117,6 +2122,7 @@ pub(crate) async fn sync_environment(
         &build_hasher,
         exclude_newer,
         sources,
+        no_sources_local,
         workspace_cache,
         concurrency,
         preview,
@@ -2212,6 +2218,7 @@ pub(crate) async fn update_environment(
                 prerelease,
                 resolution,
                 sources,
+                no_sources_local,
                 upgrade,
             },
         compile_bytecode,
@@ -2344,6 +2351,7 @@ pub(crate) async fn update_environment(
         &build_hasher,
         exclude_newer.clone(),
         sources.clone(),
+        *no_sources_local,
         workspace_cache,
         concurrency,
         preview,

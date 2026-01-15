@@ -568,6 +568,7 @@ impl SourceBuild {
                             install_path,
                             locations,
                             no_sources,
+                            false,
                             workspace_cache,
                         )
                         .await
@@ -1028,6 +1029,7 @@ async fn create_pep517_build_environment(
             install_path,
             locations,
             &no_sources,
+            false,
             workspace_cache,
         )
         .await

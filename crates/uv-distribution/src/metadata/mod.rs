@@ -88,6 +88,7 @@ impl Metadata {
         git_source: Option<&GitWorkspaceMember<'_>>,
         locations: &IndexLocations,
         sources: NoSources,
+        no_sources_local: bool,
         cache: &WorkspaceCache,
     ) -> Result<Self, MetadataError> {
         // Lower the requirements.
@@ -109,6 +110,7 @@ impl Metadata {
             git_source,
             locations,
             sources,
+            no_sources_local,
             cache,
         )
         .await?;

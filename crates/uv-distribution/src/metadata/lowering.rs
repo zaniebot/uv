@@ -44,6 +44,7 @@ impl LoweredRequirement {
         locations: &'data IndexLocations,
         workspace: &'data Workspace,
         git_member: Option<&'data GitWorkspaceMember<'data>>,
+        no_sources_local: bool,
     ) -> impl Iterator<Item = Result<Self, LoweringError>> + use<'data> + 'data {
         // Identify the source from the `tool.uv.sources` table.
         let (sources, origin) = if let Some(source) = project_sources.get(&requirement.name) {
@@ -55,10 +56,16 @@ impl LoweredRequirement {
         };
 
         // If the source only applies to a given extra or dependency group, filter it out.
+        // Also filter out local sources if `no_sources_local` is set.
         let sources = sources.map(|sources| {
             sources
                 .iter()
                 .filter(|source| {
+                    // Filter out local sources if no_sources_local is set
+                    if no_sources_local && source.is_local() {
+                        return false;
+                    }
+
                     if let Some(target) = source.extra() {
                         if extra != Some(target) {
                             return false;

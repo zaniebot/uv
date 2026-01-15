@@ -380,6 +380,7 @@ pub(crate) async fn pip_sync(
         &build_hasher,
         exclude_newer.clone(),
         sources,
+        false,
         WorkspaceCache::default(),
         concurrency,
         preview,

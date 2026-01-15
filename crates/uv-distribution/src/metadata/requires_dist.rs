@@ -47,6 +47,7 @@ impl RequiresDist {
         git_member: Option<&GitWorkspaceMember<'_>>,
         locations: &IndexLocations,
         sources: NoSources,
+        no_sources_local: bool,
         cache: &WorkspaceCache,
     ) -> Result<Self, MetadataError> {
         let discovery = DiscoveryOptions {
@@ -75,6 +76,7 @@ impl RequiresDist {
             git_member,
             locations,
             &sources,
+            no_sources_local,
         )
     }
 
@@ -84,6 +86,7 @@ impl RequiresDist {
         git_member: Option<&GitWorkspaceMember<'_>>,
         locations: &IndexLocations,
         no_sources: &NoSources,
+        no_sources_local: bool,
     ) -> Result<Self, MetadataError> {
         // Collect any `tool.uv.index` entries.
         let empty = vec![];
@@ -144,6 +147,7 @@ impl RequiresDist {
                                 locations,
                                 project_workspace.workspace(),
                                 git_member,
+                                no_sources_local,
                             )
                             .map(move |requirement| match requirement {
                                 Ok(requirement) => Ok(requirement.into_inner()),
@@ -185,6 +189,7 @@ impl RequiresDist {
                         locations,
                         project_workspace.workspace(),
                         git_member,
+                        no_sources_local,
                     )
                     .map(move |requirement| match requirement {
                         Ok(requirement) => Ok(requirement.into_inner()),
@@ -471,6 +476,7 @@ mod test {
             None,
             &IndexLocations::default(),
             &NoSources::default(),
+            false,
         )?)
     }
 

@@ -40,6 +40,7 @@ impl BuildRequires {
         install_path: &Path,
         locations: &IndexLocations,
         sources: &NoSources,
+        no_sources_local: bool,
         cache: &WorkspaceCache,
     ) -> Result<Self, MetadataError> {
         let discovery = if sources.no_sources() {
@@ -56,7 +57,7 @@ impl BuildRequires {
             return Ok(Self::from_metadata23(metadata));
         };
 
-        Self::from_project_workspace(metadata, &project_workspace, locations, sources)
+        Self::from_project_workspace(metadata, &project_workspace, locations, sources, no_sources_local)
     }
 
     /// Lower the `build-system.requires` field from a `pyproject.toml` file.
@@ -65,6 +66,7 @@ impl BuildRequires {
         project_workspace: &ProjectWorkspace,
         locations: &IndexLocations,
         sources: &NoSources,
+        no_sources_local: bool,
     ) -> Result<Self, MetadataError> {
         // Collect any `tool.uv.index` entries.
         let empty = vec![];
@@ -122,6 +124,7 @@ impl BuildRequires {
                             locations,
                             project_workspace.workspace(),
                             None,
+                            no_sources_local,
                         )
                         .map(move |requirement| match requirement {
                             Ok(requirement) => Ok(requirement.into_inner()),
@@ -149,6 +152,7 @@ impl BuildRequires {
         workspace: &Workspace,
         locations: &IndexLocations,
         sources: &NoSources,
+        no_sources_local: bool,
     ) -> Result<Self, MetadataError> {
         // Collect any `tool.uv.index` entries.
         let empty = vec![];
@@ -194,6 +198,7 @@ impl BuildRequires {
                         locations,
                         workspace,
                         None,
+                        no_sources_local,
                     )
                     .map(move |requirement| match requirement {
                         Ok(requirement) => Ok(requirement.into_inner()),
@@ -228,6 +233,7 @@ impl ExtraBuildRequires {
         workspace: &Workspace,
         index_locations: &IndexLocations,
         source_strategy: &NoSources,
+        no_sources_local: bool,
     ) -> Result<Self, MetadataError> {
         match source_strategy {
             NoSources::None => {
@@ -270,6 +276,7 @@ impl ExtraBuildRequires {
                                 index_locations,
                                 workspace,
                                 None,
+                                no_sources_local,
                             )
                             .map(
                                 move |requirement| match requirement {

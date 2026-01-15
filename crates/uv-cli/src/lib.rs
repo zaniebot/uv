@@ -4855,6 +4855,12 @@ pub struct ToolUpgradeArgs {
     #[arg(long, help_heading = "Resolver options", env = EnvVars::UV_NO_SOURCES_PACKAGE, value_delimiter = ' ')]
     pub no_sources_package: Vec<PackageName>,
 
+    /// Ignore local sources (path and workspace) from the `tool.uv.sources` table when resolving
+    /// dependencies. Used to lock against the publishable package metadata without using local
+    /// path or workspace sources.
+    #[arg(long, help_heading = "Resolver options", env = EnvVars::UV_NO_SOURCES_LOCAL)]
+    pub no_sources_local: bool,
+
     #[command(flatten)]
     pub build: BuildOptionsArgs,
 }
@@ -5662,6 +5668,12 @@ pub struct InstallerArgs {
     /// Don't use sources from the `tool.uv.sources` table for the specified packages.
     #[arg(long, help_heading = "Resolver options", env = EnvVars::UV_NO_SOURCES_PACKAGE, value_delimiter = ' ')]
     pub no_sources_package: Vec<PackageName>,
+
+    /// Ignore local sources (path and workspace) from the `tool.uv.sources` table when resolving
+    /// dependencies. Used to lock against the publishable package metadata without using local
+    /// path or workspace sources.
+    #[arg(long, help_heading = "Resolver options", env = EnvVars::UV_NO_SOURCES_LOCAL)]
+    pub no_sources_local: bool,
 }
 
 /// Arguments that are used by commands that need to resolve (but not install) packages.
@@ -5849,6 +5861,12 @@ pub struct ResolverArgs {
     /// Don't use sources from the `tool.uv.sources` table for the specified packages.
     #[arg(long, help_heading = "Resolver options", env = EnvVars::UV_NO_SOURCES_PACKAGE, value_delimiter = ' ')]
     pub no_sources_package: Vec<PackageName>,
+
+    /// Ignore local sources (path and workspace) from the `tool.uv.sources` table when resolving
+    /// dependencies. Used to lock against the publishable package metadata without using local
+    /// path or workspace sources.
+    #[arg(long, help_heading = "Resolver options", env = EnvVars::UV_NO_SOURCES_LOCAL)]
+    pub no_sources_local: bool,
 }
 
 /// Arguments that are used by commands that need to resolve and install packages.
@@ -6086,6 +6104,12 @@ pub struct ResolverInstallerArgs {
     /// Don't use sources from the `tool.uv.sources` table for the specified packages.
     #[arg(long, help_heading = "Resolver options", env = EnvVars::UV_NO_SOURCES_PACKAGE, value_delimiter = ' ')]
     pub no_sources_package: Vec<PackageName>,
+
+    /// Ignore local sources (path and workspace) from the `tool.uv.sources` table when resolving
+    /// dependencies. Used to lock against the publishable package metadata without using local
+    /// path or workspace sources.
+    #[arg(long, help_heading = "Resolver options", env = EnvVars::UV_NO_SOURCES_LOCAL)]
+    pub no_sources_local: bool,
 }
 
 /// Arguments that are used by commands that need to fetch from the Simple API.

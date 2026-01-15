@@ -95,6 +95,9 @@ pub trait BuildContext {
     /// Whether to incorporate `tool.uv.sources` when resolving requirements.
     fn sources(&self) -> NoSources;
 
+    /// Whether to ignore local sources (path and workspace) from `tool.uv.sources`.
+    fn no_sources_local(&self) -> bool;
+
     /// The index locations being searched.
     fn locations(&self) -> &IndexLocations;
 

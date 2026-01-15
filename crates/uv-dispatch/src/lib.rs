@@ -99,6 +99,7 @@ pub struct BuildDispatch<'a> {
     source_build_context: SourceBuildContext,
     build_extra_env_vars: FxHashMap<OsString, OsString>,
     sources: NoSources,
+    no_sources_local: bool,
     workspace_cache: WorkspaceCache,
     concurrency: Concurrency,
     preview: Preview,
@@ -124,6 +125,7 @@ impl<'a> BuildDispatch<'a> {
         hasher: &'a HashStrategy,
         exclude_newer: ExcludeNewer,
         sources: NoSources,
+        no_sources_local: bool,
         workspace_cache: WorkspaceCache,
         concurrency: Concurrency,
         preview: Preview,
@@ -149,6 +151,7 @@ impl<'a> BuildDispatch<'a> {
             source_build_context: SourceBuildContext::default(),
             build_extra_env_vars: FxHashMap::default(),
             sources,
+            no_sources_local,
             workspace_cache,
             concurrency,
             preview,
@@ -213,6 +216,10 @@ impl BuildContext for BuildDispatch<'_> {
 
     fn sources(&self) -> NoSources {
         self.sources.clone()
+    }
+
+    fn no_sources_local(&self) -> bool {
+        self.no_sources_local
     }
 
     fn locations(&self) -> &IndexLocations {

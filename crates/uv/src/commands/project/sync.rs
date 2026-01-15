@@ -591,6 +591,7 @@ pub(super) async fn do_sync(
         reinstall,
         build_options,
         sources,
+        no_sources_local,
     } = settings;
 
     if !preview.is_enabled(PreviewFeatures::EXTRA_BUILD_DEPENDENCIES)
@@ -612,6 +613,7 @@ pub(super) async fn do_sync(
                 workspace,
                 index_locations,
                 &sources,
+                no_sources_local,
             )?
         }
         InstallTarget::Script { script, .. } => {
@@ -633,6 +635,7 @@ pub(super) async fn do_sync(
                 prerelease: PrereleaseMode::default(),
                 resolution: ResolutionMode::default(),
                 sources: sources.clone(),
+                no_sources_local,
                 upgrade: Upgrade::default(),
             };
             script_extra_build_requires((*script).into(), &resolver_settings)?
@@ -773,6 +776,7 @@ pub(super) async fn do_sync(
         &build_hasher,
         exclude_newer.clone(),
         sources.clone(),
+        no_sources_local,
         workspace_cache.clone(),
         concurrency,
         preview,

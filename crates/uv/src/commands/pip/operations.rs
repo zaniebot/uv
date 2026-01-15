@@ -213,6 +213,7 @@ pub(crate) async fn resolve<InstalledPackages: InstalledPackagesProvider>(
                 None,
                 build_dispatch.locations(),
                 build_dispatch.sources(),
+                build_dispatch.no_sources_local(),
                 build_dispatch.workspace_cache(),
             )
             .await

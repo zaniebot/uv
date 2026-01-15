@@ -207,6 +207,7 @@ async fn build_impl(
         upgrade: _,
         build_options,
         sources,
+        no_sources_local: _,
     } = settings;
 
     let client_builder = BaseClientBuilder::default()
@@ -585,6 +586,7 @@ async fn build_package(
         &hasher,
         exclude_newer,
         sources.clone(),
+        false,
         workspace_cache,
         concurrency,
         preview,

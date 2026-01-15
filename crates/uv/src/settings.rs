@@ -731,6 +731,7 @@ impl ToolUpgradeSettings {
             no_compile_bytecode,
             no_sources,
             no_sources_package,
+            no_sources_local,
             exclude_newer_package,
             build,
         } = args;
@@ -769,6 +770,7 @@ impl ToolUpgradeSettings {
             no_compile_bytecode,
             no_sources,
             no_sources_package,
+            no_sources_local,
         };
 
         let args = resolver_installer_options(installer, build);
@@ -2729,6 +2731,7 @@ pub(crate) struct InstallerSettingsRef<'a> {
     pub(crate) reinstall: &'a Reinstall,
     pub(crate) build_options: &'a BuildOptions,
     pub(crate) sources: NoSources,
+    pub(crate) no_sources_local: bool,
 }
 
 /// The resolved settings to use for an invocation of the uv CLI when resolving dependencies.
@@ -2753,6 +2756,7 @@ pub(crate) struct ResolverSettings {
     pub(crate) prerelease: PrereleaseMode,
     pub(crate) resolution: ResolutionMode,
     pub(crate) sources: NoSources,
+    pub(crate) no_sources_local: bool,
     pub(crate) upgrade: Upgrade,
 }
 
@@ -2809,6 +2813,7 @@ impl From<ResolverOptions> for ResolverSettings {
                 value.no_sources,
                 value.no_sources_package.unwrap_or_default(),
             ),
+            no_sources_local: value.no_sources_local.unwrap_or_default(),
             upgrade: Upgrade::from_args(
                 value.upgrade,
                 value
@@ -2910,6 +2915,7 @@ impl From<ResolverInstallerOptions> for ResolverInstallerSettings {
                     value.no_sources,
                     value.no_sources_package.unwrap_or_default(),
                 ),
+                no_sources_local: value.no_sources_local.unwrap_or_default(),
                 upgrade: Upgrade::from_args(
                     value.upgrade,
                     value
@@ -3055,6 +3061,7 @@ impl PipSettings {
             verify_hashes,
             no_sources,
             no_sources_package,
+            no_sources_local: _,
             upgrade,
             upgrade_package,
             reinstall,
@@ -3084,6 +3091,7 @@ impl PipSettings {
             compile_bytecode: top_level_compile_bytecode,
             no_sources: top_level_no_sources,
             no_sources_package: top_level_no_sources_package,
+            no_sources_local: _,
             upgrade: top_level_upgrade,
             upgrade_package: top_level_upgrade_package,
             reinstall: top_level_reinstall,
@@ -3343,6 +3351,7 @@ impl<'a> From<&'a ResolverInstallerSettings> for InstallerSettingsRef<'a> {
             reinstall: &settings.reinstall,
             build_options: &settings.resolver.build_options,
             sources: settings.resolver.sources.clone(),
+            no_sources_local: settings.resolver.no_sources_local,
         }
     }
 }

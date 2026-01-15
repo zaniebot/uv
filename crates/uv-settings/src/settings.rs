@@ -349,6 +349,8 @@ pub struct InstallerOptions {
     pub no_build_isolation: Option<bool>,
     pub no_sources: Option<bool>,
     pub no_sources_package: Option<Vec<PackageName>>,
+    /// CLI-only option, not persisted to config files.
+    pub no_sources_local: Option<bool>,
 }
 
 /// Settings relevant to all resolver operations.
@@ -380,6 +382,8 @@ pub struct ResolverOptions {
     pub extra_build_dependencies: Option<ExtraBuildDependencies>,
     pub no_sources: Option<bool>,
     pub no_sources_package: Option<Vec<PackageName>>,
+    /// CLI-only option, not persisted to config files.
+    pub no_sources_local: Option<bool>,
 }
 
 /// Shared settings, relevant to all operations that must resolve and install dependencies. The
@@ -720,6 +724,11 @@ pub struct ResolverInstallerOptions {
         "#
     )]
     pub no_sources_package: Option<Vec<PackageName>>,
+    /// Ignore local sources (path and workspace) from `tool.uv.sources`.
+    /// CLI-only option, not persisted to config files.
+    #[serde(skip)]
+    #[cfg_attr(feature = "schemars", schemars(skip))]
+    pub no_sources_local: Option<bool>,
     /// Allow package upgrades, ignoring pinned versions in any existing output file.
     #[option(
         default = "false",
@@ -1632,6 +1641,11 @@ pub struct PipOptions {
         "#
     )]
     pub no_sources_package: Option<Vec<PackageName>>,
+    /// Ignore local sources (path and workspace) from `tool.uv.sources`.
+    /// CLI-only option, not persisted to config files.
+    #[serde(skip)]
+    #[cfg_attr(feature = "schemars", schemars(skip))]
+    pub no_sources_local: Option<bool>,
     /// Allow package upgrades, ignoring pinned versions in any existing output file.
     #[option(
         default = "false",
@@ -1771,6 +1785,7 @@ impl From<ResolverInstallerOptions> for ResolverOptions {
             extra_build_dependencies: value.extra_build_dependencies,
             no_sources: value.no_sources,
             no_sources_package: value.no_sources_package,
+            no_sources_local: value.no_sources_local,
         }
     }
 }
@@ -1807,6 +1822,7 @@ impl From<ResolverInstallerOptions> for InstallerOptions {
             no_build_isolation: value.no_build_isolation,
             no_sources: value.no_sources,
             no_sources_package: value.no_sources_package,
+            no_sources_local: value.no_sources_local,
         }
     }
 }
@@ -1907,6 +1923,7 @@ impl From<ToolOptions> for ResolverInstallerOptions {
             compile_bytecode: value.compile_bytecode,
             no_sources: value.no_sources,
             no_sources_package: value.no_sources_package,
+            no_sources_local: None,
             upgrade: None,
             upgrade_package: None,
             reinstall: None,
@@ -2126,6 +2143,7 @@ impl From<OptionsWire> for Options {
                 compile_bytecode,
                 no_sources,
                 no_sources_package,
+                no_sources_local: None,
                 upgrade,
                 upgrade_package,
                 reinstall,

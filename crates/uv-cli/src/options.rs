@@ -70,6 +70,7 @@ impl From<ResolverArgs> for PipOptions {
             link_mode,
             no_sources,
             no_sources_package,
+            no_sources_local,
             exclude_newer_package,
         } = args;
 
@@ -99,6 +100,7 @@ impl From<ResolverArgs> for PipOptions {
             link_mode,
             no_sources: if no_sources { Some(true) } else { None },
             no_sources_package: Some(no_sources_package),
+            no_sources_local: if no_sources_local { Some(true) } else { None },
             ..PipOptions::from(index_args)
         }
     }
@@ -123,6 +125,7 @@ impl From<InstallerArgs> for PipOptions {
             no_compile_bytecode,
             no_sources,
             no_sources_package,
+            no_sources_local,
             exclude_newer_package,
         } = args;
 
@@ -145,6 +148,7 @@ impl From<InstallerArgs> for PipOptions {
             compile_bytecode: flag(compile_bytecode, no_compile_bytecode, "compile-bytecode"),
             no_sources: if no_sources { Some(true) } else { None },
             no_sources_package: Some(no_sources_package),
+            no_sources_local: if no_sources_local { Some(true) } else { None },
             ..PipOptions::from(index_args)
         }
     }
@@ -177,6 +181,7 @@ impl From<ResolverInstallerArgs> for PipOptions {
             no_compile_bytecode,
             no_sources,
             no_sources_package,
+            no_sources_local,
             exclude_newer_package,
         } = args;
 
@@ -209,6 +214,7 @@ impl From<ResolverInstallerArgs> for PipOptions {
             compile_bytecode: flag(compile_bytecode, no_compile_bytecode, "compile-bytecode"),
             no_sources: if no_sources { Some(true) } else { None },
             no_sources_package: Some(no_sources_package),
+            no_sources_local: if no_sources_local { Some(true) } else { None },
             ..PipOptions::from(index_args)
         }
     }
@@ -298,6 +304,7 @@ pub fn resolver_options(
         link_mode,
         no_sources,
         no_sources_package,
+        no_sources_local,
         exclude_newer_package,
     } = resolver_args;
 
@@ -373,6 +380,7 @@ pub fn resolver_options(
         no_binary_package: Some(no_binary_package),
         no_sources: if no_sources { Some(true) } else { None },
         no_sources_package: Some(no_sources_package),
+        no_sources_local: if no_sources_local { Some(true) } else { None },
     }
 }
 
@@ -407,6 +415,7 @@ pub fn resolver_installer_options(
         no_compile_bytecode,
         no_sources,
         no_sources_package,
+        no_sources_local,
     } = resolver_installer_args;
 
     let BuildOptionsArgs {
@@ -508,5 +517,6 @@ pub fn resolver_installer_options(
         } else {
             Some(no_sources_package)
         },
+        no_sources_local: if no_sources_local { Some(true) } else { None },
     }
 }
