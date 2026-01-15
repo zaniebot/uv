@@ -74,7 +74,7 @@ jobs:
             [[ "$file" =~ ^crates/uv-build/ ]] && uv_build_changed=1
             [[ "$file" == "Dockerfile" ]] && dockerfile_changed=1
             [[ "$file" == ".github/workflows/build-docker.yml" ]] && docker_workflow_changed=1
-            [[ "$file" =~ ^docs/ || "$file" =~ ^mkdocs.*\.yml$ || "$file" =~ \.md$ || "$file" =~ ^bin/ || "$file" =~ ^assets/ ]] && continue
+            [[ "$file" =~ ^docs/ || "$file" =~ ^mkdocs.*\.yml$ || "$file" =~ \.md$ || "$file" =~ ^bin/ || "$file" =~ ^assets/ || "$file" =~ ^\.claude/ ]] && continue
             any_code_changed=1
           done <<< "$(git diff --name-only "${BASE_SHA:-origin/main}...HEAD")"
 
