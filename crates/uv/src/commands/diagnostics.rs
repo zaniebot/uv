@@ -165,7 +165,7 @@ pub(crate) fn dist_error(
         help: Option<String>,
     }
 
-    let help = help.or_else(|| {
+    let diagnostic_help = help.or_else(|| {
         SUGGESTIONS
             .get(dist.name())
             .map(|suggestion| {
@@ -188,7 +188,7 @@ pub(crate) fn dist_error(
         kind,
         dist,
         cause,
-        help,
+        help: diagnostic_help,
     });
     anstream::eprint!("{report:?}");
 }
@@ -213,7 +213,7 @@ pub(crate) fn requested_dist_error(
         help: Option<String>,
     }
 
-    let help = help.or_else(|| {
+    let diagnostic_help = help.or_else(|| {
         SUGGESTIONS
             .get(dist.name())
             .map(|suggestion| {
@@ -236,7 +236,7 @@ pub(crate) fn requested_dist_error(
         kind,
         dist,
         cause,
-        help,
+        help: diagnostic_help,
     });
     anstream::eprint!("{report:?}");
 }
@@ -261,7 +261,7 @@ pub(crate) fn dependencies_error(
         help: Option<String>,
     }
 
-    let help = help.or_else(|| {
+    let diagnostic_help = help.or_else(|| {
         SUGGESTIONS
             .get(name)
             .map(|suggestion| {
@@ -284,7 +284,7 @@ pub(crate) fn dependencies_error(
         name: name.clone(),
         version: version.clone(),
         cause: error,
-        help,
+        help: diagnostic_help,
     });
     anstream::eprint!("{report:?}");
 }
@@ -302,7 +302,7 @@ pub(crate) fn no_solution_context(err: &uv_resolver::NoSolutionError, context: &
 }
 
 /// Render a [`uv_resolver::NoSolutionError`] with a help message.
-pub(crate) fn no_solution_hint(err: Box<uv_resolver::NoSolutionError>, help: String) {
+pub(crate) fn no_solution_hint(error: Box<uv_resolver::NoSolutionError>, hint: String) {
     #[derive(Debug, miette::Diagnostic, thiserror::Error)]
     #[error("{header}")]
     #[diagnostic()]
@@ -319,13 +319,17 @@ pub(crate) fn no_solution_hint(err: Box<uv_resolver::NoSolutionError>, help: Str
         help: String,
     }
 
-    let header = err.header();
-    let report = miette::Report::new(Error { header, err, help });
+    let header = error.header();
+    let report = miette::Report::new(Error {
+        header,
+        err: error,
+        help: hint,
+    });
     anstream::eprint!("{report:?}");
 }
 
 /// Render a [`uv_resolver::NoSolutionError`] with a help message.
-pub(crate) fn native_tls_hint(err: uv_client::Error) {
+pub(crate) fn native_tls_hint(error: uv_client::Error) {
     #[derive(Debug, miette::Diagnostic)]
     #[diagnostic()]
     struct Error {
@@ -350,7 +354,7 @@ pub(crate) fn native_tls_hint(err: uv_client::Error) {
     }
 
     let report = miette::Report::new(Error {
-        err,
+        err: error,
         help: format!(
             "Consider enabling use of system TLS certificates with the `{}` command-line flag",
             "--native-tls".green()

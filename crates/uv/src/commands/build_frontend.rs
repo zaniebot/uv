@@ -397,7 +397,7 @@ async fn build_impl(
                     help: Option<String>,
                 }
 
-                let help = if let Error::Extract(uv_extract::Error::Tar(err)) = &err {
+                let diagnostic_help = if let Error::Extract(uv_extract::Error::Tar(err)) = &err {
                     // TODO(konsti): astral-tokio-tar should use a proper error instead of
                     // encoding everything in strings
                     // NOTE(ww): We check for both messages below because the both indicate
@@ -425,7 +425,7 @@ async fn build_impl(
                 let report = miette::Report::new(Diagnostic {
                     source: source.to_string(),
                     cause: err.into(),
-                    help,
+                    help: diagnostic_help,
                 });
                 anstream::eprint!("{report:?}");
 
