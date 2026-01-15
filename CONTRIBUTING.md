@@ -126,6 +126,9 @@ Linting requires [shellcheck](https://github.com/koalaman/shellcheck) and
 # Rust
 cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
 
+# Rust (Windows target from Linux)
+cargo xwin clippy --target x86_64-pc-windows-msvc --workspace --all-targets --all-features --locked -- -D warnings
+
 # Python
 uvx ruff check .
 
