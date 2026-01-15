@@ -126,9 +126,6 @@ Linting requires [shellcheck](https://github.com/koalaman/shellcheck) and
 # Rust
 cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
 
-# Rust (Windows target from Linux)
-cargo xwin clippy --target x86_64-pc-windows-msvc --workspace --all-targets --all-features --locked -- -D warnings
-
 # Python
 uvx ruff check .
 
@@ -143,6 +140,23 @@ uvx typos
 
 # Unused Rust dependencies
 cargo shear
+```
+
+## Windows
+
+### Windows from Unix
+
+To build and lint for Windows from a Unix host, install
+[cargo-xwin](https://github.com/rust-cross/cargo-xwin):
+
+```shell
+cargo install cargo-xwin
+```
+
+Then, to run clippy against the Windows target:
+
+```shell
+cargo xwin clippy --target x86_64-pc-windows-msvc --workspace --all-targets --all-features --locked -- -D warnings
 ```
 
 ## Crate structure
