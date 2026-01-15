@@ -146,7 +146,8 @@ cargo shear
 
 ### Windows from Unix
 
-To build and lint for Windows from a Unix host, install
+uv has Windows-specific code paths that need to be checked for correctness even when developing on
+Unix. To lint for Windows from a Unix host, install
 [cargo-xwin](https://github.com/rust-cross/cargo-xwin):
 
 ```shell
