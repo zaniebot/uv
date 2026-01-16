@@ -28,6 +28,7 @@ RUN case "$TARGETPLATFORM" in \
 # TODO(samypr100): Remove when toolchain updates to 1.93
 COPY <<EOF rust-toolchain.toml
 [toolchain]
+# renovate: depName=rust-nightly-dockerfile
 channel = "nightly-2025-11-02"
 EOF
 # Update rustup whenever we bump the rust version

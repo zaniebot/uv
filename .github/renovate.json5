@@ -164,24 +164,13 @@
       packageNameTemplate: "rust-lang/rust",
       datasourceTemplate: "github-releases",
     },
-    // Rust nightly toolchain version (for trampolines)
+    // Rust nightly toolchain version (for trampolines, Dockerfile, etc.)
     {
       customType: "regex",
-      managerFilePatterns: ["/crates/uv-trampoline/rust-toolchain\\.toml$/"],
+      managerFilePatterns: ["/(^|/)rust-toolchain\\.toml$/", "/Dockerfile$/"],
       matchStrings: [
-        'channel\\s*=\\s*"(?<currentValue>nightly-\\d{4}-\\d{2}-\\d{2})"',
+        '#\\s*renovate:\\s*depName=(?<depName>[\\w-]+)\\s*\\n\\s*channel\\s*=\\s*"(?<currentValue>nightly-\\d{4}-\\d{2}-\\d{2})"',
       ],
-      depNameTemplate: "rust-nightly-trampoline",
-      datasourceTemplate: "custom.rust-nightly",
-    },
-    // Rust nightly toolchain version (for Dockerfile)
-    {
-      customType: "regex",
-      managerFilePatterns: ["/Dockerfile$/"],
-      matchStrings: [
-        'channel\\s*=\\s*"(?<currentValue>nightly-\\d{4}-\\d{2}-\\d{2})"',
-      ],
-      depNameTemplate: "rust-nightly-dockerfile",
       datasourceTemplate: "custom.rust-nightly",
     },
   ],
