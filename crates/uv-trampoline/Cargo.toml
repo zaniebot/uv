@@ -38,8 +38,9 @@ debug = false
 
 [dependencies]
 uv-static = { path = "../uv-static" }
+uv-windows = { path = "../uv-windows", default-features = false }
 
-windows = { version = "0.61.0", features = [
+windows = { version = "0.59.0", features = [
   "std",
   "Win32_Foundation",
   "Win32_Security",

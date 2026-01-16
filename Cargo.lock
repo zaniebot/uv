@@ -5711,6 +5711,7 @@ dependencies = [
  "uv-version",
  "uv-virtualenv",
  "uv-warnings",
+ "uv-windows",
  "uv-workspace",
  "walkdir",
  "which",
@@ -7181,6 +7182,13 @@ dependencies = [
  "insta",
  "owo-colors",
  "rustc-hash",
+]
+
+[[package]]
+name = "uv-windows"
+version = "0.0.15"
+dependencies = [
+ "windows 0.59.0",
 ]
 
 [[package]]
