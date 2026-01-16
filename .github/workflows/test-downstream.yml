@@ -1,0 +1,80 @@
+name: "Test downstream"
+
+on:
+  workflow_call:
+    inputs:
+      sha:
+        required: true
+        type: string
+
+permissions: {}
+
+env:
+  CARGO_INCREMENTAL: 0
+  CARGO_NET_RETRY: 10
+  CARGO_TERM_COLOR: always
+  RUSTUP_MAX_RETRIES: 10
+
+jobs:
+  # Test in a Gentoo-like environment to catch downstream packaging regressions.
+  # This simulates the portage sandbox environment where HOME from /etc/passwd
+  # differs from the test harness's temp directory and may not be writable.
+  # See: https://github.com/astral-sh/uv/issues/17509
+  gentoo:
+    timeout-minutes: 60
+    runs-on: depot-ubuntu-22.04-16
+    name: "cargo test on gentoo"
+    container:
+      image: gentoo/stage3:latest
+    steps:
+      - name: "Sync portage tree"
+        run: emerge-webrsync
+
+      - name: "Install system dependencies"
+        run: |
+          # Install Python versions and build tools
+          emerge --noreplace \
+            net-misc/curl \
+            dev-lang/python:3.9 \
+            dev-lang/python:3.10 \
+            dev-lang/python:3.11 \
+            dev-lang/python:3.12
+
+      - name: "Install Rust via rustup"
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain none
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          persist-credentials: false
+
+      - name: "Install Rust toolchain"
+        run: |
+          source "$HOME/.cargo/env"
+          rustup show
+
+      - name: "Set up portage-like test user"
+        run: |
+          # Create a user simulating the Gentoo portage sandbox environment.
+          # The HOME directory is intentionally non-writable to catch bugs where
+          # uv reads HOME from /etc/passwd instead of the environment variable.
+          mkdir -p /var/lib/portage/home
+          useradd -d /var/lib/portage/home -M portage_test
+
+          # Give test user access to the source and cargo
+          chown -R portage_test:portage_test .
+          cp -r "$HOME/.cargo" /var/lib/portage/home/.cargo
+          cp -r "$HOME/.rustup" /var/lib/portage/home/.rustup
+          chown -R portage_test:portage_test /var/lib/portage/home/.cargo /var/lib/portage/home/.rustup
+
+          # Make the system home directory non-writable (simulating portage sandbox)
+          chmod 555 /var/lib/portage/home
+
+      - name: "Cargo test"
+        run: |
+          su - portage_test -c '
+            source ~/.cargo/env
+            cd "$GITHUB_WORKSPACE/crates/uv"
+            cargo test --no-fail-fast
+          '
