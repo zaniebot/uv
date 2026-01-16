@@ -1,5 +1,3 @@
-use std::error::Error;
-use std::iter;
 use std::sync::atomic::AtomicBool;
 use std::sync::{LazyLock, Mutex};
 
@@ -8,7 +6,6 @@ use std::sync::{LazyLock, Mutex};
 pub use anstream;
 #[doc(hidden)]
 pub use owo_colors;
-use owo_colors::{DynColor, OwoColorize};
 use rustc_hash::FxHashSet;
 
 /// Whether user-facing warnings are enabled.
@@ -59,6 +56,7 @@ macro_rules! warn_user_once {
         }
     }};
 }
+<<<<<<< HEAD
 
 /// Format an error or warning chain.
 ///
@@ -156,3 +154,5 @@ mod tests {
         ");
     }
 }
+=======
+>>>>>>> db82acaaf (Move error rendering into a `uv-errors` crate)

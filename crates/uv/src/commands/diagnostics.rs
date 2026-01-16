@@ -10,10 +10,10 @@ use version_ranges::Ranges;
 use uv_distribution_types::{
     DerivationChain, DerivationStep, Dist, DistErrorKind, Name, RequestedDist,
 };
+use uv_errors::write_error_chain;
 use uv_normalize::PackageName;
 use uv_pep440::Version;
 use uv_resolver::SentinelRange;
-use uv_warnings::write_error_chain;
 
 use crate::commands::pip;
 use crate::printer::Stderr;

@@ -422,7 +422,7 @@ async fn build_impl(
                     source: source.to_string(),
                     cause: err.into(),
                 };
-                let _ = uv_warnings::write_error_chain(
+                let _ = uv_errors::write_error_chain(
                     &diagnostic,
                     Stderr::Enabled,
                     "error",

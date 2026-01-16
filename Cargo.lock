@@ -5643,6 +5643,7 @@ dependencies = [
  "uv-distribution",
  "uv-distribution-filename",
  "uv-distribution-types",
+ "uv-errors",
  "uv-extract",
  "uv-flags",
  "uv-fs",
@@ -6260,6 +6261,14 @@ dependencies = [
  "uv-redacted",
  "uv-small-str",
  "uv-warnings",
+]
+
+[[package]]
+name = "uv-errors"
+version = "0.0.1"
+dependencies = [
+ "anstream",
+ "owo-colors",
 ]
 
 [[package]]
