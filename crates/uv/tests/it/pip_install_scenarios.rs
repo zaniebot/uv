@@ -3642,10 +3642,10 @@ fn no_sdist_no_wheels_with_matching_abi() {
 
     ----- stderr -----
       × No solution found when resolving dependencies:
-      ╰─▶ Because only package-a==1.0.0 is available and package-a==1.0.0 has no wheels with a matching Python ABI tag (e.g., `cp312`), we can conclude that all versions of package-a cannot be used.
+      ╰─▶ Because only package-a==1.0.0 is available and package-a==1.0.0 has no wheels with a matching Python version tag (e.g., `cp312`), we can conclude that all versions of package-a cannot be used.
           And because you require package-a, we can conclude that your requirements are unsatisfiable.
 
-          hint: You require CPython 3.12 (`cp312`), but we only found wheels for `package-a` (v1.0.0) with the following Python ABI tag: `graalpy240_310_native`
+          hint: You require CPython 3.12 (`cp312`), but we only found wheels for `package-a` (v1.0.0) with the following Python version tag: `graalpy240_310_native`
     ");
 
     context.assert_not_installed("no_sdist_no_wheels_with_matching_abi_a");

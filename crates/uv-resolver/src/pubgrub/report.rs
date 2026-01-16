@@ -1711,7 +1711,7 @@ impl std::fmt::Display for PubGrubHint {
                     };
                     write!(
                         f,
-                        "{}{} You require {}, but we only found wheels for `{}` ({}) with the following Python ABI tag{s}: {}",
+                        "{}{} You require {}, but we only found wheels for `{}` ({}) with the following Python version tag{s}: {}",
                         "hint".bold().cyan(),
                         ":".bold(),
                         best,
@@ -1725,7 +1725,7 @@ impl std::fmt::Display for PubGrubHint {
                     let s = if tags.len() == 1 { "" } else { "s" };
                     write!(
                         f,
-                        "{}{} Wheels are available for `{}` ({}) with the following Python ABI tag{s}: {}",
+                        "{}{} Wheels are available for `{}` ({}) with the following Python version tag{s}: {}",
                         "hint".bold().cyan(),
                         ":".bold(),
                         package.cyan(),

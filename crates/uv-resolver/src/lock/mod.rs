@@ -5792,7 +5792,7 @@ impl std::fmt::Display for WheelTagHint {
                     if let Some(version) = version {
                         write!(
                             f,
-                            "{}{} You're using {}, but `{}` ({}) only has wheels with the following Python ABI tag{s}: {}",
+                            "{}{} You're using {}, but `{}` ({}) only has wheels with the following Python version tag{s}: {}",
                             "hint".bold().cyan(),
                             ":".bold(),
                             best,
@@ -5805,7 +5805,7 @@ impl std::fmt::Display for WheelTagHint {
                     } else {
                         write!(
                             f,
-                            "{}{} You're using {}, but `{}` only has wheels with the following Python ABI tag{s}: {}",
+                            "{}{} You're using {}, but `{}` only has wheels with the following Python version tag{s}: {}",
                             "hint".bold().cyan(),
                             ":".bold(),
                             best,
@@ -5820,7 +5820,7 @@ impl std::fmt::Display for WheelTagHint {
                     if let Some(version) = version {
                         write!(
                             f,
-                            "{}{} Wheels are available for `{}` ({}) with the following Python ABI tag{s}: {}",
+                            "{}{} Wheels are available for `{}` ({}) with the following Python version tag{s}: {}",
                             "hint".bold().cyan(),
                             ":".bold(),
                             package.cyan(),
@@ -5832,7 +5832,7 @@ impl std::fmt::Display for WheelTagHint {
                     } else {
                         write!(
                             f,
-                            "{}{} Wheels are available for `{}` with the following Python ABI tag{s}: {}",
+                            "{}{} Wheels are available for `{}` with the following Python version tag{s}: {}",
                             "hint".bold().cyan(),
                             ":".bold(),
                             package.cyan(),

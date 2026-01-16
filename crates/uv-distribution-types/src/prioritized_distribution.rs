@@ -224,7 +224,9 @@ impl Display for IncompatibleDist {
                     IncompatibleTag::Python => {
                         f.write_str("no wheels with a matching Python implementation tag")
                     }
-                    IncompatibleTag::Abi => f.write_str("no wheels with a matching Python ABI tag"),
+                    IncompatibleTag::Abi => {
+                        f.write_str("no wheels with a matching Python version tag")
+                    }
                     IncompatibleTag::FreethreadedAbi => {
                         f.write_str("no wheels with a free-threading compatible ABI tag")
                     }
