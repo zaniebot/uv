@@ -1108,7 +1108,7 @@ async fn run(mut cli: Cli) -> Result<ExitStatus> {
         })
         | Commands::Clean(args) => {
             show_settings!(args);
-            commands::cache_clean(&args.package, args.force, cache, printer).await
+            commands::cache_clean(&args.package, args.force, args.background, cache, printer).await
         }
         Commands::Cache(CacheNamespace {
             command: CacheCommand::Prune(args),
@@ -2536,6 +2536,37 @@ async fn run_project(
     }
 }
 
+/// Handle the internal background clean daemon mode.
+///
+/// This is invoked by `uv clean --background` to delete the cache in a background process.
+/// Returns `Some(ExitCode)` if this is a daemon invocation, `None` otherwise.
+fn handle_background_clean_daemon(args: &[OsString]) -> Option<ExitCode> {
+    use commands::cache_clean_daemon::{BACKGROUND_CLEAN_ARG, run_background_clean};
+
+    // Look for the internal daemon argument
+    let mut iter = args.iter();
+    while let Some(arg) = iter.next() {
+        if arg == BACKGROUND_CLEAN_ARG {
+            // The next argument should be the directory to clean
+            let dir = iter.next()?;
+            let dir = Path::new(dir);
+
+            // Run the background clean operation
+            match run_background_clean(dir) {
+                Ok(()) => return Some(ExitCode::SUCCESS),
+                Err(err) => {
+                    // In daemon mode, we don't have a terminal to print to,
+                    // so errors are silently ignored (the cache cleanup is best-effort)
+                    debug!("Background clean failed: {err}");
+                    return Some(ExitCode::FAILURE);
+                }
+            }
+        }
+    }
+
+    None
+}
+
 /// The main entry point for a uv invocation.
 ///
 /// # Usage
@@ -2570,9 +2601,18 @@ where
         }
     }
 
+    // Collect args into a vector for inspection
+    let args: Vec<OsString> = args.into_iter().map(Into::into).collect();
+
+    // Handle internal daemon mode for background cache cleaning.
+    // This is invoked by `uv clean --background` and should not be exposed to users.
+    if let Some(exit_code) = handle_background_clean_daemon(&args) {
+        return exit_code;
+    }
+
     // `std::env::args` is not `Send` so we parse before passing to our runtime
     // https://github.com/rust-lang/rust/pull/48005
-    let cli = match Cli::try_parse_from(args) {
+    let cli = match Cli::try_parse_from(&args) {
         Ok(cli) => cli,
         Err(mut err) => {
             if let Some(ContextValue::String(subcommand)) = err.get(ContextKind::InvalidSubcommand)

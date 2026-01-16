@@ -1,6 +1,7 @@
 use std::fmt::Write;
+use std::path::{Path, PathBuf};
 
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, bail};
 use owo_colors::OwoColorize;
 use tracing::debug;
 
@@ -8,6 +9,7 @@ use uv_cache::{Cache, Removal};
 use uv_fs::Simplified;
 use uv_normalize::PackageName;
 
+use crate::commands::cache_clean_daemon::spawn_background_clean;
 use crate::commands::reporters::{CleaningDirectoryReporter, CleaningPackageReporter};
 use crate::commands::{ExitStatus, human_readable_bytes};
 use crate::printer::Printer;
@@ -16,6 +18,7 @@ use crate::printer::Printer;
 pub(crate) async fn cache_clean(
     packages: &[PackageName],
     force: bool,
+    background: bool,
     cache: Cache,
     printer: Printer,
 ) -> Result<ExitStatus> {
@@ -26,6 +29,16 @@ pub(crate) async fn cache_clean(
             cache.root().user_display().cyan()
         )?;
         return Ok(ExitStatus::Success);
+    }
+
+    // Background mode is only supported for full cache clearing
+    if background && !packages.is_empty() {
+        bail!("The `--background` flag is not supported when clearing specific packages");
+    }
+
+    // Background mode handles locking differently - we move first, then delete
+    if background {
+        return cache_clean_background(&cache, printer);
     }
 
     let cache = match cache.with_exclusive_lock_no_wait() {
@@ -104,4 +117,62 @@ pub(crate) async fn cache_clean(
     writeln!(printer.stderr())?;
 
     Ok(ExitStatus::Success)
+}
+
+/// Clear the cache in the background by moving it to a temporary directory and spawning a daemon.
+fn cache_clean_background(cache: &Cache, printer: Printer) -> Result<ExitStatus> {
+    let cache_root = cache.root().to_path_buf();
+
+    writeln!(
+        printer.stderr(),
+        "Clearing cache at: {} (in background)",
+        cache_root.user_display().cyan()
+    )?;
+
+    // Generate a unique temporary directory name in the same parent directory.
+    // This ensures the rename is atomic (same filesystem).
+    let temp_dir = generate_temp_cache_path(&cache_root)?;
+
+    // Move the cache directory to the temporary location.
+    // This should be nearly instantaneous as it's just a rename operation.
+    debug!(
+        "Moving cache from {} to {}",
+        cache_root.display(),
+        temp_dir.display()
+    );
+
+    // We don't take an exclusive lock here - the rename itself is atomic,
+    // and other processes will simply see the cache as empty and recreate it.
+    fs_err::rename(&cache_root, &temp_dir).with_context(|| {
+        format!(
+            "Failed to move cache to temporary directory: {}",
+            temp_dir.display()
+        )
+    })?;
+
+    // Spawn a background daemon to delete the temporary directory
+    spawn_background_clean(&temp_dir)?;
+
+    writeln!(
+        printer.stderr(),
+        "Cache moved; deletion continuing in background"
+    )?;
+
+    Ok(ExitStatus::Success)
+}
+
+/// Generate a unique temporary path for moving the cache directory.
+///
+/// The temporary directory is created in the same parent directory as the cache
+/// to ensure the rename is atomic (same filesystem).
+fn generate_temp_cache_path(cache_root: &Path) -> Result<PathBuf> {
+    let parent = cache_root
+        .parent()
+        .context("Cache root has no parent directory")?;
+
+    // Use a UUID v4 to ensure uniqueness
+    let id = uuid::Uuid::new_v4();
+
+    let temp_name = format!(".uv-cache-clean-{id}");
+    Ok(parent.join(temp_name))
 }

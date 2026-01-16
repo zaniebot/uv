@@ -903,6 +903,16 @@ pub struct CleanArgs {
     /// `--force` is used, `uv cache clean` will proceed without taking a lock.
     #[arg(long)]
     pub force: bool,
+
+    /// Run cache deletion in the background.
+    ///
+    /// When `--background` is used, `uv cache clean` will move the cache to a temporary directory
+    /// and spawn a background process to delete it. The main process exits immediately while
+    /// deletion continues asynchronously.
+    ///
+    /// This can significantly reduce perceived latency for large caches.
+    #[arg(long)]
+    pub background: bool,
 }
 
 #[derive(Args, Debug)]
