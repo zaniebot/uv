@@ -93,6 +93,47 @@ execute properly.
 
 These tests can be disabled by turning off either `git` or `git-lfs` uv features.
 
+### Test features
+
+Several test features are **not enabled by default** and must be explicitly enabled with
+`--features <feature-name>`:
+
+- **`python-patch`**: Tests that require specific Python patch versions (e.g., Python 3.9.20). Only
+  enabled on Linux CI.
+
+  ```shell
+  cargo nextest run --features python-patch
+  ```
+
+- **`native-auth`**: Tests for native credential storage. Requires platform-specific sub-features:
+  - **`secret-service`** (Linux): Tests using systemd secret-service for credentials
+  - **`apple-native`** (macOS): Tests using macOS Keychain Services
+  - **`windows-native`** (Windows): Tests using Windows Credential Manager
+
+  ```shell
+  # Linux
+  cargo nextest run --features native-auth,secret-service
+
+  # macOS
+  cargo nextest run --features native-auth,apple-native
+
+  # Windows
+  cargo nextest run --features native-auth,windows-native
+  ```
+
+The following features are part of `default-tests` but worth noting:
+
+- **`slow-tests`**: Includes slow-running test cases. Useful to disable for quick iteration.
+- **`test-ecosystem`**: Includes ecosystem integration tests against real-world projects.
+- **`pypi`**: Tests that interact with PyPI (requires network access).
+- **`r2`**: Tests using Cloudflare R2 storage for archive/extraction testing (requires network).
+
+To run tests without network-dependent features:
+
+```shell
+cargo nextest run --no-default-features --features python,git
+```
+
 ### Local testing
 
 You can invoke your development version of uv with `cargo run -- <args>`. For example:
