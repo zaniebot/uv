@@ -21,14 +21,14 @@ fn missing_requirements_txt() {
 
     uv_snapshot!(context.pip_sync()
         .arg("requirements.txt")
-        .arg("--strict"), @"
+        .arg("--strict"), @r###"
     success: false
     exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
     error: File not found: `requirements.txt`
-    ");
+    "###);
 
     requirements_txt.assert(predicates::path::missing());
 }
@@ -43,7 +43,7 @@ fn missing_venv() -> Result<()> {
     requirements.write_str("anyio")?;
     fs::remove_dir_all(&context.venv)?;
 
-    uv_snapshot!(context.filters(), context.pip_sync().arg("requirements.txt"), @"
+    uv_snapshot!(context.filters(), context.pip_sync().arg("requirements.txt"), @r"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -56,7 +56,7 @@ fn missing_venv() -> Result<()> {
     assert!(predicates::path::missing().eval(&context.venv));
 
     // If not "active", we hint to create one
-    uv_snapshot!(context.filters(), context.pip_sync().arg("requirements.txt").env_remove(EnvVars::VIRTUAL_ENV), @"
+    uv_snapshot!(context.filters(), context.pip_sync().arg("requirements.txt").env_remove(EnvVars::VIRTUAL_ENV), @r"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -76,14 +76,14 @@ fn missing_system() -> Result<()> {
     let requirements = context.temp_dir.child("requirements.txt");
     requirements.write_str("anyio")?;
 
-    uv_snapshot!(context.filters(), context.pip_sync().arg("requirements.txt").arg("--system"), @"
+    uv_snapshot!(context.filters(), context.pip_sync().arg("requirements.txt").arg("--system"), @r###"
     success: false
     exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
     error: No system Python installation found
-    ");
+    "###);
 
     Ok(())
 }
@@ -99,7 +99,7 @@ fn install() -> Result<()> {
 
     uv_snapshot!(context.pip_sync()
         .arg("requirements.txt")
-        .arg("--strict"), @"
+        .arg("--strict"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -109,7 +109,7 @@ fn install() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + markupsafe==2.1.3
-    "
+    "###
     );
 
     // Counterpart for the `compile()` test.
@@ -148,7 +148,7 @@ fn install_copy() -> Result<()> {
         .arg("requirements.txt")
         .arg("--link-mode")
         .arg("copy")
-        .arg("--strict"), @"
+        .arg("--strict"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -158,7 +158,7 @@ fn install_copy() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + markupsafe==2.1.3
-    "
+    "###
     );
 
     context
@@ -187,7 +187,7 @@ fn install_hardlink() -> Result<()> {
         .arg("requirements.txt")
         .arg("--link-mode")
         .arg("hardlink")
-        .arg("--strict"), @"
+        .arg("--strict"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -197,7 +197,7 @@ fn install_hardlink() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + markupsafe==2.1.3
-    "
+    "###
     );
 
     context
@@ -227,7 +227,7 @@ fn install_symlink() -> Result<()> {
         .arg("requirements.txt")
         .arg("--link-mode")
         .arg("symlink")
-        .arg("--strict"), @"
+        .arg("--strict"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -237,7 +237,7 @@ fn install_symlink() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + markupsafe==2.1.3
-    "
+    "###
     );
 
     context
@@ -267,7 +267,7 @@ fn install_symlink_no_cache() -> Result<()> {
         .arg("--link-mode")
         .arg("symlink")
         .arg("--no-cache")
-        .arg("--strict"), @"
+        .arg("--strict"), @r###"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -276,7 +276,7 @@ fn install_symlink_no_cache() -> Result<()> {
     Resolved 1 package in [TIME]
     Prepared 1 package in [TIME]
     error: Symlink-based installation is not supported with `--no-cache`. The created environment will be rendered unusable by the removal of the cache.
-    "
+    "###
     );
 
     Ok(())
@@ -292,7 +292,7 @@ fn install_many() -> Result<()> {
 
     uv_snapshot!(context.pip_sync()
         .arg("requirements.txt")
-        .arg("--strict"), @"
+        .arg("--strict"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -303,7 +303,7 @@ fn install_many() -> Result<()> {
     Installed 2 packages in [TIME]
      + markupsafe==2.1.3
      + tomli==2.0.1
-    "
+    "###
     );
 
     context
@@ -330,7 +330,7 @@ fn noop() -> Result<()> {
 
     uv_snapshot!(context.pip_sync()
         .arg("requirements.txt")
-        .arg("--strict"), @"
+        .arg("--strict"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -338,7 +338,7 @@ fn noop() -> Result<()> {
     ----- stderr -----
     Resolved 1 package in [TIME]
     Audited 1 package in [TIME]
-    "
+    "###
     );
 
     context
@@ -357,7 +357,7 @@ fn pip_sync_empty() -> Result<()> {
     requirements_txt.touch()?;
 
     uv_snapshot!(context.pip_sync()
-        .arg("requirements.txt"), @"
+        .arg("requirements.txt"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -365,12 +365,12 @@ fn pip_sync_empty() -> Result<()> {
     ----- stderr -----
     warning: Requirements file `requirements.txt` does not contain any dependencies
     No requirements found (hint: use `--allow-empty-requirements` to clear the environment)
-    "
+    "###
     );
 
     uv_snapshot!(context.pip_sync()
         .arg("requirements.txt")
-        .arg("--allow-empty-requirements"), @"
+        .arg("--allow-empty-requirements"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -379,7 +379,7 @@ fn pip_sync_empty() -> Result<()> {
     warning: Requirements file `requirements.txt` does not contain any dependencies
     Resolved in [TIME]
     Audited in [TIME]
-    "
+    "###
     );
 
     // Install a package.
@@ -394,7 +394,7 @@ fn pip_sync_empty() -> Result<()> {
     requirements_txt.write_str("")?;
     uv_snapshot!(context.pip_sync()
         .arg("requirements.txt")
-        .arg("--allow-empty-requirements"), @"
+        .arg("--allow-empty-requirements"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -404,7 +404,7 @@ fn pip_sync_empty() -> Result<()> {
     Resolved in [TIME]
     Uninstalled 1 package in [TIME]
      - iniconfig==2.0.0
-    "
+    "###
     );
 
     Ok(())
@@ -435,7 +435,7 @@ fn link() -> Result<()> {
 
     uv_snapshot!(cmd
         .arg(requirements_txt.path())
-        .arg("--strict"), @"
+        .arg("--strict"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -444,7 +444,7 @@ fn link() -> Result<()> {
     Resolved 1 package in [TIME]
     Installed 1 package in [TIME]
      + iniconfig==2.0.0
-    "
+    "###
     );
 
     context2
@@ -479,7 +479,7 @@ fn add_remove() -> Result<()> {
 
     uv_snapshot!(context.pip_sync()
         .arg("requirements.txt")
-        .arg("--strict"), @"
+        .arg("--strict"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -491,7 +491,7 @@ fn add_remove() -> Result<()> {
     Installed 1 package in [TIME]
      - iniconfig==2.0.0
      + tomli==2.0.1
-    "
+    "###
     );
 
     context.assert_command("import tomli").success();
@@ -521,7 +521,7 @@ fn install_sequential() -> Result<()> {
 
     uv_snapshot!(context.pip_sync()
         .arg("requirements.txt")
-        .arg("--strict"), @"
+        .arg("--strict"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -531,7 +531,7 @@ fn install_sequential() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + tomli==2.0.1
-    "
+    "###
     );
 
     context
@@ -562,7 +562,7 @@ fn upgrade() -> Result<()> {
 
     uv_snapshot!(context.pip_sync()
         .arg("requirements.txt")
-        .arg("--strict"), @"
+        .arg("--strict"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -574,7 +574,7 @@ fn upgrade() -> Result<()> {
     Installed 1 package in [TIME]
      - tomli==2.0.0
      + tomli==2.0.1
-    "
+    "###
     );
 
     context.assert_command("import tomli").success();
@@ -592,7 +592,7 @@ fn install_url() -> Result<()> {
 
     uv_snapshot!(context.pip_sync()
         .arg("requirements.txt")
-        .arg("--strict"), @"
+        .arg("--strict"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -602,7 +602,7 @@ fn install_url() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + werkzeug==2.0.0 (from https://files.pythonhosted.org/packages/ff/1d/960bb4017c68674a1cb099534840f18d3def3ce44aed12b5ed8b78e0153e/Werkzeug-2.0.0-py3-none-any.whl)
-    "
+    "###
     );
 
     context.assert_command("import werkzeug").success();
@@ -621,7 +621,7 @@ fn install_git_commit() -> Result<()> {
 
     uv_snapshot!(context.pip_sync()
         .arg("requirements.txt")
-        .arg("--strict"), @"
+        .arg("--strict"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -631,7 +631,7 @@ fn install_git_commit() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + uv-public-pypackage==0.1.0 (from git+https://github.com/astral-test/uv-public-pypackage@b270df1a2fb5d012294e9aaf05e7e0bab1e6a389)
-    "
+    "###
     );
 
     context
@@ -654,7 +654,7 @@ fn install_git_tag() -> Result<()> {
 
     uv_snapshot!(context.pip_sync()
         .arg("requirements.txt")
-        .arg("--strict"), @"
+        .arg("--strict"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -664,7 +664,7 @@ fn install_git_tag() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + uv-public-pypackage==0.1.0 (from git+https://github.com/astral-test/uv-public-pypackage@0dacfd662c64cb4ceb16e6cf65a157a8b715b979)
-    "
+    "###
     );
 
     context
@@ -685,7 +685,7 @@ fn install_git_subdirectories() -> Result<()> {
 
     uv_snapshot!(context.pip_sync()
         .arg("requirements.txt")
-        .arg("--strict"), @"
+        .arg("--strict"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -696,7 +696,7 @@ fn install_git_subdirectories() -> Result<()> {
     Installed 2 packages in [TIME]
      + example-pkg-a==1 (from git+https://github.com/pypa/sample-namespace-packages.git@df7530eeb8fa0cb7dbb8ecb28363e8e36bfa2f45#subdirectory=pkg_resources/pkg_a)
      + example-pkg-b==1 (from git+https://github.com/pypa/sample-namespace-packages.git@df7530eeb8fa0cb7dbb8ecb28363e8e36bfa2f45#subdirectory=pkg_resources/pkg_b)
-    "
+    "###
     );
 
     context.assert_command("import example_pkg").success();
@@ -716,7 +716,7 @@ fn install_sdist() -> Result<()> {
 
     uv_snapshot!(context.pip_sync()
         .arg("requirements.txt")
-        .arg("--strict"), @"
+        .arg("--strict"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -726,7 +726,7 @@ fn install_sdist() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + source-distribution==0.0.1
-    "
+    "###
     );
 
     context
@@ -746,7 +746,7 @@ fn install_sdist_url() -> Result<()> {
 
     uv_snapshot!(context.pip_sync()
         .arg("requirements.txt")
-        .arg("--strict"), @"
+        .arg("--strict"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -756,7 +756,7 @@ fn install_sdist_url() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + source-distribution==0.0.1 (from https://files.pythonhosted.org/packages/10/1f/57aa4cce1b1abf6b433106676e15f9fa2c92ed2bd4cf77c3b50a9e9ac773/source_distribution-0.0.1.tar.gz)
-    "
+    "###
     );
 
     context
@@ -782,7 +782,7 @@ fn install_sdist_archive_type_bz2() -> Result<()> {
 
     uv_snapshot!(context.filters(), context.pip_sync()
         .arg("requirements.txt")
-        .arg("--strict"), @"
+        .arg("--strict"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -792,7 +792,7 @@ fn install_sdist_archive_type_bz2() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + bz2==1.0.0 (from file://[WORKSPACE]/test/links/bz2-1.0.0.tar.bz2)
-    "
+    "###
     );
 
     Ok(())
@@ -816,7 +816,7 @@ fn install_url_then_install_url() -> Result<()> {
 
     uv_snapshot!(context.pip_sync()
         .arg("requirements.txt")
-        .arg("--strict"), @"
+        .arg("--strict"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -824,7 +824,7 @@ fn install_url_then_install_url() -> Result<()> {
     ----- stderr -----
     Resolved 1 package in [TIME]
     Audited 1 package in [TIME]
-    "
+    "###
     );
 
     context.assert_command("import werkzeug").success();
@@ -853,7 +853,7 @@ fn install_url_then_install_version() -> Result<()> {
 
     uv_snapshot!(context.pip_sync()
         .arg("requirements.txt")
-        .arg("--strict"), @"
+        .arg("--strict"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -861,7 +861,7 @@ fn install_url_then_install_version() -> Result<()> {
     ----- stderr -----
     Resolved 1 package in [TIME]
     Audited 1 package in [TIME]
-    "
+    "###
     );
 
     context.assert_command("import werkzeug").success();
@@ -890,7 +890,7 @@ fn install_version_then_install_url() -> Result<()> {
 
     uv_snapshot!(context.pip_sync()
         .arg("requirements.txt")
-        .arg("--strict"), @"
+        .arg("--strict"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -902,7 +902,7 @@ fn install_version_then_install_url() -> Result<()> {
     Installed 1 package in [TIME]
      - werkzeug==2.0.0
      + werkzeug==2.0.0 (from https://files.pythonhosted.org/packages/ff/1d/960bb4017c68674a1cb099534840f18d3def3ce44aed12b5ed8b78e0153e/Werkzeug-2.0.0-py3-none-any.whl)
-    "
+    "###
     );
 
     context.assert_command("import werkzeug").success();
@@ -922,7 +922,7 @@ fn install_numpy_py38() -> Result<()> {
 
     uv_snapshot!(context.pip_sync()
         .arg("requirements.txt")
-        .arg("--strict"), @"
+        .arg("--strict"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -932,7 +932,7 @@ fn install_numpy_py38() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + numpy==1.24.4
-    "
+    "###
     );
 
     context.assert_command("import numpy").success();
@@ -951,16 +951,16 @@ fn install_no_index() -> Result<()> {
     uv_snapshot!(context.pip_sync()
         .arg("requirements.txt")
         .arg("--no-index")
-        .arg("--strict"), @"
+        .arg("--strict"), @r"
     success: false
     exit_code: 1
     ----- stdout -----
 
     ----- stderr -----
-      × No solution found when resolving dependencies:
-      ╰─▶ Because iniconfig was not found in the provided package locations and you require iniconfig==2.0.0, we can conclude that your requirements are unsatisfiable.
-
-          hint: Packages were unavailable because index lookups were disabled and no additional package locations were provided (try: `--find-links <uri>`)
+    error: No solution found when resolving dependencies:
+      Caused by: Because iniconfig was not found in the provided package locations and you require iniconfig==2.0.0, we can conclude that your requirements are unsatisfiable.
+                 
+                 hint: Packages were unavailable because index lookups were disabled and no additional package locations were provided (try: `--find-links <uri>`)
     "
     );
 
@@ -980,7 +980,7 @@ fn install_no_index_cached() -> Result<()> {
 
     uv_snapshot!(context.pip_sync()
         .arg("requirements.txt")
-        .arg("--strict"), @"
+        .arg("--strict"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -990,7 +990,7 @@ fn install_no_index_cached() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + iniconfig==2.0.0
-    "
+    "###
     );
 
     context.assert_command("import iniconfig").success();
@@ -1000,16 +1000,16 @@ fn install_no_index_cached() -> Result<()> {
     uv_snapshot!(context.pip_sync()
         .arg("requirements.txt")
         .arg("--no-index")
-        .arg("--strict"), @"
+        .arg("--strict"), @r"
     success: false
     exit_code: 1
     ----- stdout -----
 
     ----- stderr -----
-      × No solution found when resolving dependencies:
-      ╰─▶ Because iniconfig was not found in the provided package locations and you require iniconfig==2.0.0, we can conclude that your requirements are unsatisfiable.
-
-          hint: Packages were unavailable because index lookups were disabled and no additional package locations were provided (try: `--find-links <uri>`)
+    error: No solution found when resolving dependencies:
+      Caused by: Because iniconfig was not found in the provided package locations and you require iniconfig==2.0.0, we can conclude that your requirements are unsatisfiable.
+                 
+                 hint: Packages were unavailable because index lookups were disabled and no additional package locations were provided (try: `--find-links <uri>`)
     "
     );
 
@@ -1028,7 +1028,7 @@ fn warn_on_yanked() -> Result<()> {
 
     uv_snapshot!(context.filters(), windows_filters=false, context.pip_sync()
         .arg("requirements.txt")
-        .arg("--strict"), @r#"
+        .arg("--strict"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1039,7 +1039,7 @@ fn warn_on_yanked() -> Result<()> {
     Installed 1 package in [TIME]
      + colorama==0.4.2
     warning: `colorama==0.4.2` is yanked (reason: "Bad build, missing files, will not install")
-    "#
+    "###
     );
 
     Ok(())
@@ -1056,7 +1056,7 @@ fn warn_on_yanked_dry_run() -> Result<()> {
     uv_snapshot!(context.filters(), windows_filters=false, context.pip_sync()
         .arg("requirements.txt")
         .arg("--dry-run")
-        .arg("--strict"), @r#"
+        .arg("--strict"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1067,7 +1067,7 @@ fn warn_on_yanked_dry_run() -> Result<()> {
     Would install 1 package
      + colorama==0.4.2
     warning: `colorama==0.4.2` is yanked (reason: "Bad build, missing files, will not install")
-    "#
+    "###
     );
 
     Ok(())
@@ -1093,7 +1093,7 @@ fn install_local_wheel() -> Result<()> {
 
     uv_snapshot!(context.filters(), context.pip_sync()
         .arg("requirements.txt")
-        .arg("--strict"), @"
+        .arg("--strict"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1103,7 +1103,7 @@ fn install_local_wheel() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + tomli==2.0.1 (from file://[TEMP_DIR]/tomli-2.0.1-py3-none-any.whl)
-    "
+    "###
     );
 
     context.assert_command("import tomli").success();
@@ -1115,7 +1115,7 @@ fn install_local_wheel() -> Result<()> {
     uv_snapshot!(context.filters(), context.pip_sync()
         .arg("requirements.txt")
         .arg("--strict")
-        , @"
+        , @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1124,7 +1124,7 @@ fn install_local_wheel() -> Result<()> {
     Resolved 1 package in [TIME]
     Installed 1 package in [TIME]
      + tomli==2.0.1 (from file://[TEMP_DIR]/tomli-2.0.1-py3-none-any.whl)
-    "
+    "###
     );
 
     context.assert_command("import tomli").success();
@@ -1140,7 +1140,7 @@ fn install_local_wheel() -> Result<()> {
     uv_snapshot!(context.filters(), context.pip_sync()
         .arg("requirements.txt")
         .arg("--strict")
-        , @"
+        , @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1150,7 +1150,7 @@ fn install_local_wheel() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + tomli==2.0.1 (from file://[TEMP_DIR]/tomli-2.0.1-py3-none-any.whl)
-    "
+    "###
     );
 
     context.assert_command("import tomli").success();
@@ -1161,7 +1161,7 @@ fn install_local_wheel() -> Result<()> {
     // Reinstall into the same virtual environment. The wheel should be reinstalled.
     uv_snapshot!(context.filters(), context.pip_sync()
         .arg("requirements.txt")
-        .arg("--strict"), @"
+        .arg("--strict"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1172,13 +1172,13 @@ fn install_local_wheel() -> Result<()> {
     Uninstalled 1 package in [TIME]
     Installed 1 package in [TIME]
      ~ tomli==2.0.1 (from file://[TEMP_DIR]/tomli-2.0.1-py3-none-any.whl)
-    "
+    "###
     );
 
     // Reinstall into the same virtual environment. The wheel should _not_ be reinstalled.
     uv_snapshot!(context.filters(), context.pip_sync()
         .arg("requirements.txt")
-        .arg("--strict"), @"
+        .arg("--strict"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1186,7 +1186,7 @@ fn install_local_wheel() -> Result<()> {
     ----- stderr -----
     Resolved 1 package in [TIME]
     Audited 1 package in [TIME]
-    "
+    "###
     );
 
     context.assert_command("import tomli").success();
@@ -1197,7 +1197,7 @@ fn install_local_wheel() -> Result<()> {
 
     uv_snapshot!(context.filters(), context.pip_sync()
         .arg("requirements.txt")
-        .arg("--strict"), @"
+        .arg("--strict"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1205,7 +1205,7 @@ fn install_local_wheel() -> Result<()> {
     ----- stderr -----
     Resolved 1 package in [TIME]
     Audited 1 package in [TIME]
-    "
+    "###
     );
 
     context.assert_command("import tomli").success();
@@ -1233,7 +1233,7 @@ fn mismatched_version() -> Result<()> {
 
     uv_snapshot!(context.filters(), context.pip_sync()
         .arg("requirements.txt")
-        .arg("--strict"), @"
+        .arg("--strict"), @r"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -1249,7 +1249,7 @@ fn mismatched_version() -> Result<()> {
     uv_snapshot!(context.filters(), context.pip_sync()
         .arg("requirements.txt")
         .arg("--strict")
-        .env(EnvVars::UV_SKIP_WHEEL_FILENAME_CHECK, "1"), @"
+        .env(EnvVars::UV_SKIP_WHEEL_FILENAME_CHECK, "1"), @r"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1284,17 +1284,17 @@ fn mismatched_name() -> Result<()> {
 
     uv_snapshot!(context.filters(), context.pip_sync()
         .arg("requirements.txt")
-        .arg("--strict"), @"
+        .arg("--strict"), @r"
     success: false
     exit_code: 1
     ----- stdout -----
 
     ----- stderr -----
-      × No solution found when resolving dependencies:
-      ╰─▶ Because foo has an invalid package format and you require foo, we can conclude that your requirements are unsatisfiable.
-
-          hint: The structure of `foo` was invalid
-            Caused by: The .dist-info directory tomli-2.0.1 does not start with the normalized package name: foo
+    error: No solution found when resolving dependencies:
+      Caused by: Because foo has an invalid package format and you require foo, we can conclude that your requirements are unsatisfiable.
+                 
+                 hint: The structure of `foo` was invalid
+                   Caused by: The .dist-info directory tomli-2.0.1 does not start with the normalized package name: foo
     "
     );
 
@@ -1321,7 +1321,7 @@ fn install_local_source_distribution() -> Result<()> {
 
     uv_snapshot!(context.filters(), context.pip_sync()
         .arg("requirements.txt")
-        .arg("--strict"), @"
+        .arg("--strict"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1331,7 +1331,7 @@ fn install_local_source_distribution() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + wheel==0.42.0 (from file://[TEMP_DIR]/wheel-0.42.0.tar.gz)
-    "
+    "###
     );
 
     context.assert_command("import wheel").success();
@@ -1360,7 +1360,7 @@ fn install_build_system_no_backend() -> Result<()> {
 
     uv_snapshot!(context.pip_sync()
         .arg("requirements.txt")
-        .arg("--strict"), @"
+        .arg("--strict"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1370,7 +1370,7 @@ fn install_build_system_no_backend() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + build-system-no-backend==0.1.0 (from https://files.pythonhosted.org/packages/ec/25/1e531108ca027dc3a3b37d351f4b86d811df4884c6a81cd99e73b8b589f5/build-system-no-backend-0.1.0.tar.gz)
-    "
+    "###
     );
 
     context
@@ -1390,7 +1390,7 @@ fn install_url_source_dist_cached() -> Result<()> {
 
     uv_snapshot!(context.pip_sync()
         .arg("requirements.txt")
-        .arg("--strict"), @"
+        .arg("--strict"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1400,7 +1400,7 @@ fn install_url_source_dist_cached() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + source-distribution==0.0.1 (from https://files.pythonhosted.org/packages/10/1f/57aa4cce1b1abf6b433106676e15f9fa2c92ed2bd4cf77c3b50a9e9ac773/source_distribution-0.0.1.tar.gz)
-    "
+    "###
     );
 
     context
@@ -1413,7 +1413,7 @@ fn install_url_source_dist_cached() -> Result<()> {
     uv_snapshot!(context.pip_sync()
         .arg("requirements.txt")
         .arg("--strict")
-        , @"
+        , @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1422,7 +1422,7 @@ fn install_url_source_dist_cached() -> Result<()> {
     Resolved 1 package in [TIME]
     Installed 1 package in [TIME]
      + source-distribution==0.0.1 (from https://files.pythonhosted.org/packages/10/1f/57aa4cce1b1abf6b433106676e15f9fa2c92ed2bd4cf77c3b50a9e9ac773/source_distribution-0.0.1.tar.gz)
-    "
+    "###
     );
 
     context
@@ -1437,20 +1437,20 @@ fn install_url_source_dist_cached() -> Result<()> {
         .collect::<Vec<_>>();
     uv_snapshot!(
         filters,
-        context.clean().arg("source_distribution"), @"
+        context.clean().arg("source_distribution"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
 
     ----- stderr -----
     Removed [N] files ([SIZE])
-    "
+    "###
     );
 
     uv_snapshot!(context.pip_sync()
         .arg("requirements.txt")
         .arg("--strict")
-        , @"
+        , @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1460,7 +1460,7 @@ fn install_url_source_dist_cached() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + source-distribution==0.0.1 (from https://files.pythonhosted.org/packages/10/1f/57aa4cce1b1abf6b433106676e15f9fa2c92ed2bd4cf77c3b50a9e9ac773/source_distribution-0.0.1.tar.gz)
-    "
+    "###
     );
 
     context
@@ -1481,7 +1481,7 @@ fn install_git_source_dist_cached() -> Result<()> {
 
     uv_snapshot!(context.pip_sync()
         .arg("requirements.txt")
-        .arg("--strict"), @"
+        .arg("--strict"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1491,7 +1491,7 @@ fn install_git_source_dist_cached() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + uv-public-pypackage==0.1.0 (from git+https://github.com/astral-test/uv-public-pypackage@b270df1a2fb5d012294e9aaf05e7e0bab1e6a389)
-    "
+    "###
     );
 
     context
@@ -1504,7 +1504,7 @@ fn install_git_source_dist_cached() -> Result<()> {
     uv_snapshot!(context.pip_sync()
         .arg("requirements.txt")
         .arg("--strict")
-        , @"
+        , @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1513,7 +1513,7 @@ fn install_git_source_dist_cached() -> Result<()> {
     Resolved 1 package in [TIME]
     Installed 1 package in [TIME]
      + uv-public-pypackage==0.1.0 (from git+https://github.com/astral-test/uv-public-pypackage@b270df1a2fb5d012294e9aaf05e7e0bab1e6a389)
-    "
+    "###
     );
 
     context
@@ -1532,20 +1532,20 @@ fn install_git_source_dist_cached() -> Result<()> {
         context.filters()
     };
     uv_snapshot!(filters, context.clean()
-        .arg("werkzeug"), @"
+        .arg("werkzeug"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
 
     ----- stderr -----
     No cache entries found
-    "
+    "###
     );
 
     uv_snapshot!(context.pip_sync()
         .arg("requirements.txt")
         .arg("--strict")
-        , @"
+        , @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1554,7 +1554,7 @@ fn install_git_source_dist_cached() -> Result<()> {
     Resolved 1 package in [TIME]
     Installed 1 package in [TIME]
      + uv-public-pypackage==0.1.0 (from git+https://github.com/astral-test/uv-public-pypackage@b270df1a2fb5d012294e9aaf05e7e0bab1e6a389)
-    "
+    "###
     );
 
     context
@@ -1574,7 +1574,7 @@ fn install_registry_source_dist_cached() -> Result<()> {
 
     uv_snapshot!(context.pip_sync()
         .arg("requirements.txt")
-        .arg("--strict"), @"
+        .arg("--strict"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1584,7 +1584,7 @@ fn install_registry_source_dist_cached() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + source-distribution==0.0.1
-    "
+    "###
     );
 
     context
@@ -1597,7 +1597,7 @@ fn install_registry_source_dist_cached() -> Result<()> {
     uv_snapshot!(context.pip_sync()
         .arg("requirements.txt")
         .arg("--strict")
-        , @"
+        , @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1606,7 +1606,7 @@ fn install_registry_source_dist_cached() -> Result<()> {
     Resolved 1 package in [TIME]
     Installed 1 package in [TIME]
      + source-distribution==0.0.1
-    "
+    "###
     );
 
     context
@@ -1620,20 +1620,20 @@ fn install_registry_source_dist_cached() -> Result<()> {
         .chain(context.filters())
         .collect::<Vec<_>>();
     uv_snapshot!(filters, context.clean()
-        .arg("source_distribution"), @"
+        .arg("source_distribution"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
 
     ----- stderr -----
     Removed [N] files ([SIZE])
-    "
+    "###
     );
 
     uv_snapshot!(context.pip_sync()
         .arg("requirements.txt")
         .arg("--strict")
-        , @"
+        , @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1643,7 +1643,7 @@ fn install_registry_source_dist_cached() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + source-distribution==0.0.1
-    "
+    "###
     );
 
     context
@@ -1673,7 +1673,7 @@ fn install_path_source_dist_cached() -> Result<()> {
 
     uv_snapshot!(context.filters(), context.pip_sync()
         .arg("requirements.txt")
-        .arg("--strict"), @"
+        .arg("--strict"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1683,7 +1683,7 @@ fn install_path_source_dist_cached() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + source-distribution==0.0.1 (from file://[TEMP_DIR]/source_distribution-0.0.1.tar.gz)
-    "
+    "###
     );
 
     context
@@ -1696,7 +1696,7 @@ fn install_path_source_dist_cached() -> Result<()> {
     uv_snapshot!(context.filters(), context.pip_sync()
         .arg("requirements.txt")
         .arg("--strict")
-        , @"
+        , @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1705,7 +1705,7 @@ fn install_path_source_dist_cached() -> Result<()> {
     Resolved 1 package in [TIME]
     Installed 1 package in [TIME]
      + source-distribution==0.0.1 (from file://[TEMP_DIR]/source_distribution-0.0.1.tar.gz)
-    "
+    "###
     );
 
     context
@@ -1720,20 +1720,20 @@ fn install_path_source_dist_cached() -> Result<()> {
         .collect::<Vec<_>>();
     uv_snapshot!(
         filters,
-        context.clean().arg("source-distribution"), @"
+        context.clean().arg("source-distribution"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
 
     ----- stderr -----
     Removed [N] files ([SIZE])
-    "
+    "###
     );
 
     uv_snapshot!(context.filters(), context.pip_sync()
         .arg("requirements.txt")
         .arg("--strict")
-        , @"
+        , @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1743,7 +1743,7 @@ fn install_path_source_dist_cached() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + source-distribution==0.0.1 (from file://[TEMP_DIR]/source_distribution-0.0.1.tar.gz)
-    "
+    "###
     );
 
     context
@@ -1771,7 +1771,7 @@ fn install_path_built_dist_cached() -> Result<()> {
 
     uv_snapshot!(context.filters(), context.pip_sync()
         .arg("requirements.txt")
-        .arg("--strict"), @"
+        .arg("--strict"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1781,7 +1781,7 @@ fn install_path_built_dist_cached() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + tomli==2.0.1 (from file://[TEMP_DIR]/tomli-2.0.1-py3-none-any.whl)
-    "
+    "###
     );
 
     context.assert_command("import tomli").success();
@@ -1792,7 +1792,7 @@ fn install_path_built_dist_cached() -> Result<()> {
     uv_snapshot!(context.filters(), context.pip_sync()
         .arg("requirements.txt")
         .arg("--strict")
-        , @"
+        , @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1801,7 +1801,7 @@ fn install_path_built_dist_cached() -> Result<()> {
     Resolved 1 package in [TIME]
     Installed 1 package in [TIME]
      + tomli==2.0.1 (from file://[TEMP_DIR]/tomli-2.0.1-py3-none-any.whl)
-    "
+    "###
     );
 
     context.assert_command("import tomli").success();
@@ -1814,20 +1814,20 @@ fn install_path_built_dist_cached() -> Result<()> {
         .collect::<Vec<_>>();
     uv_snapshot!(
         filters,
-        context.clean().arg("tomli"), @"
+        context.clean().arg("tomli"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
 
     ----- stderr -----
     Removed [N] files ([SIZE])
-    "
+    "###
     );
 
     uv_snapshot!(context.filters(), context.pip_sync()
         .arg("requirements.txt")
         .arg("--strict")
-        , @"
+        , @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1837,7 +1837,7 @@ fn install_path_built_dist_cached() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + tomli==2.0.1 (from file://[TEMP_DIR]/tomli-2.0.1-py3-none-any.whl)
-    "
+    "###
     );
 
     context.assert_command("import tomli").success();
@@ -1863,7 +1863,7 @@ fn install_url_built_dist_cached() -> Result<()> {
     };
     uv_snapshot!(context_filters, context.pip_sync()
         .arg("requirements.txt")
-        .arg("--strict"), @"
+        .arg("--strict"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1873,7 +1873,7 @@ fn install_url_built_dist_cached() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + tqdm==4.66.1 (from https://files.pythonhosted.org/packages/00/e5/f12a80907d0884e6dff9c16d0c0114d81b8cd07dc3ae54c5e962cc83037e/tqdm-4.66.1-py3-none-any.whl)
-    "
+    "###
     );
 
     context.assert_command("import tqdm").success();
@@ -1884,7 +1884,7 @@ fn install_url_built_dist_cached() -> Result<()> {
     uv_snapshot!(context_filters, context.pip_sync()
         .arg("requirements.txt")
         .arg("--strict")
-        , @"
+        , @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1893,7 +1893,7 @@ fn install_url_built_dist_cached() -> Result<()> {
     Resolved 1 package in [TIME]
     Installed 1 package in [TIME]
      + tqdm==4.66.1 (from https://files.pythonhosted.org/packages/00/e5/f12a80907d0884e6dff9c16d0c0114d81b8cd07dc3ae54c5e962cc83037e/tqdm-4.66.1-py3-none-any.whl)
-    "
+    "###
     );
 
     context.assert_command("import tqdm").success();
@@ -1906,20 +1906,20 @@ fn install_url_built_dist_cached() -> Result<()> {
         .collect::<Vec<_>>();
     uv_snapshot!(
         filters,
-        context.clean().arg("tqdm"), @"
+        context.clean().arg("tqdm"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
 
     ----- stderr -----
     Removed [N] files ([SIZE])
-    "
+    "###
     );
 
     uv_snapshot!(context_filters, context.pip_sync()
         .arg("requirements.txt")
         .arg("--strict")
-        , @"
+        , @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1929,7 +1929,7 @@ fn install_url_built_dist_cached() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + tqdm==4.66.1 (from https://files.pythonhosted.org/packages/00/e5/f12a80907d0884e6dff9c16d0c0114d81b8cd07dc3ae54c5e962cc83037e/tqdm-4.66.1-py3-none-any.whl)
-    "
+    "###
     );
 
     context.assert_command("import tqdm").success();
@@ -1947,14 +1947,14 @@ fn duplicate_package_overlap() -> Result<()> {
 
     uv_snapshot!(context.pip_sync()
         .arg("requirements.txt")
-        .arg("--strict"), @"
+        .arg("--strict"), @r"
     success: false
     exit_code: 1
     ----- stdout -----
 
     ----- stderr -----
-      × No solution found when resolving dependencies:
-      ╰─▶ Because you require markupsafe==2.1.3 and markupsafe==2.1.2, we can conclude that your requirements are unsatisfiable.
+    error: No solution found when resolving dependencies:
+      Caused by: Because you require markupsafe==2.1.3 and markupsafe==2.1.2, we can conclude that your requirements are unsatisfiable.
     "
     );
 
@@ -1971,7 +1971,7 @@ fn duplicate_package_disjoint() -> Result<()> {
 
     uv_snapshot!(context.pip_sync()
         .arg("requirements.txt")
-        .arg("--strict"), @"
+        .arg("--strict"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1981,7 +1981,7 @@ fn duplicate_package_disjoint() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + markupsafe==2.1.3
-    "
+    "###
     );
 
     Ok(())
@@ -1997,7 +1997,7 @@ fn reinstall() -> Result<()> {
 
     uv_snapshot!(context.pip_sync()
         .arg("requirements.txt")
-        .arg("--strict"), @"
+        .arg("--strict"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -2008,7 +2008,7 @@ fn reinstall() -> Result<()> {
     Installed 2 packages in [TIME]
      + markupsafe==2.1.3
      + tomli==2.0.1
-    "
+    "###
     );
 
     context.assert_command("import markupsafe").success();
@@ -2018,7 +2018,7 @@ fn reinstall() -> Result<()> {
     uv_snapshot!(context.pip_sync()
         .arg("requirements.txt")
         .arg("--reinstall")
-        .arg("--strict"), @"
+        .arg("--strict"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -2030,7 +2030,7 @@ fn reinstall() -> Result<()> {
     Installed 2 packages in [TIME]
      ~ markupsafe==2.1.3
      ~ tomli==2.0.1
-    "
+    "###
     );
 
     context.assert_command("import markupsafe").success();
@@ -2049,7 +2049,7 @@ fn reinstall_package() -> Result<()> {
 
     uv_snapshot!(context.pip_sync()
         .arg("requirements.txt")
-        .arg("--strict"), @"
+        .arg("--strict"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -2060,7 +2060,7 @@ fn reinstall_package() -> Result<()> {
     Installed 2 packages in [TIME]
      + markupsafe==2.1.3
      + tomli==2.0.1
-    "
+    "###
     );
 
     context.assert_command("import markupsafe").success();
@@ -2071,7 +2071,7 @@ fn reinstall_package() -> Result<()> {
         .arg("requirements.txt")
         .arg("--reinstall-package")
         .arg("tomli")
-        .arg("--strict"), @"
+        .arg("--strict"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -2082,7 +2082,7 @@ fn reinstall_package() -> Result<()> {
     Uninstalled 1 package in [TIME]
     Installed 1 package in [TIME]
      ~ tomli==2.0.1
-    "
+    "###
     );
 
     context.assert_command("import markupsafe").success();
@@ -2102,7 +2102,7 @@ fn reinstall_git() -> Result<()> {
 
     uv_snapshot!(context.pip_sync()
         .arg("requirements.txt")
-        .arg("--strict"), @"
+        .arg("--strict"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -2112,7 +2112,7 @@ fn reinstall_git() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + uv-public-pypackage==0.1.0 (from git+https://github.com/astral-test/uv-public-pypackage@b270df1a2fb5d012294e9aaf05e7e0bab1e6a389)
-    "
+    "###
     );
 
     context
@@ -2124,7 +2124,7 @@ fn reinstall_git() -> Result<()> {
         .arg("requirements.txt")
         .arg("--reinstall-package")
         .arg("uv-public-pypackage")
-        .arg("--strict"), @"
+        .arg("--strict"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -2135,7 +2135,7 @@ fn reinstall_git() -> Result<()> {
     Uninstalled 1 package in [TIME]
     Installed 1 package in [TIME]
      ~ uv-public-pypackage==0.1.0 (from git+https://github.com/astral-test/uv-public-pypackage@b270df1a2fb5d012294e9aaf05e7e0bab1e6a389)
-    "
+    "###
     );
 
     context
@@ -2155,7 +2155,7 @@ fn refresh() -> Result<()> {
 
     uv_snapshot!(context.pip_sync()
         .arg("requirements.txt")
-        .arg("--strict"), @"
+        .arg("--strict"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -2166,7 +2166,7 @@ fn refresh() -> Result<()> {
     Installed 2 packages in [TIME]
      + markupsafe==2.1.3
      + tomli==2.0.1
-    "
+    "###
     );
 
     context.assert_command("import markupsafe").success();
@@ -2180,7 +2180,7 @@ fn refresh() -> Result<()> {
         .arg("requirements.txt")
         .arg("--refresh")
         .arg("--strict")
-        , @"
+        , @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -2191,7 +2191,7 @@ fn refresh() -> Result<()> {
     Installed 2 packages in [TIME]
      + markupsafe==2.1.3
      + tomli==2.0.1
-    "
+    "###
     );
 
     context.assert_command("import markupsafe").success();
@@ -2210,7 +2210,7 @@ fn refresh_package() -> Result<()> {
 
     uv_snapshot!(context.pip_sync()
         .arg("requirements.txt")
-        .arg("--strict"), @"
+        .arg("--strict"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -2221,7 +2221,7 @@ fn refresh_package() -> Result<()> {
     Installed 2 packages in [TIME]
      + markupsafe==2.1.3
      + tomli==2.0.1
-    "
+    "###
     );
 
     context.assert_command("import markupsafe").success();
@@ -2236,7 +2236,7 @@ fn refresh_package() -> Result<()> {
         .arg("--refresh-package")
         .arg("tomli")
         .arg("--strict")
-        , @"
+        , @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -2247,7 +2247,7 @@ fn refresh_package() -> Result<()> {
     Installed 2 packages in [TIME]
      + markupsafe==2.1.3
      + tomli==2.0.1
-    "
+    "###
     );
 
     context.assert_command("import markupsafe").success();
@@ -2277,7 +2277,7 @@ fn sync_editable() -> Result<()> {
 
     // Install the editable package.
     uv_snapshot!(context.filters(), context.pip_sync()
-        .arg(requirements_txt.path()), @"
+        .arg(requirements_txt.path()), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -2288,12 +2288,12 @@ fn sync_editable() -> Result<()> {
     Installed 2 packages in [TIME]
      + anyio==3.7.0
      + poetry-editable==0.1.0 (from file://[TEMP_DIR]/poetry_editable)
-    "
+    "###
     );
 
     // Re-install the editable package. This is a no-op.
     uv_snapshot!(context.filters(), context.pip_sync()
-        .arg(requirements_txt.path()), @"
+        .arg(requirements_txt.path()), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -2301,14 +2301,14 @@ fn sync_editable() -> Result<()> {
     ----- stderr -----
     Resolved 2 packages in [TIME]
     Audited 2 packages in [TIME]
-    "
+    "###
     );
 
     // Reinstall the editable package. This won't trigger a rebuild, but it will trigger an install.
     uv_snapshot!(context.filters(), context.pip_sync()
         .arg(requirements_txt.path())
         .arg("--reinstall-package")
-        .arg("poetry-editable"), @"
+        .arg("poetry-editable"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -2319,7 +2319,7 @@ fn sync_editable() -> Result<()> {
     Uninstalled 1 package in [TIME]
     Installed 1 package in [TIME]
      ~ poetry-editable==0.1.0 (from file://[TEMP_DIR]/poetry_editable)
-    "
+    "###
     );
 
     let python_source_file = poetry_editable.path().join("poetry_editable/__init__.py");
@@ -2358,7 +2358,7 @@ fn sync_editable() -> Result<()> {
     // Reinstall the editable package. This won't trigger a rebuild or reinstall, since we only
     // detect changes to metadata files (like `pyproject.toml`).
     uv_snapshot!(context.filters(), context.pip_sync()
-        .arg(requirements_txt.path()), @"
+        .arg(requirements_txt.path()), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -2366,7 +2366,7 @@ fn sync_editable() -> Result<()> {
     ----- stderr -----
     Resolved 2 packages in [TIME]
     Audited 2 packages in [TIME]
-    "
+    "###
     );
 
     // Modify the `pyproject.toml` file.
@@ -2379,7 +2379,7 @@ fn sync_editable() -> Result<()> {
 
     // Reinstall the editable package. This will trigger a rebuild and reinstall.
     uv_snapshot!(context.filters(), context.pip_sync()
-        .arg(requirements_txt.path()), @"
+        .arg(requirements_txt.path()), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -2391,7 +2391,7 @@ fn sync_editable() -> Result<()> {
     Installed 1 package in [TIME]
      - poetry-editable==0.1.0 (from file://[TEMP_DIR]/poetry_editable)
      + poetry-editable==0.1.1 (from file://[TEMP_DIR]/poetry_editable)
-    "
+    "###
     );
 
     // Modify the `pyproject.toml` file.
@@ -2404,7 +2404,7 @@ fn sync_editable() -> Result<()> {
 
     // Reinstall the editable package. This will trigger a rebuild and reinstall.
     uv_snapshot!(context.filters(), context.pip_sync()
-        .arg(requirements_txt.path()), @"
+        .arg(requirements_txt.path()), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -2415,7 +2415,7 @@ fn sync_editable() -> Result<()> {
     Uninstalled 1 package in [TIME]
     Installed 1 package in [TIME]
      ~ poetry-editable==0.1.1 (from file://[TEMP_DIR]/poetry_editable)
-    "
+    "###
     );
 
     Ok(())
@@ -2440,7 +2440,7 @@ fn sync_editable_and_registry() -> Result<()> {
 
     uv_snapshot!(context.filters(), context.pip_sync()
         .arg(requirements_txt.path())
-        .arg("--strict"), @"
+        .arg("--strict"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -2455,7 +2455,7 @@ fn sync_editable_and_registry() -> Result<()> {
     warning: The package `black` requires `packaging>=22.0`, but it's not installed
     warning: The package `black` requires `pathspec>=0.9.0`, but it's not installed
     warning: The package `black` requires `platformdirs>=2`, but it's not installed
-    "
+    "###
     );
 
     // Install the editable version of Black. This should remove the registry-based version.
@@ -2467,7 +2467,7 @@ fn sync_editable_and_registry() -> Result<()> {
     })?;
 
     uv_snapshot!(context.filters(), context.pip_sync()
-        .arg(requirements_txt.path()), @"
+        .arg(requirements_txt.path()), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -2479,7 +2479,7 @@ fn sync_editable_and_registry() -> Result<()> {
     Installed 1 package in [TIME]
      - black==24.1.0
      + black==0.1.0 (from file://[TEMP_DIR]/black_editable)
-    "
+    "###
     );
 
     // Re-install the registry-based version of Black. This should be a no-op, since we have a
@@ -2491,7 +2491,7 @@ fn sync_editable_and_registry() -> Result<()> {
     })?;
 
     uv_snapshot!(context.filters(), context.pip_sync()
-        .arg(requirements_txt.path()), @"
+        .arg(requirements_txt.path()), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -2499,7 +2499,7 @@ fn sync_editable_and_registry() -> Result<()> {
     ----- stderr -----
     Resolved 1 package in [TIME]
     Audited 1 package in [TIME]
-    "
+    "###
     );
 
     // Re-install Black at a specific version. This should replace the editable version.
@@ -2511,7 +2511,7 @@ fn sync_editable_and_registry() -> Result<()> {
 
     uv_snapshot!(context.filters(), context.pip_sync()
         .arg(requirements_txt.path())
-        .arg("--strict"), @"
+        .arg("--strict"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -2528,7 +2528,7 @@ fn sync_editable_and_registry() -> Result<()> {
     warning: The package `black` requires `packaging>=22.0`, but it's not installed
     warning: The package `black` requires `pathspec>=0.9.0`, but it's not installed
     warning: The package `black` requires `platformdirs>=2`, but it's not installed
-    "
+    "###
     );
 
     Ok(())
@@ -2552,7 +2552,7 @@ fn sync_editable_and_local() -> Result<()> {
     })?;
 
     uv_snapshot!(context.filters(), context.pip_sync()
-        .arg(requirements_txt.path()), @"
+        .arg(requirements_txt.path()), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -2562,7 +2562,7 @@ fn sync_editable_and_local() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + black==0.1.0 (from file://[TEMP_DIR]/black_editable)
-    "
+    "###
     );
 
     // Install the non-editable version of Black. This should replace the editable version.
@@ -2573,7 +2573,7 @@ fn sync_editable_and_local() -> Result<()> {
     })?;
 
     uv_snapshot!(context.filters(), context.pip_sync()
-        .arg(requirements_txt.path()), @"
+        .arg(requirements_txt.path()), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -2584,7 +2584,7 @@ fn sync_editable_and_local() -> Result<()> {
     Uninstalled 1 package in [TIME]
     Installed 1 package in [TIME]
      ~ black==0.1.0 (from file://[TEMP_DIR]/black_editable)
-    "
+    "###
     );
 
     // Reinstall the editable version of Black. This should replace the non-editable version.
@@ -2595,7 +2595,7 @@ fn sync_editable_and_local() -> Result<()> {
     })?;
 
     uv_snapshot!(context.filters(), context.pip_sync()
-        .arg(requirements_txt.path()), @"
+        .arg(requirements_txt.path()), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -2605,7 +2605,7 @@ fn sync_editable_and_local() -> Result<()> {
     Uninstalled 1 package in [TIME]
     Installed 1 package in [TIME]
      ~ black==0.1.0 (from file://[TEMP_DIR]/black_editable)
-    "
+    "###
     );
 
     Ok(())
@@ -2622,18 +2622,18 @@ fn incompatible_wheel() -> Result<()> {
 
     uv_snapshot!(context.filters(), context.pip_sync()
         .arg("requirements.txt")
-        .arg("--strict"), @"
+        .arg("--strict"), @r"
     success: false
     exit_code: 1
     ----- stdout -----
 
     ----- stderr -----
-      × No solution found when resolving dependencies:
-      ╰─▶ Because foo has an invalid package format and you require foo, we can conclude that your requirements are unsatisfiable.
-
-          hint: The structure of `foo` was invalid
-            Caused by: Failed to read from zip file
-            Caused by: unable to locate the end of central directory record
+    error: No solution found when resolving dependencies:
+      Caused by: Because foo has an invalid package format and you require foo, we can conclude that your requirements are unsatisfiable.
+                 
+                 hint: The structure of `foo` was invalid
+                   Caused by: Failed to read from zip file
+                   Caused by: unable to locate the end of central directory record
     "
     );
 
@@ -2649,7 +2649,7 @@ fn sync_legacy_sdist_pep_517() -> Result<()> {
     requirements_in.write_str("flake8 @ https://files.pythonhosted.org/packages/66/53/3ad4a3b74d609b3b9008a10075c40e7c8909eae60af53623c3888f7a529a/flake8-6.0.0.tar.gz")?;
 
     uv_snapshot!(context.pip_sync()
-        .arg("requirements.in"), @"
+        .arg("requirements.in"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -2659,7 +2659,7 @@ fn sync_legacy_sdist_pep_517() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + flake8==6.0.0 (from https://files.pythonhosted.org/packages/66/53/3ad4a3b74d609b3b9008a10075c40e7c8909eae60af53623c3888f7a529a/flake8-6.0.0.tar.gz)
-    "
+    "###
     );
 
     Ok(())
@@ -2681,7 +2681,7 @@ fn find_links() -> Result<()> {
     uv_snapshot!(context.filters(), context.pip_sync()
         .arg("requirements.txt")
         .arg("--find-links")
-        .arg(context.workspace_root.join("test/links/")), @"
+        .arg(context.workspace_root.join("test/links/")), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -2694,7 +2694,7 @@ fn find_links() -> Result<()> {
      + numpy==1.26.3
      + tqdm==1000.0.0
      + werkzeug==3.0.1 (from https://files.pythonhosted.org/packages/c3/fc/254c3e9b5feb89ff5b9076a23218dafbc99c96ac5941e900b71206e6313b/werkzeug-3.0.1-py3-none-any.whl)
-    "
+    "###
     );
 
     Ok(())
@@ -2714,7 +2714,7 @@ fn find_links_no_index_match() -> Result<()> {
         .arg("requirements.txt")
         .arg("--no-index")
         .arg("--find-links")
-        .arg(context.workspace_root.join("test/links/")), @"
+        .arg(context.workspace_root.join("test/links/")), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -2724,7 +2724,7 @@ fn find_links_no_index_match() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + tqdm==1000.0.0
-    "
+    "###
     );
 
     Ok(())
@@ -2744,7 +2744,7 @@ fn find_links_offline_match() -> Result<()> {
         .arg("requirements.txt")
         .arg("--offline")
         .arg("--find-links")
-        .arg(context.workspace_root.join("test/links/")), @"
+        .arg(context.workspace_root.join("test/links/")), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -2754,7 +2754,7 @@ fn find_links_offline_match() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + tqdm==1000.0.0
-    "
+    "###
     );
 
     Ok(())
@@ -2775,16 +2775,16 @@ fn find_links_offline_no_match() -> Result<()> {
         .arg("requirements.txt")
         .arg("--offline")
         .arg("--find-links")
-        .arg(context.workspace_root.join("test/links/")), @"
+        .arg(context.workspace_root.join("test/links/")), @r"
     success: false
     exit_code: 1
     ----- stdout -----
 
     ----- stderr -----
-      × No solution found when resolving dependencies:
-      ╰─▶ Because numpy was not found in the cache and you require numpy, we can conclude that your requirements are unsatisfiable.
-
-          hint: Packages were unavailable because the network was disabled. When the network is disabled, registry packages may only be read from the cache.
+    error: No solution found when resolving dependencies:
+      Caused by: Because numpy was not found in the cache and you require numpy, we can conclude that your requirements are unsatisfiable.
+                 
+                 hint: Packages were unavailable because the network was disabled. When the network is disabled, registry packages may only be read from the cache.
     "
     );
 
@@ -2805,7 +2805,7 @@ fn find_links_wheel_cache() -> Result<()> {
     uv_snapshot!(context.filters(), context.pip_sync()
         .arg("requirements.txt")
         .arg("--find-links")
-        .arg(context.workspace_root.join("test/links/")), @"
+        .arg(context.workspace_root.join("test/links/")), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -2815,7 +2815,7 @@ fn find_links_wheel_cache() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + tqdm==1000.0.0
-    "
+    "###
     );
 
     // Reinstall `tqdm` with `--reinstall`. Ensure that the wheel is reused.
@@ -2823,7 +2823,7 @@ fn find_links_wheel_cache() -> Result<()> {
         .arg("requirements.txt")
         .arg("--reinstall")
         .arg("--find-links")
-        .arg(context.workspace_root.join("test/links/")), @"
+        .arg(context.workspace_root.join("test/links/")), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -2834,7 +2834,7 @@ fn find_links_wheel_cache() -> Result<()> {
     Uninstalled 1 package in [TIME]
     Installed 1 package in [TIME]
      ~ tqdm==1000.0.0
-    "
+    "###
     );
 
     Ok(())
@@ -2855,7 +2855,7 @@ fn find_links_source_cache() -> Result<()> {
     uv_snapshot!(context.filters(), context.pip_sync()
         .arg("requirements.txt")
         .arg("--find-links")
-        .arg(context.workspace_root.join("test/links/")), @"
+        .arg(context.workspace_root.join("test/links/")), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -2865,7 +2865,7 @@ fn find_links_source_cache() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + tqdm==999.0.0
-    "
+    "###
     );
 
     // Reinstall `tqdm` with `--reinstall`. Ensure that the wheel is reused.
@@ -2873,7 +2873,7 @@ fn find_links_source_cache() -> Result<()> {
         .arg("requirements.txt")
         .arg("--reinstall")
         .arg("--find-links")
-        .arg(context.workspace_root.join("test/links/")), @"
+        .arg(context.workspace_root.join("test/links/")), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -2884,7 +2884,7 @@ fn find_links_source_cache() -> Result<()> {
     Uninstalled 1 package in [TIME]
     Installed 1 package in [TIME]
      ~ tqdm==999.0.0
-    "
+    "###
     );
 
     Ok(())
@@ -2900,22 +2900,22 @@ fn offline() -> Result<()> {
     // Install with `--offline` with an empty cache.
     uv_snapshot!(context.pip_sync()
         .arg("requirements.in")
-        .arg("--offline"), @"
+        .arg("--offline"), @r"
     success: false
     exit_code: 1
     ----- stdout -----
 
     ----- stderr -----
-      × No solution found when resolving dependencies:
-      ╰─▶ Because black was not found in the cache and you require black==23.10.1, we can conclude that your requirements are unsatisfiable.
-
-          hint: Packages were unavailable because the network was disabled. When the network is disabled, registry packages may only be read from the cache.
+    error: No solution found when resolving dependencies:
+      Caused by: Because black was not found in the cache and you require black==23.10.1, we can conclude that your requirements are unsatisfiable.
+                 
+                 hint: Packages were unavailable because the network was disabled. When the network is disabled, registry packages may only be read from the cache.
     "
     );
 
     // Populate the cache.
     uv_snapshot!(context.pip_sync()
-        .arg("requirements.in"), @"
+        .arg("requirements.in"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -2925,7 +2925,7 @@ fn offline() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + black==23.10.1
-    "
+    "###
     );
 
     // Install with `--offline` with a populated cache.
@@ -2934,7 +2934,7 @@ fn offline() -> Result<()> {
     uv_snapshot!(context.pip_sync()
         .arg("requirements.in")
         .arg("--offline")
-        , @"
+        , @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -2943,7 +2943,7 @@ fn offline() -> Result<()> {
     Resolved 1 package in [TIME]
     Installed 1 package in [TIME]
      + black==23.10.1
-    "
+    "###
     );
 
     Ok(())
@@ -2962,7 +2962,7 @@ fn compatible_constraint() -> Result<()> {
     uv_snapshot!(context.pip_sync()
         .arg("requirements.txt")
         .arg("--constraint")
-        .arg("constraints.txt"), @"
+        .arg("constraints.txt"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -2972,7 +2972,7 @@ fn compatible_constraint() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + anyio==3.7.0
-    "
+    "###
     );
 
     Ok(())
@@ -2991,14 +2991,14 @@ fn incompatible_constraint() -> Result<()> {
     uv_snapshot!(context.pip_sync()
         .arg("requirements.txt")
         .arg("--constraint")
-        .arg("constraints.txt"), @"
+        .arg("constraints.txt"), @r"
     success: false
     exit_code: 1
     ----- stdout -----
 
     ----- stderr -----
-      × No solution found when resolving dependencies:
-      ╰─▶ Because you require anyio==3.7.0 and anyio==3.6.0, we can conclude that your requirements are unsatisfiable.
+    error: No solution found when resolving dependencies:
+      Caused by: Because you require anyio==3.7.0 and anyio==3.6.0, we can conclude that your requirements are unsatisfiable.
     "
     );
 
@@ -3018,7 +3018,7 @@ fn irrelevant_constraint() -> Result<()> {
     uv_snapshot!(context.pip_sync()
         .arg("requirements.txt")
         .arg("--constraint")
-        .arg("constraints.txt"), @"
+        .arg("constraints.txt"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -3028,7 +3028,7 @@ fn irrelevant_constraint() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + anyio==3.7.0
-    "
+    "###
     );
 
     Ok(())
@@ -3042,7 +3042,7 @@ fn repeat_requirement_identical() -> Result<()> {
     requirements_in.write_str("anyio\nanyio")?;
 
     uv_snapshot!(context.pip_sync()
-        .arg("requirements.in"), @"
+        .arg("requirements.in"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -3052,7 +3052,7 @@ fn repeat_requirement_identical() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + anyio==4.3.0
-    ");
+    "###);
 
     Ok(())
 }
@@ -3065,7 +3065,7 @@ fn repeat_requirement_compatible() -> Result<()> {
     requirements_in.write_str("anyio\nanyio==4.0.0")?;
 
     uv_snapshot!(context.pip_sync()
-        .arg("requirements.in"), @"
+        .arg("requirements.in"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -3075,7 +3075,7 @@ fn repeat_requirement_compatible() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + anyio==4.0.0
-    ");
+    "###);
 
     Ok(())
 }
@@ -3088,14 +3088,14 @@ fn repeat_requirement_incompatible() -> Result<()> {
     requirements_in.write_str("anyio<4.0.0\nanyio==4.0.0")?;
 
     uv_snapshot!(context.pip_sync()
-        .arg("requirements.in"), @"
+        .arg("requirements.in"), @r"
     success: false
     exit_code: 1
     ----- stdout -----
 
     ----- stderr -----
-      × No solution found when resolving dependencies:
-      ╰─▶ Because you require anyio<4.0.0 and anyio==4.0.0, we can conclude that your requirements are unsatisfiable.
+    error: No solution found when resolving dependencies:
+      Caused by: Because you require anyio<4.0.0 and anyio==4.0.0, we can conclude that your requirements are unsatisfiable.
     ");
 
     Ok(())
@@ -3111,7 +3111,7 @@ fn tar_dont_preserve_mtime() -> Result<()> {
     requirements_txt.write_str("tomli @ https://files.pythonhosted.org/packages/c0/3f/d7af728f075fb08564c5949a9c95e44352e23dee646869fa104a3b2060a3/tomli-2.0.1.tar.gz")?;
 
     uv_snapshot!(context.pip_sync()
-        .arg("requirements.txt"), @"
+        .arg("requirements.txt"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -3121,7 +3121,7 @@ fn tar_dont_preserve_mtime() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + tomli==2.0.1 (from https://files.pythonhosted.org/packages/c0/3f/d7af728f075fb08564c5949a9c95e44352e23dee646869fa104a3b2060a3/tomli-2.0.1.tar.gz)
-    ");
+    "###);
 
     Ok(())
 }
@@ -3134,7 +3134,7 @@ fn set_read_permissions() -> Result<()> {
     requirements_in.write_str("databricks==0.2")?;
 
     uv_snapshot!(context.pip_sync()
-        .arg("requirements.in"), @"
+        .arg("requirements.in"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -3144,7 +3144,7 @@ fn set_read_permissions() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + databricks==0.2
-    ");
+    "###);
 
     Ok(())
 }
@@ -3214,7 +3214,7 @@ requires-python = ">=3.8"
     requirements_in.write_str(&format!("-e {}", editable_dir.path().display()))?;
 
     uv_snapshot!(context.filters(), context.pip_sync()
-        .arg("requirements.in"), @"
+        .arg("requirements.in"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -3224,12 +3224,12 @@ requires-python = ">=3.8"
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + example==0.0.0 (from file://[TEMP_DIR]/editable)
-    "
+    "###
     );
 
     // Installing again should be a no-op.
     uv_snapshot!(context.filters(), context.pip_sync()
-        .arg("requirements.in"), @"
+        .arg("requirements.in"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -3237,7 +3237,7 @@ requires-python = ">=3.8"
     ----- stderr -----
     Resolved 1 package in [TIME]
     Audited 1 package in [TIME]
-    "
+    "###
     );
 
     // Modify the editable package.
@@ -3254,7 +3254,7 @@ requires-python = ">=3.8"
 
     // Re-installing should update the package.
     uv_snapshot!(context.filters(), context.pip_sync()
-        .arg("requirements.in"), @"
+        .arg("requirements.in"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -3265,7 +3265,7 @@ requires-python = ">=3.8"
     Uninstalled 1 package in [TIME]
     Installed 1 package in [TIME]
      ~ example==0.0.0 (from file://[TEMP_DIR]/editable)
-    "
+    "###
     );
 
     Ok(())
@@ -3282,7 +3282,7 @@ fn compile() -> Result<()> {
     uv_snapshot!(context.pip_sync()
         .arg("requirements.txt")
         .arg("--compile")
-        .arg("--strict"), @"
+        .arg("--strict"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -3293,7 +3293,7 @@ fn compile() -> Result<()> {
     Installed 1 package in [TIME]
     Bytecode compiled 3 files in [TIME]
      + markupsafe==2.1.3
-    "
+    "###
     );
 
     assert!(
@@ -3320,7 +3320,7 @@ fn recompile() -> Result<()> {
 
     uv_snapshot!(context.pip_sync()
         .arg("requirements.txt")
-        .arg("--strict"), @"
+        .arg("--strict"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -3330,13 +3330,13 @@ fn recompile() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + markupsafe==2.1.3
-    "
+    "###
     );
 
     uv_snapshot!(context.pip_sync()
         .arg("requirements.txt")
         .arg("--compile")
-        .arg("--strict"), @"
+        .arg("--strict"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -3344,7 +3344,7 @@ fn recompile() -> Result<()> {
     ----- stderr -----
     Resolved 1 package in [TIME]
     Bytecode compiled 3 files in [TIME]
-    "
+    "###
     );
 
     assert!(
@@ -3386,15 +3386,15 @@ requires-python = ">=3.13"
     requirements_in.write_str(&format!("-e {}", editable_dir.path().display()))?;
 
     uv_snapshot!(context.filters(), context.pip_sync()
-        .arg("requirements.in"), @"
+        .arg("requirements.in"), @r"
     success: false
     exit_code: 1
     ----- stdout -----
 
     ----- stderr -----
-      × No solution found when resolving dependencies:
-      ╰─▶ Because the current Python version (3.12.[X]) does not satisfy Python>=3.13 and example==0.0.0 depends on Python>=3.13, we can conclude that example==0.0.0 cannot be used.
-          And because only example==0.0.0 is available and you require example, we can conclude that your requirements are unsatisfiable.
+    error: No solution found when resolving dependencies:
+      Caused by: Because the current Python version (3.12.[X]) does not satisfy Python>=3.13 and example==0.0.0 depends on Python>=3.13, we can conclude that example==0.0.0 cannot be used.
+                 And because only example==0.0.0 is available and you require example, we can conclude that your requirements are unsatisfiable.
     "
     );
 
@@ -3426,15 +3426,15 @@ requires-python = ">=3.13"
     requirements_in.write_str(&format!("example @ {}", editable_dir.path().display()))?;
 
     uv_snapshot!(context.filters(), context.pip_sync()
-        .arg("requirements.in"), @"
+        .arg("requirements.in"), @r"
     success: false
     exit_code: 1
     ----- stdout -----
 
     ----- stderr -----
-      × No solution found when resolving dependencies:
-      ╰─▶ Because the current Python version (3.12.[X]) does not satisfy Python>=3.13 and example==0.0.0 depends on Python>=3.13, we can conclude that example==0.0.0 cannot be used.
-          And because only example==0.0.0 is available and you require example, we can conclude that your requirements are unsatisfiable.
+    error: No solution found when resolving dependencies:
+      Caused by: Because the current Python version (3.12.[X]) does not satisfy Python>=3.13 and example==0.0.0 depends on Python>=3.13, we can conclude that example==0.0.0 cannot be used.
+                 And because only example==0.0.0 is available and you require example, we can conclude that your requirements are unsatisfiable.
     "
     );
 
@@ -3453,7 +3453,7 @@ fn require_hashes_unknown_algorithm() -> Result<()> {
 
     uv_snapshot!(context.pip_sync()
         .arg("requirements.txt")
-        .arg("--require-hashes"), @"
+        .arg("--require-hashes"), @r"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -3476,7 +3476,7 @@ fn require_hashes_missing_hash() -> Result<()> {
 
     // Install without error when `--require-hashes` is omitted.
     uv_snapshot!(context.pip_sync()
-        .arg("requirements.txt"), @"
+        .arg("requirements.txt"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -3486,20 +3486,20 @@ fn require_hashes_missing_hash() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + anyio==4.0.0
-    "
+    "###
     );
 
     // Error when `--require-hashes` is provided.
     uv_snapshot!(context.pip_sync()
         .arg("requirements.txt")
-        .arg("--require-hashes"), @"
+        .arg("--require-hashes"), @r###"
     success: false
     exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
     error: In `--require-hashes` mode, all requirements must have a hash, but none were provided for: anyio==4.0.0
-    "
+    "###
     );
 
     Ok(())
@@ -3517,7 +3517,7 @@ fn require_hashes_missing_version() -> Result<()> {
 
     // Install without error when `--require-hashes` is omitted.
     uv_snapshot!(context.pip_sync()
-        .arg("requirements.txt"), @"
+        .arg("requirements.txt"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -3527,20 +3527,20 @@ fn require_hashes_missing_version() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + anyio==4.3.0
-    "
+    "###
     );
 
     // Error when `--require-hashes` is provided.
     uv_snapshot!(context.pip_sync()
         .arg("requirements.txt")
-        .arg("--require-hashes"), @"
+        .arg("--require-hashes"), @r###"
     success: false
     exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
     error: In `--require-hashes` mode, all requirements must have their versions pinned with `==`, but found: anyio
-    "
+    "###
     );
 
     Ok(())
@@ -3558,7 +3558,7 @@ fn require_hashes_invalid_operator() -> Result<()> {
 
     // Install without error when `--require-hashes` is omitted.
     uv_snapshot!(context.pip_sync()
-        .arg("requirements.txt"), @"
+        .arg("requirements.txt"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -3568,20 +3568,20 @@ fn require_hashes_invalid_operator() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + anyio==4.3.0
-    "
+    "###
     );
 
     // Error when `--require-hashes` is provided.
     uv_snapshot!(context.pip_sync()
         .arg("requirements.txt")
-        .arg("--require-hashes"), @"
+        .arg("--require-hashes"), @r###"
     success: false
     exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
     error: In `--require-hashes` mode, all requirements must have their versions pinned with `==`, but found: anyio>4.0.0
-    "
+    "###
     );
 
     Ok(())
@@ -3600,21 +3600,21 @@ fn require_hashes_wheel_no_binary() -> Result<()> {
         .arg("requirements.txt")
         .arg("--no-binary")
         .arg(":all:")
-        .arg("--require-hashes"), @"
+        .arg("--require-hashes"), @r"
     success: false
     exit_code: 1
     ----- stdout -----
 
     ----- stderr -----
     Resolved 1 package in [TIME]
-      × Failed to download and build `anyio==4.0.0`
-      ╰─▶ Hash mismatch for `anyio==4.0.0`
-
-          Expected:
-            sha256:cfdb2b588b9fc25ede96d8db56ed50848b0b649dca3dd1df0b11f683bb9e0b5f
-
-          Computed:
-            sha256:f7ed51751b2c2add651e5747c891b47e26d2a21be5d32d9311dfe9692f3e5d7a
+    error: Failed to download and build `anyio==4.0.0`
+      Caused by: Hash mismatch for `anyio==4.0.0`
+                 
+                 Expected:
+                   sha256:cfdb2b588b9fc25ede96d8db56ed50848b0b649dca3dd1df0b11f683bb9e0b5f
+                 
+                 Computed:
+                   sha256:f7ed51751b2c2add651e5747c891b47e26d2a21be5d32d9311dfe9692f3e5d7a
     "
     );
 
@@ -3634,7 +3634,7 @@ fn require_hashes_wheel_only_binary() -> Result<()> {
         .arg("requirements.txt")
         .arg("--only-binary")
         .arg(":all:")
-        .arg("--require-hashes"), @"
+        .arg("--require-hashes"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -3644,7 +3644,7 @@ fn require_hashes_wheel_only_binary() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + anyio==4.0.0
-    "
+    "###
     );
 
     Ok(())
@@ -3663,7 +3663,7 @@ fn require_hashes_source_no_binary() -> Result<()> {
         .arg("requirements.txt")
         .arg("--no-binary")
         .arg(":all:")
-        .arg("--require-hashes"), @"
+        .arg("--require-hashes"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -3673,7 +3673,7 @@ fn require_hashes_source_no_binary() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + source-distribution==0.0.1
-    "
+    "###
     );
 
     Ok(())
@@ -3692,21 +3692,21 @@ fn require_hashes_source_only_binary() -> Result<()> {
         .arg("requirements.txt")
         .arg("--only-binary")
         .arg(":all:")
-        .arg("--require-hashes"), @"
+        .arg("--require-hashes"), @r"
     success: false
     exit_code: 1
     ----- stdout -----
 
     ----- stderr -----
     Resolved 1 package in [TIME]
-      × Failed to download `anyio==4.0.0`
-      ╰─▶ Hash mismatch for `anyio==4.0.0`
-
-          Expected:
-            sha256:f7ed51751b2c2add651e5747c891b47e26d2a21be5d32d9311dfe9692f3e5d7a
-
-          Computed:
-            sha256:cfdb2b588b9fc25ede96d8db56ed50848b0b649dca3dd1df0b11f683bb9e0b5f
+    error: Failed to download `anyio==4.0.0`
+      Caused by: Hash mismatch for `anyio==4.0.0`
+                 
+                 Expected:
+                   sha256:f7ed51751b2c2add651e5747c891b47e26d2a21be5d32d9311dfe9692f3e5d7a
+                 
+                 Computed:
+                   sha256:cfdb2b588b9fc25ede96d8db56ed50848b0b649dca3dd1df0b11f683bb9e0b5f
     "
     );
 
@@ -3724,21 +3724,21 @@ fn require_hashes_wrong_digest() -> Result<()> {
 
     uv_snapshot!(context.pip_sync()
         .arg("requirements.txt")
-        .arg("--require-hashes"), @"
+        .arg("--require-hashes"), @r"
     success: false
     exit_code: 1
     ----- stdout -----
 
     ----- stderr -----
     Resolved 1 package in [TIME]
-      × Failed to download `anyio==4.0.0`
-      ╰─▶ Hash mismatch for `anyio==4.0.0`
-
-          Expected:
-            sha256:afdb2b588b9fc25ede96d8db56ed50848b0b649dca3dd1df0b11f683bb9e0b5f
-
-          Computed:
-            sha256:cfdb2b588b9fc25ede96d8db56ed50848b0b649dca3dd1df0b11f683bb9e0b5f
+    error: Failed to download `anyio==4.0.0`
+      Caused by: Hash mismatch for `anyio==4.0.0`
+                 
+                 Expected:
+                   sha256:afdb2b588b9fc25ede96d8db56ed50848b0b649dca3dd1df0b11f683bb9e0b5f
+                 
+                 Computed:
+                   sha256:cfdb2b588b9fc25ede96d8db56ed50848b0b649dca3dd1df0b11f683bb9e0b5f
     "
     );
 
@@ -3756,21 +3756,21 @@ fn require_hashes_wrong_algorithm() -> Result<()> {
 
     uv_snapshot!(context.pip_sync()
         .arg("requirements.txt")
-        .arg("--require-hashes"), @"
+        .arg("--require-hashes"), @r"
     success: false
     exit_code: 1
     ----- stdout -----
 
     ----- stderr -----
     Resolved 1 package in [TIME]
-      × Failed to download `anyio==4.0.0`
-      ╰─▶ Hash mismatch for `anyio==4.0.0`
-
-          Expected:
-            sha512:cfdb2b588b9fc25ede96d8db56ed50848b0b649dca3dd1df0b11f683bb9e0b5f
-
-          Computed:
-            sha512:f30761c1e8725b49c498273b90dba4b05c0fd157811994c806183062cb6647e773364ce45f0e1ff0b10e32fe6d0232ea5ad39476ccf37109d6b49603a09c11c2
+    error: Failed to download `anyio==4.0.0`
+      Caused by: Hash mismatch for `anyio==4.0.0`
+                 
+                 Expected:
+                   sha512:cfdb2b588b9fc25ede96d8db56ed50848b0b649dca3dd1df0b11f683bb9e0b5f
+                 
+                 Computed:
+                   sha512:f30761c1e8725b49c498273b90dba4b05c0fd157811994c806183062cb6647e773364ce45f0e1ff0b10e32fe6d0232ea5ad39476ccf37109d6b49603a09c11c2
     "
     );
 
@@ -3788,7 +3788,7 @@ fn require_hashes_source_url() -> Result<()> {
 
     uv_snapshot!(context.pip_sync()
         .arg("requirements.txt")
-        .arg("--require-hashes"), @"
+        .arg("--require-hashes"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -3798,14 +3798,14 @@ fn require_hashes_source_url() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + source-distribution==0.0.1 (from https://files.pythonhosted.org/packages/10/1f/57aa4cce1b1abf6b433106676e15f9fa2c92ed2bd4cf77c3b50a9e9ac773/source_distribution-0.0.1.tar.gz)
-    "
+    "###
     );
 
     // Reinstall with the right hash, and verify that it's reused.
     uv_snapshot!(context.pip_sync()
         .arg("requirements.txt")
         .arg("--reinstall")
-        .arg("--require-hashes"), @"
+        .arg("--require-hashes"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -3816,7 +3816,7 @@ fn require_hashes_source_url() -> Result<()> {
     Uninstalled 1 package in [TIME]
     Installed 1 package in [TIME]
      ~ source-distribution==0.0.1 (from https://files.pythonhosted.org/packages/10/1f/57aa4cce1b1abf6b433106676e15f9fa2c92ed2bd4cf77c3b50a9e9ac773/source_distribution-0.0.1.tar.gz)
-    "
+    "###
     );
 
     // Reinstall with the wrong hash, and verify that it's rejected despite being cached.
@@ -3827,20 +3827,20 @@ fn require_hashes_source_url() -> Result<()> {
     uv_snapshot!(context.pip_sync()
         .arg("requirements.txt")
         .arg("--reinstall")
-        .arg("--require-hashes"), @"
+        .arg("--require-hashes"), @r"
     success: false
     exit_code: 1
     ----- stdout -----
 
     ----- stderr -----
-      × Failed to download and build `source-distribution @ https://files.pythonhosted.org/packages/10/1f/57aa4cce1b1abf6b433106676e15f9fa2c92ed2bd4cf77c3b50a9e9ac773/source_distribution-0.0.1.tar.gz`
-      ╰─▶ Hash mismatch for `source-distribution @ https://files.pythonhosted.org/packages/10/1f/57aa4cce1b1abf6b433106676e15f9fa2c92ed2bd4cf77c3b50a9e9ac773/source_distribution-0.0.1.tar.gz`
-
-          Expected:
-            sha256:a7ed51751b2c2add651e5747c891b47e26d2a21be5d32d9311dfe9692f3e5d7a
-
-          Computed:
-            sha256:1f83ed7498336c7f2ab9b002cf22583d91115ebc624053dc4eb3a45694490106
+    error: Failed to download and build `source-distribution @ https://files.pythonhosted.org/packages/10/1f/57aa4cce1b1abf6b433106676e15f9fa2c92ed2bd4cf77c3b50a9e9ac773/source_distribution-0.0.1.tar.gz`
+      Caused by: Hash mismatch for `source-distribution @ https://files.pythonhosted.org/packages/10/1f/57aa4cce1b1abf6b433106676e15f9fa2c92ed2bd4cf77c3b50a9e9ac773/source_distribution-0.0.1.tar.gz`
+                 
+                 Expected:
+                   sha256:a7ed51751b2c2add651e5747c891b47e26d2a21be5d32d9311dfe9692f3e5d7a
+                 
+                 Computed:
+                   sha256:1f83ed7498336c7f2ab9b002cf22583d91115ebc624053dc4eb3a45694490106
     "
     );
 
@@ -3858,20 +3858,20 @@ fn require_hashes_source_url_mismatch() -> Result<()> {
 
     uv_snapshot!(context.pip_sync()
         .arg("requirements.txt")
-        .arg("--require-hashes"), @"
+        .arg("--require-hashes"), @r"
     success: false
     exit_code: 1
     ----- stdout -----
 
     ----- stderr -----
-      × Failed to download and build `source-distribution @ https://files.pythonhosted.org/packages/10/1f/57aa4cce1b1abf6b433106676e15f9fa2c92ed2bd4cf77c3b50a9e9ac773/source_distribution-0.0.1.tar.gz`
-      ╰─▶ Hash mismatch for `source-distribution @ https://files.pythonhosted.org/packages/10/1f/57aa4cce1b1abf6b433106676e15f9fa2c92ed2bd4cf77c3b50a9e9ac773/source_distribution-0.0.1.tar.gz`
-
-          Expected:
-            sha256:a7ed51751b2c2add651e5747c891b47e26d2a21be5d32d9311dfe9692f3e5d7a
-
-          Computed:
-            sha256:1f83ed7498336c7f2ab9b002cf22583d91115ebc624053dc4eb3a45694490106
+    error: Failed to download and build `source-distribution @ https://files.pythonhosted.org/packages/10/1f/57aa4cce1b1abf6b433106676e15f9fa2c92ed2bd4cf77c3b50a9e9ac773/source_distribution-0.0.1.tar.gz`
+      Caused by: Hash mismatch for `source-distribution @ https://files.pythonhosted.org/packages/10/1f/57aa4cce1b1abf6b433106676e15f9fa2c92ed2bd4cf77c3b50a9e9ac773/source_distribution-0.0.1.tar.gz`
+                 
+                 Expected:
+                   sha256:a7ed51751b2c2add651e5747c891b47e26d2a21be5d32d9311dfe9692f3e5d7a
+                 
+                 Computed:
+                   sha256:1f83ed7498336c7f2ab9b002cf22583d91115ebc624053dc4eb3a45694490106
     "
     );
 
@@ -3889,7 +3889,7 @@ fn require_hashes_wheel_url() -> Result<()> {
 
     uv_snapshot!(context.pip_sync()
         .arg("requirements.txt")
-        .arg("--require-hashes"), @"
+        .arg("--require-hashes"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -3899,14 +3899,14 @@ fn require_hashes_wheel_url() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + anyio==4.0.0 (from https://files.pythonhosted.org/packages/36/55/ad4de788d84a630656ece71059665e01ca793c04294c463fd84132f40fe6/anyio-4.0.0-py3-none-any.whl)
-    "
+    "###
     );
 
     // Reinstall with the right hash, and verify that it's reused.
     uv_snapshot!(context.pip_sync()
         .arg("requirements.txt")
         .arg("--reinstall")
-        .arg("--require-hashes"), @"
+        .arg("--require-hashes"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -3917,7 +3917,7 @@ fn require_hashes_wheel_url() -> Result<()> {
     Uninstalled 1 package in [TIME]
     Installed 1 package in [TIME]
      ~ anyio==4.0.0 (from https://files.pythonhosted.org/packages/36/55/ad4de788d84a630656ece71059665e01ca793c04294c463fd84132f40fe6/anyio-4.0.0-py3-none-any.whl)
-    "
+    "###
     );
 
     // Reinstall with the wrong hash, and verify that it's rejected despite being cached.
@@ -3928,21 +3928,21 @@ fn require_hashes_wheel_url() -> Result<()> {
     uv_snapshot!(context.pip_sync()
         .arg("requirements.txt")
         .arg("--reinstall")
-        .arg("--require-hashes"), @"
+        .arg("--require-hashes"), @r"
     success: false
     exit_code: 1
     ----- stdout -----
 
     ----- stderr -----
     Resolved 1 package in [TIME]
-      × Failed to download `anyio @ https://files.pythonhosted.org/packages/36/55/ad4de788d84a630656ece71059665e01ca793c04294c463fd84132f40fe6/anyio-4.0.0-py3-none-any.whl`
-      ╰─▶ Hash mismatch for `anyio @ https://files.pythonhosted.org/packages/36/55/ad4de788d84a630656ece71059665e01ca793c04294c463fd84132f40fe6/anyio-4.0.0-py3-none-any.whl`
-
-          Expected:
-            sha256:afdb2b588b9fc25ede96d8db56ed50848b0b649dca3dd1df0b11f683bb9e0b5f
-
-          Computed:
-            sha256:cfdb2b588b9fc25ede96d8db56ed50848b0b649dca3dd1df0b11f683bb9e0b5f
+    error: Failed to download `anyio @ https://files.pythonhosted.org/packages/36/55/ad4de788d84a630656ece71059665e01ca793c04294c463fd84132f40fe6/anyio-4.0.0-py3-none-any.whl`
+      Caused by: Hash mismatch for `anyio @ https://files.pythonhosted.org/packages/36/55/ad4de788d84a630656ece71059665e01ca793c04294c463fd84132f40fe6/anyio-4.0.0-py3-none-any.whl`
+                 
+                 Expected:
+                   sha256:afdb2b588b9fc25ede96d8db56ed50848b0b649dca3dd1df0b11f683bb9e0b5f
+                 
+                 Computed:
+                   sha256:cfdb2b588b9fc25ede96d8db56ed50848b0b649dca3dd1df0b11f683bb9e0b5f
     "
     );
 
@@ -3955,7 +3955,7 @@ fn require_hashes_wheel_url() -> Result<()> {
 
     uv_snapshot!(context.pip_sync()
         .arg("requirements.txt")
-        .arg("--require-hashes"), @"
+        .arg("--require-hashes"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -3965,7 +3965,7 @@ fn require_hashes_wheel_url() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + iniconfig==2.0.0
-    "
+    "###
     );
 
     Ok(())
@@ -3982,21 +3982,21 @@ fn require_hashes_wheel_url_mismatch() -> Result<()> {
 
     uv_snapshot!(context.pip_sync()
         .arg("requirements.txt")
-        .arg("--require-hashes"), @"
+        .arg("--require-hashes"), @r"
     success: false
     exit_code: 1
     ----- stdout -----
 
     ----- stderr -----
     Resolved 1 package in [TIME]
-      × Failed to download `anyio @ https://files.pythonhosted.org/packages/36/55/ad4de788d84a630656ece71059665e01ca793c04294c463fd84132f40fe6/anyio-4.0.0-py3-none-any.whl`
-      ╰─▶ Hash mismatch for `anyio @ https://files.pythonhosted.org/packages/36/55/ad4de788d84a630656ece71059665e01ca793c04294c463fd84132f40fe6/anyio-4.0.0-py3-none-any.whl`
-
-          Expected:
-            sha256:afdb2b588b9fc25ede96d8db56ed50848b0b649dca3dd1df0b11f683bb9e0b5f
-
-          Computed:
-            sha256:cfdb2b588b9fc25ede96d8db56ed50848b0b649dca3dd1df0b11f683bb9e0b5f
+    error: Failed to download `anyio @ https://files.pythonhosted.org/packages/36/55/ad4de788d84a630656ece71059665e01ca793c04294c463fd84132f40fe6/anyio-4.0.0-py3-none-any.whl`
+      Caused by: Hash mismatch for `anyio @ https://files.pythonhosted.org/packages/36/55/ad4de788d84a630656ece71059665e01ca793c04294c463fd84132f40fe6/anyio-4.0.0-py3-none-any.whl`
+                 
+                 Expected:
+                   sha256:afdb2b588b9fc25ede96d8db56ed50848b0b649dca3dd1df0b11f683bb9e0b5f
+                 
+                 Computed:
+                   sha256:cfdb2b588b9fc25ede96d8db56ed50848b0b649dca3dd1df0b11f683bb9e0b5f
     "
     );
 
@@ -4015,14 +4015,14 @@ fn require_hashes_git() -> Result<()> {
 
     uv_snapshot!(context.pip_sync()
         .arg("requirements.txt")
-        .arg("--require-hashes"), @"
+        .arg("--require-hashes"), @r"
     success: false
     exit_code: 1
     ----- stdout -----
 
     ----- stderr -----
-      × Failed to download and build `anyio @ git+https://github.com/agronholm/anyio@4a23745badf5bf5ef7928f1e346e9986bd696d82`
-      ╰─▶ Hash-checking is not supported for Git repositories: `anyio @ git+https://github.com/agronholm/anyio@4a23745badf5bf5ef7928f1e346e9986bd696d82`
+    error: Failed to download and build `anyio @ git+https://github.com/agronholm/anyio@4a23745badf5bf5ef7928f1e346e9986bd696d82`
+      Caused by: Hash-checking is not supported for Git repositories: `anyio @ git+https://github.com/agronholm/anyio@4a23745badf5bf5ef7928f1e346e9986bd696d82`
     "
     );
 
@@ -4045,14 +4045,14 @@ fn require_hashes_source_tree() -> Result<()> {
 
     uv_snapshot!(context.filters(), context.pip_sync()
         .arg("requirements.txt")
-        .arg("--require-hashes"), @"
+        .arg("--require-hashes"), @r"
     success: false
     exit_code: 1
     ----- stdout -----
 
     ----- stderr -----
-      × Failed to build `black @ file://[WORKSPACE]/test/packages/black_editable`
-      ╰─▶ Hash-checking is not supported for local directories: `black @ file://[WORKSPACE]/test/packages/black_editable`
+    error: Failed to build `black @ file://[WORKSPACE]/test/packages/black_editable`
+      Caused by: Hash-checking is not supported for local directories: `black @ file://[WORKSPACE]/test/packages/black_editable`
     "
     );
 
@@ -4069,7 +4069,7 @@ fn require_hashes_re_download() -> Result<()> {
 
     // Install without `--require-hashes`.
     uv_snapshot!(context.pip_sync()
-        .arg("requirements.txt"), @"
+        .arg("requirements.txt"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -4079,7 +4079,7 @@ fn require_hashes_re_download() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + anyio==4.0.0
-    "
+    "###
     );
 
     // Reinstall with `--require-hashes`, and the wrong hash.
@@ -4090,21 +4090,21 @@ fn require_hashes_re_download() -> Result<()> {
     uv_snapshot!(context.pip_sync()
         .arg("requirements.txt")
         .arg("--reinstall")
-        .arg("--require-hashes"), @"
+        .arg("--require-hashes"), @r"
     success: false
     exit_code: 1
     ----- stdout -----
 
     ----- stderr -----
     Resolved 1 package in [TIME]
-      × Failed to download `anyio==4.0.0`
-      ╰─▶ Hash mismatch for `anyio==4.0.0`
-
-          Expected:
-            sha256:afdb2b588b9fc25ede96d8db56ed50848b0b649dca3dd1df0b11f683bb9e0b5f
-
-          Computed:
-            sha256:cfdb2b588b9fc25ede96d8db56ed50848b0b649dca3dd1df0b11f683bb9e0b5f
+    error: Failed to download `anyio==4.0.0`
+      Caused by: Hash mismatch for `anyio==4.0.0`
+                 
+                 Expected:
+                   sha256:afdb2b588b9fc25ede96d8db56ed50848b0b649dca3dd1df0b11f683bb9e0b5f
+                 
+                 Computed:
+                   sha256:cfdb2b588b9fc25ede96d8db56ed50848b0b649dca3dd1df0b11f683bb9e0b5f
     "
     );
 
@@ -4116,7 +4116,7 @@ fn require_hashes_re_download() -> Result<()> {
     uv_snapshot!(context.pip_sync()
         .arg("requirements.txt")
         .arg("--reinstall")
-        .arg("--require-hashes"), @"
+        .arg("--require-hashes"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -4127,7 +4127,7 @@ fn require_hashes_re_download() -> Result<()> {
     Uninstalled 1 package in [TIME]
     Installed 1 package in [TIME]
      ~ anyio==4.0.0
-    "
+    "###
     );
 
     Ok(())
@@ -4149,7 +4149,7 @@ fn require_hashes_wheel_path() -> Result<()> {
 
     uv_snapshot!(context.filters(), context.pip_sync()
         .arg("requirements.txt")
-        .arg("--require-hashes"), @"
+        .arg("--require-hashes"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -4159,7 +4159,7 @@ fn require_hashes_wheel_path() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + tqdm==1000.0.0 (from file://[WORKSPACE]/test/links/tqdm-1000.0.0-py3-none-any.whl)
-    "
+    "###
     );
 
     Ok(())
@@ -4181,21 +4181,21 @@ fn require_hashes_wheel_path_mismatch() -> Result<()> {
 
     uv_snapshot!(context.filters(), context.pip_sync()
         .arg("requirements.txt")
-        .arg("--require-hashes"), @"
+        .arg("--require-hashes"), @r"
     success: false
     exit_code: 1
     ----- stdout -----
 
     ----- stderr -----
     Resolved 1 package in [TIME]
-      × Failed to read `tqdm @ file://[WORKSPACE]/test/links/tqdm-1000.0.0-py3-none-any.whl`
-      ╰─▶ Hash mismatch for `tqdm @ file://[WORKSPACE]/test/links/tqdm-1000.0.0-py3-none-any.whl`
-
-          Expected:
-            sha256:cfdb2b588b9fc25ede96d8db56ed50848b0b649dca3dd1df0b11f683bb9e0b5f
-
-          Computed:
-            sha256:a34996d4bd5abb2336e14ff0a2d22b92cfd0f0ed344e6883041ce01953276a13
+    error: Failed to read `tqdm @ file://[WORKSPACE]/test/links/tqdm-1000.0.0-py3-none-any.whl`
+      Caused by: Hash mismatch for `tqdm @ file://[WORKSPACE]/test/links/tqdm-1000.0.0-py3-none-any.whl`
+                 
+                 Expected:
+                   sha256:cfdb2b588b9fc25ede96d8db56ed50848b0b649dca3dd1df0b11f683bb9e0b5f
+                 
+                 Computed:
+                   sha256:a34996d4bd5abb2336e14ff0a2d22b92cfd0f0ed344e6883041ce01953276a13
     "
     );
 
@@ -4218,7 +4218,7 @@ fn require_hashes_source_path() -> Result<()> {
 
     uv_snapshot!(context.filters(), context.pip_sync()
         .arg("requirements.txt")
-        .arg("--require-hashes"), @"
+        .arg("--require-hashes"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -4228,7 +4228,7 @@ fn require_hashes_source_path() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + tqdm==999.0.0 (from file://[WORKSPACE]/test/links/tqdm-999.0.0.tar.gz)
-    "
+    "###
     );
 
     Ok(())
@@ -4250,20 +4250,20 @@ fn require_hashes_source_path_mismatch() -> Result<()> {
 
     uv_snapshot!(context.filters(), context.pip_sync()
         .arg("requirements.txt")
-        .arg("--require-hashes"), @"
+        .arg("--require-hashes"), @r"
     success: false
     exit_code: 1
     ----- stdout -----
 
     ----- stderr -----
-      × Failed to build `tqdm @ file://[WORKSPACE]/test/links/tqdm-999.0.0.tar.gz`
-      ╰─▶ Hash mismatch for `tqdm @ file://[WORKSPACE]/test/links/tqdm-999.0.0.tar.gz`
-
-          Expected:
-            sha256:cfdb2b588b9fc25ede96d8db56ed50848b0b649dca3dd1df0b11f683bb9e0b5f
-
-          Computed:
-            sha256:89fa05cffa7f457658373b85de302d24d0c205ceda2819a8739e324b75e9430b
+    error: Failed to build `tqdm @ file://[WORKSPACE]/test/links/tqdm-999.0.0.tar.gz`
+      Caused by: Hash mismatch for `tqdm @ file://[WORKSPACE]/test/links/tqdm-999.0.0.tar.gz`
+                 
+                 Expected:
+                   sha256:cfdb2b588b9fc25ede96d8db56ed50848b0b649dca3dd1df0b11f683bb9e0b5f
+                 
+                 Computed:
+                   sha256:89fa05cffa7f457658373b85de302d24d0c205ceda2819a8739e324b75e9430b
     "
     );
 
@@ -4283,7 +4283,7 @@ fn require_hashes_unnamed() -> Result<()> {
 
     uv_snapshot!(context.pip_sync()
         .arg("requirements.txt")
-        .arg("--require-hashes"), @"
+        .arg("--require-hashes"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -4293,7 +4293,7 @@ fn require_hashes_unnamed() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + anyio==4.0.0 (from https://files.pythonhosted.org/packages/36/55/ad4de788d84a630656ece71059665e01ca793c04294c463fd84132f40fe6/anyio-4.0.0-py3-none-any.whl)
-    "
+    "###
     );
 
     Ok(())
@@ -4314,14 +4314,14 @@ fn require_hashes_editable() -> Result<()> {
     // Install the editable packages.
     uv_snapshot!(context.filters(), context.pip_sync()
         .arg(requirements_txt.path())
-        .arg("--require-hashes"), @"
+        .arg("--require-hashes"), @r###"
     success: false
     exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
     error: In `--require-hashes` mode, all requirements must have a hash, but none were provided for: file://[WORKSPACE]/test/packages/black_editable[d]
-    "
+    "###
     );
 
     Ok(())
@@ -4338,14 +4338,14 @@ fn require_hashes_repeated_dependency() -> Result<()> {
 
     uv_snapshot!(context.pip_sync()
         .arg("requirements.txt")
-        .arg("--require-hashes"), @"
+        .arg("--require-hashes"), @r###"
     success: false
     exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
     error: In `--require-hashes` mode, all requirements must have their versions pinned with `==`, but found: anyio
-    "
+    "###
     );
 
     // Reverse the order.
@@ -4355,14 +4355,14 @@ fn require_hashes_repeated_dependency() -> Result<()> {
 
     uv_snapshot!(context.pip_sync()
         .arg("requirements.txt")
-        .arg("--require-hashes"), @"
+        .arg("--require-hashes"), @r###"
     success: false
     exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
     error: In `--require-hashes` mode, all requirements must have their versions pinned with `==`, but found: anyio
-    "
+    "###
     );
 
     Ok(())
@@ -4383,7 +4383,7 @@ fn require_hashes_repeated_hash() -> Result<()> {
 
     uv_snapshot!(context.pip_sync()
         .arg("requirements.txt")
-        .arg("--require-hashes"), @"
+        .arg("--require-hashes"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -4393,7 +4393,7 @@ fn require_hashes_repeated_hash() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + anyio==4.0.0 (from https://files.pythonhosted.org/packages/36/55/ad4de788d84a630656ece71059665e01ca793c04294c463fd84132f40fe6/anyio-4.0.0-py3-none-any.whl)
-    "
+    "###
     );
 
     // Use a different hash, but both are correct.
@@ -4407,7 +4407,7 @@ fn require_hashes_repeated_hash() -> Result<()> {
     uv_snapshot!(context.pip_sync()
         .arg("requirements.txt")
         .arg("--require-hashes")
-        .arg("--reinstall"), @"
+        .arg("--reinstall"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -4418,7 +4418,7 @@ fn require_hashes_repeated_hash() -> Result<()> {
     Uninstalled 1 package in [TIME]
     Installed 1 package in [TIME]
      ~ anyio==4.0.0 (from https://files.pythonhosted.org/packages/36/55/ad4de788d84a630656ece71059665e01ca793c04294c463fd84132f40fe6/anyio-4.0.0-py3-none-any.whl)
-    "
+    "###
     );
 
     // Use a different hash. The first hash is wrong, but that's fine, since we use the last hash.
@@ -4432,7 +4432,7 @@ fn require_hashes_repeated_hash() -> Result<()> {
     uv_snapshot!(context.pip_sync()
         .arg("requirements.txt")
         .arg("--require-hashes")
-        .arg("--reinstall"), @"
+        .arg("--reinstall"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -4443,7 +4443,7 @@ fn require_hashes_repeated_hash() -> Result<()> {
     Uninstalled 1 package in [TIME]
     Installed 1 package in [TIME]
      ~ anyio==4.0.0 (from https://files.pythonhosted.org/packages/36/55/ad4de788d84a630656ece71059665e01ca793c04294c463fd84132f40fe6/anyio-4.0.0-py3-none-any.whl)
-    "
+    "###
     );
 
     // Use a different hash. The second hash is wrong. This should fail, since we use the last hash.
@@ -4457,21 +4457,21 @@ fn require_hashes_repeated_hash() -> Result<()> {
     uv_snapshot!(context.pip_sync()
         .arg("requirements.txt")
         .arg("--require-hashes")
-        .arg("--reinstall"), @"
+        .arg("--reinstall"), @r"
     success: false
     exit_code: 1
     ----- stdout -----
 
     ----- stderr -----
     Resolved 1 package in [TIME]
-      × Failed to download `anyio @ https://files.pythonhosted.org/packages/36/55/ad4de788d84a630656ece71059665e01ca793c04294c463fd84132f40fe6/anyio-4.0.0-py3-none-any.whl`
-      ╰─▶ Hash mismatch for `anyio @ https://files.pythonhosted.org/packages/36/55/ad4de788d84a630656ece71059665e01ca793c04294c463fd84132f40fe6/anyio-4.0.0-py3-none-any.whl`
-
-          Expected:
-            md5:520d85e19168705cdf0223621b18831a
-
-          Computed:
-            md5:420d85e19168705cdf0223621b18831a
+    error: Failed to download `anyio @ https://files.pythonhosted.org/packages/36/55/ad4de788d84a630656ece71059665e01ca793c04294c463fd84132f40fe6/anyio-4.0.0-py3-none-any.whl`
+      Caused by: Hash mismatch for `anyio @ https://files.pythonhosted.org/packages/36/55/ad4de788d84a630656ece71059665e01ca793c04294c463fd84132f40fe6/anyio-4.0.0-py3-none-any.whl`
+                 
+                 Expected:
+                   md5:520d85e19168705cdf0223621b18831a
+                 
+                 Computed:
+                   md5:420d85e19168705cdf0223621b18831a
     "
     );
 
@@ -4490,7 +4490,7 @@ fn require_hashes_at_least_one() -> Result<()> {
 
     uv_snapshot!(context.pip_sync()
         .arg("requirements.txt")
-        .arg("--require-hashes"), @"
+        .arg("--require-hashes"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -4500,7 +4500,7 @@ fn require_hashes_at_least_one() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + anyio==4.0.0
-    "
+    "###
     );
 
     // Reinstall, requesting both `sha256` and `sha512`. We should reinstall from the cache, since
@@ -4512,7 +4512,7 @@ fn require_hashes_at_least_one() -> Result<()> {
     uv_snapshot!(context.pip_sync()
         .arg("requirements.txt")
         .arg("--reinstall")
-        .arg("--require-hashes"), @"
+        .arg("--require-hashes"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -4523,7 +4523,7 @@ fn require_hashes_at_least_one() -> Result<()> {
     Uninstalled 1 package in [TIME]
     Installed 1 package in [TIME]
      ~ anyio==4.0.0
-    "
+    "###
     );
 
     // This should be true even if the second hash is wrong.
@@ -4534,7 +4534,7 @@ fn require_hashes_at_least_one() -> Result<()> {
     uv_snapshot!(context.pip_sync()
         .arg("requirements.txt")
         .arg("--reinstall")
-        .arg("--require-hashes"), @"
+        .arg("--require-hashes"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -4545,7 +4545,7 @@ fn require_hashes_at_least_one() -> Result<()> {
     Uninstalled 1 package in [TIME]
     Installed 1 package in [TIME]
      ~ anyio==4.0.0
-    "
+    "###
     );
 
     Ok(())
@@ -4566,7 +4566,7 @@ fn require_hashes_find_links_no_hash() -> Result<()> {
         .arg("--reinstall")
         .arg("--require-hashes")
         .arg("--find-links")
-        .arg("https://raw.githubusercontent.com/astral-test/astral-test-hash/main/no-hash/simple-html/example-a-961b4c22/index.html"), @"
+        .arg("https://raw.githubusercontent.com/astral-test/astral-test-hash/main/no-hash/simple-html/example-a-961b4c22/index.html"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -4576,7 +4576,7 @@ fn require_hashes_find_links_no_hash() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + example-a-961b4c22==1.0.0
-    "
+    "###
     );
 
     // Second, use an incorrect hash.
@@ -4588,21 +4588,21 @@ fn require_hashes_find_links_no_hash() -> Result<()> {
         .arg("--reinstall")
         .arg("--require-hashes")
         .arg("--find-links")
-        .arg("https://raw.githubusercontent.com/astral-test/astral-test-hash/main/no-hash/simple-html/example-a-961b4c22/index.html"), @"
+        .arg("https://raw.githubusercontent.com/astral-test/astral-test-hash/main/no-hash/simple-html/example-a-961b4c22/index.html"), @r"
     success: false
     exit_code: 1
     ----- stdout -----
 
     ----- stderr -----
     Resolved 1 package in [TIME]
-      × Failed to download `example-a-961b4c22==1.0.0`
-      ╰─▶ Hash mismatch for `example-a-961b4c22==1.0.0`
-
-          Expected:
-            sha256:123
-
-          Computed:
-            sha256:5d69f0b590514103234f0c3526563856f04d044d8d0ea1073a843ae429b3187e
+    error: Failed to download `example-a-961b4c22==1.0.0`
+      Caused by: Hash mismatch for `example-a-961b4c22==1.0.0`
+                 
+                 Expected:
+                   sha256:123
+                 
+                 Computed:
+                   sha256:5d69f0b590514103234f0c3526563856f04d044d8d0ea1073a843ae429b3187e
     "
     );
 
@@ -4617,21 +4617,21 @@ fn require_hashes_find_links_no_hash() -> Result<()> {
         .arg("--reinstall")
         .arg("--require-hashes")
         .arg("--find-links")
-        .arg("https://raw.githubusercontent.com/astral-test/astral-test-hash/main/no-hash/simple-html/example-a-961b4c22/index.html"), @"
+        .arg("https://raw.githubusercontent.com/astral-test/astral-test-hash/main/no-hash/simple-html/example-a-961b4c22/index.html"), @r"
     success: false
     exit_code: 1
     ----- stdout -----
 
     ----- stderr -----
     Resolved 1 package in [TIME]
-      × Failed to download `example-a-961b4c22==1.0.0`
-      ╰─▶ Hash mismatch for `example-a-961b4c22==1.0.0`
-
-          Expected:
-            sha256:294e788dbe500fdc39e8b88e82652ab67409a1dc9dd06543d0fe0ae31b713eb3
-
-          Computed:
-            sha256:5d69f0b590514103234f0c3526563856f04d044d8d0ea1073a843ae429b3187e
+    error: Failed to download `example-a-961b4c22==1.0.0`
+      Caused by: Hash mismatch for `example-a-961b4c22==1.0.0`
+                 
+                 Expected:
+                   sha256:294e788dbe500fdc39e8b88e82652ab67409a1dc9dd06543d0fe0ae31b713eb3
+                 
+                 Computed:
+                   sha256:5d69f0b590514103234f0c3526563856f04d044d8d0ea1073a843ae429b3187e
     "
     );
 
@@ -4647,7 +4647,7 @@ fn require_hashes_find_links_no_hash() -> Result<()> {
         .arg("--reinstall")
         .arg("--require-hashes")
         .arg("--find-links")
-        .arg("https://raw.githubusercontent.com/astral-test/astral-test-hash/main/no-hash/simple-html/example-a-961b4c22/index.html"), @"
+        .arg("https://raw.githubusercontent.com/astral-test/astral-test-hash/main/no-hash/simple-html/example-a-961b4c22/index.html"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -4658,7 +4658,7 @@ fn require_hashes_find_links_no_hash() -> Result<()> {
     Uninstalled 1 package in [TIME]
     Installed 1 package in [TIME]
      ~ example-a-961b4c22==1.0.0
-    "
+    "###
     );
 
     Ok(())
@@ -4677,7 +4677,7 @@ fn require_hashes_find_links_valid_hash() -> Result<()> {
         .arg("requirements.txt")
         .arg("--require-hashes")
         .arg("--find-links")
-        .arg("https://raw.githubusercontent.com/astral-test/astral-test-hash/main/valid-hash/simple-html/example-a-961b4c22/index.html"), @"
+        .arg("https://raw.githubusercontent.com/astral-test/astral-test-hash/main/valid-hash/simple-html/example-a-961b4c22/index.html"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -4687,7 +4687,7 @@ fn require_hashes_find_links_valid_hash() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + example-a-961b4c22==1.0.0
-    "
+    "###
     );
 
     Ok(())
@@ -4707,21 +4707,21 @@ fn require_hashes_find_links_invalid_hash() -> Result<()> {
         .arg("--reinstall")
         .arg("--require-hashes")
         .arg("--find-links")
-        .arg("https://raw.githubusercontent.com/astral-test/astral-test-hash/main/invalid-hash/simple-html/example-a-961b4c22/index.html"), @"
+        .arg("https://raw.githubusercontent.com/astral-test/astral-test-hash/main/invalid-hash/simple-html/example-a-961b4c22/index.html"), @r"
     success: false
     exit_code: 1
     ----- stdout -----
 
     ----- stderr -----
     Resolved 1 package in [TIME]
-      × Failed to download `example-a-961b4c22==1.0.0`
-      ╰─▶ Hash mismatch for `example-a-961b4c22==1.0.0`
-
-          Expected:
-            sha256:123
-
-          Computed:
-            sha256:5d69f0b590514103234f0c3526563856f04d044d8d0ea1073a843ae429b3187e
+    error: Failed to download `example-a-961b4c22==1.0.0`
+      Caused by: Hash mismatch for `example-a-961b4c22==1.0.0`
+                 
+                 Expected:
+                   sha256:123
+                 
+                 Computed:
+                   sha256:5d69f0b590514103234f0c3526563856f04d044d8d0ea1073a843ae429b3187e
     "
     );
 
@@ -4735,21 +4735,21 @@ fn require_hashes_find_links_invalid_hash() -> Result<()> {
         .arg("--reinstall")
         .arg("--require-hashes")
         .arg("--find-links")
-        .arg("https://raw.githubusercontent.com/astral-test/astral-test-hash/main/invalid-hash/simple-html/example-a-961b4c22/index.html"), @"
+        .arg("https://raw.githubusercontent.com/astral-test/astral-test-hash/main/invalid-hash/simple-html/example-a-961b4c22/index.html"), @r"
     success: false
     exit_code: 1
     ----- stdout -----
 
     ----- stderr -----
     Resolved 1 package in [TIME]
-      × Failed to download `example-a-961b4c22==1.0.0`
-      ╰─▶ Hash mismatch for `example-a-961b4c22==1.0.0`
-
-          Expected:
-            sha256:8838f9d005ff0432b258ba648d9cabb1cbdf06ac29d14f788b02edae544032ea
-
-          Computed:
-            sha256:5d69f0b590514103234f0c3526563856f04d044d8d0ea1073a843ae429b3187e
+    error: Failed to download `example-a-961b4c22==1.0.0`
+      Caused by: Hash mismatch for `example-a-961b4c22==1.0.0`
+                 
+                 Expected:
+                   sha256:8838f9d005ff0432b258ba648d9cabb1cbdf06ac29d14f788b02edae544032ea
+                 
+                 Computed:
+                   sha256:5d69f0b590514103234f0c3526563856f04d044d8d0ea1073a843ae429b3187e
     "
     );
 
@@ -4764,7 +4764,7 @@ fn require_hashes_find_links_invalid_hash() -> Result<()> {
         .arg("--reinstall")
         .arg("--require-hashes")
         .arg("--find-links")
-        .arg("https://raw.githubusercontent.com/astral-test/astral-test-hash/main/invalid-hash/simple-html/example-a-961b4c22/index.html"), @"
+        .arg("https://raw.githubusercontent.com/astral-test/astral-test-hash/main/invalid-hash/simple-html/example-a-961b4c22/index.html"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -4774,7 +4774,7 @@ fn require_hashes_find_links_invalid_hash() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + example-a-961b4c22==1.0.0
-    "
+    "###
     );
 
     // Fourth, request the correct hash, that the registry _thinks_ is correct, but without the
@@ -4789,7 +4789,7 @@ fn require_hashes_find_links_invalid_hash() -> Result<()> {
         .arg("--reinstall")
         .arg("--require-hashes")
         .arg("--find-links")
-        .arg("https://raw.githubusercontent.com/astral-test/astral-test-hash/main/invalid-hash/simple-html/example-a-961b4c22/index.html"), @"
+        .arg("https://raw.githubusercontent.com/astral-test/astral-test-hash/main/invalid-hash/simple-html/example-a-961b4c22/index.html"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -4800,7 +4800,7 @@ fn require_hashes_find_links_invalid_hash() -> Result<()> {
     Uninstalled 1 package in [TIME]
     Installed 1 package in [TIME]
      ~ example-a-961b4c22==1.0.0
-    "
+    "###
     );
 
     // Finally, request the correct hash, along with the incorrect hash for the source distribution.
@@ -4815,22 +4815,22 @@ fn require_hashes_find_links_invalid_hash() -> Result<()> {
         .arg("--reinstall")
         .arg("--require-hashes")
         .arg("--find-links")
-        .arg("https://raw.githubusercontent.com/astral-test/astral-test-hash/main/invalid-hash/simple-html/example-a-961b4c22/index.html"), @"
+        .arg("https://raw.githubusercontent.com/astral-test/astral-test-hash/main/invalid-hash/simple-html/example-a-961b4c22/index.html"), @r"
     success: false
     exit_code: 1
     ----- stdout -----
 
     ----- stderr -----
     Resolved 1 package in [TIME]
-      × Failed to download and build `example-a-961b4c22==1.0.0`
-      ╰─▶ Hash mismatch for `example-a-961b4c22==1.0.0`
-
-          Expected:
-            sha256:5d69f0b590514103234f0c3526563856f04d044d8d0ea1073a843ae429b3187e
-            sha256:a3cf07a05aac526131a2e8b6e4375ee6c6eaac8add05b88035e960ac6cd999ee
-
-          Computed:
-            sha256:294e788dbe500fdc39e8b88e82652ab67409a1dc9dd06543d0fe0ae31b713eb3
+    error: Failed to download and build `example-a-961b4c22==1.0.0`
+      Caused by: Hash mismatch for `example-a-961b4c22==1.0.0`
+                 
+                 Expected:
+                   sha256:5d69f0b590514103234f0c3526563856f04d044d8d0ea1073a843ae429b3187e
+                   sha256:a3cf07a05aac526131a2e8b6e4375ee6c6eaac8add05b88035e960ac6cd999ee
+                 
+                 Computed:
+                   sha256:294e788dbe500fdc39e8b88e82652ab67409a1dc9dd06543d0fe0ae31b713eb3
     "
     );
 
@@ -4851,7 +4851,7 @@ fn require_hashes_registry_no_hash() -> Result<()> {
         .arg("requirements.txt")
         .arg("--require-hashes")
         .arg("--index-url")
-        .arg("https://astral-test.github.io/astral-test-hash/no-hash/simple-html/"), @"
+        .arg("https://astral-test.github.io/astral-test-hash/no-hash/simple-html/"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -4861,7 +4861,7 @@ fn require_hashes_registry_no_hash() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + example-a-961b4c22==1.0.0
-    "
+    "###
     );
 
     Ok(())
@@ -4881,14 +4881,14 @@ fn require_hashes_registry_valid_hash() -> Result<()> {
         .arg("requirements.txt")
         .arg("--require-hashes")
         .arg("--find-links")
-        .arg("https://astral-test.github.io/astral-test-hash/valid-hash/simple-html/"), @"
+        .arg("https://astral-test.github.io/astral-test-hash/valid-hash/simple-html/"), @r"
     success: false
     exit_code: 1
     ----- stdout -----
 
     ----- stderr -----
-      × No solution found when resolving dependencies:
-      ╰─▶ Because example-a-961b4c22 was not found in the package registry and you require example-a-961b4c22==1.0.0, we can conclude that your requirements are unsatisfiable.
+    error: No solution found when resolving dependencies:
+      Caused by: Because example-a-961b4c22 was not found in the package registry and you require example-a-961b4c22==1.0.0, we can conclude that your requirements are unsatisfiable.
     "
     );
 
@@ -4910,21 +4910,21 @@ fn require_hashes_registry_invalid_hash() -> Result<()> {
         .arg("--reinstall")
         .arg("--require-hashes")
         .arg("--index-url")
-        .arg("https://astral-test.github.io/astral-test-hash/invalid-hash/simple-html/"), @"
+        .arg("https://astral-test.github.io/astral-test-hash/invalid-hash/simple-html/"), @r"
     success: false
     exit_code: 1
     ----- stdout -----
 
     ----- stderr -----
     Resolved 1 package in [TIME]
-      × Failed to download `example-a-961b4c22==1.0.0`
-      ╰─▶ Hash mismatch for `example-a-961b4c22==1.0.0`
-
-          Expected:
-            sha256:123
-
-          Computed:
-            sha256:5d69f0b590514103234f0c3526563856f04d044d8d0ea1073a843ae429b3187e
+    error: Failed to download `example-a-961b4c22==1.0.0`
+      Caused by: Hash mismatch for `example-a-961b4c22==1.0.0`
+                 
+                 Expected:
+                   sha256:123
+                 
+                 Computed:
+                   sha256:5d69f0b590514103234f0c3526563856f04d044d8d0ea1073a843ae429b3187e
     "
     );
 
@@ -4939,21 +4939,21 @@ fn require_hashes_registry_invalid_hash() -> Result<()> {
         .arg("--reinstall")
         .arg("--require-hashes")
         .arg("--index-url")
-        .arg("https://astral-test.github.io/astral-test-hash/invalid-hash/simple-html/"), @"
+        .arg("https://astral-test.github.io/astral-test-hash/invalid-hash/simple-html/"), @r"
     success: false
     exit_code: 1
     ----- stdout -----
 
     ----- stderr -----
     Resolved 1 package in [TIME]
-      × Failed to download `example-a-961b4c22==1.0.0`
-      ╰─▶ Hash mismatch for `example-a-961b4c22==1.0.0`
-
-          Expected:
-            sha256:8838f9d005ff0432b258ba648d9cabb1cbdf06ac29d14f788b02edae544032ea
-
-          Computed:
-            sha256:5d69f0b590514103234f0c3526563856f04d044d8d0ea1073a843ae429b3187e
+    error: Failed to download `example-a-961b4c22==1.0.0`
+      Caused by: Hash mismatch for `example-a-961b4c22==1.0.0`
+                 
+                 Expected:
+                   sha256:8838f9d005ff0432b258ba648d9cabb1cbdf06ac29d14f788b02edae544032ea
+                 
+                 Computed:
+                   sha256:5d69f0b590514103234f0c3526563856f04d044d8d0ea1073a843ae429b3187e
     "
     );
 
@@ -4969,7 +4969,7 @@ fn require_hashes_registry_invalid_hash() -> Result<()> {
         .arg("--reinstall")
         .arg("--require-hashes")
         .arg("--index-url")
-        .arg("https://astral-test.github.io/astral-test-hash/invalid-hash/simple-html/"), @"
+        .arg("https://astral-test.github.io/astral-test-hash/invalid-hash/simple-html/"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -4979,7 +4979,7 @@ fn require_hashes_registry_invalid_hash() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + example-a-961b4c22==1.0.0
-    "
+    "###
     );
 
     // Fourth, request the correct hash, that the registry _thinks_ is correct, but without the
@@ -4995,7 +4995,7 @@ fn require_hashes_registry_invalid_hash() -> Result<()> {
         .arg("--reinstall")
         .arg("--require-hashes")
         .arg("--index-url")
-        .arg("https://astral-test.github.io/astral-test-hash/invalid-hash/simple-html/"), @"
+        .arg("https://astral-test.github.io/astral-test-hash/invalid-hash/simple-html/"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -5006,7 +5006,7 @@ fn require_hashes_registry_invalid_hash() -> Result<()> {
     Uninstalled 1 package in [TIME]
     Installed 1 package in [TIME]
      ~ example-a-961b4c22==1.0.0
-    "
+    "###
     );
 
     // Finally, request the correct hash, along with the incorrect hash for the source distribution.
@@ -5022,22 +5022,22 @@ fn require_hashes_registry_invalid_hash() -> Result<()> {
         .arg("--reinstall")
         .arg("--require-hashes")
         .arg("--index-url")
-        .arg("https://astral-test.github.io/astral-test-hash/invalid-hash/simple-html/"), @"
+        .arg("https://astral-test.github.io/astral-test-hash/invalid-hash/simple-html/"), @r"
     success: false
     exit_code: 1
     ----- stdout -----
 
     ----- stderr -----
     Resolved 1 package in [TIME]
-      × Failed to download and build `example-a-961b4c22==1.0.0`
-      ╰─▶ Hash mismatch for `example-a-961b4c22==1.0.0`
-
-          Expected:
-            sha256:5d69f0b590514103234f0c3526563856f04d044d8d0ea1073a843ae429b3187e
-            sha256:a3cf07a05aac526131a2e8b6e4375ee6c6eaac8add05b88035e960ac6cd999ee
-
-          Computed:
-            sha256:294e788dbe500fdc39e8b88e82652ab67409a1dc9dd06543d0fe0ae31b713eb3
+    error: Failed to download and build `example-a-961b4c22==1.0.0`
+      Caused by: Hash mismatch for `example-a-961b4c22==1.0.0`
+                 
+                 Expected:
+                   sha256:5d69f0b590514103234f0c3526563856f04d044d8d0ea1073a843ae429b3187e
+                   sha256:a3cf07a05aac526131a2e8b6e4375ee6c6eaac8add05b88035e960ac6cd999ee
+                 
+                 Computed:
+                   sha256:294e788dbe500fdc39e8b88e82652ab67409a1dc9dd06543d0fe0ae31b713eb3
     "
     );
 
@@ -5055,7 +5055,7 @@ fn require_hashes_url() -> Result<()> {
 
     uv_snapshot!(context.pip_sync()
         .arg("requirements.txt")
-        .arg("--require-hashes"), @"
+        .arg("--require-hashes"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -5065,7 +5065,7 @@ fn require_hashes_url() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + iniconfig==2.0.0 (from https://files.pythonhosted.org/packages/ef/a6/62565a6e1cf69e10f5727360368e451d4b7f58beeac6173dc9db836a5b46/iniconfig-2.0.0-py3-none-any.whl#sha256=b6a85871a79d2e3b22d2d1b94ac2824226a63c6b741c88f7ae975f18b6778374)
-    "
+    "###
     );
 
     Ok(())
@@ -5082,14 +5082,14 @@ fn require_hashes_url_other_fragment() -> Result<()> {
 
     uv_snapshot!(context.pip_sync()
         .arg("requirements.txt")
-        .arg("--require-hashes"), @"
+        .arg("--require-hashes"), @r###"
     success: false
     exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
     error: In `--require-hashes` mode, all requirements must have a hash, but none were provided for: iniconfig @ https://files.pythonhosted.org/packages/ef/a6/62565a6e1cf69e10f5727360368e451d4b7f58beeac6173dc9db836a5b46/iniconfig-2.0.0-py3-none-any.whl#foo=bar
-    "
+    "###
     );
 
     Ok(())
@@ -5106,21 +5106,21 @@ fn require_hashes_url_invalid() -> Result<()> {
 
     uv_snapshot!(context.pip_sync()
         .arg("requirements.txt")
-        .arg("--require-hashes"), @"
+        .arg("--require-hashes"), @r"
     success: false
     exit_code: 1
     ----- stdout -----
 
     ----- stderr -----
     Resolved 1 package in [TIME]
-      × Failed to download `iniconfig @ https://files.pythonhosted.org/packages/ef/a6/62565a6e1cf69e10f5727360368e451d4b7f58beeac6173dc9db836a5b46/iniconfig-2.0.0-py3-none-any.whl#sha256=c6a85871a79d2e3b22d2d1b94ac2824226a63c6b741c88f7ae975f18b6778374`
-      ╰─▶ Hash mismatch for `iniconfig @ https://files.pythonhosted.org/packages/ef/a6/62565a6e1cf69e10f5727360368e451d4b7f58beeac6173dc9db836a5b46/iniconfig-2.0.0-py3-none-any.whl#sha256=c6a85871a79d2e3b22d2d1b94ac2824226a63c6b741c88f7ae975f18b6778374`
-
-          Expected:
-            sha256:c6a85871a79d2e3b22d2d1b94ac2824226a63c6b741c88f7ae975f18b6778374
-
-          Computed:
-            sha256:b6a85871a79d2e3b22d2d1b94ac2824226a63c6b741c88f7ae975f18b6778374
+    error: Failed to download `iniconfig @ https://files.pythonhosted.org/packages/ef/a6/62565a6e1cf69e10f5727360368e451d4b7f58beeac6173dc9db836a5b46/iniconfig-2.0.0-py3-none-any.whl#sha256=c6a85871a79d2e3b22d2d1b94ac2824226a63c6b741c88f7ae975f18b6778374`
+      Caused by: Hash mismatch for `iniconfig @ https://files.pythonhosted.org/packages/ef/a6/62565a6e1cf69e10f5727360368e451d4b7f58beeac6173dc9db836a5b46/iniconfig-2.0.0-py3-none-any.whl#sha256=c6a85871a79d2e3b22d2d1b94ac2824226a63c6b741c88f7ae975f18b6778374`
+                 
+                 Expected:
+                   sha256:c6a85871a79d2e3b22d2d1b94ac2824226a63c6b741c88f7ae975f18b6778374
+                 
+                 Computed:
+                   sha256:b6a85871a79d2e3b22d2d1b94ac2824226a63c6b741c88f7ae975f18b6778374
     "
     );
 
@@ -5138,21 +5138,21 @@ fn require_hashes_url_ignore() -> Result<()> {
 
     uv_snapshot!(context.pip_sync()
         .arg("requirements.txt")
-        .arg("--require-hashes"), @"
+        .arg("--require-hashes"), @r"
     success: false
     exit_code: 1
     ----- stdout -----
 
     ----- stderr -----
     Resolved 1 package in [TIME]
-      × Failed to download `iniconfig @ https://files.pythonhosted.org/packages/ef/a6/62565a6e1cf69e10f5727360368e451d4b7f58beeac6173dc9db836a5b46/iniconfig-2.0.0-py3-none-any.whl#sha256=b6a85871a79d2e3b22d2d1b94ac2824226a63c6b741c88f7ae975f18b6778374`
-      ╰─▶ Hash mismatch for `iniconfig @ https://files.pythonhosted.org/packages/ef/a6/62565a6e1cf69e10f5727360368e451d4b7f58beeac6173dc9db836a5b46/iniconfig-2.0.0-py3-none-any.whl#sha256=b6a85871a79d2e3b22d2d1b94ac2824226a63c6b741c88f7ae975f18b6778374`
-
-          Expected:
-            sha256:c6a85871a79d2e3b22d2d1b94ac2824226a63c6b741c88f7ae975f18b6778374
-
-          Computed:
-            sha256:b6a85871a79d2e3b22d2d1b94ac2824226a63c6b741c88f7ae975f18b6778374
+    error: Failed to download `iniconfig @ https://files.pythonhosted.org/packages/ef/a6/62565a6e1cf69e10f5727360368e451d4b7f58beeac6173dc9db836a5b46/iniconfig-2.0.0-py3-none-any.whl#sha256=b6a85871a79d2e3b22d2d1b94ac2824226a63c6b741c88f7ae975f18b6778374`
+      Caused by: Hash mismatch for `iniconfig @ https://files.pythonhosted.org/packages/ef/a6/62565a6e1cf69e10f5727360368e451d4b7f58beeac6173dc9db836a5b46/iniconfig-2.0.0-py3-none-any.whl#sha256=b6a85871a79d2e3b22d2d1b94ac2824226a63c6b741c88f7ae975f18b6778374`
+                 
+                 Expected:
+                   sha256:c6a85871a79d2e3b22d2d1b94ac2824226a63c6b741c88f7ae975f18b6778374
+                 
+                 Computed:
+                   sha256:b6a85871a79d2e3b22d2d1b94ac2824226a63c6b741c88f7ae975f18b6778374
     "
     );
 
@@ -5170,7 +5170,7 @@ fn require_hashes_url_unnamed() -> Result<()> {
 
     uv_snapshot!(context.pip_sync()
         .arg("requirements.txt")
-        .arg("--require-hashes"), @"
+        .arg("--require-hashes"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -5180,7 +5180,7 @@ fn require_hashes_url_unnamed() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + iniconfig==2.0.0 (from https://files.pythonhosted.org/packages/ef/a6/62565a6e1cf69e10f5727360368e451d4b7f58beeac6173dc9db836a5b46/iniconfig-2.0.0-py3-none-any.whl#sha256=b6a85871a79d2e3b22d2d1b94ac2824226a63c6b741c88f7ae975f18b6778374)
-    "
+    "###
     );
 
     Ok(())
@@ -5201,7 +5201,7 @@ fn target_built_distribution() -> Result<()> {
     uv_snapshot!(context.filters(), context.pip_sync()
         .arg("requirements.in")
         .arg("--target")
-        .arg("target"), @"
+        .arg("target"), @r"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -5237,7 +5237,7 @@ fn target_built_distribution() -> Result<()> {
     uv_snapshot!(context.filters(), context.pip_sync()
         .arg("requirements.in")
         .arg("--target")
-        .arg("target"), @"
+        .arg("target"), @r"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -5259,7 +5259,7 @@ fn target_built_distribution() -> Result<()> {
     uv_snapshot!(context.filters(), context.pip_sync()
         .arg("requirements.in")
         .arg("--target")
-        .arg("target"), @"
+        .arg("target"), @r"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -5303,7 +5303,7 @@ fn target_source_distribution() -> Result<()> {
         .arg("--no-binary")
         .arg("iniconfig")
         .arg("--target")
-        .arg("target"), @"
+        .arg("target"), @r"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -5352,7 +5352,7 @@ fn target_no_build_isolation() -> Result<()> {
     requirements_in.write_str("flit_core")?;
 
     uv_snapshot!(context.filters(), context.pip_sync()
-        .arg("requirements.in"), @"
+        .arg("requirements.in"), @r"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -5374,7 +5374,7 @@ fn target_no_build_isolation() -> Result<()> {
         .arg("--no-binary")
         .arg("wheel")
         .arg("--target")
-        .arg("target"), @"
+        .arg("target"), @r"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -5421,7 +5421,7 @@ fn target_system() -> Result<()> {
     uv_snapshot!(context.filters(), context.pip_sync()
         .arg("requirements.in")
         .arg("--target")
-        .arg("target"), @"
+        .arg("target"), @r"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -5457,7 +5457,7 @@ fn prefix() -> Result<()> {
     uv_snapshot!(context.filters(), context.pip_sync()
         .arg("requirements.in")
         .arg("--prefix")
-        .arg(prefix.path()), @"
+        .arg(prefix.path()), @r"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -5493,7 +5493,7 @@ fn prefix() -> Result<()> {
     uv_snapshot!(context.filters(), context.pip_sync()
         .arg("requirements.in")
         .arg("--prefix")
-        .arg(prefix.path()), @"
+        .arg(prefix.path()), @r"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -5520,7 +5520,7 @@ fn preserve_markers() -> Result<()> {
     requirements_txt.write_str("anyio ; python_version > '3.7'")?;
 
     uv_snapshot!(context.pip_sync()
-        .arg("requirements.txt"), @"
+        .arg("requirements.txt"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -5530,7 +5530,7 @@ fn preserve_markers() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + anyio==4.3.0
-    "
+    "###
     );
 
     Ok(())
@@ -5549,17 +5549,17 @@ fn incompatible_build_constraint() -> Result<()> {
     uv_snapshot!(context.pip_sync()
         .arg("requirements.txt")
         .arg("--build-constraint")
-        .arg("build_constraints.txt"), @"
+        .arg("build_constraints.txt"), @r"
     success: false
     exit_code: 1
     ----- stdout -----
 
     ----- stderr -----
     Resolved 1 package in [TIME]
-      × Failed to download and build `requests==1.2.0`
-      ├─▶ Failed to resolve requirements from `setup.py` build
-      ├─▶ No solution found when resolving: `setuptools>=40.8.0`
-      ╰─▶ Because you require setuptools>=40.8.0 and setuptools==1, we can conclude that your requirements are unsatisfiable.
+    error: Failed to download and build `requests==1.2.0`
+      Caused by: Failed to resolve requirements from `setup.py` build
+      Caused by: No solution found when resolving: `setuptools>=40.8.0`
+      Caused by: Because you require setuptools>=40.8.0 and setuptools==1, we can conclude that your requirements are unsatisfiable.
     "
     );
 
@@ -5579,7 +5579,7 @@ fn compatible_build_constraint() -> Result<()> {
     uv_snapshot!(context.pip_sync()
         .arg("requirements.txt")
         .arg("--build-constraint")
-        .arg("build_constraints.txt"), @"
+        .arg("build_constraints.txt"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -5589,7 +5589,7 @@ fn compatible_build_constraint() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + requests==1.2.0
-    "
+    "###
     );
 
     Ok(())
@@ -5604,7 +5604,7 @@ fn sync_seed() -> Result<()> {
 
     // Add `pip` to the environment.
     uv_snapshot!(context.filters(), context.pip_install()
-        .arg("pip"), @"
+        .arg("pip"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -5614,12 +5614,12 @@ fn sync_seed() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + pip==24.0
-    "
+    "###
     );
 
     // Syncing should remove the seed packages.
     uv_snapshot!(context.filters(), context.pip_sync()
-        .arg("requirements.txt"), @"
+        .arg("requirements.txt"), @r"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -5636,7 +5636,7 @@ fn sync_seed() -> Result<()> {
 
     // Re-create the environment with seed packages.
     uv_snapshot!(context.filters(), context.venv().arg("--clear")
-        .arg("--seed"), @"
+        .arg("--seed"), @r"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -5653,7 +5653,7 @@ fn sync_seed() -> Result<()> {
 
     // Syncing should retain the seed packages.
     uv_snapshot!(context.filters(), context.pip_sync()
-        .arg("requirements.txt"), @"
+        .arg("requirements.txt"), @r"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -5678,7 +5678,7 @@ fn sanitize() -> Result<()> {
     requirements_txt.write_str("payload-package @ https://github.com/astral-sh/sanitize-wheel-test/raw/bc59283d5b4b136a191792e32baa51b477fdf65e/payload_package-0.1.0-py3-none-any.whl")?;
 
     uv_snapshot!(context.pip_sync()
-        .arg("requirements.txt"), @"
+        .arg("requirements.txt"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -5688,7 +5688,7 @@ fn sanitize() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + payload-package==0.1.0 (from https://github.com/astral-sh/sanitize-wheel-test/raw/bc59283d5b4b136a191792e32baa51b477fdf65e/payload_package-0.1.0-py3-none-any.whl)
-    "
+    "###
     );
 
     // There should be no `payload` file in the root.
@@ -5708,7 +5708,7 @@ fn semicolon_trailing_space() -> Result<()> {
     requirements.write_str("iniconfig @ https://files.pythonhosted.org/packages/ef/a6/62565a6e1cf69e10f5727360368e451d4b7f58beeac6173dc9db836a5b46/iniconfig-2.0.0-py3-none-any.whl; python_version > '3.10'")?;
 
     uv_snapshot!(context.pip_sync()
-        .arg("requirements.txt"), @"
+        .arg("requirements.txt"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -5718,7 +5718,7 @@ fn semicolon_trailing_space() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + iniconfig==2.0.0 (from https://files.pythonhosted.org/packages/ef/a6/62565a6e1cf69e10f5727360368e451d4b7f58beeac6173dc9db836a5b46/iniconfig-2.0.0-py3-none-any.whl)
-    "
+    "###
     );
 
     Ok(())
@@ -5733,7 +5733,7 @@ fn semicolon_no_space() -> Result<()> {
     requirements.write_str("iniconfig @ https://files.pythonhosted.org/packages/ef/a6/62565a6e1cf69e10f5727360368e451d4b7f58beeac6173dc9db836a5b46/iniconfig-2.0.0-py3-none-any.whl;python_version > '3.10'")?;
 
     uv_snapshot!(context.pip_sync()
-        .arg("requirements.txt"), @"
+        .arg("requirements.txt"), @r###"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -5743,7 +5743,7 @@ fn semicolon_no_space() -> Result<()> {
       Caused by: Expected direct URL (`https://files.pythonhosted.org/packages/ef/a6/62565a6e1cf69e10f5727360368e451d4b7f58beeac6173dc9db836a5b46/iniconfig-2.0.0-py3-none-any.whl;python_version%20%3E%20'3.10'`) to end in a supported file extension: `.whl`, `.tar.gz`, `.zip`, `.tar.bz2`, `.tar.lz`, `.tar.lzma`, `.tar.xz`, `.tar.zst`, `.tar`, `.tbz`, `.tgz`, `.tlz`, or `.txz`
     iniconfig @ https://files.pythonhosted.org/packages/ef/a6/62565a6e1cf69e10f5727360368e451d4b7f58beeac6173dc9db836a5b46/iniconfig-2.0.0-py3-none-any.whl;python_version > '3.10'
                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    "
+    "###
     );
 
     Ok(())
@@ -5773,7 +5773,7 @@ fn pep_751() -> Result<()> {
 
     uv_snapshot!(context.filters(), context.pip_sync()
         .arg("--preview")
-        .arg("pylock.toml"), @"
+        .arg("pylock.toml"), @r"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -5789,7 +5789,7 @@ fn pep_751() -> Result<()> {
 
     uv_snapshot!(context.filters(), context.pip_sync()
         .arg("--preview")
-        .arg("pylock.toml"), @"
+        .arg("pylock.toml"), @r"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -5819,7 +5819,7 @@ fn pep_751() -> Result<()> {
 
     uv_snapshot!(context.filters(), context.pip_sync()
         .arg("--preview")
-        .arg("pylock.toml"), @"
+        .arg("pylock.toml"), @r"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -5871,7 +5871,7 @@ fn pep_751_wheel_only() -> Result<()> {
         .arg("pylock.toml")
         .arg("--dry-run")
         .arg("--python-platform")
-        .arg("macos"), @"
+        .arg("macos"), @r"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -5900,7 +5900,7 @@ fn pep_751_wheel_only() -> Result<()> {
         .arg("--python-platform")
         .arg("macos")
         .arg("--python-version")
-        .arg("3.8"), @"
+        .arg("3.8"), @r"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -5942,7 +5942,7 @@ fn pep_751_build_options() -> Result<()> {
         .arg("--preview")
         .arg("pylock.toml")
         .arg("--no-binary")
-        .arg("anyio"), @"
+        .arg("anyio"), @r"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -5979,7 +5979,7 @@ fn pep_751_build_options() -> Result<()> {
         .arg("--preview")
         .arg("pylock.toml")
         .arg("--no-binary")
-        .arg("odrive"), @"
+        .arg("odrive"), @r"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -6011,7 +6011,7 @@ fn pep_751_build_options() -> Result<()> {
         .arg("--preview")
         .arg("pylock.toml")
         .arg("--only-binary")
-        .arg("source-distribution"), @"
+        .arg("source-distribution"), @r"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -6025,7 +6025,7 @@ fn pep_751_build_options() -> Result<()> {
         .arg("--preview")
         .arg("pylock.toml")
         .arg("--no-binary")
-        .arg("source-distribution"), @"
+        .arg("source-distribution"), @r"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -6071,7 +6071,7 @@ fn pep_751_direct_url_tags() -> Result<()> {
         .arg("--preview")
         .arg("pylock.toml")
         .arg("--python-platform")
-        .arg("linux"), @"
+        .arg("linux"), @r"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -6088,7 +6088,7 @@ fn pep_751_direct_url_tags() -> Result<()> {
         .arg("--preview")
         .arg("pylock.toml")
         .arg("--python-platform")
-        .arg("macos"), @"
+        .arg("macos"), @r"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -6112,7 +6112,7 @@ fn incompatible_python_version_direct_url() -> Result<()> {
     uv_snapshot!(context.filters(), context.pip_sync()
         .arg("requirements.txt")
         .arg("--python-platform")
-        .arg("windows"), @"
+        .arg("windows"), @r"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -6139,7 +6139,7 @@ fn incompatible_platform_direct_url() -> Result<()> {
     uv_snapshot!(context.filters(), context.pip_sync()
         .arg("requirements.txt")
         .arg("--python-platform")
-        .arg("linux"), @"
+        .arg("linux"), @r"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -6171,14 +6171,14 @@ fn sync_missing_python_no_target() -> Result<()> {
     // Request Python 3.12; which should fail
     uv_snapshot!(context.filters(), context.pip_sync()
         .arg("--python").arg("3.12")
-        .arg("requirements.txt"), @"
+        .arg("requirements.txt"), @r###"
     success: false
     exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
     error: No virtual environment found for Python 3.12; run `uv venv` to create an environment, or pass `--system` to install into a non-virtual environment
-    "
+    "###
     );
     Ok(())
 }
@@ -6199,18 +6199,18 @@ fn sync_with_target_installs_missing_python() -> Result<()> {
     uv_snapshot!(context.filters(), context.pip_sync()
         .arg("requirements.txt")
         .arg("--python").arg("3.12")
-        .arg("--target").arg(target_dir.path()), @"
-    success: true
-    exit_code: 0
-    ----- stdout -----
+        .arg("--target").arg(target_dir.path()), @r###"
+        success: true
+        exit_code: 0
+        ----- stdout -----
 
-    ----- stderr -----
-    Using CPython 3.12.12
-    Resolved 1 package in [TIME]
-    Prepared 1 package in [TIME]
-    Installed 1 package in [TIME]
-     + anyio==4.3.0
-    "
+        ----- stderr -----
+        Using CPython 3.12.12
+        Resolved 1 package in [TIME]
+        Prepared 1 package in [TIME]
+        Installed 1 package in [TIME]
+         + anyio==4.3.0
+        "###
     );
     Ok(())
 }
