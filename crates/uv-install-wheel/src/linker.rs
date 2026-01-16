@@ -19,7 +19,7 @@ use uv_warnings::{warn_user, warn_user_once};
 
 use crate::Error;
 
-#[allow(clippy::struct_field_names)]
+#[expect(clippy::struct_field_names)]
 #[derive(Debug, Default)]
 pub struct Locks {
     /// The parent directory of a file in a synchronized copy
@@ -166,7 +166,7 @@ fn clone_wheel_files(
     let now = SystemTime::now();
 
     // `File.set_modified` is not available in `fs_err` yet
-    #[allow(clippy::disallowed_types)]
+    #[expect(clippy::disallowed_types)]
     match std::fs::File::open(site_packages.as_ref()) {
         Ok(dir) => {
             if let Err(err) = dir.set_modified(now) {
