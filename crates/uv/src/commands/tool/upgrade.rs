@@ -420,10 +420,20 @@ async fn upgrade_tool(
         (environment, outcome)
     };
 
+    // Check if any entrypoints from the receipt are missing. This can happen if a previous
+    // upgrade attempt failed after updating packages but before installing entrypoints.
+    // In this case, we should reinstall the entrypoints even if the outcome is NoOp.
+    // See: https://github.com/astral-sh/uv/issues/17548
+    let missing_entrypoints = existing_tool_receipt
+        .entrypoints()
+        .iter()
+        .any(|entry| !entry.install_path.exists());
+
     if matches!(
         outcome,
         UpgradeOutcome::UpgradeEnvironment | UpgradeOutcome::UpgradeTool
-    ) {
+    ) || missing_entrypoints
+    {
         // At this point, we updated the existing environment, so we should remove any of its
         // existing executables.
         remove_entrypoints(&existing_tool_receipt);

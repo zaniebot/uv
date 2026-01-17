@@ -1008,3 +1008,97 @@ fn test_tool_upgrade_additional_entrypoints() {
     Upgraded tool environment for `babel` to Python 3.12
     ");
 }
+
+/// Test that when a tool upgrade fails during entrypoint installation,
+/// a subsequent upgrade attempt correctly reinstalls the missing entrypoints.
+///
+/// Regression test for <https://github.com/astral-sh/uv/issues/17548>
+#[test]
+#[cfg(unix)]
+fn tool_upgrade_entrypoint_failure_then_retry() {
+    let context = TestContext::new("3.12")
+        .with_filtered_counts()
+        .with_filtered_exe_suffix();
+    let tool_dir = context.temp_dir.child("tools");
+    let bin_dir = context.temp_dir.child("bin");
+
+    // Install `babel` from Test PyPI, to get an outdated version.
+    uv_snapshot!(context.filters(), context.tool_install()
+        .arg("babel")
+        .arg("--index-url")
+        .arg("https://test.pypi.org/simple/")
+        .arg("--exclude-newer")
+        .arg("2019-01-01")
+        .env(EnvVars::UV_TOOL_DIR, tool_dir.as_os_str())
+        .env(EnvVars::XDG_BIN_HOME, bin_dir.as_os_str())
+        .env(EnvVars::PATH, bin_dir.as_os_str()), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Resolved [N] packages in [TIME]
+    Prepared [N] packages in [TIME]
+    Installed [N] packages in [TIME]
+     + babel==2.6.0
+     + pytz==2018.5
+    Installed 1 executable: pybabel
+    ");
+
+    // Replace the entrypoint symlink with a directory.
+    // This will cause the upgrade to fail when trying to install the new entrypoint,
+    // because you can't replace a directory with a symlink via rename.
+    let entrypoint_path = bin_dir.join("pybabel");
+    fs_err::remove_file(&entrypoint_path).unwrap();
+    fs_err::create_dir(&entrypoint_path).unwrap();
+
+    // Attempt to upgrade `babel` from PyPI. This should fail because
+    // we can't replace a directory with a symlink.
+    uv_snapshot!(context.filters(), context.tool_upgrade()
+        .arg("babel")
+        .arg("--index-url")
+        .arg("https://pypi.org/simple/")
+        .env(EnvVars::UV_TOOL_DIR, tool_dir.as_os_str())
+        .env(EnvVars::XDG_BIN_HOME, bin_dir.as_os_str())
+        .env(EnvVars::PATH, bin_dir.as_os_str()), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+
+    ----- stderr -----
+    Updated babel v2.6.0 -> v2.14.0
+     - babel==2.6.0
+     + babel==2.14.0
+     - pytz==2018.5
+    error: Failed to upgrade babel
+      Caused by: Failed to install executable
+      Caused by: failed to rename file from [TEMP_DIR]/bin/[TMP]/pybabel: Is a directory (os error 21)
+    ");
+
+    // Remove the directory obstruction
+    fs_err::remove_dir(&entrypoint_path).unwrap();
+
+    // Attempt to upgrade again. This should detect that the entrypoint
+    // is missing and reinstall it.
+    uv_snapshot!(context.filters(), context.tool_upgrade()
+        .arg("babel")
+        .arg("--index-url")
+        .arg("https://pypi.org/simple/")
+        .env(EnvVars::UV_TOOL_DIR, tool_dir.as_os_str())
+        .env(EnvVars::XDG_BIN_HOME, bin_dir.as_os_str())
+        .env(EnvVars::PATH, bin_dir.as_os_str()), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Installed 1 executable: pybabel
+    Nothing to upgrade
+    ");
+
+    // Verify the entrypoint was restored
+    assert!(
+        bin_dir.join("pybabel").exists(),
+        "Entrypoint should have been reinstalled"
+    );
+}
