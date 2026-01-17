@@ -15,18 +15,13 @@ fi
 rustup component add clippy rustfmt
 
 # Clone or update rendered GitHub issues and PRs
-CACHE_REPO="/tmp/.unmaintain-rendered-cache"
-if [ -d "$CACHE_REPO/.git" ]; then
+CONTEXT_DIR=".github/context"
+if [ -d "$CONTEXT_DIR/.git" ]; then
     # Already cloned, just update
-    git -C "$CACHE_REPO" pull --depth 1 origin main
+    git -C "$CONTEXT_DIR" pull --depth 1 origin main
 else
     # Sparse shallow clone with only astral-sh/uv
     git clone --depth 1 --filter=blob:none --sparse \
-        https://github.com/zaniebot/unmaintain-rendered.git "$CACHE_REPO"
-    git -C "$CACHE_REPO" sparse-checkout set astral-sh/uv
+        https://github.com/zaniebot/unmaintain-rendered.git "$CONTEXT_DIR"
+    git -C "$CONTEXT_DIR" sparse-checkout set astral-sh/uv
 fi
-
-# Copy to .github/issues and .github/pulls
-rm -rf .github/issues .github/pulls
-cp -r "$CACHE_REPO/astral-sh/uv/issues" .github/issues
-cp -r "$CACHE_REPO/astral-sh/uv/pulls" .github/pulls

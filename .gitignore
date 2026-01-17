@@ -50,5 +50,4 @@ profile.json.gz
 .vscode
 
 # Rendered GitHub issues/PRs (cloned at session start)
-.github/issues
-.github/pulls
+.github/context
