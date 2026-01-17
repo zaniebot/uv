@@ -9,13 +9,11 @@ use crate::common::{TestContext, uv_snapshot};
 fn freeze_many() -> Result<()> {
     let context = TestContext::new("3.12");
 
-    let requirements_txt = context.temp_dir.child("requirements.txt");
-    requirements_txt.write_str("MarkupSafe\ntomli")?;
-
-    // Run `pip sync`.
+    // Install packages.
     context
-        .pip_sync()
-        .arg(requirements_txt.path())
+        .pip_install()
+        .arg("MarkupSafe")
+        .arg("tomli")
         .assert()
         .success();
 
@@ -359,15 +357,13 @@ Version: 0.22.0
 fn freeze_path() -> Result<()> {
     let context = TestContext::new("3.12");
 
-    let requirements_txt = context.temp_dir.child("requirements.txt");
-    requirements_txt.write_str("MarkupSafe\ntomli")?;
-
     let target = context.temp_dir.child("install-path");
 
-    // Run `pip sync`.
+    // Install packages to a target directory.
     context
-        .pip_sync()
-        .arg(requirements_txt.path())
+        .pip_install()
+        .arg("MarkupSafe")
+        .arg("tomli")
         .arg("--target")
         .arg(target.path())
         .assert()
@@ -393,37 +389,40 @@ fn freeze_path() -> Result<()> {
 fn freeze_multiple_paths() -> Result<()> {
     let context = TestContext::new("3.12");
 
-    let requirements_txt1 = context.temp_dir.child("requirements1.txt");
-    requirements_txt1.write_str("MarkupSafe\ntomli")?;
-
-    let requirements_txt2 = context.temp_dir.child("requirements2.txt");
-    requirements_txt2.write_str("MarkupSafe\nrequests")?;
-
     let target1 = context.temp_dir.child("install-path1");
     let target2 = context.temp_dir.child("install-path2");
 
-    // Run `pip sync`.
-    for (target, requirements_txt) in [
-        (target1.path(), requirements_txt1),
-        (target2.path(), requirements_txt2),
-    ] {
-        context
-            .pip_sync()
-            .arg(requirements_txt.path())
-            .arg("--target")
-            .arg(target)
-            .assert()
-            .success();
-    }
+    // Install packages to target directories.
+    context
+        .pip_install()
+        .arg("MarkupSafe")
+        .arg("tomli")
+        .arg("--target")
+        .arg(target1.path())
+        .assert()
+        .success();
+
+    context
+        .pip_install()
+        .arg("MarkupSafe")
+        .arg("requests")
+        .arg("--target")
+        .arg(target2.path())
+        .assert()
+        .success();
 
     // Run `pip freeze`.
     uv_snapshot!(context.filters(), context.pip_freeze().arg("--path").arg(target1.path()).arg("--path").arg(target2.path()), @"
     success: true
     exit_code: 0
     ----- stdout -----
+    certifi==2024.2.2
+    charset-normalizer==3.3.2
+    idna==3.6
     markupsafe==2.1.5
     requests==2.31.0
     tomli==2.0.1
+    urllib3==2.2.1
 
     ----- stderr -----
     ");
@@ -458,13 +457,11 @@ fn freeze_nonexistent_path() {
 fn freeze_with_quiet_flag() -> Result<()> {
     let context = TestContext::new("3.12");
 
-    let requirements_txt = context.temp_dir.child("requirements.txt");
-    requirements_txt.write_str("MarkupSafe\ntomli")?;
-
-    // Run `pip sync`.
+    // Install packages.
     context
-        .pip_sync()
-        .arg(requirements_txt.path())
+        .pip_install()
+        .arg("MarkupSafe")
+        .arg("tomli")
         .assert()
         .success();
 
@@ -487,16 +484,13 @@ fn freeze_with_quiet_flag() -> Result<()> {
 fn freeze_target() -> Result<()> {
     let context = TestContext::new("3.12");
 
-    let requirements_txt = context.temp_dir.child("requirements.txt");
-    requirements_txt.write_str("MarkupSafe\ntomli")?;
-
     let target = context.temp_dir.child("target");
 
     // Install packages to a target directory.
     context
         .pip_install()
-        .arg("-r")
-        .arg("requirements.txt")
+        .arg("MarkupSafe")
+        .arg("tomli")
         .arg("--target")
         .arg(target.path())
         .assert()
@@ -533,16 +527,13 @@ fn freeze_target() -> Result<()> {
 fn freeze_prefix() -> Result<()> {
     let context = TestContext::new("3.12");
 
-    let requirements_txt = context.temp_dir.child("requirements.txt");
-    requirements_txt.write_str("MarkupSafe\ntomli")?;
-
     let prefix = context.temp_dir.child("prefix");
 
     // Install packages to a prefix directory.
     context
         .pip_install()
-        .arg("-r")
-        .arg("requirements.txt")
+        .arg("MarkupSafe")
+        .arg("tomli")
         .arg("--prefix")
         .arg(prefix.path())
         .assert()
