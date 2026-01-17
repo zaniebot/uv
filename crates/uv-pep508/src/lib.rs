@@ -1740,6 +1740,22 @@ mod tests {
     }
 
     #[test]
+    fn error_markers_unicode_not_keyword() {
+        // This test verifies that non-ASCII characters in marker expressions
+        // are handled correctly (specifically testing the peek_while function
+        // which must return byte lengths, not character counts).
+        // The Chinese character "和" (meaning "and") is 3 bytes in UTF-8.
+        assert_snapshot!(
+            parse_pep508_err(r#"name; python_version == "3.8" 和 os_name == "linux""#),
+            @r#"
+        Unexpected character '和', expected 'and', 'or' or end of input
+        name; python_version == "3.8" 和 os_name == "linux"
+                                      ^^^^^^^^^^^^^^^^^^
+        "#
+        );
+    }
+
+    #[test]
     fn error_markers_invalid_operator() {
         assert_snapshot!(
             parse_pep508_err("name; '3.7' ~ python_version"),

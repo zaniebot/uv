@@ -85,10 +85,16 @@ impl<'a> Cursor<'a> {
     }
 
     /// Peeks over the cursor as long as the condition is met, without consuming it.
+    ///
+    /// Returns `(start_byte_position, byte_length)` - both values are byte offsets,
+    /// not character counts, so they can be used directly with [`Self::slice`].
     pub(crate) fn peek_while(&mut self, condition: impl Fn(char) -> bool) -> (usize, usize) {
         let peeker = self.chars.clone();
         let start = self.pos();
-        let len = peeker.take_while(|c| condition(*c)).count();
+        let len: usize = peeker
+            .take_while(|c| condition(*c))
+            .map(char::len_utf8)
+            .sum();
         (start, len)
     }
 
