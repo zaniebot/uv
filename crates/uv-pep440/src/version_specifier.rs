@@ -568,12 +568,15 @@ impl VersionSpecifier {
         match self.operator {
             Operator::Equal => other.as_ref() == this,
             Operator::EqualStar => {
+                // For prefix matching, pad the version with zeros if it's shorter than
+                // the specifier prefix. E.g., version "2" (== "2.0") should NOT match
+                // "==2.1.*" because 2.0 != 2.1.
                 this.epoch() == other.epoch()
                     && self
                         .version
                         .release()
                         .iter()
-                        .zip(&*other.release())
+                        .zip(other.release().iter().chain(std::iter::repeat(&0)))
                         .all(|(this, other)| this == other)
             }
             #[allow(deprecated)]
@@ -586,11 +589,14 @@ impl VersionSpecifier {
             }
             Operator::NotEqual => this != other.as_ref(),
             Operator::NotEqualStar => {
+                // For prefix matching, pad the version with zeros if it's shorter than
+                // the specifier prefix. E.g., version "2" (== "2.0") should match
+                // "!=2.1.*" because 2.0 != 2.1.
                 this.epoch() != other.epoch()
                     || !this
                         .release()
                         .iter()
-                        .zip(&*version.release())
+                        .zip(version.release().iter().chain(std::iter::repeat(&0)))
                         .all(|(this, other)| this == other)
             }
             Operator::TildeEqual => {
@@ -1269,6 +1275,44 @@ mod tests {
             !VersionSpecifier::from_str("=== 1.2a1")
                 .unwrap()
                 .contains(&Version::from_str("1.2a1+local").unwrap())
+        );
+    }
+
+    /// Test for bug: short version incorrectly matches longer prefix specifier.
+    /// Version "2" (which is 2.0) should NOT match "==2.1.*" because 2.0 is not
+    /// in the 2.1 family.
+    #[test]
+    fn test_equal_star_short_version_bug() {
+        // Version "2" (equivalent to 2.0) should NOT match "==2.1.*"
+        let specifier = VersionSpecifier::from_str("==2.1.*").unwrap();
+        let version = Version::from_str("2").unwrap();
+        assert!(
+            !specifier.contains(&version),
+            "Bug: version '2' incorrectly matches '==2.1.*'"
+        );
+
+        // Version "2" (equivalent to 2.0) SHOULD match "!=2.1.*"
+        let specifier = VersionSpecifier::from_str("!=2.1.*").unwrap();
+        let version = Version::from_str("2").unwrap();
+        assert!(
+            specifier.contains(&version),
+            "Bug: version '2' should match '!=2.1.*' (2.0 is not in 2.1 family)"
+        );
+
+        // Verify existing behavior still works: "2" matches "==2.0.*"
+        let specifier = VersionSpecifier::from_str("==2.0.*").unwrap();
+        let version = Version::from_str("2").unwrap();
+        assert!(
+            specifier.contains(&version),
+            "version '2' should match '==2.0.*'"
+        );
+
+        // And "2" should NOT match "!=2.0.*"
+        let specifier = VersionSpecifier::from_str("!=2.0.*").unwrap();
+        let version = Version::from_str("2").unwrap();
+        assert!(
+            !specifier.contains(&version),
+            "version '2' should not match '!=2.0.*'"
         );
     }
 
