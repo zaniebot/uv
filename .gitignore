@@ -48,3 +48,7 @@ profile.json.gz
 # IDE
 .idea
 .vscode
+
+# Rendered GitHub issues/PRs (cloned at session start)
+.github/issues
+.github/pulls
