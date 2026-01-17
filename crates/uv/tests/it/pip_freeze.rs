@@ -10,7 +10,7 @@ fn freeze_many() -> Result<()> {
     let context = TestContext::new("3.12");
 
     let requirements_txt = context.temp_dir.child("requirements.txt");
-    requirements_txt.write_str("MarkupSafe==2.1.3\ntomli==2.0.1")?;
+    requirements_txt.write_str("MarkupSafe\ntomli")?;
 
     // Run `pip sync`.
     context
@@ -25,7 +25,7 @@ fn freeze_many() -> Result<()> {
     success: true
     exit_code: 0
     ----- stdout -----
-    markupsafe==2.1.3
+    markupsafe==2.1.5
     tomli==2.0.1
 
     ----- stderr -----
@@ -360,7 +360,7 @@ fn freeze_path() -> Result<()> {
     let context = TestContext::new("3.12");
 
     let requirements_txt = context.temp_dir.child("requirements.txt");
-    requirements_txt.write_str("MarkupSafe==2.1.3\ntomli==2.0.1")?;
+    requirements_txt.write_str("MarkupSafe\ntomli")?;
 
     let target = context.temp_dir.child("install-path");
 
@@ -380,7 +380,7 @@ fn freeze_path() -> Result<()> {
     success: true
     exit_code: 0
     ----- stdout -----
-    markupsafe==2.1.3
+    markupsafe==2.1.5
     tomli==2.0.1
 
     ----- stderr -----
@@ -394,10 +394,10 @@ fn freeze_multiple_paths() -> Result<()> {
     let context = TestContext::new("3.12");
 
     let requirements_txt1 = context.temp_dir.child("requirements1.txt");
-    requirements_txt1.write_str("MarkupSafe==2.1.3\ntomli==2.0.1")?;
+    requirements_txt1.write_str("MarkupSafe\ntomli")?;
 
     let requirements_txt2 = context.temp_dir.child("requirements2.txt");
-    requirements_txt2.write_str("MarkupSafe==2.1.3\nrequests==2.31.0")?;
+    requirements_txt2.write_str("MarkupSafe\nrequests")?;
 
     let target1 = context.temp_dir.child("install-path1");
     let target2 = context.temp_dir.child("install-path2");
@@ -421,7 +421,7 @@ fn freeze_multiple_paths() -> Result<()> {
     success: true
     exit_code: 0
     ----- stdout -----
-    markupsafe==2.1.3
+    markupsafe==2.1.5
     requests==2.31.0
     tomli==2.0.1
 
@@ -459,7 +459,7 @@ fn freeze_with_quiet_flag() -> Result<()> {
     let context = TestContext::new("3.12");
 
     let requirements_txt = context.temp_dir.child("requirements.txt");
-    requirements_txt.write_str("MarkupSafe==2.1.3\ntomli==2.0.1")?;
+    requirements_txt.write_str("MarkupSafe\ntomli")?;
 
     // Run `pip sync`.
     context
@@ -473,7 +473,7 @@ fn freeze_with_quiet_flag() -> Result<()> {
     success: true
     exit_code: 0
     ----- stdout -----
-    markupsafe==2.1.3
+    markupsafe==2.1.5
     tomli==2.0.1
 
     ----- stderr -----
@@ -488,7 +488,7 @@ fn freeze_target() -> Result<()> {
     let context = TestContext::new("3.12");
 
     let requirements_txt = context.temp_dir.child("requirements.txt");
-    requirements_txt.write_str("MarkupSafe==2.1.3\ntomli==2.0.1")?;
+    requirements_txt.write_str("MarkupSafe\ntomli")?;
 
     let target = context.temp_dir.child("target");
 
@@ -509,7 +509,7 @@ fn freeze_target() -> Result<()> {
     success: true
     exit_code: 0
     ----- stdout -----
-    markupsafe==2.1.3
+    markupsafe==2.1.5
     tomli==2.0.1
 
     ----- stderr -----
@@ -534,7 +534,7 @@ fn freeze_prefix() -> Result<()> {
     let context = TestContext::new("3.12");
 
     let requirements_txt = context.temp_dir.child("requirements.txt");
-    requirements_txt.write_str("MarkupSafe==2.1.3\ntomli==2.0.1")?;
+    requirements_txt.write_str("MarkupSafe\ntomli")?;
 
     let prefix = context.temp_dir.child("prefix");
 
@@ -555,7 +555,7 @@ fn freeze_prefix() -> Result<()> {
     success: true
     exit_code: 0
     ----- stdout -----
-    markupsafe==2.1.3
+    markupsafe==2.1.5
     tomli==2.0.1
 
     ----- stderr -----
