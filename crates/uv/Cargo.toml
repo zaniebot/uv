@@ -140,6 +140,7 @@ predicates = { workspace = true }
 regex = { workspace = true }
 reqwest = { workspace = true, features = ["blocking"], default-features = false }
 sha2 = { workspace = true }
+shlex = { workspace = true }
 tar = { workspace = true }
 tempfile = { workspace = true }
 tokio-util = { workspace = true }
@@ -186,6 +187,8 @@ crates-io = []
 git = ["uv-test/git"]
 # Introduces a testing dependency on Git LFS.
 git-lfs = ["git"]
+# Introduces a testing dependency on GitHub (provides read-only token for private repos).
+github = ["git"]
 # Introduces a testing dependency on PyPI.
 pypi = []
 # Introduces a testing dependency on R2.

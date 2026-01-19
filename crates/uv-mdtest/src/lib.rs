@@ -9,10 +9,12 @@ pub mod snapshot;
 pub mod types;
 
 pub use parser::ParseError;
-pub use runner::{Mismatch, MismatchKind, RunConfig, RunError, TestResult};
+pub use runner::{
+    Mismatch, MismatchKind, RunConfig, RunError, TestResult, get_platform_variables, run_rm_command,
+};
 pub use snapshot::{SnapshotMode, SnapshotUpdater};
 pub use types::{
-    AssertKind, ContentAssertion, EnvironmentConfig, FilterConfig, MarkdownTest, MarkdownTestFile,
-    PythonVersions, RequiredFeatures, TargetFamily, TargetOs, TestConfig, TreeConfig, TreeCreation,
-    TreeEntry, TreeSnapshot,
+    AssertKind, ContentAssertion, CopyFrom, EnvironmentConfig, FilterConfig, MarkdownTest,
+    MarkdownTestFile, PythonVersions, RequiredFeatures, TargetFamily, TargetOs, TestConfig,
+    TreeConfig, TreeCreation, TreeEntry, TreeSnapshot,
 };

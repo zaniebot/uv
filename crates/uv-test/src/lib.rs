@@ -246,6 +246,18 @@ impl TestContext {
         self
     }
 
+    /// Add extra filtering for cache entry hashes (used in `uv cache prune` verbose output)
+    #[must_use]
+    pub fn with_filtered_cache_entry(mut self) -> Self {
+        // Filter cache entry hashes in verbose debug output
+        // Matches patterns like "environments-v2/abc123hash" -> "environments-v2/[ENTRY]"
+        self.filters.push((
+            r"(environments-v2|archive-v0|sdists-v\d+|wheels-v\d+)/[a-zA-Z0-9_-]+".to_string(),
+            "$1/[ENTRY]".to_string(),
+        ));
+        self
+    }
+
     /// Add extra standard filtering for Windows-compatible missing file errors.
     #[must_use]
     pub fn with_filtered_missing_file_error(mut self) -> Self {

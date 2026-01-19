@@ -21,7 +21,7 @@ python-versions = "3.12"
 | `concurrent-installs` | string          | Number of concurrent installs                                                            |
 | `target-os`           | string or array | Target OS(es) for this test (e.g., `"linux"`, `["macos", "linux"]`)                      |
 | `target-family`       | string or array | Target OS family (e.g., `"unix"`, `"windows"`)                                           |
-| `required-features`   | string or array | Required features to run this test (e.g., `"python-patch"`)                              |
+| `required-features`   | string or array | Required features to run this test (see [Required Features](#required-features) below)   |
 | `env`                 | table           | Extra environment variables to set (e.g., `env = { FOO = "bar" }`)                       |
 | `env-remove`          | array           | Environment variables to remove                                                          |
 | `create-venv`         | bool            | Whether to create a virtual environment (default: true)                                  |
@@ -55,6 +55,68 @@ All filter options are booleans (default: false):
 | ----------------- | ----- | ----------------------------------------------------------------- |
 | `exclude`         | array | Patterns to exclude from tree output (e.g., `["cache", "*.pyc"]`) |
 | `default-filters` | bool  | Apply cross-platform normalization (default: true)                |
+
+### Required Features
+
+Tests can require Cargo features that must be enabled at compile time. These mirror the test
+features in `crates/uv/Cargo.toml`. If a required feature is not enabled, the test is skipped.
+
+| Feature          | Description                                                                  |
+| ---------------- | ---------------------------------------------------------------------------- |
+| `pypi`           | Tests that require PyPI access                                               |
+| `git`            | Tests that require Git                                                       |
+| `git-lfs`        | Tests that require Git LFS (also sets up LFS configuration automatically)    |
+| `github`         | Tests that need GitHub access (provides `${GITHUB_TOKEN}` for private repos) |
+| `python`         | Tests that require a local Python installation                               |
+| `python-managed` | Tests that require managed Python installations                              |
+| `python-patch`   | Tests that require specific Python patch versions                            |
+| `crates-io`      | Tests that require crates.io access                                          |
+| `r2`             | Tests that require R2 access                                                 |
+
+By default, most features are enabled via `default-tests`. To run tests without certain features:
+
+```bash
+cargo nextest run mdtest --no-default-features --features pypi,git
+```
+
+### Variable Substitution
+
+Commands support variable substitution using `${VAR_NAME}` syntax:
+
+**Built-in Variables:**
+
+| Variable          | Description                                          | Availability     |
+| ----------------- | ---------------------------------------------------- | ---------------- |
+| `${WORKSPACE}`    | Path to the workspace root directory                 | Always available |
+| `${GITHUB_TOKEN}` | Read-only GitHub token for private repository access | `github` feature |
+| `${VENV_BIN}`     | Virtual environment bin directory (bin/Scripts)      | Always available |
+| `${PATH_SEP}`     | PATH separator character (`:` or `;`)                | Always available |
+| `${EXE_SUFFIX}`   | Executable suffix (empty or `.exe`)                  | Always available |
+
+**Environment Variable Passthrough:**
+
+Any `${VAR_NAME}` not found in the built-in variables will automatically check environment
+variables. For example, `${SHELL}`, `${HOME}`, `${USER}`, etc. will work if set in your environment.
+
+Example using workspace path:
+
+```
+uv tool install -e '${WORKSPACE}/test/packages/black_editable'
+```
+
+### Copy Blocks
+
+Copy blocks copy files or directories from a source path to the test directory. This is useful for
+tests that need to modify fixtures without affecting the original files.
+
+````markdown
+```copy
+source = "${WORKSPACE}/test/packages/black_editable"
+dest = "black_editable"
+```
+````
+
+The `source` path supports variable substitution. The `dest` path is relative to the test directory.
 
 ## Basic command execution
 

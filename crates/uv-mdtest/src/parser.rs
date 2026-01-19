@@ -3,13 +3,23 @@
 //! Parses markdown files into test definitions using pulldown-cmark.
 
 use pulldown_cmark::{CodeBlockKind, Event, HeadingLevel, Options, Parser, Tag, TagEnd};
+use serde::Deserialize;
 use std::path::PathBuf;
 use thiserror::Error;
 
 use crate::types::{
-    CodeBlockAttributes, Command, ContentAssertion, EmbeddedFile, FileSnapshot, MarkdownTest,
-    MarkdownTestFile, TestConfig, TestStep, TreeCreation, TreeEntry, TreeSnapshot,
+    CodeBlockAttributes, Command, ContentAssertion, CopyFrom, EmbeddedFile, FileSnapshot,
+    MarkdownTest, MarkdownTestFile, TestConfig, TestStep, TreeCreation, TreeEntry, TreeSnapshot,
 };
+
+/// Configuration for a copy block.
+#[derive(Debug, Deserialize)]
+struct CopyBlockConfig {
+    /// Source path (may contain variable references like `${WORKSPACE}`).
+    source: String,
+    /// Destination path relative to the test directory.
+    dest: String,
+}
 
 /// Errors that can occur during parsing.
 #[derive(Debug, Error)]
@@ -262,6 +272,21 @@ impl<'a> ParserState<'a> {
                         line_number,
                     }));
             }
+            return Ok(());
+        }
+
+        // Check if this is a copy block
+        if attrs.language.as_deref() == Some("copy") {
+            let copy_config: CopyBlockConfig =
+                toml::from_str(&content).map_err(|e| ParseError::InvalidConfig {
+                    line: line_number,
+                    message: format!("Invalid copy block: {e}"),
+                })?;
+            self.current_steps.push(TestStep::CopyFrom(CopyFrom {
+                source: copy_config.source,
+                dest: PathBuf::from(copy_config.dest),
+                line_number,
+            }));
             return Ok(());
         }
 

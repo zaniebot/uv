@@ -659,6 +659,94 @@ error: Found conflicting Python requirements:
 - foo:dev: >=3.12
 ```
 
+### Python preference (managed vs system)
+
+<!-- Derived from [`venv::venv_python_preference`](https://github.com/astral-sh/uv/blob/c83066b8ee71432543ec3ff183bec4681beca2e7/crates/uv/tests/it/venv.rs#L169-L232) -->
+
+When managed Python interpreters are available, uv prefers them over system interpreters by default.
+
+```toml
+# mdtest
+
+[environment]
+python-versions = ["3.11"]
+managed-python-versions = ["3.12"]
+```
+
+By default, uv uses the managed Python (3.12):
+
+```console
+$ uv venv
+success: true
+exit_code: 0
+----- stdout -----
+
+----- stderr -----
+Using CPython 3.12.[X]
+Creating virtual environment at: .venv
+Activate with: source .venv/[BIN]/activate
+```
+
+With `--no-managed-python`, uv uses the system Python (3.11):
+
+```console
+$ uv venv --no-managed-python
+success: true
+exit_code: 0
+----- stdout -----
+
+----- stderr -----
+Using CPython 3.11.[X] interpreter at: [PYTHON-3.11]
+Creating virtual environment at: .venv
+warning: A virtual environment already exists at `.venv`. In the future, uv will require `--clear` to replace it
+Activate with: source .venv/[BIN]/activate
+```
+
+Running again with `--no-managed-python` continues to use system Python:
+
+```console
+$ uv venv --no-managed-python
+success: true
+exit_code: 0
+----- stdout -----
+
+----- stderr -----
+Using CPython 3.11.[X] interpreter at: [PYTHON-3.11]
+Creating virtual environment at: .venv
+warning: A virtual environment already exists at `.venv`. In the future, uv will require `--clear` to replace it
+Activate with: source .venv/[BIN]/activate
+```
+
+Without the flag, uv goes back to using managed Python:
+
+```console
+$ uv venv
+success: true
+exit_code: 0
+----- stdout -----
+
+----- stderr -----
+Using CPython 3.12.[X]
+Creating virtual environment at: .venv
+warning: A virtual environment already exists at `.venv`. In the future, uv will require `--clear` to replace it
+Activate with: source .venv/[BIN]/activate
+```
+
+With `--managed-python`, uv explicitly uses managed Python:
+
+```console
+$ uv venv --managed-python
+success: true
+exit_code: 0
+----- stdout -----
+
+----- stderr -----
+Using CPython 3.12.[X]
+Creating virtual environment at: .venv
+warning: A virtual environment already exists at `.venv`. In the future, uv will require `--clear` to replace it
+Activate with: source .venv/[BIN]/activate
+```
+
 ### Unknown Python minor version
 
 <!-- Derived from [`venv::create_venv_unknown_python_minor`](https://github.com/astral-sh/uv/blob/c83066b8ee71432543ec3ff183bec4681beca2e7/crates/uv/tests/it/venv.rs#L917-L941) -->
@@ -1114,6 +1202,37 @@ Creating virtual environment with seed packages at: .venv
 Activate with: source .venv/[BIN]/activate
 ```
 
+### Seed packages with older Python version
+
+<!-- Derived from [`venv::seed_older_python_version`](https://github.com/astral-sh/uv/blob/main/crates/uv/tests/it/venv.rs#L11-L35) -->
+
+When seeding with Python 3.11, older versions of pip, setuptools, and wheel are installed.
+
+```toml
+# mdtest
+
+[environment]
+python-versions = ["3.11"]
+
+[filters]
+counts = true
+```
+
+```console
+$ uv venv .venv --seed --python 3.11
+success: true
+exit_code: 0
+----- stdout -----
+
+----- stderr -----
+Using CPython 3.11.[X] interpreter at: [PYTHON-3.11]
+Creating virtual environment with seed packages at: .venv
+ + pip==24.0
+ + setuptools==69.2.0
+ + wheel==0.43.0
+Activate with: source .venv/[BIN]/activate
+```
+
 ## Working Directory
 
 ### Creating a virtual environment in the current directory (Unix)
@@ -1199,4 +1318,314 @@ Using CPython 3.12.[X] interpreter at: [PYTHON-3.12]
 Creating virtual environment at: .
 error: Failed to create virtual environment
   Caused by: failed to remove directory `[VENV]/`: The process cannot access the file because it is being used by another process. (os error 32)
+```
+
+## Symlink Handling
+
+### Symlink preservation with --clear
+
+<!-- Derived from [`venv::create_venv_symlink_clear_preservation`](https://github.com/astral-sh/uv/blob/c83066b8ee71432543ec3ff183bec4681beca2e7/crates/uv/tests/it/venv.rs#L236-L290) -->
+
+When creating a virtual environment at a symlink path, the symlink should be preserved (not replaced
+with a real directory), even when using `--clear`.
+
+```toml
+# mdtest
+
+[environment]
+target-family = "unix"
+```
+
+Create a target directory and a symlink pointing to it:
+
+```tree create=true
+.
+├── target/
+└── .venv -> target
+```
+
+Create a virtual environment at the symlink location:
+
+```console
+$ uv venv .venv --python 3.12
+success: true
+exit_code: 0
+----- stdout -----
+
+----- stderr -----
+Using CPython 3.12.[X] interpreter at: [PYTHON-3.12]
+Creating virtual environment at: .venv
+Activate with: source .venv/[BIN]/activate
+```
+
+The symlink should still be preserved:
+
+```tree depth=1
+.
+├── .venv -> target
+└── target/
+```
+
+Run `uv venv` with `--clear` to test symlink preservation during clear:
+
+```console
+$ uv venv .venv --clear --python 3.12
+success: true
+exit_code: 0
+----- stdout -----
+
+----- stderr -----
+Using CPython 3.12.[X] interpreter at: [PYTHON-3.12]
+Creating virtual environment at: .venv
+Activate with: source .venv/[BIN]/activate
+```
+
+The symlink should still be preserved after `--clear`:
+
+```tree depth=1
+.
+├── .venv -> target
+└── target/
+```
+
+### Symlink preservation on recreation
+
+<!-- Derived from [`venv::create_venv_symlink_recreate_preservation`](https://github.com/astral-sh/uv/blob/c83066b8ee71432543ec3ff183bec4681beca2e7/crates/uv/tests/it/venv.rs#L292-L348) -->
+
+When recreating a virtual environment at a symlink path without `--clear`, the symlink should be
+preserved.
+
+```toml
+# mdtest
+
+[environment]
+target-family = "unix"
+```
+
+Create a target directory and a symlink pointing to it:
+
+```tree create=true
+.
+├── target/
+└── .venv -> target
+```
+
+Create a virtual environment at the symlink location:
+
+```console
+$ uv venv .venv --python 3.12
+success: true
+exit_code: 0
+----- stdout -----
+
+----- stderr -----
+Using CPython 3.12.[X] interpreter at: [PYTHON-3.12]
+Creating virtual environment at: .venv
+Activate with: source .venv/[BIN]/activate
+```
+
+The symlink should be preserved after first creation:
+
+```tree depth=1
+.
+├── .venv -> target
+└── target/
+```
+
+Run `uv venv` again WITHOUT `--clear` to test recreation behavior:
+
+```console
+$ uv venv .venv --python 3.12
+success: true
+exit_code: 0
+----- stdout -----
+
+----- stderr -----
+Using CPython 3.12.[X] interpreter at: [PYTHON-3.12]
+Creating virtual environment at: .venv
+warning: A virtual environment already exists at `.venv`. In the future, uv will require `--clear` to replace it
+Activate with: source .venv/[BIN]/activate
+```
+
+The symlink should still be preserved after recreation:
+
+```tree depth=1
+.
+├── .venv -> target
+└── target/
+```
+
+### Nested symlink preservation
+
+<!-- Derived from [`venv::create_venv_nested_symlink_preservation`](https://github.com/astral-sh/uv/blob/c83066b8ee71432543ec3ff183bec4681beca2e7/crates/uv/tests/it/venv.rs#L350-L413) -->
+
+When creating a virtual environment at a nested symlink path (symlink pointing to another symlink),
+both symlinks should be preserved.
+
+```toml
+# mdtest
+
+[environment]
+target-family = "unix"
+```
+
+Create a target directory and nested symlinks:
+
+```tree create=true
+.
+├── target/
+├── intermediate -> target
+└── .venv -> intermediate
+```
+
+Create a virtual environment at the nested symlink location:
+
+```console
+$ uv venv .venv --python 3.12
+success: true
+exit_code: 0
+----- stdout -----
+
+----- stderr -----
+Using CPython 3.12.[X] interpreter at: [PYTHON-3.12]
+Creating virtual environment at: .venv
+Activate with: source .venv/[BIN]/activate
+```
+
+Both symlinks should be preserved:
+
+```tree depth=1
+.
+├── .venv -> intermediate
+├── intermediate -> target
+└── target/
+```
+
+Run `uv venv` again to test nested symlink preservation during recreation:
+
+```console
+$ uv venv .venv --python 3.12
+success: true
+exit_code: 0
+----- stdout -----
+
+----- stderr -----
+Using CPython 3.12.[X] interpreter at: [PYTHON-3.12]
+Creating virtual environment at: .venv
+warning: A virtual environment already exists at `.venv`. In the future, uv will require `--clear` to replace it
+Activate with: source .venv/[BIN]/activate
+```
+
+Both nested symlinks should still be preserved:
+
+```tree depth=1
+.
+├── .venv -> intermediate
+├── intermediate -> target
+└── target/
+```
+
+## Platform-Specific
+
+### Windows shims
+
+<!-- Derived from [`venv::windows_shims`](https://github.com/astral-sh/uv/blob/main/crates/uv/tests/it/venv.rs#L37-L82) -->
+
+On Windows, uv should correctly follow `.bat` shim scripts to find the Python installation.
+
+```toml
+# mdtest
+
+[environment]
+target-family = "windows"
+python-versions = ["3.10", "3.9"]
+```
+
+Create a shim directory with a `python.bat` script that forwards to Python 3.9:
+
+```bat
+# file: shim/python.bat
+
+@echo off
+python3.9 %*
+```
+
+Run `uv venv` with the shim directory in `UV_TEST_PYTHON_PATH`. The shim should be followed and
+Python 3.9 should be used:
+
+```console
+$ UV_TEST_PYTHON_PATH="shim;${UV_TEST_PYTHON_PATH}" uv venv .venv
+success: true
+exit_code: 0
+----- stdout -----
+
+----- stderr -----
+Using CPython 3.9.[X] interpreter at: [PYTHON-3.9]
+Creating virtual environment at: .venv
+Activate with: source .venv/[BIN]/activate
+```
+
+### Path with trailing space error
+
+<!-- Derived from [`venv::path_with_trailing_space_gives_proper_error`](https://github.com/astral-sh/uv/blob/main/crates/uv/tests/it/venv.rs#L84-L112) -->
+
+On Windows, setting `UV_CACHE_DIR` to a path with a trailing space should produce a clear error
+message.
+
+```toml
+# mdtest
+
+[environment]
+target-family = "windows"
+python-versions = ["3.12"]
+```
+
+```console
+$ UV_CACHE_DIR="${UV_CACHE_DIR} " uv venv
+success: false
+exit_code: 2
+----- stdout -----
+
+----- stderr -----
+error: Failed to initialize cache at `[CACHE_DIR]/ `
+  Caused by: failed to open file `[CACHE_DIR]/ /CACHEDIR.TAG`: The system cannot find the path specified. (os error 3)
+```
+
+### Shell activation with apostrophe in path
+
+<!-- Derived from [`venv::create_venv_apostrophe`](https://github.com/astral-sh/uv/blob/main/crates/uv/tests/it/venv.rs#L114-L166) -->
+
+On Linux, creating a virtual environment in a directory with an apostrophe in its name should work,
+and the activation script should function correctly.
+
+```toml
+# mdtest
+
+[environment]
+target-os = "linux"
+python-versions = ["3.12"]
+```
+
+```console
+$ uv venv "Testing's" --python 3.12
+success: true
+exit_code: 0
+----- stdout -----
+
+----- stderr -----
+Using CPython 3.12.[X] interpreter at: [PYTHON-3.12]
+Creating virtual environment at: Testing's
+Activate with: source Testing's/[BIN]/activate
+```
+
+The activation script should work correctly with the apostrophe in the path:
+
+```console working-dir="Testing's"
+$ bash -c ". bin/activate && python -c 'import sys; print(sys.prefix)'"
+success: true
+exit_code: 0
+----- stdout -----
+[TEMP_DIR]/Testing's
+
+----- stderr -----
 ```

@@ -12,16 +12,10 @@ mod build;
 mod build_backend;
 
 #[cfg(all(feature = "python", feature = "pypi"))]
-mod cache;
-
-#[cfg(all(feature = "python", feature = "pypi"))]
 mod cache_clean;
 
 #[cfg(all(feature = "python", feature = "pypi"))]
 mod cache_prune;
-
-#[cfg(all(feature = "python", feature = "pypi"))]
-mod cache_size;
 
 #[cfg(all(feature = "python", feature = "pypi", feature = "test-ecosystem"))]
 mod ecosystem;
@@ -146,6 +140,3 @@ mod workflow;
 
 mod extract;
 mod workspace;
-mod workspace_dir;
-mod workspace_list;
-mod workspace_metadata;

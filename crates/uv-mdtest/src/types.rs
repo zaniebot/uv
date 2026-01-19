@@ -56,6 +56,8 @@ pub enum TestStep {
     WriteFile(EmbeddedFile),
     /// Create a directory tree structure.
     CreateTree(TreeCreation),
+    /// Copy files or directories from a source path.
+    CopyFrom(CopyFrom),
     /// Execute a command and validate output.
     RunCommand(Command),
     /// Verify a file snapshot.
@@ -74,6 +76,19 @@ pub struct EmbeddedFile {
     /// Content of the file.
     pub content: String,
     /// Line number in the markdown source where this file is defined.
+    pub line_number: usize,
+}
+
+/// Copy files or directories from an external source path.
+///
+/// The source path can use variable substitution (e.g., `${WORKSPACE}/test/packages/foo`).
+#[derive(Debug, Clone)]
+pub struct CopyFrom {
+    /// Source path (may contain variable references like `${WORKSPACE}`).
+    pub source: String,
+    /// Destination path relative to the test directory.
+    pub dest: PathBuf,
+    /// Line number in the markdown source where this copy is defined.
     pub line_number: usize,
 }
 
@@ -201,6 +216,11 @@ pub struct EnvironmentConfig {
     /// and `python-versions` (plural).
     #[serde(default, alias = "python-version", rename = "python-versions")]
     pub python_versions: PythonVersions,
+    /// Python versions to mark as "managed" for tests that need to distinguish
+    /// between managed and system Python installations. Sets the
+    /// `UV_INTERNAL__TEST_PYTHON_MANAGED` environment variable.
+    #[serde(default, rename = "managed-python-versions")]
+    pub managed_python_versions: PythonVersions,
     /// Exclude packages newer than this date.
     pub exclude_newer: Option<String>,
     /// HTTP timeout for requests.
@@ -592,6 +612,9 @@ pub struct FilterConfig {
     /// Filter cache size output.
     #[serde(default)]
     pub cache_size: bool,
+    /// Filter cache entry hashes.
+    #[serde(default)]
+    pub cache_entry: bool,
     /// Filter missing file errors (OS error 2/3).
     #[serde(default)]
     pub missing_file_error: bool,
@@ -607,6 +630,11 @@ impl TestConfig {
                     self.environment.python_versions.clone()
                 } else {
                     other.environment.python_versions.clone()
+                },
+                managed_python_versions: if other.environment.managed_python_versions.is_default() {
+                    self.environment.managed_python_versions.clone()
+                } else {
+                    other.environment.managed_python_versions.clone()
                 },
                 exclude_newer: other
                     .environment
@@ -683,6 +711,7 @@ impl TestConfig {
                 collapse_whitespace: other.filters.collapse_whitespace
                     || self.filters.collapse_whitespace,
                 cache_size: other.filters.cache_size || self.filters.cache_size,
+                cache_entry: other.filters.cache_entry || self.filters.cache_entry,
                 missing_file_error: other.filters.missing_file_error
                     || self.filters.missing_file_error,
             },
