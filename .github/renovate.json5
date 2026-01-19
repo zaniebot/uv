@@ -92,6 +92,12 @@
       description: "version-ranges and pubgrub are in the same Git repository",
     },
     {
+      groupName: "windows crates",
+      matchManagers: ["cargo"],
+      matchPackageNames: ["windows", "windows-registry"],
+      description: "Group windows and windows-registry crates together",
+    },
+    {
       commitMessageTopic: "MSRV",
       matchManagers: ["custom.regex"],
       matchDepNames: ["msrv"],
