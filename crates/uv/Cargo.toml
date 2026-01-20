@@ -164,6 +164,8 @@ self-update = ["axoupdater", "uv-cli/self-update"]
 
 # Features for development only.
 tracing-durations-export = ["dep:tracing-durations-export", "uv-resolver/tracing-durations-export", "uv-settings/tracing-durations-export"]
+# Enhanced file system error messages showing absolute paths and directory contents.
+fs-debug = ["fs-err/debug_tokio"]
 
 # Features that only apply when running tests, no-ops otherwise.
 default-tests = [
