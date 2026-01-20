@@ -1501,11 +1501,12 @@ Running a Python script with `.py` extension is not supported.
 ```toml
 # mdtest
 
-[environment]
-tree = { "script.py" = { create = true } }
-
 [filters]
 counts = true
+```
+
+```python script.py
+
 ```
 
 ```console
@@ -1529,11 +1530,12 @@ Running a Python script with `.pyw` extension is not supported.
 ```toml
 # mdtest
 
-[environment]
-tree = { "script.pyw" = { create = true } }
-
 [filters]
 counts = true
+```
+
+```python script.pyw
+
 ```
 
 ```console

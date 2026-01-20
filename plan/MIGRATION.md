@@ -1,0 +1,2547 @@
+# Migration Tracking
+
+> **👉 START HERE:** See [migration-status.md](migration-status.md) for what to work on next!
+>
+> **Quick summary:** 997 of 2,504 tests (39.8%) migrated. Goal is 90%+ (2,200+ tests). **Keep
+> working** on pip_compile, lock, pip_install, sync, pip_sync, edit, run!
+>
+> **Updating this file:** Run `python3 plan/update-migration-status.py` to sync checkboxes with
+> actual mdtest files.
+
+See [style.md](style.md) for migration guidelines.
+
+## Sections
+
+Organized test assignments by feature area:
+
+- [Workspaces](workspaces.md)
+- [Git Dependencies](git-dependencies.md)
+- [Build Backend](build-backend.md)
+- [Authentication](authentication.md)
+- [Caching](caching.md)
+- [Python Management](python-management.md)
+- [pip Commands](pip.md)
+- [Tools](tools.md)
+- [Resolution](resolution.md)
+- [Virtual Environments](virtual-environments.md)
+- [Project Lifecycle](project-lifecycle.md)
+- [Export](export.md)
+- [Building Packages](building.md)
+- [Cannot Migrate](cannot-migrate.md)
+
+### Reorganization Plans
+
+For large test files that mix universal features with command-specific behavior:
+
+- [Reorganization Strategy](reorganization-strategy.md) - Overall approach
+- [pip install Breakdown](pip-install-breakdown.md) - 271 tests → 19 files
+- [pip compile Breakdown](pip-compile-breakdown.md) - 372 tests → 20 files
+
+---
+
+## All Tests
+
+- [ ] auth.rs::add_package_native_auth_realm
+- [ ] auth.rs::add_package_native_auth
+- [ ] auth.rs::token_native_auth
+- [ ] auth.rs::token_native_auth_realm
+- [ ] auth.rs::login_native_auth
+- [ ] auth.rs::login_token_native_auth
+- [ ] auth.rs::logout_native_auth
+- [ ] auth.rs::logout_token_native_auth
+- [ ] auth.rs::login_native_auth_url
+- [x] auth.rs::login_text_store
+- [x] auth.rs::login_password_stdin
+- [x] auth.rs::login_token_stdin
+- [x] auth.rs::token_text_store
+- [x] auth.rs::logout_text_store
+- [x] auth.rs::auth_disabled_provider_uses_text_store
+- [x] auth.rs::login_text_store_strips_simple_suffix
+- [x] auth.rs::logout_text_store_strips_simple_suffix
+- [x] auth.rs::token_text_store_strips_simple_suffix
+- [x] auth.rs::token_text_store_username
+- [x] auth.rs::logout_text_store_multiple_usernames
+- [ ] auth.rs::native_auth_prefix_match
+- [ ] auth.rs::native_auth_host_fallback
+- [x] auth.rs::bazel_helper_basic_auth
+- [x] auth.rs::bazel_helper_token
+- [x] auth.rs::bazel_helper_no_credentials
+- [x] auth.rs::bazel_helper_invalid_json
+- [x] auth.rs::bazel_helper_invalid_uri
+- [x] auth.rs::bazel_helper_username_in_uri
+- [x] auth.rs::bazel_helper_unknown_username_in_uri
+- [x] branching_urls.rs::branching_urls_disjoint
+- [x] branching_urls.rs::branching_urls_overlapping
+- [x] branching_urls.rs::root_package_splits_but_transitive_conflict
+- [x] branching_urls.rs::root_package_splits_transitive_too
+- [x] branching_urls.rs::root_package_splits_other_dependencies_too
+- [x] branching_urls.rs::branching_between_registry_and_direct_url
+- [x] branching_urls.rs::branching_urls_of_different_sources_disjoint
+- [x] branching_urls.rs::branching_urls_of_different_sources_conflict
+- [x] branching_urls.rs::dont_pre_visit_url_packages
+- [x] build.rs::build_basic
+- [x] build.rs::build_sdist
+- [x] build.rs::build_wheel
+- [x] build.rs::build_sdist_wheel
+- [x] build.rs::build_wheel_from_sdist
+- [x] build.rs::build_fail
+- [x] build.rs::build_workspace
+- [x] build.rs::build_all_with_failure
+- [x] build.rs::build_constraints
+- [x] build.rs::build_sha
+- [x] build.rs::build_quiet
+- [x] build.rs::build_no_build_logs
+- [x] build.rs::build_hide_build_output_env_var
+- [x] build.rs::build_hide_build_output_on_failure
+- [x] build.rs::build_tool_uv_sources
+- [x] build.rs::build_git_boundary_in_dist_build
+- [x] build.rs::build_non_package
+- [x] build.rs::build_fast_path
+- [x] build.rs::build_list_files
+- [x] build.rs::build_list_files_errors
+- [x] build.rs::build_version_mismatch
+- [x] build.rs::build_with_symlink
+- [x] build.rs::build_with_hardlink
+- [x] build.rs::build_unconfigured_setuptools
+- [x] build.rs::build_workspace_virtual_root
+- [x] build.rs::build_pyproject_toml_not_a_project
+- [x] build.rs::build_with_nonnormalized_name
+- [x] build.rs::force_pep517
+- [x] build.rs::venv_included_in_sdist
+- [x] build.rs::test_workspace_trailing_slash
+- [x] build.rs::build_clear
+- [x] build.rs::build_no_gitignore
+- [x] build_backend.rs::built_by_uv_direct_wheel
+- [x] build_backend.rs::built_by_uv_direct
+- [x] build_backend.rs::built_by_uv_editable
+- [ ] build_backend.rs::preserve_executable_bit
+- [x] build_backend.rs::rename_module
+- [x] build_backend.rs::rename_module_editable_build
+- [x] build_backend.rs::build_module_name_normalization
+- [x] build_backend.rs::build_sdist_with_long_path
+- [x] build_backend.rs::sdist_error_without_module
+- [x] build_backend.rs::complex_namespace_packages
+- [x] build_backend.rs::license_glob_without_matches_errors
+- [x] build_backend.rs::license_file_must_be_utf8
+- [x] build_backend.rs::symlinked_file
+- [x] build_backend.rs::invalid_build_backend_settings_are_ignored
+- [x] build_backend.rs::error_on_relative_module_root_outside_project_root
+- [x] build_backend.rs::error_on_relative_data_dir_outside_project_root
+- [x] build_backend.rs::venv_in_source_tree
+- [x] build_backend.rs::warn_on_redundant_module_names
+- [x] build_backend.rs::invalid_pyproject_toml
+- [x] build_backend.rs::build_with_all_metadata
+- [x] cache.rs::cache_init_failure
+- [x] cache_clean.rs::clean_all
+- [x] cache_clean.rs::clean_package_pypi
+- [x] cache_clean.rs::clean_package_index
+- [x] cache_prune.rs::prune_no_op
+- [x] cache_prune.rs::prune_stale_directory
+- [x] cache_prune.rs::prune_cached_env
+- [x] cache_prune.rs::prune_stale_symlink
+- [x] cache_prune.rs::prune_unzipped
+- [x] cache_prune.rs::prune_stale_revision
+- [x] cache_size.rs::cache_size_empty_raw
+- [x] cache_size.rs::cache_size_with_packages_raw
+- [x] cache_size.rs::cache_size_with_packages_human
+- [ ] ecosystem.rs::packse
+- [ ] ecosystem.rs::github_wikidata_bot
+- [ ] ecosystem.rs::black
+- [ ] ecosystem.rs::home_assistant_core
+- [ ] ecosystem.rs::transformers
+- [ ] ecosystem.rs::warehouse
+- [ ] ecosystem.rs::saleor
+- [ ] ecosystem.rs::airflow
+- [x] edit.rs::add_registry
+- [x] edit.rs::add_git
+- [x] edit.rs::add_git_private_source
+- [x] edit.rs::add_git_private_raw
+- [x] edit.rs::add_git_error
+- [x] edit.rs::add_git_branch
+- [x] edit.rs::add_git_lfs
+- [x] edit.rs::add_git_raw
+- [x] edit.rs::add_git_implicit
+- [x] edit.rs::add_raw_error
+- [ ] edit.rs::reinstall_local_source_trees
+- [x] edit.rs::add_editable_error
+- [x] edit.rs::add_unnamed
+- [x] edit.rs::add_remove_dev
+- [x] edit.rs::add_remove_optional
+- [x] edit.rs::add_remove_inline_optional
+- [x] edit.rs::add_remove_workspace
+- [x] edit.rs::update_existing_dev
+- [x] edit.rs::add_existing_dev
+- [x] edit.rs::update_existing_dev_group
+- [x] edit.rs::add_existing_dev_group
+- [x] edit.rs::remove_both_dev
+- [x] edit.rs::disallow_group_script_add
+- [x] edit.rs::remove_both_dev_group
+- [x] edit.rs::add_workspace_editable
+- [x] edit.rs::add_workspace_path
+- [x] edit.rs::add_path_implicit_workspace
+- [x] edit.rs::add_path_no_workspace
+- [ ] edit.rs::add_path_adjacent_directory
+- [x] edit.rs::update
+- [ ] edit.rs::add_update_marker
+- [ ] edit.rs::update_source_replace_url
+- [ ] edit.rs::add_non_normalized_source
+- [x] edit.rs::add_update_git_reference_project
+- [x] edit.rs::add_update_git_reference_script
+- [ ] edit.rs::remove_non_normalized_source
+- [x] edit.rs::add_inexact
+- [x] edit.rs::remove_registry
+- [ ] edit.rs::add_preserves_indentation_in_pyproject_toml
+- [ ] edit.rs::add_puts_default_indentation_in_pyproject_toml_if_not_observed
+- [x] edit.rs::add_frozen
+- [x] edit.rs::add_no_sync
+- [x] edit.rs::add_reject_multiple_git_ref_flags
+- [x] edit.rs::add_error
+- [x] edit.rs::add_environment_yml_error
+- [x] edit.rs::add_lower_bound
+- [x] edit.rs::add_lower_bound_existing
+- [x] edit.rs::add_lower_bound_raw
+- [x] edit.rs::add_lower_bound_dev
+- [x] edit.rs::add_lower_bound_optional
+- [x] edit.rs::add_lower_bound_local
+- [x] edit.rs::add_non_project
+- [x] edit.rs::add_virtual_empty
+- [x] edit.rs::add_virtual_dependency_group
+- [x] edit.rs::add_empty_requirements_group
+- [x] edit.rs::add_empty_requirements_optional
+- [x] edit.rs::remove_virtual_empty
+- [x] edit.rs::remove_virtual_dependency_group
+- [x] edit.rs::add_repeat
+- [ ] edit.rs::add_requirements_file
+- [ ] edit.rs::add_requirements_file_non_editable
+- [ ] edit.rs::add_requirements_file_editable
+- [ ] edit.rs::add_requirements_file_editable_override
+- [ ] edit.rs::add_requirements_file_with_marker_flag
+- [ ] edit.rs::add_requirements_file_constraints
+- [x] edit.rs::add_group
+- [x] edit.rs::add_group_normalize
+- [x] edit.rs::add_group_before_commented_groups
+- [x] edit.rs::add_group_between_commented_groups
+- [x] edit.rs::add_group_to_unsorted
+- [x] edit.rs::remove_group
+- [x] edit.rs::add_script
+- [x] edit.rs::add_script_bounds
+- [ ] edit.rs::add_script_relative_path
+- [ ] edit.rs::add_script_settings
+- [ ] edit.rs::add_script_trailing_comment_lines
+- [x] edit.rs::add_script_without_metadata_table
+- [ ] edit.rs::add_script_without_metadata_table_with_shebang
+- [ ] edit.rs::add_script_with_metadata_table_and_shebang
+- [ ] edit.rs::add_script_without_metadata_table_with_docstring
+- [ ] edit.rs::add_extensionless_script
+- [x] edit.rs::remove_repeated
+- [ ] edit.rs::add_remove_script_lock
+- [x] edit.rs::remove_script
+- [x] edit.rs::remove_last_dep_script
+- [x] edit.rs::add_git_to_script
+- [x] edit.rs::add_include_default_groups
+- [x] edit.rs::remove_include_default_groups
+- [ ] edit.rs::fail_to_add_revert_project
+- [ ] edit.rs::fail_to_edit_revert_project
+- [x] edit.rs::fail_to_add_revert_workspace_root
+- [x] edit.rs::fail_to_add_revert_workspace_member
+- [ ] edit.rs::sorted_dependencies
+- [ ] edit.rs::naive_sorted_dependencies
+- [ ] edit.rs::case_sensitive_sorted_dependencies
+- [ ] edit.rs::case_sensitive_naive_sorted_dependencies
+- [ ] edit.rs::sorted_dependencies_name_specifiers
+- [ ] edit.rs::sorted_dependencies_with_include_group
+- [ ] edit.rs::sorted_dependencies_new_dependency_after_include_group
+- [ ] edit.rs::sorted_dependencies_include_group_kept_at_bottom
+- [ ] edit.rs::custom_dependencies
+- [ ] edit.rs::update_offset
+- [x] edit.rs::add_shadowed_name
+- [ ] edit.rs::add_warn_index_url
+- [ ] edit.rs::add_no_warn_index_url
+- [ ] edit.rs::add_index
+- [ ] edit.rs::add_default_index_url
+- [ ] edit.rs::add_index_credentials
+- [ ] edit.rs::existing_index_credentials
+- [ ] edit.rs::add_index_with_trailing_slash
+- [ ] edit.rs::add_index_without_trailing_slash
+- [ ] edit.rs::add_index_with_existing_relative_path_index
+- [ ] edit.rs::add_index_with_non_existent_relative_path
+- [ ] edit.rs::add_index_with_non_existent_relative_path_with_same_name_as_index
+- [ ] edit.rs::add_index_empty_directory
+- [ ] edit.rs::add_index_with_ambiguous_relative_path
+- [x] edit.rs::add_group_comment
+- [ ] edit.rs::add_index_comments
+- [x] edit.rs::add_self
+- [ ] edit.rs::add_preserves_end_of_line_comments
+- [ ] edit.rs::add_preserves_end_of_line_comment_on_non_last_deps
+- [ ] edit.rs::add_direct_url_subdirectory
+- [ ] edit.rs::add_direct_url_subdirectory_raw
+- [ ] edit.rs::add_preserves_open_bracket_comment
+- [ ] edit.rs::add_preserves_empty_comment
+- [ ] edit.rs::add_preserves_trailing_comment
+- [ ] edit.rs::add_preserves_trailing_depth
+- [ ] edit.rs::add_preserves_first_own_line_comment
+- [ ] edit.rs::add_preserves_first_line_bracket_comment
+- [ ] edit.rs::add_no_indent
+- [x] edit.rs::remove_requirement
+- [x] edit.rs::remove_all_with_comments
+- [ ] edit.rs::multiple_index_cli
+- [ ] edit.rs::repeated_index_cli_environment_variable
+- [ ] edit.rs::repeated_index_cli_environment_variable_newline
+- [ ] edit.rs::repeated_index_cli
+- [ ] edit.rs::repeated_index_cli_reversed
+- [ ] edit.rs::add_with_build_constraints
+- [x] edit.rs::add_unsupported_git_scheme
+- [ ] edit.rs::add_index_url_in_keyring
+- [ ] edit.rs::add_full_url_in_keyring
+- [ ] edit.rs::add_stop_index_search_early_on_auth_failure
+- [ ] edit.rs::add_ignore_error_codes
+- [ ] edit.rs::add_empty_ignore_error_codes
+- [ ] edit.rs::add_missing_package_on_pytorch
+- [x] edit.rs::add_invalid_ignore_error_code
+- [x] edit.rs::add_invalid_requires_python
+- [ ] edit.rs::add_auth_policy_always_with_credentials
+- [ ] edit.rs::add_auth_policy_always_without_credentials
+- [ ] edit.rs::add_auth_policy_always_with_username_no_password
+- [ ] edit.rs::add_auth_policy_never_with_url_credentials
+- [ ] edit.rs::add_auth_policy_never_with_env_var_credentials
+- [ ] edit.rs::add_auth_policy_never_without_credentials
+- [x] edit.rs::add_ambiguous
+- [x] edit.rs::add_optional_normalize
+- [x] edit.rs::add_bounds
+- [x] edit.rs::add_bounds_requirement_over_bounds_kind
+- [x] edit.rs::add_path_with_existing_workspace
+- [x] edit.rs::add_path_with_workspace
+- [x] edit.rs::add_path_within_workspace_defaults_to_workspace
+- [x] edit.rs::add_path_with_no_workspace
+- [x] edit.rs::add_path_outside_workspace_no_default
+- [ ] edit.rs::add_multiline_indentation
+- [ ] edit.rs::add_no_install_project
+- [x] edit.rs::add_git_lfs_error
+- [x] export.rs::requirements_txt_dependency
+- [x] export.rs::requirements_txt_export_no_header
+- [x] export.rs::requirements_txt_dependency_extra
+- [x] export.rs::requirements_txt_project_extra
+- [x] export.rs::requirements_txt_prune
+- [x] export.rs::requirements_txt_dependency_marker
+- [x] export.rs::requirements_txt_dependency_multiple_markers
+- [x] export.rs::requirements_txt_dependency_conflicting_markers
+- [x] export.rs::requirements_txt_non_root
+- [ ] export.rs::allrequirements*txt*
+- [x] export.rs::requirements_txt_frozen
+- [x] export.rs::requirements_txt_create_missing_dir
+- [x] export.rs::requirements_txt_non_project
+- [x] export.rs::virtual_empty
+- [x] export.rs::virtual_dependency_group
+- [x] export.rs::requirements_txt_https_git_credentials
+- [x] export.rs::requirements_txt_ssh_git_username
+- [x] export.rs::requirements_txt_https_credentials
+- [x] export.rs::requirements_txt_non_project_marker
+- [x] export.rs::requirements_txt_non_project_workspace
+- [x] export.rs::requirements_txt_non_project_fork
+- [x] export.rs::requirements_txt_relative_path
+- [ ] export.rs::devrequirements*txt*
+- [x] export.rs::requirements_txt_no_hashes
+- [x] export.rs::requirements_txt_output_file
+- [x] export.rs::requirements_txt_no_emit
+- [x] export.rs::requirements_txt_only_emit
+- [x] export.rs::requirements_txt_no_editable
+- [x] export.rs::requirements_txt_export_group
+- [x] export.rs::requirements_txt_script
+- [x] export.rs::requirements_txt_conflicts
+- [x] export.rs::requirements_txt_simple_conflict_markers
+- [x] export.rs::requirements_txt_complex_conflict_markers
+- [x] export.rs::requirements_txt_cyclic_dependencies
+- [x] export.rs::requirements_txt_cyclic_dependencies_conflict
+- [x] export.rs::pep_751_dependency
+- [x] export.rs::pep_751_export_no_header
+- [x] export.rs::pep_751_export_no_editable
+- [x] export.rs::pep_751_dependency_extra
+- [x] export.rs::pep_751_project_extra
+- [x] export.rs::pep_751_git_dependency
+- [x] export.rs::pep_751_wheel_url
+- [x] export.rs::pep_751_sdist_url
+- [x] export.rs::pep_751_sdist_url_subdirectory
+- [x] export.rs::pep_751_infer_output_format
+- [x] export.rs::pep_751_filename
+- [x] export.rs::pep_751_https_git_credentials
+- [x] export.rs::pep_751_https_credentials
+- [x] export.rs::no_editable_env_var
+- [x] export.rs::export_only_group_and_extra_conflict
+- [x] export.rs::export_lock_workspace_mismatch_with_frozen
+- [x] export.rs::multiple_packages
+- [x] export.rs::cyclonedx_export_basic
+- [x] export.rs::cyclonedx_export_direct_url
+- [x] export.rs::cyclonedx_export_git_dependency
+- [x] export.rs::cyclonedx_export_no_dependencies
+- [x] export.rs::cyclonedx_export_mixed_source_types
+- [x] export.rs::cyclonedx_export_project_extra
+- [x] export.rs::cyclonedx_export_project_extra_with_optional_flag
+- [ ] export.rs::cyclonedx_export_with_workspace_member
+- [x] export.rs::cyclonedx_export_workspace_non_root
+- [x] export.rs::cyclonedx_export_workspace_with_extras
+- [x] export.rs::cyclonedx_export_workspace_frozen
+- [x] export.rs::cyclonedx_export_workspace_all_packages
+- [x] export.rs::cyclonedx_export_all_packages_non_workspace_root_dependency
+- [x] export.rs::cyclonedx_export_workspace_mixed_dependencies
+- [x] export.rs::cyclonedx_export_dependency_marker
+- [x] export.rs::cyclonedx_export_multiple_dependency_markers
+- [x] export.rs::cyclonedx_export_dependency_extra
+- [x] export.rs::cyclonedx_export_prune
+- [x] export.rs::cyclonedx_export_group
+- [x] export.rs::cyclonedx_export_non_project
+- [x] export.rs::cyclonedx_export_no_emit
+- [x] export.rs::cyclonedx_export_relative_path
+- [x] export.rs::cyclonedx_export_cyclic_dependencies
+- [x] export.rs::cyclonedx_export_dev_dependencies
+- [x] export.rs::cyclonedx_export_all_packages_conflicting_workspace_members
+- [x] export.rs::cyclonedx_export_alternative_registry
+- [x] format.rs::format_project
+- [x] format.rs::format_missing_pyproject_toml
+- [ ] format.rs::format_missing_project_in_pyproject_toml
+- [x] format.rs::format_unmanaged_project
+- [ ] format.rs::format_from_project_root
+- [x] format.rs::format_no_project
+- [ ] format.rs::format_relative_project
+- [x] format.rs::format_fails_malformed_pyproject
+- [x] format.rs::format_check
+- [x] format.rs::format_diff
+- [ ] format.rs::format_with_ruff_args
+- [ ] format.rs::format_specific_files
+- [x] format.rs::format_version_option
+- [ ] help.rs::help
+- [ ] help.rs::help_flag
+- [ ] help.rs::help_short_flag
+- [ ] help.rs::help_subcommand
+- [ ] help.rs::help_subsubcommand
+- [ ] help.rs::help_flag_subcommand
+- [ ] help.rs::help_flag_subsubcommand
+- [x] help.rs::help_unknown_subcommand
+- [x] help.rs::help_unknown_subsubcommand
+- [x] help.rs::help_with_global_option
+- [x] help.rs::help_with_help
+- [x] help.rs::help_with_version
+- [ ] help.rs::help_with_no_pager
+- [x] init.rs::init
+- [x] init.rs::init_bare
+- [x] init.rs::init_application
+- [x] init.rs::init_application_hello_exists
+- [x] init.rs::init_application_other_python_exists
+- [x] init.rs::init_application_package
+- [x] init.rs::init_library
+- [x] init.rs::init_package_preview
+- [x] init.rs::init_bare_lib
+- [x] init.rs::init_bare_package
+- [x] init.rs::init_bare_opt_in
+- [x] init.rs::init_script
+- [x] init.rs::init_script_bare
+- [x] init.rs::init_script_python_version
+- [x] init.rs::init_script_create_directory
+- [x] init.rs::init_script_file_conflicts
+- [x] init.rs::init_script_shebang
+- [x] init.rs::init_script_picks_latest_stable_version
+- [x] init.rs::init_py_typed_exists
+- [x] init.rs::init_library_no_package
+- [x] init.rs::init_cache
+- [x] init.rs::init_no_readme
+- [x] init.rs::init_no_pin_python
+- [x] init.rs::init_library_current_dir
+- [x] init.rs::init_application_current_dir
+- [x] init.rs::init_dot_args
+- [x] init.rs::init_workspace
+- [x] init.rs::init_workspace_relative_sub_package
+- [x] init.rs::init_workspace_outside
+- [x] init.rs::init_normalized_names
+- [x] init.rs::init_isolated
+- [x] init.rs::init_no_workspace
+- [x] init.rs::init_no_workspace_warning
+- [x] init.rs::init_project_inside_project
+- [x] init.rs::init_explicit_workspace
+- [x] init.rs::init_virtual_project
+- [x] init.rs::init_virtual_workspace
+- [x] init.rs::init_nested_virtual_workspace
+- [x] init.rs::init_matches_members
+- [x] init.rs::init_matches_exclude
+- [x] init.rs::init_requires_python_workspace
+- [x] init.rs::init_requires_python_version
+- [x] init.rs::init_requires_python_specifiers
+- [x] init.rs::init_requires_python_version_file
+- [x] init.rs::init_existing_environment
+- [x] init.rs::init_existing_environment_parent
+- [x] init.rs::init_unmanaged
+- [x] init.rs::init_hidden
+- [x] init.rs::init_non_ascii_directory
+- [x] init.rs::init_failure
+- [x] init.rs::init_failure_with_invalid_option_named_backend
+- [x] init.rs::init_git
+- [x] init.rs::init_vcs_none
+- [x] init.rs::init_inside_git_repo
+- [x] init.rs::init_git_not_installed
+- [x] init.rs::init_with_author
+- [x] init.rs::init_application_package_flit
+- [x] init.rs::init_library_flit
+- [x] init.rs::init_backend_implies_package
+- [x] init.rs::init_library_poetry
+- [x] init.rs::init_app_build_backend_maturin
+- [x] init.rs::init_app_build_backend_scikit
+- [x] init.rs::init_lib_build_backend_maturin
+- [x] init.rs::init_lib_build_backend_scikit
+- [x] init.rs::init_application_package_hatchling
+- [x] init.rs::init_with_description
+- [x] init.rs::init_without_description
+- [x] init.rs::init_python_variant
+- [x] init.rs::git_states
+- [x] init.rs::init_project_flag_is_not_allowed_under_preview
+- [x] init.rs::init_project_flag_is_ignored_with_explicit_path
+- [x] init.rs::init_project_flag_is_warned_without_path
+- [x] init.rs::init_working_directory_change
+- [x] lock.rs::lock_wheel_registry
+- [x] lock.rs::lock_sdist_registry
+- [x] lock.rs::lock_sdist_git
+- [x] lock.rs::lock_sdist_git_subdirectory
+- [x] lock.rs::lock_sdist_git_pep508
+- [x] lock.rs::lock_sdist_git_short_rev
+- [x] lock.rs::lock_wheel_url
+- [x] lock.rs::lock_sdist_url
+- [x] lock.rs::lock_sdist_url_subdirectory
+- [x] lock.rs::lock_sdist_url_subdirectory_pep508
+- [x] lock.rs::lock_project_extra
+- [x] lock.rs::lock_project_with_overrides
+- [x] lock.rs::lock_project_with_override_sources
+- [x] lock.rs::lock_project_with_excludes
+- [x] lock.rs::lock_project_with_constraints
+- [ ] lock.rs::lock_project_with_constraint_sources
+- [ ] lock.rs::lock_project_with_build_constraints
+- [ ] lock.rs::lock_project_with_build_constraint_sources
+- [x] lock.rs::lock_dependency_extra
+- [ ] lock.rs::lock_conditional_dependency_extra
+- [x] lock.rs::lock_dependency_non_existent_extra
+- [x] lock.rs::lock_conflicting_project_basic1
+- [x] lock.rs::lock_conflicting_workspace_members
+- [x] lock.rs::lock_conflicting_workspace_members_depends_direct
+- [x] lock.rs::lock_conflicting_workspace_members_depends_direct_extra
+- [x] lock.rs::lock_conflicting_workspace_members_depends_transitive
+- [x] lock.rs::lock_conflicting_workspace_members_depends_transitive_extra
+- [ ] lock.rs::lock_conflicting_project_basic2
+- [x] lock.rs::lock_conflicting_mixed
+- [x] lock.rs::lock_upgrade_log
+- [x] lock.rs::lock_upgrade_log_multi_version
+- [x] lock.rs::lock_preference
+- [x] lock.rs::lock_git_plus_prefix
+- [x] lock.rs::lock_partial_git
+- [ ] lock.rs::lock_unsupported_tag
+- [x] lock.rs::lock_git_sha
+- [x] lock.rs::lock_requires_python
+- [x] lock.rs::lock_requires_python_upper
+- [ ] lock.rs::lock_requires_python_exact
+- [ ] lock.rs::lock_requires_python_compatible_specifier
+- [ ] lock.rs::lock_requires_python_fork
+- [ ] lock.rs::lock_requires_python_wheels
+- [ ] lock.rs::lock_requires_python_star
+- [ ] lock.rs::lock_requires_python_not_equal
+- [ ] lock.rs::lock_requires_python_pre
+- [ ] lock.rs::lock_requires_python_unbounded
+- [x] lock.rs::lock_requires_python_disjoint
+- [ ] lock.rs::lock_requires_python_maximum_version
+- [ ] lock.rs::lock_requires_python_fewest_versions
+- [ ] lock.rs::lock_python_version_marker_complement
+- [x] lock.rs::lock_dev
+- [x] lock.rs::lock_conditional_unconditional
+- [x] lock.rs::lock_multiple_markers
+- [ ] lock.rs::lock_relative_and_absolute_paths
+- [x] lock.rs::lock_cycles
+- [ ] lock.rs::lock_new_extras
+- [x] lock.rs::lock_invalid_hash
+- [ ] lock.rs::lock_mixed_hashes
+- [x] lock.rs::lock_resolution_mode
+- [ ] lock.rs::lock_requires_python_no_wheels
+- [ ] lock.rs::lock_same_version_multiple_urls
+- [ ] lock.rs::lock_unsafe_lowest
+- [ ] lock.rs::lock_exclusion
+- [ ] lock.rs::lock_relative_lock_deserialization
+- [x] lock.rs::lock_non_workspace_source
+- [x] lock.rs::lock_no_workspace_source
+- [ ] lock.rs::lock_peer_member
+- [x] lock.rs::lock_index_workspace_member
+- [ ] lock.rs::lock_dev_transitive
+- [ ] lock.rs::lock_redact_https
+- [ ] lock.rs::lock_index_url_username_change_no_update
+- [ ] lock.rs::lock_redact_git_pep508
+- [ ] lock.rs::lock_redact_git_sources
+- [ ] lock.rs::lock_redact_git_pep508_non_project
+- [ ] lock.rs::lock_redact_index_sources
+- [ ] lock.rs::lock_redact_url_sources
+- [ ] lock.rs::lock_env_credentials
+- [ ] lock.rs::lock_multiple_indexes_same_realm_different_credentials
+- [ ] lock.rs::lock_multiple_indexes_same_realm_different_credentials_trailing_slash
+- [ ] lock.rs::lock_relative_index
+- [ ] lock.rs::lock_no_sources
+- [ ] lock.rs::lock_migrate
+- [x] lock.rs::lock_upgrade_package
+- [ ] lock.rs::lock_upgrade_drop_fork_markers
+- [x] lock.rs::lock_warn_missing_transitive_lower_bounds
+- [ ] lock.rs::lock_find_links_local_wheel
+- [ ] lock.rs::lock_find_links_ignore_explicit_index
+- [ ] lock.rs::lock_find_links_relative_url
+- [ ] lock.rs::lock_find_links_local_sdist
+- [ ] lock.rs::lock_find_links_http_wheel
+- [ ] lock.rs::lock_find_links_http_sdist
+- [ ] lock.rs::lock_find_links_explicit_index
+- [ ] lock.rs::lock_find_links_higher_priority_index
+- [ ] lock.rs::lock_find_links_lower_priority_index
+- [ ] lock.rs::lock_local_index
+- [ ] lock.rs::lock_sources_url
+- [ ] lock.rs::lock_sources_archive
+- [ ] lock.rs::lock_sources_source_tree
+- [ ] lock.rs::lock_editable
+- [ ] lock.rs::lock_mixed_extras
+- [ ] lock.rs::lock_transitive_extra
+- [ ] lock.rs::lock_mismatched_sources
+- [ ] lock.rs::lock_mismatched_versions
+- [ ] lock.rs::lock_no_sources_package
+- [ ] lock.rs::lock_no_sources_package_multiple
+- [ ] lock.rs::lock_no_sources_with_no_sources_package
+- [ ] lock.rs::lock_no_sources_package_env_var
+- [ ] lock.rs::unconditional_overlapping_marker_disjoint_version_constraints
+- [x] lock.rs::check_no_lock
+- [x] lock.rs::check_outdated_lock
+- [ ] lock.rs::normalize_false_marker_dependency_groups
+- [ ] lock.rs::normalize_false_marker_requires_dist
+- [ ] lock.rs::lock_change_index
+- [ ] lock.rs::lock_remove_member
+- [ ] lock.rs::lock_add_member_with_build_system
+- [ ] lock.rs::lock_add_member_without_build_system
+- [ ] lock.rs::lock_redundant_add_member
+- [ ] lock.rs::lock_new_constraints
+- [ ] lock.rs::lock_remove_member_non_project
+- [ ] lock.rs::lock_rename_project
+- [ ] lock.rs::lock_missing_metadata
+- [ ] lock.rs::lock_dev_dependencies_alias
+- [ ] lock.rs::lock_reorder
+- [ ] lock.rs::lock_narrowed_python_version_upper
+- [ ] lock.rs::lock_narrowed_python_version
+- [ ] lock.rs::lock_exclude_unnecessary_python_forks
+- [ ] lock.rs::lock_constrained_environment
+- [ ] lock.rs::lock_constrained_environment_legacy
+- [ ] lock.rs::lock_overlapping_environment
+- [ ] lock.rs::lock_non_project_fork
+- [ ] lock.rs::lock_non_project_conditional
+- [ ] lock.rs::lock_non_project_group
+- [ ] lock.rs::lock_non_project_sources
+- [ ] lock.rs::lock_dropped_dev_extra
+- [ ] lock.rs::lock_empty_dev_dependencies
+- [ ] lock.rs::lock_empty_dependency_group
+- [ ] lock.rs::lock_add_empty_dependency_group
+- [ ] lock.rs::lock_trailing_slash_index_url
+- [x] lock.rs::lock_invalid_index
+- [ ] lock.rs::lock_explicit_index
+- [ ] lock.rs::lock_explicit_default_index
+- [ ] lock.rs::lock_named_index
+- [ ] lock.rs::lock_default_index
+- [ ] lock.rs::lock_named_index_cli
+- [ ] lock.rs::lock_repeat_named_index
+- [ ] lock.rs::lock_repeat_named_index_member
+- [ ] lock.rs::lock_unique_named_index
+- [ ] lock.rs::lock_repeat_named_index_cli
+- [ ] lock.rs::lock_named_index_overlap
+- [ ] lock.rs::lock_explicit_virtual_project
+- [ ] lock.rs::lock_implicit_virtual_project
+- [ ] lock.rs::lock_implicit_package_path
+- [ ] lock.rs::lock_conflicting_environment
+- [ ] lock.rs::lock_split_python_environment
+- [ ] lock.rs::lock_python_upper_bound
+- [ ] lock.rs::lock_simplified_environments
+- [ ] lock.rs::lock_dependency_metadata
+- [ ] lock.rs::lock_dependency_metadata_git
+- [ ] lock.rs::lock_strip_fragment
+- [ ] lock.rs::lock_request_requires_python
+- [ ] lock.rs::lock_duplicate_sources
+- [ ] lock.rs::lock_invalid_project_table
+- [x] lock.rs::lock_missing_name
+- [x] lock.rs::lock_missing_version
+- [ ] lock.rs::lock_unsupported_version
+- [ ] lock.rs::lock_change_requires_python
+- [ ] lock.rs::lock_keyring_credentials
+- [ ] lock.rs::lock_keyring_explicit_always
+- [ ] lock.rs::lock_keyring_credentials_always_authenticate_fetches_username
+- [ ] lock.rs::lock_keyring_credentials_always_authenticate_unsupported_mode
+- [ ] lock.rs::lock_multiple_sources
+- [ ] lock.rs::lock_multiple_sources_conflict
+- [ ] lock.rs::lock_multiple_sources_no_marker
+- [ ] lock.rs::lock_multiple_sources_index_disjoint_markers
+- [ ] lock.rs::lock_multiple_sources_index_mixed
+- [ ] lock.rs::lock_multiple_sources_index_non_total
+- [ ] lock.rs::lock_multiple_sources_index_explicit
+- [ ] lock.rs::lock_multiple_sources_non_total
+- [ ] lock.rs::lock_multiple_sources_respect_marker
+- [ ] lock.rs::lock_multiple_sources_extra
+- [ ] lock.rs::lock_multiple_sources_index_overlapping_extras
+- [ ] lock.rs::lock_multiple_index_with_missing_extra
+- [ ] lock.rs::lock_multiple_index_with_absent_extra
+- [ ] lock.rs::lock_multiple_index_with_missing_group
+- [ ] lock.rs::lock_multiple_index_with_absent_group
+- [x] lock.rs::lock_dry_run
+- [x] lock.rs::lock_dry_run_noop
+- [ ] lock.rs::lock_group_include
+- [ ] lock.rs::lock_group_requires_python
+- [ ] lock.rs::lock_group_includes_requires_python
+- [ ] lock.rs::lock_group_requires_undefined_group
+- [ ] lock.rs::lock_group_requires_dev_dep
+- [ ] lock.rs::lock_group_includes_requires_python_contradiction
+- [ ] lock.rs::lock_group_include_cycle
+- [ ] lock.rs::lock_group_include_dev
+- [x] lock.rs::lock_group_include_missing
+- [x] lock.rs::lock_group_invalid_entry_package
+- [x] lock.rs::lock_group_invalid_entry_group_name
+- [x] lock.rs::lock_group_invalid_duplicate_group_name
+- [x] lock.rs::lock_group_invalid_entry_table
+- [x] lock.rs::lock_group_invalid_entry_type
+- [x] lock.rs::lock_group_empty_entry_table
+- [x] lock.rs::lock_group_workspace
+- [ ] lock.rs::lock_transitive_git
+- [ ] lock.rs::lock_dynamic_version
+- [ ] lock.rs::lock_dynamic_version_dependencies
+- [ ] lock.rs::lock_dynamic_version_no_build
+- [x] lock.rs::lock_dynamic_version_workspace_member
+- [ ] lock.rs::lock_dynamic_version_path_dependency
+- [ ] lock.rs::lock_dynamic_version_self_extra_hatchling
+- [ ] lock.rs::lock_dynamic_version_self_extra_setuptools
+- [ ] lock.rs::lock_dynamic_built_cache
+- [ ] lock.rs::lock_shared_build_dependency
+- [ ] lock.rs::lock_dynamic_to_static
+- [ ] lock.rs::lock_static_to_dynamic
+- [ ] lock.rs::lock_bump_static_version
+- [ ] lock.rs::lock_derivation_chain_prod
+- [ ] lock.rs::lock_derivation_chain_extra
+- [ ] lock.rs::lock_derivation_chain_group
+- [ ] lock.rs::lock_derivation_chain_extended
+- [ ] lock.rs::mismatched_name_self_editable
+- [ ] lock.rs::lock_relative_project
+- [ ] lock.rs::lock_recursive_extra
+- [ ] lock.rs::no_lowest_warning_with_name_and_url
+- [ ] lock.rs::lock_no_build_static_metadata
+- [ ] lock.rs::lock_no_build_dynamic_metadata
+- [ ] lock.rs::lock_self_compatible
+- [ ] lock.rs::lock_self_exact
+- [ ] lock.rs::lock_self_incompatible
+- [ ] lock.rs::lock_self_extra_to_extra_compatible
+- [ ] lock.rs::lock_self_extra_to_same_extra_incompatible
+- [ ] lock.rs::lock_self_extra_to_other_extra_incompatible
+- [ ] lock.rs::lock_self_extra_compatible
+- [ ] lock.rs::lock_self_extra_incompatible
+- [ ] lock.rs::lock_self_marker_compatible
+- [ ] lock.rs::lock_self_marker_incompatible
+- [ ] lock.rs::lock_split_on_windows
+- [ ] lock.rs::lock_missing_git_prefix
+- [x] lock.rs::lock_arm
+- [x] lock.rs::lock_x86_64
+- [x] lock.rs::lock_x86
+- [ ] lock.rs::lock_script
+- [ ] lock.rs::lock_script_path
+- [ ] lock.rs::lock_script_initialize
+- [ ] lock.rs::lock_pytorch_cpu
+- [ ] lock.rs::lock_pytorch_index_preferences
+- [ ] lock.rs::lock_intel_mac
+- [ ] lock.rs::lock_pytorch_local_preference
+- [ ] lock.rs::windows_arm
+- [ ] lock.rs::windows_amd64_required
+- [ ] lock.rs::windows_arm64_required
+- [x] lock.rs::lock_empty_extra
+- [ ] lock.rs::lock_invalid_fork_markers
+- [ ] lock.rs::lock_omit_wheels_exclude_newer
+- [ ] lock.rs::lock_conflict_for_disjoint_python_version
+- [ ] lock.rs::lock_requires_python_empty_lock_file
+- [ ] lock.rs::lock_conflict_for_disjoint_platform
+- [ ] lock.rs::lock_trailing_slash_index_url_in_pyproject_not_index_argument
+- [ ] lock.rs::lock_trailing_slash_index_url_in_lockfile_not_pyproject
+- [ ] lock.rs::lock_trailing_slash_index_url_in_pyproject_and_not_lockfile
+- [ ] lock.rs::lock_trailing_slash_index_url_in_lockfile_and_pyproject_toml
+- [ ] lock.rs::lock_trailing_slash_find_links
+- [x] lock.rs::lock_prefix_match
+- [ ] lock.rs::test_tilde_equals_python_version
+- [ ] lock.rs::lock_exclude_newer_package_disable
+- [ ] lock.rs::lock_exclude_newer_package
+- [ ] lock.rs::lock_path_dependency_explicit_index
+- [x] lock.rs::lock_path_dependency_explicit_index_workspace_member
+- [ ] lock.rs::lock_path_dependency_mixed_indexes
+- [ ] lock.rs::lock_path_dependency_no_index
+- [ ] lock.rs::lock_nested_path_dependency_explicit_index
+- [ ] lock.rs::lock_circular_path_dependency_explicit_index
+- [x] lock.rs::lock_android
+- [x] lock.rs::lock_required_intersection
+- [x] lock.rs::lock_refresh
+- [ ] lock.rs::collapsed_error_with_marker_packages
+- [ ] lock.rs::no_warning_without_and_with_lower_bound
+- [ ] lock.rs::lock_unsupported_wheel_url_requires_python
+- [ ] lock.rs::lock_unsupported_wheel_url_required_platform
+- [ ] lock.rs::lock_check_multiple_default_indexes_explicit_assignment_dependency_group
+- [ ] lock_conflict.rs::extra_basic
+- [ ] lock_conflict.rs::extra_basic_three_extras
+- [ ] lock_conflict.rs::extra_multiple_not_conflicting1
+- [ ] lock_conflict.rs::extra_multiple_not_conflicting2
+- [ ] lock_conflict.rs::extra_multiple_independent
+- [ ] lock_conflict.rs::extra_config_change_ignore_lockfile
+- [ ] lock_conflict.rs::extra_unconditional
+- [ ] lock_conflict.rs::extra_unconditional_non_conflicting
+- [ ] lock_conflict.rs::extra_unconditional_in_optional
+- [ ] lock_conflict.rs::extra_unconditional_non_local_conflict
+- [ ] lock_conflict.rs::extra_nested_across_workspace
+- [ ] lock_conflict.rs::extra_depends_on_conflicting_extra
+- [ ] lock_conflict.rs::extra_depends_on_conflicting_extra_transitive
+- [ ] lock_conflict.rs::group_basic
+- [ ] lock_conflict.rs::group_default
+- [ ] lock_conflict.rs::mixed
+- [ ] lock_conflict.rs::multiple_sources_index_disjoint_extras
+- [ ] lock_conflict.rs::multiple_sources_index_disjoint_groups
+- [ ] lock_conflict.rs::multiple_sources_index_disjoint_extras_with_extra
+- [ ] lock_conflict.rs::multiple_sources_index_disjoint_extras_with_marker
+- [ ] lock_conflict.rs::non_optional_dependency_extra
+- [ ] lock_conflict.rs::non_optional_dependency_group
+- [ ] lock_conflict.rs::non_optional_dependency_mixed
+- [ ] lock_conflict.rs::shared_optional_dependency_extra1
+- [ ] lock_conflict.rs::shared_optional_dependency_group1
+- [ ] lock_conflict.rs::shared_optional_dependency_mixed1
+- [ ] lock_conflict.rs::shared_optional_dependency_extra2
+- [ ] lock_conflict.rs::shared_optional_dependency_group2
+- [ ] lock_conflict.rs::shared_optional_dependency_mixed2
+- [ ] lock_conflict.rs::shared_dependency_extra
+- [ ] lock_conflict.rs::shared_dependency_group
+- [ ] lock_conflict.rs::shared_dependency_mixed
+- [ ] lock_conflict.rs::extras_are_namespaced
+- [ ] lock_conflict.rs::jinja_no_conflict_markers1
+- [ ] lock_conflict.rs::jinja_no_conflict_markers2
+- [ ] lock_conflict.rs::collision_extra
+- [ ] lock_conflict.rs::extra_inferences
+- [ ] lock_conflict.rs::deduplicate_resolution_markers
+- [ ] lock_conflict.rs::incorrect_extra_simplification_leads_to_multiple_torch_packages
+- [ ] lock_conflict.rs::duplicate_torch_and_sympy_because_of_wrong_inferences
+- [ ] lock_conflict.rs::overlapping_resolution_markers
+- [ ] lock_conflict.rs::avoids_exponential_lock_file_growth
+- [ ] lock_conflict.rs::do_not_simplify_if_not_all_conflict_extras_satisfy_the_marker_by_themselves
+- [ ] lock_exclude_newer_relative.rs::lock_exclude_newer_relative
+- [ ] lock_exclude_newer_relative.rs::lock_exclude_newer_package_relative
+- [ ] lock_exclude_newer_relative.rs::lock_exclude_newer_relative_pyproject
+- [ ] lock_exclude_newer_relative.rs::lock_exclude_newer_package_relative_pyproject
+- [ ] lock_exclude_newer_relative.rs::lock_exclude_newer_relative_global_and_package
+- [ ] lock_exclude_newer_relative.rs::lock_exclude_newer_relative_values
+- [ ] lock_exclude_newer_relative.rs::lock_exclude_newer_relative_values_pyproject
+- [ ] lock_scenarios.rs::wrong_backtracking_basic
+- [ ] lock_scenarios.rs::wrong_backtracking_indirect
+- [ ] lock_scenarios.rs::fork_allows_non_conflicting_non_overlapping_dependencies
+- [ ] lock_scenarios.rs::fork_allows_non_conflicting_repeated_dependencies
+- [ ] lock_scenarios.rs::fork_basic
+- [ ] lock_scenarios.rs::conflict_in_fork
+- [ ] lock_scenarios.rs::fork_conflict_unsatisfiable
+- [ ] lock_scenarios.rs::fork_filter_sibling_dependencies
+- [ ] lock_scenarios.rs::fork_upgrade
+- [ ] lock_scenarios.rs::fork_incomplete_markers
+- [ ] lock_scenarios.rs::fork_marker_accrue
+- [ ] lock_scenarios.rs::fork_marker_disjoint
+- [ ] lock_scenarios.rs::fork_marker_inherit_combined_allowed
+- [ ] lock_scenarios.rs::fork_marker_inherit_combined_disallowed
+- [ ] lock_scenarios.rs::fork_marker_inherit_combined
+- [ ] lock_scenarios.rs::fork_marker_inherit_isolated
+- [ ] lock_scenarios.rs::fork_marker_inherit_transitive
+- [ ] lock_scenarios.rs::fork_marker_inherit
+- [ ] lock_scenarios.rs::fork_marker_limited_inherit
+- [ ] lock_scenarios.rs::fork_marker_selection
+- [ ] lock_scenarios.rs::fork_marker_track
+- [ ] lock_scenarios.rs::fork_non_fork_marker_transitive
+- [ ] lock_scenarios.rs::fork_non_local_fork_marker_direct
+- [ ] lock_scenarios.rs::fork_non_local_fork_marker_transitive
+- [ ] lock_scenarios.rs::fork_overlapping_markers_basic
+- [ ] lock_scenarios.rs::preferences_dependent_forking_bistable
+- [ ] lock_scenarios.rs::preferences_dependent_forking_conflicting
+- [ ] lock_scenarios.rs::preferences_dependent_forking_tristable
+- [ ] lock_scenarios.rs::preferences_dependent_forking
+- [ ] lock_scenarios.rs::fork_remaining_universe_partitioning
+- [ ] lock_scenarios.rs::fork_requires_python_full_prerelease
+- [ ] lock_scenarios.rs::fork_requires_python_full
+- [ ] lock_scenarios.rs::fork_requires_python_patch_overlap
+- [ ] lock_scenarios.rs::fork_requires_python
+- [ ] lock_scenarios.rs::requires_python_wheels
+- [ ] lock_scenarios.rs::unreachable_package
+- [ ] lock_scenarios.rs::unreachable_wheels
+- [ ] lock_scenarios.rs::marker_variants_have_different_extras
+- [ ] lock_scenarios.rs::virtual_package_extra_priorities
+- [ ] lock_scenarios.rs::specific_architecture
+- [ ] network.rs::proxy_https_proxy_in_uv_toml
+- [x] pip_check.rs::check_compatible_packages
+- [x] pip_check.rs::check_incompatible_packages
+- [x] pip_check.rs::check_multiple_incompatible_packages
+- [x] pip_check.rs::check_python_version
+- [x] pip_compile.rs::compile_requirements_in
+- [x] pip_compile.rs::compile_requirements_in_annotation_line
+- [x] pip_compile.rs::compile_requirements_in_stdin
+- [x] pip_compile.rs::missing_requirements_in
+- [ ] pip_compile.rs::missing_venv
+- [x] pip_compile.rs::empty_output
+- [x] pip_compile.rs::compile_pyproject_toml
+- [x] pip_compile.rs::compile_pyproject_toml_dynamic_version
+- [x] pip_compile.rs::compile_pyproject_toml_with_line_annotation
+- [x] pip_compile.rs::compile_pyproject_toml_eager_validation
+- [x] pip_compile.rs::compile_constraints_txt
+- [ ] pip_compile.rs::compile_constraints_inline
+- [x] pip_compile.rs::compile_constraints_markers
+- [x] pip_compile.rs::compile_constraint_extra
+- [ ] pip_compile.rs::compile_constraints_omit_impossible_dependencies
+- [x] pip_compile.rs::compile_pyproject_toml_extra
+- [x] pip_compile.rs::compile_pyproject_toml_extra_name_normalization
+- [x] pip_compile.rs::compile_pyproject_toml_extra_missing
+- [x] pip_compile.rs::compile_pyproject_toml_poetry
+- [x] pip_compile.rs::compile_pyproject_toml_poetry_empty_dependencies
+- [x] pip_compile.rs::compile_pyproject_toml_poetry_invalid_dependencies
+- [x] pip_compile.rs::compile_pyproject_toml_setuptools
+- [x] pip_compile.rs::compile_setup_cfg
+- [x] pip_compile.rs::compile_setup_py
+- [x] pip_compile.rs::compile_pyproject_toml_invalid_name
+- [x] pip_compile.rs::compile_pyproject_toml_extras_missing
+- [x] pip_compile.rs::compile_requirements_file_extra
+- [x] pip_compile.rs::invalid_extra_name
+- [x] pip_compile.rs::compile_python_312
+- [x] pip_compile.rs::compile_python_312_annotation_line
+- [ ] pip_compile.rs::compile_fallback_interpreter
+- [x] pip_compile.rs::compile_python_conflicts
+- [ ] pip_compile.rs::compile_python_build_version_different_than_target
+- [ ] pip_compile.rs::compile_fallback_interpreter_broken_in_path
+- [x] pip_compile.rs::compile_python_312_no_deps
+- [x] pip_compile.rs::compile_python_37
+- [x] pip_compile.rs::compile_sdist_resolution_lowest
+- [x] pip_compile.rs::compile_python_invalid_version
+- [x] pip_compile.rs::compile_python_dev_version
+- [x] pip_compile.rs::omit_non_matching_annotation
+- [ ] pip_compile.rs::compile_numpy_py38
+- [x] pip_compile.rs::compile_wheel_url_dependency
+- [x] pip_compile.rs::compile_sdist_url_dependency
+- [x] pip_compile.rs::compile_git_https_dependency
+- [x] pip_compile.rs::compile_git_branch_https_dependency
+- [x] pip_compile.rs::compile_git_tag_https_dependency
+- [x] pip_compile.rs::compile_git_date_tag_https_dependency
+- [x] pip_compile.rs::compile_git_long_commit_https_dependency
+- [x] pip_compile.rs::compile_git_short_commit_https_dependency
+- [x] pip_compile.rs::compile_git_refs_https_dependency
+- [x] pip_compile.rs::compile_git_subdirectory_dependency
+- [x] pip_compile.rs::compile_git_concurrent_access
+- [x] pip_compile.rs::compile_git_unnamed_concurrent_access
+- [x] pip_compile.rs::compile_git_mismatched_name
+- [x] pip_compile.rs::compile_git_subdirectory_static_metadata
+- [x] pip_compile.rs::mixed_url_dependency
+- [x] pip_compile.rs::conflicting_direct_url_dependency
+- [x] pip_compile.rs::compatible_direct_url_dependency
+- [x] pip_compile.rs::conflicting_repeated_url_dependency_version_mismatch
+- [x] pip_compile.rs::conflicting_repeated_url_dependency_markers
+- [x] pip_compile.rs::conflicting_repeated_url_dependency_version_match
+- [x] pip_compile.rs::conflicting_transitive_url_dependency
+- [x] pip_compile.rs::compatible_repeated_url_dependency
+- [x] pip_compile.rs::conflicting_repeated_url_dependency
+- [x] pip_compile.rs::compatible_narrowed_url_dependency
+- [x] pip_compile.rs::compatible_broader_url_dependency
+- [x] pip_compile.rs::compatible_repeated_narrowed_url_dependency
+- [x] pip_compile.rs::incompatible_narrowed_url_dependency
+- [x] pip_compile.rs::allowed_transitive_git_dependency
+- [x] pip_compile.rs::allowed_transitive_url_dependency
+- [x] pip_compile.rs::allowed_transitive_canonical_url_dependency
+- [ ] pip_compile.rs::allowed_transitive_url_path_dependency
+- [x] pip_compile.rs::requirement_constraint_override_url
+- [x] pip_compile.rs::requirement_override_prerelease
+- [x] pip_compile.rs::compile_pyproject_toml_all_extras
+- [x] pip_compile.rs::compile_pyproject_toml_all_extras_annotation_line
+- [x] pip_compile.rs::compile_does_not_allow_both_extra_and_all_extras
+- [x] pip_compile.rs::compile_unsolvable_requirements
+- [x] pip_compile.rs::compile_unsolvable_requirements_version_not_available
+- [x] pip_compile.rs::compile_exclude_newer
+- [x] pip_compile.rs::compile_exclude_newer_package
+- [x] pip_compile.rs::compile_exclude_newer_package_errors
+- [ ] pip_compile.rs::compile_wheel_path_dependency
+- [ ] pip_compile.rs::compile_source_distribution_path_dependency
+- [ ] pip_compile.rs::compile_wheel_path_dependency_missing
+- [x] pip_compile.rs::compile_yanked_version_direct
+- [x] pip_compile.rs::compile_yanked_version_indirect
+- [x] pip_compile.rs::override_dependency
+- [x] pip_compile.rs::override_dependency_from_pyproject
+- [x] pip_compile.rs::constraint_dependency_from_pyproject
+- [ ] pip_compile.rs::override_dependency_from_specific_uv_toml
+- [x] pip_compile.rs::override_multi_dependency
+- [x] pip_compile.rs::dont_add_override_for_non_activated_extra
+- [ ] pip_compile.rs::override_dependency_from_workspace_invalid_syntax
+- [x] pip_compile.rs::override_dependency_url
+- [x] pip_compile.rs::override_dependency_unnamed_url
+- [x] pip_compile.rs::missing_registry_extra
+- [x] pip_compile.rs::missing_url_extra
+- [x] pip_compile.rs::preserve_url
+- [ ] pip_compile.rs::preserve_project_root
+- [ ] pip_compile.rs::respect_http_env_var
+- [ ] pip_compile.rs::respect_unnamed_env_var
+- [x] pip_compile.rs::error_missing_unnamed_env_var
+- [ ] pip_compile.rs::respect_file_env_var
+- [x] pip_compile.rs::compile_editable
+- [x] pip_compile.rs::deduplicate_editable
+- [x] pip_compile.rs::strip_fragment_unnamed
+- [x] pip_compile.rs::strip_fragment_named
+- [x] pip_compile.rs::recursive_extras_direct_url
+- [ ] pip_compile.rs::compile_editable_url_requirement
+- [x] pip_compile.rs::compile_html
+- [x] pip_compile.rs::trailing_slash
+- [x] pip_compile.rs::compile_legacy_sdist_pep_517
+- [x] pip_compile.rs::generate_hashes_registry
+- [x] pip_compile.rs::generate_hashes_source_distribution_url
+- [x] pip_compile.rs::generate_hashes_built_distribution_url
+- [x] pip_compile.rs::generate_hashes_git
+- [x] pip_compile.rs::generate_hashes_unnamed_url
+- [x] pip_compile.rs::generate_hashes_local_directory
+- [x] pip_compile.rs::generate_hashes_editable
+- [x] pip_compile.rs::generate_hashes_find_links_directory
+- [x] pip_compile.rs::generate_hashes_find_links_url
+- [x] pip_compile.rs::find_links_directory
+- [x] pip_compile.rs::find_links_url
+- [x] pip_compile.rs::find_links_env_var
+- [x] pip_compile.rs::find_links_requirements_txt
+- [x] pip_compile.rs::find_links_uv_env_var
+- [ ] pip_compile.rs::avoid_irrelevant_extras
+- [ ] pip_compile.rs::avoid_irrelevant_recursive_extras
+- [x] pip_compile.rs::requires_python_prefetch
+- [x] pip_compile.rs::upgrade_none
+- [x] pip_compile.rs::upgrade_all
+- [x] pip_compile.rs::upgrade_package
+- [x] pip_compile.rs::upgrade_constraint
+- [ ] pip_compile.rs::missing_path_requirement
+- [x] pip_compile.rs::missing_editable_file
+- [x] pip_compile.rs::missing_editable_directory
+- [x] pip_compile.rs::unnamed_requirement_with_package_name
+- [x] pip_compile.rs::no_annotate
+- [x] pip_compile.rs::no_header
+- [x] pip_compile.rs::custom_compile_command
+- [x] pip_compile.rs::allow_unsafe
+- [x] pip_compile.rs::resolver_legacy
+- [x] pip_compile.rs::hide_index_urls
+- [x] pip_compile.rs::emit_index_urls
+- [x] pip_compile.rs::emit_find_links
+- [x] pip_compile.rs::emit_find_links_relative
+- [x] pip_compile.rs::emit_build_options
+- [x] pip_compile.rs::no_index_requirements_txt
+- [x] pip_compile.rs::index_url_requirements_txt
+- [x] pip_compile.rs::conflicting_index_urls_requirements_txt
+- [x] pip_compile.rs::matching_index_urls_requirements_txt
+- [x] pip_compile.rs::offline_registry
+- [ ] pip_compile.rs::offline_registry_backtrack
+- [x] pip_compile.rs::offline_find_links
+- [x] pip_compile.rs::offline_direct_url
+- [ ] pip_compile.rs::invalid_metadata_requires_python
+- [ ] pip_compile.rs::invalid_metadata_multiple_dist_info
+- [ ] pip_compile.rs::invalid_metadata_backtrack
+- [x] pip_compile.rs::compile_relative_subfile
+- [x] pip_compile.rs::compile_none_extra
+- [x] pip_compile.rs::compile_types_pytz
+- [ ] pip_compile.rs::compile_unnamed_preference
+- [x] pip_compile.rs::compile_constraints_compatible_url
+- [x] pip_compile.rs::compile_constraints_compatible_url_version
+- [x] pip_compile.rs::compile_constraints_incompatible_url
+- [x] pip_compile.rs::index_url_in_requirements
+- [x] pip_compile.rs::index_url_from_command_line
+- [x] pip_compile.rs::unsupported_scheme
+- [x] pip_compile.rs::no_deps_valid_extra
+- [x] pip_compile.rs::no_deps_invalid_extra
+- [ ] pip_compile.rs::no_deps_transitive_conflict
+- [ ] pip_compile.rs::editable_invalid_extra
+- [x] pip_compile.rs::no_strip_extra
+- [x] pip_compile.rs::no_strip_extras
+- [x] pip_compile.rs::no_strip_markers
+- [x] pip_compile.rs::no_strip_markers_multiple_markers
+- [x] pip_compile.rs::no_strip_markers_transitive_marker
+- [x] pip_compile.rs::universal
+- [x] pip_compile.rs::universal_conflicting
+- [x] pip_compile.rs::universal_cycles
+- [x] pip_compile.rs::universal_constraint
+- [x] pip_compile.rs::universal_constraint_marker
+- [x] pip_compile.rs::universal_multi_version
+- [ ] pip_compile.rs::universal_platform_fork
+- [x] pip_compile.rs::universal_disjoint_locals
+- [ ] pip_compile.rs::universal_transitive_disjoint_locals
+- [ ] pip_compile.rs::universal_local_path_requirement
+- [ ] pip_compile.rs::universal_overlapping_local_requirement
+- [ ] pip_compile.rs::universal_disjoint_local_requirement
+- [ ] pip_compile.rs::universal_disjoint_base_or_local_requirement
+- [ ] pip_compile.rs::universal_nested_overlapping_local_requirement
+- [ ] pip_compile.rs::universal_nested_disjoint_local_requirement
+- [x] pip_compile.rs::existing_prerelease_preference
+- [x] pip_compile.rs::universal_disjoint_prereleases
+- [ ] pip_compile.rs::universal_disjoint_prereleases_preference
+- [ ] pip_compile.rs::universal_disjoint_prereleases_preference_marker
+- [x] pip_compile.rs::universal_disjoint_prereleases_allow
+- [x] pip_compile.rs::universal_transitive_disjoint_prerelease_requirement
+- [x] pip_compile.rs::universal_prerelease_mode
+- [ ] pip_compile.rs::universal_overlapping_prerelease_requirement
+- [ ] pip_compile.rs::universal_disjoint_prerelease_requirement
+- [x] pip_compile.rs::universal_requires_python
+- [x] pip_compile.rs::universal_requires_python_incomplete
+- [ ] pip_compile.rs::universal_no_repeated_unconditional_distributions_1
+- [ ] pip_compile.rs::universal_no_repeated_unconditional_distributions_2
+- [x] pip_compile.rs::universal_prefer_upper_bounds
+- [x] pip_compile.rs::universal_unnecessary_python
+- [ ] pip_compile.rs::universal_marker_propagation
+- [x] pip_compile.rs::universal_disjoint_extra
+- [x] pip_compile.rs::universal_disjoint_extra_no_strip
+- [x] pip_compile.rs::universal_overlap_extra_base
+- [ ] pip_compile.rs::universal_overlap_extra_base_no_strip
+- [ ] pip_compile.rs::universal_overlap_extras
+- [ ] pip_compile.rs::universal_overlap_extras_no_strip
+- [ ] pip_compile.rs::universal_identical_extras
+- [ ] pip_compile.rs::universal_identical_extras_no_strip
+- [x] pip_compile.rs::compile_constraints_compatible_version
+- [x] pip_compile.rs::compile_constraints_incompatible_version
+- [ ] pip_compile.rs::conflicting_url_markers
+- [x] pip_compile.rs::editable_override
+- [x] pip_compile.rs::override_editable
+- [x] pip_compile.rs::override_with_compatible_constraint
+- [x] pip_compile.rs::override_with_incompatible_constraint
+- [ ] pip_compile.rs::unsafe_package
+- [x] pip_compile.rs::prerelease_upper_bound_exclude
+- [x] pip_compile.rs::prerelease_upper_bound_include
+- [x] pip_compile.rs::pre_alias
+- [x] pip_compile.rs::prerelease_constraint
+- [x] pip_compile.rs::compile_pyproject_toml_mutually_recursive_extra
+- [x] pip_compile.rs::compile_pyproject_toml_recursive_extra
+- [x] pip_compile.rs::compile_pyproject_toml_recursive_extra_marker
+- [x] pip_compile.rs::compile_pyproject_toml_deeply_recursive_extra
+- [x] pip_compile.rs::editable_direct_dependency
+- [ ] pip_compile.rs::empty_index_url_env_var
+- [ ] pip_compile.rs::empty_extra_index_url_env_var
+- [ ] pip_compile.rs::empty_index_url_env_var_override
+- [ ] pip_compile.rs::index_url_env_var_override
+- [ ] pip_compile.rs::expand_env_var_requirements_txt
+- [ ] pip_compile.rs::requires_python_editable
+- [ ] pip_compile.rs::requires_python_editable_target_version
+- [ ] pip_compile.rs::editable_optional_url
+- [ ] pip_compile.rs::editable_optional_lowest_direct
+- [ ] pip_compile.rs::metadata_2_2
+- [ ] pip_compile.rs::not_found_direct_url
+- [ ] pip_compile.rs::requires_python_direct_url
+- [ ] pip_compile.rs::compile_root_uri_editable
+- [ ] pip_compile.rs::compile_root_uri_non_editable
+- [x] pip_compile.rs::requirement_wheel_name_mismatch
+- [x] pip_compile.rs::preserve_hashes_no_upgrade
+- [x] pip_compile.rs::preserve_hashes_upgrade
+- [x] pip_compile.rs::preserve_hashes_no_existing_hashes
+- [x] pip_compile.rs::preserve_hashes_newer_version
+- [ ] pip_compile.rs::unnamed_path_requirement
+- [x] pip_compile.rs::unnamed_git_requirement
+- [x] pip_compile.rs::unnamed_https_requirement
+- [ ] pip_compile.rs::dynamic_dependencies
+- [ ] pip_compile.rs::emit_marker_expression_exciting_linux
+- [ ] pip_compile.rs::emit_marker_expression_direct
+- [x] pip_compile.rs::emit_marker_expression_conditional
+- [ ] pip_compile.rs::emit_marker_expression_pypy
+- [ ] pip_compile.rs::local_version_of_remote_package
+- [ ] pip_compile.rs::pendulum_no_tzdata_on_windows
+- [ ] pip_compile.rs::allow_recursive_url_local_path
+- [ ] pip_compile.rs::allow_recursive_url_local_path_override
+- [ ] pip_compile.rs::allow_recursive_url_local_path_override_constraint
+- [ ] pip_compile.rs::prerelease_path_requirement
+- [ ] pip_compile.rs::prerelease_editable_requirement
+- [x] pip_compile.rs::compile_index_url_first_match_base
+- [x] pip_compile.rs::compile_index_url_first_match_marker
+- [x] pip_compile.rs::compile_index_url_first_match_all_versions
+- [x] pip_compile.rs::compile_index_url_fallback
+- [x] pip_compile.rs::compile_index_url_fallback_prefer_primary
+- [x] pip_compile.rs::compile_index_url_unsafe_highest
+- [x] pip_compile.rs::compile_index_url_unsafe_lowest
+- [x] pip_compile.rs::emit_index_annotation_hide_password
+- [x] pip_compile.rs::emit_index_annotation_pypi_org_simple
+- [x] pip_compile.rs::emit_index_annotation_no_annotate
+- [x] pip_compile.rs::emit_index_annotation_line
+- [x] pip_compile.rs::emit_index_annotation_multiple_indexes
+- [ ] pip_compile.rs::no_version_for_direct_dependency
+- [x] pip_compile.rs::python_platform
+- [x] pip_compile.rs::git_source_default_branch
+- [x] pip_compile.rs::git_source_branch
+- [x] pip_compile.rs::git_source_tag
+- [x] pip_compile.rs::git_source_long_commit
+- [x] pip_compile.rs::git_source_short_commit
+- [x] pip_compile.rs::git_source_refs
+- [x] pip_compile.rs::git_source_missing_tag
+- [ ] pip_compile.rs::warn_missing_constraint
+- [ ] pip_compile.rs::dont_warn_missing_constraint_without_sources
+- [ ] pip_compile.rs::tool_uv_sources
+- [x] pip_compile.rs::invalid_tool_uv_sources
+- [ ] pip_compile.rs::dynamic_pyproject_toml
+- [ ] pip_compile.rs::file_url
+- [ ] pip_compile.rs::no_binary_only_binary
+- [ ] pip_compile.rs::ignore_invalid_constraint
+- [x] pip_compile.rs::incompatible_build_constraint
+- [x] pip_compile.rs::compatible_build_constraint
+- [x] pip_compile.rs::incompatible_build_constraint_in_pyproject_toml
+- [ ] pip_compile.rs::compatible_build_constraint_in_pyproject_toml
+- [ ] pip_compile.rs::incompatible_build_constraint_merged_with_pyproject_toml
+- [ ] pip_compile.rs::compatible_build_constraint_merged_with_pyproject_toml
+- [ ] pip_compile.rs::invalid_extra
+- [ ] pip_compile.rs::symlink
+- [ ] pip_compile.rs::universal_constrained_environment
+- [x] pip_compile.rs::compile_enumerate_no_versions
+- [x] pip_compile.rs::compile_requires_txt
+- [ ] pip_compile.rs::astroid_not_repeated
+- [ ] pip_compile.rs::tomli_less_than_python311
+- [ ] pip_compile.rs::importlib_metadata_not_repeated
+- [ ] pip_compile.rs::prune_unreachable
+- [ ] pip_compile.rs::unsupported_requires_python_static_metadata
+- [ ] pip_compile.rs::unsupported_requires_python_dynamic_metadata
+- [ ] pip_compile.rs::negation_not_imply_prerelease
+- [x] pip_compile.rs::lowest_direct_fork_min_python
+- [x] pip_compile.rs::lowest_fork_min_python
+- [x] pip_compile.rs::lowest_direct_fork_max_python
+- [x] pip_compile.rs::lowest_fork_max_python
+- [ ] pip_compile.rs::same_version_multi_index_incompatibility
+- [ ] pip_compile.rs::compile_derivation_chain
+- [ ] pip_compile.rs::invalid_platform
+- [ ] pip_compile.rs::universal_disjoint_deprecated_markers
+- [x] pip_compile.rs::universal_disjoint_override_urls
+- [x] pip_compile.rs::universal_conflicting_override_urls
+- [ ] pip_compile.rs::compile_lowest_extra_unpinned_warning
+- [ ] pip_compile.rs::disjoint_requires_python
+- [ ] pip_compile.rs::dynamic_version_source_dist
+- [ ] pip_compile.rs::max_python_requirement
+- [ ] pip_compile.rs::respect_index_preference
+- [ ] pip_compile.rs::dependency_group
+- [ ] pip_compile.rs::many_pyproject_group
+- [ ] pip_compile.rs::suspicious_group
+- [ ] pip_compile.rs::invalid_group
+- [ ] pip_compile.rs::project_and_group_workspace_inherit
+- [ ] pip_compile.rs::project_and_group_workspace
+- [ ] pip_compile.rs::directory_and_group
+- [ ] pip_compile.rs::group_target_does_not_exist
+- [ ] pip_compile.rs::compile_preserve_requires_python_split
+- [ ] pip_compile.rs::markers_on_extra_packages
+- [ ] pip_compile.rs::respect_non_local_preference
+- [ ] pip_compile.rs::omit_wheels_exclude_newer
+- [ ] pip_compile.rs::compile_quotes
+- [x] pip_compile.rs::compile_invalid_output_file
+- [x] pip_compile.rs::pep_751_filename
+- [x] pip_compile.rs::pep_751_compile_registry_wheel
+- [ ] pip_compile.rs::pep_751_compile_registry_sdist
+- [ ] pip_compile.rs::pep_751_compile_directory
+- [x] pip_compile.rs::pep_751_compile_git
+- [ ] pip_compile.rs::pep_751_compile_url_wheel
+- [ ] pip_compile.rs::pep_751_compile_url_sdist
+- [ ] pip_compile.rs::pep_751_compile_path_wheel
+- [ ] pip_compile.rs::pep_751_compile_path_sdist
+- [ ] pip_compile.rs::pep_751_compile_preferences
+- [x] pip_compile.rs::pep_751_compile_warn
+- [ ] pip_compile.rs::pep_751_compile_non_universal
+- [ ] pip_compile.rs::pep_751_compile_only_binary
+- [ ] pip_compile.rs::pep_751_compile_no_binary
+- [ ] pip_compile.rs::pep_751_compile_no_emit_package
+- [ ] pip_compile.rs::incompatible_cuda
+- [ ] pip_compile.rs::compile_broken_active_venv
+- [ ] pip_compile.rs::pubgrub_panic_double_self_dependency
+- [ ] pip_compile.rs::pubgrub_panic_double_self_dependency_extra
+- [x] pip_compile.rs::git_path_transitive_dependency
+- [ ] pip_compile.rs::omit_python_patch_universal
+- [ ] pip_compile.rs::credentials_from_subdirectory
+- [ ] pip_compile.rs::post_release_less_than
+- [ ] pip_compile.rs::compile_with_python_platform_and_built_wheel_for_different_platform
+- [ ] pip_compile.rs::compile_missing_python
+- [ ] pip_compile.rs::compile_missing_python_version
+- [ ] pip_compile.rs::compile_missing_python_version_patch_fallback
+- [ ] pip_compile.rs::compile_missing_python_version_default_fallback
+- [ ] pip_compile_scenarios.rs::compatible_python_incompatible_override
+- [ ] pip_compile_scenarios.rs::incompatible_python_compatible_override_available_no_wheels
+- [ ] pip_compile_scenarios.rs::incompatible_python_compatible_override_no_compatible_wheels
+- [ ] pip_compile_scenarios.rs::incompatible_python_compatible_override_other_wheel
+- [ ] pip_compile_scenarios.rs::incompatible_python_compatible_override_unavailable_no_wheels
+- [ ] pip_compile_scenarios.rs::incompatible_python_compatible_override
+- [ ] pip_compile_scenarios.rs::python_patch_override_no_patch
+- [ ] pip_compile_scenarios.rs::python_patch_override_patch_compatible
+- [x] pip_debug.rs::debug_warn
+- [x] pip_freeze.rs::freeze_many
+- [x] pip_freeze.rs::freeze_duplicate
+- [x] pip_freeze.rs::freeze_url
+- [x] pip_freeze.rs::freeze_with_editable
+- [x] pip_freeze.rs::freeze_with_egg_info
+- [x] pip_freeze.rs::freeze_with_egg_info_no_py
+- [x] pip_freeze.rs::freeze_with_egg_info_file
+- [x] pip_freeze.rs::freeze_with_legacy_editable
+- [x] pip_freeze.rs::freeze_path
+- [x] pip_freeze.rs::freeze_multiple_paths
+- [x] pip_freeze.rs::freeze_nonexistent_path
+- [x] pip_freeze.rs::freeze_with_quiet_flag
+- [x] pip_freeze.rs::freeze_target
+- [x] pip_freeze.rs::freeze_prefix
+- [x] pip_freeze.rs::freeze_exclude
+- [x] pip_install.rs::missing_requirements_txt
+- [x] pip_install.rs::empty_requirements_txt
+- [x] pip_install.rs::missing_pyproject_toml
+- [ ] pip_install.rs::missing_find_links
+- [x] pip_install.rs::invalid_pyproject_toml_syntax
+- [x] pip_install.rs::invalid_pyproject_toml_project_schema
+- [x] pip_install.rs::invalid_pyproject_toml_option_schema
+- [x] pip_install.rs::invalid_pyproject_toml_option_unknown_field
+- [x] pip_install.rs::invalid_toml_filename
+- [x] pip_install.rs::invalid_uv_toml_option_disallowed_automatic_discovery
+- [x] pip_install.rs::invalid_uv_toml_option_disallowed_command_line
+- [ ] pip_install.rs::cache_uv_toml_credentials
+- [ ] pip_install.rs::invalid_pyproject_toml_requirement_indirect
+- [x] pip_install.rs::invalid_python_version
+- [x] pip_install.rs::missing_pip
+- [x] pip_install.rs::no_solution
+- [x] pip_install.rs::install_package
+- [x] pip_install.rs::install_requirements_txt
+- [x] pip_install.rs::install_from_stdin
+- [ ] pip_install.rs::install_from_dev_stdin
+- [x] pip_install.rs::install_unsupported_flag
+- [x] pip_install.rs::install_requirements_txt_conflicting_pins
+- [ ] pip_install.rs::install_with_dependencies_from_script
+- [x] pip_install.rs::install_pyproject_toml_poetry
+- [x] pip_install.rs::respect_installed_and_reinstall
+- [x] pip_install.rs::reinstall_extras
+- [ ] pip_install.rs::reinstall_incomplete
+- [x] pip_install.rs::exact_install_removes_extraneous_packages
+- [ ] pip_install.rs::allow_incompatibilities
+- [x] pip_install.rs::install_extras
+- [x] pip_install.rs::install_editable
+- [ ] pip_install.rs::install_editable_and_registry
+- [ ] pip_install.rs::install_editable_no_binary
+- [ ] pip_install.rs::install_editable_compatible_constraint
+- [ ] pip_install.rs::install_editable_incompatible_constraint_version
+- [ ] pip_install.rs::install_editable_incompatible_constraint_url
+- [ ] pip_install.rs::install_editable_pep_508_requirements_txt
+- [ ] pip_install.rs::install_editable_pep_508_cli
+- [ ] pip_install.rs::install_editable_bare_cli
+- [ ] pip_install.rs::install_editable_bare_requirements_txt
+- [x] pip_install.rs::invalid_editable_no_url
+- [x] pip_install.rs::invalid_editable_unnamed_https_url
+- [x] pip_install.rs::invalid_editable_named_https_url
+- [ ] pip_install.rs::reinstall_build_system
+- [x] pip_install.rs::install_no_index
+- [x] pip_install.rs::install_no_index_version
+- [x] pip_install.rs::install_extra_index_url_has_priority
+- [ ] pip_install.rs::install_git_public_https
+- [x] pip_install.rs::install_implicit_git_public_https
+- [ ] pip_install.rs::update_ref_git_public_https
+- [x] pip_install.rs::install_git_public_https_missing_branch_or_tag
+- [x] pip_install.rs::install_git_public_https_missing_commit
+- [ ] pip_install.rs::install_git_public_https_exact_commit
+- [ ] pip_install.rs::install_git_private_https_pat
+- [ ] pip_install.rs::install_git_private_https_pat_mixed_with_public
+- [ ] pip_install.rs::install_git_private_https_multiple_pat
+- [ ] pip_install.rs::install_git_private_https_pat_at_ref
+- [ ] pip_install.rs::install_git_private_https_pat_and_username
+- [ ] pip_install.rs::install_git_private_https_pat_not_authorized
+- [ ] pip_install.rs::install_github_artifact_private_https_pat_mixed_with_public
+- [ ] pip_install.rs::install_github_artifact_private_https_multiple_pat
+- [ ] pip_install.rs::install_git_private_https_interactive
+- [ ] pip_install.rs::reinstall_no_binary
+- [x] pip_install.rs::install_no_binary_overrides_only_binary_all
+- [x] pip_install.rs::install_no_binary_comma_separated
+- [ ] pip_install.rs::install_no_binary_env
+- [x] pip_install.rs::install_only_binary_overrides_no_binary_all
+- [x] pip_install.rs::install_only_binary_comma_separated
+- [x] pip_install.rs::install_only_binary_all_and_no_binary_all
+- [ ] pip_install.rs::install_no_binary_cache
+- [ ] pip_install.rs::only_binary_requirements_txt
+- [ ] pip_install.rs::only_binary_editable
+- [ ] pip_install.rs::only_binary_dependent_editables
+- [ ] pip_install.rs::only_binary_editable_setup_py
+- [ ] pip_install.rs::no_prerelease_hint_source_builds
+- [ ] pip_install.rs::cache_priority
+- [ ] pip_install.rs::install_executable
+- [ ] pip_install.rs::install_executable_copy
+- [ ] pip_install.rs::install_executable_hardlink
+- [x] pip_install.rs::no_deps
+- [ ] pip_install.rs::no_deps_editable
+- [ ] pip_install.rs::install_no_downgrade
+- [x] pip_install.rs::install_upgrade
+- [x] pip_install.rs::install_constraints_txt
+- [ ] pip_install.rs::install_constraints_txt_from_stdin
+- [x] pip_install.rs::install_constraints_from_pyproject
+- [x] pip_install.rs::install_constraints_inline
+- [x] pip_install.rs::install_constraints_remote
+- [x] pip_install.rs::install_constraints_inline_remote
+- [x] pip_install.rs::install_constraints_extra
+- [ ] pip_install.rs::install_constraints_respects_offline_mode
+- [ ] pip_install.rs::install_git_source_respects_offline_mode
+- [ ] pip_install.rs::build_prerelease_hint
+- [x] pip_install.rs::install_constraints_with_markers
+- [ ] pip_install.rs::install_pinned_polars_invalid_metadata
+- [x] pip_install.rs::install_sdist_resolution_lowest
+- [ ] pip_install.rs::direct_url_zip_file_bunk_permissions
+- [ ] pip_install.rs::launcher
+- [ ] pip_install.rs::launcher_with_symlink
+- [ ] pip_install.rs::config_settings_registry
+- [ ] pip_install.rs::config_settings_path
+- [ ] pip_install.rs::reinstall_duplicate
+- [ ] pip_install.rs::install_symlink
+- [ ] pip_install.rs::invalidate_editable_on_change
+- [ ] pip_install.rs::editable_dynamic
+- [ ] pip_install.rs::invalidate_path_on_change
+- [ ] pip_install.rs::invalidate_path_on_cache_key
+- [ ] pip_install.rs::invalidate_path_on_commit
+- [ ] pip_install.rs::invalidate_path_on_env_var
+- [ ] pip_install.rs::path_name_version_change
+- [ ] pip_install.rs::path_changes_with_same_name
+- [ ] pip_install.rs::editable_url_with_marker
+- [ ] pip_install.rs::requires_python_editable
+- [ ] pip_install.rs::no_build_isolation
+- [ ] pip_install.rs::respect_no_build_isolation_env_var
+- [ ] pip_install.rs::install_utf16le_requirements
+- [ ] pip_install.rs::install_utf16be_requirements
+- [x] pip_install.rs::dry_run_install
+- [x] pip_install.rs::dry_run_install_url_dependency
+- [ ] pip_install.rs::dry_run_uninstall_url_dependency
+- [x] pip_install.rs::dry_run_install_already_installed
+- [ ] pip_install.rs::dry_run_install_transitive_dependency_already_installed
+- [ ] pip_install.rs::dry_run_install_then_upgrade
+- [ ] pip_install.rs::requires_python_direct_url
+- [ ] pip_install.rs::install_package_basic_auth_from_url
+- [ ] pip_install.rs::install_package_basic_auth_from_netrc_default
+- [ ] pip_install.rs::install_package_basic_auth_from_netrc
+- [ ] pip_install.rs::install_package_basic_auth_from_netrc_index_in_requirements
+- [ ] pip_install.rs::install_index_with_relative_links
+- [ ] pip_install.rs::install_package_basic_auth_from_keyring
+- [ ] pip_install.rs::install_package_basic_auth_from_keyring_wrong_password
+- [ ] pip_install.rs::install_package_basic_auth_from_keyring_wrong_username
+- [ ] pip_install.rs::install_index_with_relative_links_authenticated
+- [ ] pip_install.rs::install_site_packages_mtime_updated
+- [ ] pip_install.rs::deptry_gitignore
+- [ ] pip_install.rs::reinstall_no_index
+- [ ] pip_install.rs::already_installed_remote_dependencies
+- [ ] pip_install.rs::already_installed_dependent_editable
+- [ ] pip_install.rs::already_installed_local_path_dependent
+- [ ] pip_install.rs::already_installed_local_version_of_remote_package
+- [ ] pip_install.rs::already_installed_multiple_versions
+- [ ] pip_install.rs::already_installed_remote_url
+- [x] pip_install.rs::find_links
+- [x] pip_install.rs::find_links_no_binary
+- [x] pip_install.rs::require_hashes
+- [x] pip_install.rs::require_hashes_build_dependencies
+- [x] pip_install.rs::require_hashes_no_deps
+- [x] pip_install.rs::require_hashes_mismatch
+- [x] pip_install.rs::require_hashes_missing_dependency
+- [x] pip_install.rs::require_hashes_editable
+- [x] pip_install.rs::require_hashes_constraint
+- [x] pip_install.rs::require_hashes_unnamed
+- [x] pip_install.rs::require_hashes_unnamed_repeated
+- [x] pip_install.rs::require_hashes_override
+- [ ] pip_install.rs::install_with_overrides_from_stdin
+- [ ] pip_install.rs::install_with_excludes_from_stdin
+- [ ] pip_install.rs::require_hashes_marker
+- [x] pip_install.rs::verify_hashes
+- [x] pip_install.rs::verify_hashes_missing_version
+- [x] pip_install.rs::verify_hashes_mismatch
+- [x] pip_install.rs::verify_hashes_match
+- [x] pip_install.rs::verify_hashes_omit_dependency
+- [x] pip_install.rs::verify_hashes_editable
+- [ ] pip_install.rs::double_quoted_arguments
+- [ ] pip_install.rs::single_quoted_arguments
+- [ ] pip_install.rs::unquoted_arguments
+- [ ] pip_install.rs::concatenated_quoted_arguments
+- [ ] pip_install.rs::tool_uv_sources
+- [x] pip_install.rs::tool_uv_sources_is_in_preview
+- [ ] pip_install.rs::recursive_extra_transitive_url
+- [ ] pip_install.rs::prefer_editable
+- [ ] pip_install.rs::local_index_absolute
+- [ ] pip_install.rs::local_index_relative
+- [ ] pip_install.rs::local_index_requirements_txt_absolute
+- [ ] pip_install.rs::local_index_requirements_txt_relative
+- [ ] pip_install.rs::local_index_fallback
+- [ ] pip_install.rs::accept_existing_prerelease
+- [ ] pip_install.rs::unmanaged
+- [ ] pip_install.rs::install_relocatable
+- [ ] pip_install.rs::install_incompatible_python_version
+- [ ] pip_install.rs::install_incompatible_python_version_interpreter_broken_in_path
+- [ ] pip_install.rs::install_unsupported_environment_yml
+- [ ] pip_install.rs::incompatible_build_constraint
+- [ ] pip_install.rs::incompatible_build_constraint_from_stdin
+- [ ] pip_install.rs::compatible_build_constraint
+- [ ] pip_install.rs::incompatible_build_constraint_in_pyproject_toml
+- [ ] pip_install.rs::compatible_build_constraint_in_pyproject_toml
+- [ ] pip_install.rs::incompatible_build_constraint_merged_with_pyproject_toml
+- [ ] pip_install.rs::compatible_build_constraint_merged_with_pyproject_toml
+- [ ] pip_install.rs::install_build_isolation_package
+- [x] pip_install.rs::invalid_extension
+- [x] pip_install.rs::no_extension
+- [ ] pip_install.rs::switch_python_version
+- [ ] pip_install.rs::stale_egg_info
+- [ ] pip_install.rs::avoid_cached_wheel
+- [ ] pip_install.rs::missing_top_level
+- [ ] pip_install.rs::sklearn
+- [ ] pip_install.rs::resolve_derivation_chain
+- [ ] pip_install.rs::respect_no_installer_metadata_env_var
+- [ ] pip_install.rs::test_dynamic_version_sdist_wrong_version
+- [ ] pip_install.rs::build_tag
+- [x] pip_install.rs::missing_git_prefix
+- [x] pip_install.rs::missing_subdirectory_git
+- [ ] pip_install.rs::missing_subdirectory_url
+- [ ] pip_install.rs::bad_crc32
+- [ ] pip_install.rs::static_metadata_pyproject_toml
+- [ ] pip_install.rs::static_metadata_source_tree
+- [ ] pip_install.rs::static_metadata_already_installed
+- [ ] pip_install.rs::cyclic_build_dependency
+- [ ] pip_install.rs::direct_url_json_git_default
+- [ ] pip_install.rs::direct_url_json_git_tag
+- [ ] pip_install.rs::direct_url_json_direct_url
+- [ ] pip_install.rs::dependency_group
+- [ ] pip_install.rs::recursive_dependency_group
+- [ ] pip_install.rs::virtual_dependency_group
+- [ ] pip_install.rs::many_pyproject_group
+- [ ] pip_install.rs::other_sources_group
+- [ ] pip_install.rs::suspicious_group
+- [ ] pip_install.rs::invalid_group
+- [ ] pip_install.rs::project_and_group
+- [ ] pip_install.rs::directory_and_group
+- [ ] pip_install.rs::no_sources_workspace_discovery
+- [ ] pip_install.rs::pip_install_no_sources_package
+- [ ] pip_install.rs::unsupported_git_scheme
+- [ ] pip_install.rs::change_layout_src
+- [ ] pip_install.rs::change_layout_custom_directory
+- [ ] pip_install.rs::pep_751_install_registry_wheel
+- [ ] pip_install.rs::pep_751_install_registry_sdist
+- [ ] pip_install.rs::pep_751_install_directory
+- [ ] pip_install.rs::pep_751_install_git
+- [ ] pip_install.rs::pep_751_install_url_wheel
+- [ ] pip_install.rs::pep_751_install_url_sdist
+- [ ] pip_install.rs::pep_751_install_path_wheel
+- [ ] pip_install.rs::pep_751_install_path_sdist
+- [ ] pip_install.rs::pep_751_hash_mismatch
+- [ ] pip_install.rs::pep_751_mix
+- [ ] pip_install.rs::pep_751_multiple_sources
+- [ ] pip_install.rs::pep_751_groups
+- [ ] pip_install.rs::pep_751_requires_python
+- [ ] pip_install.rs::reserved_script_name
+- [ ] pip_install.rs::pep_751_dependency
+- [ ] pip_install.rs::conflicting_flags_clap_bug
+- [ ] pip_install.rs::offline_refresh_conflict
+- [ ] pip_install.rs::strip_shebang_arguments
+- [ ] pip_install.rs::install_python_preference
+- [ ] pip_install.rs::config_settings_package
+- [ ] pip_install.rs::reject_invalid_archive_member_names
+- [ ] pip_install.rs::reject_invalid_streaming_zip
+- [ ] pip_install.rs::reject_invalid_double_zip
+- [ ] pip_install.rs::reject_invalid_central_directory_offset
+- [ ] pip_install.rs::reject_invalid_crc32_mismatch
+- [ ] pip_install.rs::reject_invalid_crc32_non_data_descriptor
+- [ ] pip_install.rs::reject_invalid_duplicate_extra_field
+- [ ] pip_install.rs::reject_invalid_short_usize
+- [ ] pip_install.rs::reject_invalid_chained_extra_field
+- [ ] pip_install.rs::reject_invalid_short_usize_zip64
+- [ ] pip_install.rs::already_installed_url_dependency_no_sources
+- [ ] pip_install.rs::pip_install_build_dependencies_respect_locked_versions
+- [ ] pip_install.rs::overlapping_packages_warning
+- [ ] pip_install.rs::transitive_dependency_config_settings_invalidation
+- [ ] pip_install.rs::switch_platform
+- [ ] pip_install.rs::pip_install_no_sources_editable_to_registry_switch
+- [ ] pip_install.rs::install_with_system_interpreter
+- [ ] pip_install.rs::install_missing_python_no_target
+- [ ] pip_install.rs::install_missing_python_with_target
+- [ ] pip_install.rs::install_missing_python_version_with_target
+- [ ] pip_install.rs::build_backend_wrong_wheel_platform
+- [ ] pip_install.rs::record_uses_forward_slashes
+- [ ] pip_install.rs::abi3_wheel_on_freethreaded_python
+- [ ] pip_install_scenarios.rs::requires_exact_version_does_not_exist
+- [ ] pip_install_scenarios.rs::requires_greater_version_does_not_exist
+- [ ] pip_install_scenarios.rs::requires_less_version_does_not_exist
+- [ ] pip_install_scenarios.rs::requires_package_does_not_exist
+- [ ] pip_install_scenarios.rs::transitive_requires_package_does_not_exist
+- [ ] pip_install_scenarios.rs::dependency_excludes_non_contiguous_range_of_compatible_versions
+- [ ] pip_install_scenarios.rs::dependency_excludes_range_of_compatible_versions
+- [ ] pip_install_scenarios.rs::excluded_only_compatible_version
+- [ ] pip_install_scenarios.rs::excluded_only_version
+- [ ] pip_install_scenarios.rs::all_extras_required
+- [ ] pip_install_scenarios.rs::extra_does_not_exist_backtrack
+- [ ] pip_install_scenarios.rs::extra_incompatible_with_extra_not_requested
+- [ ] pip_install_scenarios.rs::extra_incompatible_with_extra
+- [ ] pip_install_scenarios.rs::extra_incompatible_with_root
+- [ ] pip_install_scenarios.rs::extra_required
+- [ ] pip_install_scenarios.rs::missing_extra
+- [ ] pip_install_scenarios.rs::multiple_extras_required
+- [ ] pip_install_scenarios.rs::direct_incompatible_versions
+- [ ] pip_install_scenarios.rs::transitive_incompatible_versions
+- [ ] pip_install_scenarios.rs::transitive_incompatible_with_root_version
+- [ ] pip_install_scenarios.rs::transitive_incompatible_with_transitive
+- [ ] pip_install_scenarios.rs::local_greater_than_or_equal
+- [ ] pip_install_scenarios.rs::local_greater_than
+- [ ] pip_install_scenarios.rs::local_less_than_or_equal
+- [ ] pip_install_scenarios.rs::local_less_than
+- [ ] pip_install_scenarios.rs::local_not_latest
+- [ ] pip_install_scenarios.rs::local_not_used_with_sdist
+- [ ] pip_install_scenarios.rs::local_simple
+- [ ] pip_install_scenarios.rs::local_transitive_backtrack
+- [ ] pip_install_scenarios.rs::local_transitive_conflicting
+- [ ] pip_install_scenarios.rs::local_transitive_confounding
+- [ ] pip_install_scenarios.rs::local_transitive_greater_than_or_equal
+- [ ] pip_install_scenarios.rs::local_transitive_greater_than
+- [ ] pip_install_scenarios.rs::local_transitive_less_than_or_equal
+- [ ] pip_install_scenarios.rs::local_transitive_less_than
+- [ ] pip_install_scenarios.rs::local_transitive
+- [ ] pip_install_scenarios.rs::local_used_without_sdist
+- [ ] pip_install_scenarios.rs::post_equal_available
+- [ ] pip_install_scenarios.rs::post_equal_not_available
+- [ ] pip_install_scenarios.rs::post_greater_than_or_equal_post
+- [ ] pip_install_scenarios.rs::post_greater_than_or_equal
+- [ ] pip_install_scenarios.rs::post_greater_than_post_not_available
+- [ ] pip_install_scenarios.rs::post_greater_than_post
+- [ ] pip_install_scenarios.rs::post_greater_than
+- [ ] pip_install_scenarios.rs::post_less_than_or_equal
+- [ ] pip_install_scenarios.rs::post_less_than
+- [ ] pip_install_scenarios.rs::post_local_greater_than_post
+- [ ] pip_install_scenarios.rs::post_local_greater_than
+- [ ] pip_install_scenarios.rs::post_simple
+- [ ] pip_install_scenarios.rs::package_multiple_prereleases_kinds
+- [ ] pip_install_scenarios.rs::package_multiple_prereleases_numbers
+- [ ] pip_install_scenarios.rs::package_only_prereleases_boundary
+- [ ] pip_install_scenarios.rs::package_only_prereleases_in_range
+- [ ] pip_install_scenarios.rs::package_only_prereleases
+- [ ] pip_install_scenarios.rs::package_prerelease_specified_mixed_available
+- [ ] pip_install_scenarios.rs::package_prerelease_specified_only_final_available
+- [ ] pip_install_scenarios.rs::package_prerelease_specified_only_prerelease_available
+- [ ] pip_install_scenarios.rs::package_prereleases_boundary
+- [ ] pip_install_scenarios.rs::package_prereleases_global_boundary
+- [ ] pip_install_scenarios.rs::package_prereleases_specifier_boundary
+- [ ] pip_install_scenarios.rs::requires_package_only_prereleases_in_range_global_opt_in
+- [ ] pip_install_scenarios.rs::requires_package_prerelease_and_final_any
+- [ ] pip_install_scenarios.rs::transitive_package_only_prereleases_in_range_opt_in
+- [ ] pip_install_scenarios.rs::transitive_package_only_prereleases_in_range
+- [ ] pip_install_scenarios.rs::transitive_package_only_prereleases
+- [ ] pip_install_scenarios.rs::transitive_prerelease_and_stable_dependency_many_versions_holes
+- [ ] pip_install_scenarios.rs::transitive_prerelease_and_stable_dependency_many_versions
+- [ ] pip_install_scenarios.rs::transitive_prerelease_and_stable_dependency_opt_in
+- [ ] pip_install_scenarios.rs::transitive_prerelease_and_stable_dependency
+- [ ] pip_install_scenarios.rs::python_greater_than_current_backtrack
+- [ ] pip_install_scenarios.rs::python_greater_than_current_excluded
+- [ ] pip_install_scenarios.rs::python_greater_than_current_many
+- [ ] pip_install_scenarios.rs::python_greater_than_current_patch
+- [ ] pip_install_scenarios.rs::python_greater_than_current
+- [ ] pip_install_scenarios.rs::python_less_than_current
+- [ ] pip_install_scenarios.rs::python_version_does_not_exist
+- [ ] pip_install_scenarios.rs::no_binary
+- [ ] pip_install_scenarios.rs::no_build
+- [ ] pip_install_scenarios.rs::no_sdist_no_wheels_with_matching_abi
+- [ ] pip_install_scenarios.rs::no_sdist_no_wheels_with_matching_platform
+- [ ] pip_install_scenarios.rs::no_sdist_no_wheels_with_matching_python
+- [ ] pip_install_scenarios.rs::no_wheels_no_build
+- [ ] pip_install_scenarios.rs::no_wheels_with_matching_platform
+- [ ] pip_install_scenarios.rs::no_wheels
+- [ ] pip_install_scenarios.rs::only_wheels_no_binary
+- [ ] pip_install_scenarios.rs::only_wheels
+- [ ] pip_install_scenarios.rs::specific_tag_and_default
+- [ ] pip_install_scenarios.rs::package_only_yanked_in_range
+- [ ] pip_install_scenarios.rs::package_only_yanked
+- [ ] pip_install_scenarios.rs::package_yanked_specified_mixed_available
+- [ ] pip_install_scenarios.rs::requires_package_yanked_and_unyanked_any
+- [ ] pip_install_scenarios.rs::transitive_package_only_yanked_in_range_opt_in
+- [ ] pip_install_scenarios.rs::transitive_package_only_yanked_in_range
+- [ ] pip_install_scenarios.rs::transitive_package_only_yanked
+- [ ] pip_install_scenarios.rs::transitive_yanked_and_unyanked_dependency_opt_in
+- [ ] pip_install_scenarios.rs::transitive_yanked_and_unyanked_dependency
+- [x] pip_list.rs::list_empty_columns
+- [x] pip_list.rs::list_empty_freeze
+- [x] pip_list.rs::list_empty_json
+- [x] pip_list.rs::list_single_no_editable
+- [x] pip_list.rs::list_outdated_columns
+- [x] pip_list.rs::list_outdated_json
+- [x] pip_list.rs::list_outdated_freeze
+- [x] pip_list.rs::list_outdated_git
+- [x] pip_list.rs::list_outdated_index
+- [x] pip_list.rs::list_editable
+- [x] pip_list.rs::list_editable_only
+- [x] pip_list.rs::list_exclude
+- [x] pip_list.rs::list_format_json
+- [x] pip_list.rs::list_format_freeze
+- [x] pip_list.rs::list_legacy_editable
+- [x] pip_list.rs::list_legacy_editable_invalid_version
+- [x] pip_list.rs::list_ignores_quiet_flag_format_freeze
+- [x] pip_list.rs::list_target
+- [x] pip_list.rs::list_prefix
+- [x] pip_show.rs::show_empty
+- [x] pip_show.rs::show_requires_multiple
+- [x] pip_show.rs::show_python_version_marker
+- [x] pip_show.rs::show_found_single_package
+- [x] pip_show.rs::show_found_multiple_packages
+- [x] pip_show.rs::show_found_one_out_of_three
+- [x] pip_show.rs::show_found_one_out_of_two_quiet
+- [x] pip_show.rs::show_empty_quiet
+- [x] pip_show.rs::show_editable
+- [x] pip_show.rs::show_required_by_multiple
+- [x] pip_show.rs::show_files
+- [x] pip_show.rs::show_target
+- [x] pip_show.rs::show_prefix
+- [x] pip_sync.rs::missing_requirements_txt
+- [x] pip_sync.rs::missing_venv
+- [ ] pip_sync.rs::missing_system
+- [x] pip_sync.rs::install
+- [x] pip_sync.rs::install_copy
+- [x] pip_sync.rs::install_hardlink
+- [x] pip_sync.rs::install_symlink
+- [x] pip_sync.rs::install_symlink_no_cache
+- [x] pip_sync.rs::install_many
+- [x] pip_sync.rs::noop
+- [x] pip_sync.rs::pip_sync_empty
+- [x] pip_sync.rs::link
+- [x] pip_sync.rs::add_remove
+- [x] pip_sync.rs::install_sequential
+- [x] pip_sync.rs::upgrade
+- [x] pip_sync.rs::install_url
+- [x] pip_sync.rs::install_git_commit
+- [x] pip_sync.rs::install_git_tag
+- [ ] pip_sync.rs::install_git_subdirectories
+- [x] pip_sync.rs::install_sdist
+- [x] pip_sync.rs::install_sdist_url
+- [ ] pip_sync.rs::install_sdist_archive_type_bz2
+- [ ] pip_sync.rs::install_url_then_install_url
+- [ ] pip_sync.rs::install_url_then_install_version
+- [ ] pip_sync.rs::install_version_then_install_url
+- [ ] pip_sync.rs::install_numpy_py38
+- [x] pip_sync.rs::install_no_index
+- [ ] pip_sync.rs::install_no_index_cached
+- [x] pip_sync.rs::warn_on_yanked
+- [x] pip_sync.rs::warn_on_yanked_dry_run
+- [ ] pip_sync.rs::install_local_wheel
+- [ ] pip_sync.rs::mismatched_version
+- [ ] pip_sync.rs::mismatched_name
+- [ ] pip_sync.rs::install_local_source_distribution
+- [ ] pip_sync.rs::install_build_system_no_backend
+- [ ] pip_sync.rs::install_url_source_dist_cached
+- [ ] pip_sync.rs::install_git_source_dist_cached
+- [ ] pip_sync.rs::install_registry_source_dist_cached
+- [ ] pip_sync.rs::install_path_source_dist_cached
+- [ ] pip_sync.rs::install_path_built_dist_cached
+- [ ] pip_sync.rs::install_url_built_dist_cached
+- [x] pip_sync.rs::duplicate_package_overlap
+- [x] pip_sync.rs::duplicate_package_disjoint
+- [x] pip_sync.rs::reinstall
+- [x] pip_sync.rs::reinstall_package
+- [ ] pip_sync.rs::reinstall_git
+- [ ] pip_sync.rs::refresh
+- [ ] pip_sync.rs::refresh_package
+- [ ] pip_sync.rs::sync_editable
+- [ ] pip_sync.rs::sync_editable_and_registry
+- [ ] pip_sync.rs::sync_editable_and_local
+- [x] pip_sync.rs::incompatible_wheel
+- [ ] pip_sync.rs::sync_legacy_sdist_pep_517
+- [ ] pip_sync.rs::find_links
+- [ ] pip_sync.rs::find_links_no_index_match
+- [ ] pip_sync.rs::find_links_offline_match
+- [ ] pip_sync.rs::find_links_offline_no_match
+- [ ] pip_sync.rs::find_links_wheel_cache
+- [ ] pip_sync.rs::find_links_source_cache
+- [ ] pip_sync.rs::offline
+- [x] pip_sync.rs::compatible_constraint
+- [x] pip_sync.rs::incompatible_constraint
+- [x] pip_sync.rs::irrelevant_constraint
+- [x] pip_sync.rs::repeat_requirement_identical
+- [x] pip_sync.rs::repeat_requirement_compatible
+- [x] pip_sync.rs::repeat_requirement_incompatible
+- [ ] pip_sync.rs::tar_dont_preserve_mtime
+- [ ] pip_sync.rs::set_read_permissions
+- [ ] pip_sync.rs::pip_entrypoints
+- [ ] pip_sync.rs::invalidate_on_change
+- [ ] pip_sync.rs::compile
+- [ ] pip_sync.rs::recompile
+- [ ] pip_sync.rs::requires_python_editable
+- [ ] pip_sync.rs::requires_python_direct_url
+- [x] pip_sync.rs::require_hashes_unknown_algorithm
+- [x] pip_sync.rs::require_hashes_missing_hash
+- [x] pip_sync.rs::require_hashes_missing_version
+- [x] pip_sync.rs::require_hashes_invalid_operator
+- [x] pip_sync.rs::require_hashes_wheel_no_binary
+- [x] pip_sync.rs::require_hashes_wheel_only_binary
+- [x] pip_sync.rs::require_hashes_source_no_binary
+- [x] pip_sync.rs::require_hashes_source_only_binary
+- [x] pip_sync.rs::require_hashes_wrong_digest
+- [x] pip_sync.rs::require_hashes_wrong_algorithm
+- [x] pip_sync.rs::require_hashes_source_url
+- [x] pip_sync.rs::require_hashes_source_url_mismatch
+- [x] pip_sync.rs::require_hashes_wheel_url
+- [x] pip_sync.rs::require_hashes_wheel_url_mismatch
+- [ ] pip_sync.rs::require_hashes_git
+- [ ] pip_sync.rs::require_hashes_source_tree
+- [ ] pip_sync.rs::require_hashes_re_download
+- [ ] pip_sync.rs::require_hashes_wheel_path
+- [ ] pip_sync.rs::require_hashes_wheel_path_mismatch
+- [ ] pip_sync.rs::require_hashes_source_path
+- [ ] pip_sync.rs::require_hashes_source_path_mismatch
+- [ ] pip_sync.rs::require_hashes_unnamed
+- [ ] pip_sync.rs::require_hashes_editable
+- [ ] pip_sync.rs::require_hashes_repeated_dependency
+- [ ] pip_sync.rs::require_hashes_repeated_hash
+- [ ] pip_sync.rs::require_hashes_at_least_one
+- [ ] pip_sync.rs::require_hashes_find_links_no_hash
+- [ ] pip_sync.rs::require_hashes_find_links_valid_hash
+- [ ] pip_sync.rs::require_hashes_find_links_invalid_hash
+- [ ] pip_sync.rs::require_hashes_registry_no_hash
+- [ ] pip_sync.rs::require_hashes_registry_valid_hash
+- [ ] pip_sync.rs::require_hashes_registry_invalid_hash
+- [ ] pip_sync.rs::require_hashes_url
+- [ ] pip_sync.rs::require_hashes_url_other_fragment
+- [ ] pip_sync.rs::require_hashes_url_invalid
+- [ ] pip_sync.rs::require_hashes_url_ignore
+- [ ] pip_sync.rs::require_hashes_url_unnamed
+- [ ] pip_sync.rs::target_built_distribution
+- [ ] pip_sync.rs::target_source_distribution
+- [ ] pip_sync.rs::target_no_build_isolation
+- [ ] pip_sync.rs::target_system
+- [ ] pip_sync.rs::prefix
+- [ ] pip_sync.rs::preserve_markers
+- [ ] pip_sync.rs::incompatible_build_constraint
+- [ ] pip_sync.rs::compatible_build_constraint
+- [ ] pip_sync.rs::sync_seed
+- [ ] pip_sync.rs::sanitize
+- [ ] pip_sync.rs::semicolon_trailing_space
+- [ ] pip_sync.rs::semicolon_no_space
+- [ ] pip_sync.rs::pep_751
+- [ ] pip_sync.rs::pep_751_wheel_only
+- [ ] pip_sync.rs::pep_751_build_options
+- [ ] pip_sync.rs::pep_751_direct_url_tags
+- [ ] pip_sync.rs::incompatible_python_version_direct_url
+- [ ] pip_sync.rs::incompatible_platform_direct_url
+- [ ] pip_sync.rs::sync_missing_python_no_target
+- [ ] pip_sync.rs::sync_with_target_installs_missing_python
+- [x] pip_tree.rs::no_package
+- [x] pip_tree.rs::prune_last_in_the_subgroup
+- [x] pip_tree.rs::single_package
+- [x] pip_tree.rs::nested_dependencies
+- [x] pip_tree.rs::reverse
+- [x] pip_tree.rs::invert
+- [x] pip_tree.rs::depth
+- [x] pip_tree.rs::prune
+- [x] pip_tree.rs::removed_dependency
+- [x] pip_tree.rs::multiple_packages
+- [x] pip_tree.rs::cycle
+- [x] pip_tree.rs::multiple_packages_shared_descendant
+- [x] pip_tree.rs::no_dedupe_and_invert
+- [x] pip_tree.rs::no_dedupe
+- [x] pip_tree.rs::with_editable
+- [x] pip_tree.rs::package_flag
+- [x] pip_tree.rs::show_version_specifiers_simple
+- [x] pip_tree.rs::show_version_specifiers_with_invert
+- [x] pip_tree.rs::show_version_specifiers_with_package
+- [x] pip_tree.rs::print_output_even_with_quite_flag
+- [x] pip_tree.rs::outdated
+- [x] pip_tree.rs::no_duplicate_dependencies_with_markers
+- [x] pip_uninstall.rs::no_arguments
+- [x] pip_uninstall.rs::invalid_requirement
+- [x] pip_uninstall.rs::missing_requirements_txt
+- [x] pip_uninstall.rs::invalid_requirements_txt_requirement
+- [x] pip_uninstall.rs::uninstall
+- [x] pip_uninstall.rs::missing_record
+- [x] pip_uninstall.rs::uninstall_editable_by_name
+- [x] pip_uninstall.rs::uninstall_by_path
+- [x] pip_uninstall.rs::uninstall_duplicate_by_path
+- [x] pip_uninstall.rs::uninstall_duplicate
+- [x] pip_uninstall.rs::uninstall_egg_info
+- [x] pip_uninstall.rs::uninstall_legacy_editable
+- [x] pip_uninstall.rs::dry_run_uninstall_egg_info
+- [ ] publish.rs::username_password_no_longer_supported
+- [ ] publish.rs::invalid_token
+- [ ] publish.rs::mixed_credentials
+- [ ] publish.rs::missing_trusted_publishing_permission
+- [ ] publish.rs::no_credentials
+- [ ] publish.rs::skip_existing_redirect
+- [ ] publish.rs::dubious_filenames
+- [ ] publish.rs::check_keyring_behaviours
+- [ ] publish.rs::invalid_index
+- [x] python_dir.rs::python_dir
+- [x] python_find.rs::python_find
+- [x] python_find.rs::python_find_pin
+- [x] python_find.rs::python_find_pin_arbitrary_name
+- [x] python_find.rs::python_find_project
+- [x] python_find.rs::virtual_empty
+- [x] python_find.rs::virtual_dependency_group
+- [ ] python_find.rs::python_find_venv
+- [x] python_find.rs::python_find_unsupported_version
+- [ ] python_find.rs::python_find_venv_invalid
+- [ ] python_find.rs::python_find_managed
+- [ ] python_find.rs::python_required_python_major_minor
+- [ ] python_find.rs::python_find_script
+- [ ] python_find.rs::python_find_script_no_environment
+- [ ] python_find.rs::python_find_script_python_not_found
+- [ ] python_find.rs::python_find_script_no_such_version
+- [x] python_find.rs::python_find_show_version
+- [x] python_find.rs::python_find_path
+- [ ] python_find.rs::python_find_freethreaded_313
+- [ ] python_find.rs::python_find_freethreaded_314
+- [ ] python_find.rs::python_find_prerelease_version_specifiers
+- [ ] python_find.rs::python_find_prerelease_with_patch_request
+- [x] python_install.rs::python_install
+- [x] python_install.rs::python_reinstall
+- [x] python_install.rs::python_reinstall_patch
+- [x] python_install.rs::python_install_automatic
+- [x] python_install.rs::regression_cpython
+- [x] python_install.rs::python_install_force
+- [x] python_install.rs::python_install_minor
+- [x] python_install.rs::python_install_multiple_patch
+- [x] python_install.rs::python_install_preview
+- [x] python_install.rs::python_install_preview_no_bin
+- [x] python_install.rs::python_install_preview_upgrade
+- [x] python_install.rs::python_install_freethreaded
+- [x] python_install.rs::python_upgrade_not_allowed
+- [x] python_install.rs::python_install_debug
+- [x] python_install.rs::python_install_debug_freethreaded
+- [x] python_install.rs::python_install_invalid_request
+- [x] python_install.rs::python_install_default
+- [x] python_install.rs::python_install_default_preview
+- [x] python_install.rs::python_install_unknown
+- [x] python_install.rs::python_install_broken_link
+- [x] python_install.rs::python_install_default_prerelease
+- [x] python_install.rs::python_install_default_from_env
+- [x] python_install.rs::python_install_patch_dylib
+- [x] python_install.rs::python_install_prerelease
+- [x] python_install.rs::python_find_prerelease
+- [x] python_install.rs::python_install_cached
+- [x] python_install.rs::python_install_no_cache
+- [x] python_install.rs::python_install_emulated_macos
+- [x] python_install.rs::python_install_emulated_windows_x86_on_x64
+- [x] python_install.rs::install_transparent_patch_upgrade_uv_venv
+- [x] python_install.rs::install_multiple_patches
+- [x] python_install.rs::uninstall_highest_patch
+- [x] python_install.rs::install_no_transparent_upgrade_with_venv_patch_specification
+- [x] python_install.rs::install_transparent_patch_upgrade_venv_module
+- [x] python_install.rs::install_lower_patch_automatically
+- [x] python_install.rs::uninstall_last_patch
+- [x] python_install.rs::python_install_pyodide
+- [x] python_install.rs::python_install_build_version
+- [x] python_install.rs::python_install_build_version_pypy
+- [x] python_install.rs::python_install_upgrade
+- [x] python_install.rs::python_install_upgrade_version_file
+- [x] python_install.rs::python_install_armv7
+- [x] python_install.rs::python_install_compile_bytecode
+- [x] python_install.rs::python_install_compile_bytecode_existing
+- [x] python_install.rs::python_install_compile_bytecode_upgrade
+- [x] python_install.rs::python_install_compile_bytecode_multiple
+- [x] python_install.rs::python_install_compile_bytecode_pyodide
+- [x] python_install.rs::python_install_compile_bytecode_graalpy
+- [x] python_install.rs::python_install_compile_bytecode_pypy
+- [x] python_list.rs::python_list
+- [x] python_list.rs::python_list_pin
+- [ ] python_list.rs::python_list_venv
+- [x] python_list.rs::python_list_unsupported_version
+- [x] python_list.rs::python_list_duplicate_path_entries
+- [x] python_list.rs::python_list_downloads
+- [ ] python_list.rs::python_list_downloads_installed
+- [x] python_list.rs::python_list_with_mirrors
+- [x] python_module.rs::find_uv_bin_venv
+- [x] python_module.rs::find_uv_bin_target
+- [x] python_module.rs::find_uv_bin_prefix
+- [x] python_module.rs::find_uv_bin_base_prefix
+- [x] python_module.rs::find_uv_bin_in_ephemeral_environment
+- [x] python_module.rs::find_uv_bin_in_parent_of_ephemeral_environment
+- [x] python_module.rs::find_uv_bin_user_bin
+- [x] python_module.rs::find_uv_bin_error_message
+- [x] python_module.rs::find_uv_bin_py38
+- [x] python_module.rs::find_uv_bin_py39
+- [x] python_module.rs::find_uv_bin_py310
+- [x] python_module.rs::find_uv_bin_py311
+- [x] python_module.rs::find_uv_bin_py312
+- [x] python_module.rs::find_uv_bin_py313
+- [x] python_module.rs::find_uv_bin_py314
+- [x] python_pin.rs::python_pin
+- [x] python_pin.rs::python_pin_global_if_no_local
+- [x] python_pin.rs::python_pin_global_use_local_if_available
+- [x] python_pin.rs::python_pin_global_creates_parent_dirs
+- [x] python_pin.rs::python_pin_no_python
+- [x] python_pin.rs::python_pin_compatible_with_requires_python
+- [x] python_pin.rs::warning_pinned_python_version_not_installed
+- [x] python_pin.rs::python_pin_resolve_no_python
+- [x] python_pin.rs::python_pin_resolve
+- [x] python_pin.rs::python_pin_with_comments
+- [ ] python_pin.rs::python_pin_install
+- [x] python_pin.rs::python_pin_rm
+- [x] python_upgrade.rs::python_upgrade
+- [x] python_upgrade.rs::python_upgrade_without_version
+- [x] python_upgrade.rs::python_upgrade_transparent_from_venv
+- [x] python_upgrade.rs::python_upgrade_transparent_from_venv_preview
+- [x] python_upgrade.rs::python_upgrade_ignored_with_python_pin
+- [x] python_upgrade.rs::python_no_transparent_upgrade_with_venv_patch_specification
+- [x] python_upgrade.rs::python_transparent_upgrade_venv_venv
+- [x] python_upgrade.rs::python_upgrade_transparent_from_venv_module
+- [x] python_upgrade.rs::python_upgrade_transparent_from_venv_module_in_venv
+- [x] python_upgrade.rs::python_upgrade_force_install
+- [x] python_upgrade.rs::python_upgrade_implementation
+- [ ] run.rs::run_with_python_version
+- [x] run.rs::run_args
+- [x] run.rs::run_no_args
+- [x] run.rs::run_pep723_script
+- [x] run.rs::run_pep723_script_requires_python
+- [ ] run.rs::run_pythonw_script
+- [ ] run.rs::run_pep723_script_metadata
+- [ ] run.rs::run_pep723_script_index
+- [ ] run.rs::run_pep723_script_constraints
+- [ ] run.rs::run_pep723_script_overrides
+- [ ] run.rs::run_pep723_script_build_constraints
+- [ ] run.rs::run_pep723_script_lock
+- [ ] run.rs::run_managed_false
+- [x] run.rs::run_exact
+- [x] run.rs::run_with
+- [ ] run.rs::run_with_pyvenv_cfg_file
+- [ ] run.rs::run_with_overlay_interpreter
+- [ ] run.rs::run_with_build_constraints
+- [x] run.rs::run_in_workspace
+- [ ] run.rs::run_with_editable
+- [x] run.rs::run_group
+- [x] run.rs::run_locked
+- [x] run.rs::run_frozen
+- [x] run.rs::run_no_sync
+- [ ] run.rs::run_no_sync_env_var
+- [x] run.rs::run_empty_requirements_txt
+- [x] run.rs::run_requirements_txt
+- [ ] run.rs::run_requirements_txt_arguments
+- [ ] run.rs::run_editable
+- [ ] run.rs::run_from_directory
+- [ ] run.rs::run_without_output
+- [ ] run.rs::run_isolated_python_version
+- [ ] run.rs::run_no_project
+- [ ] run.rs::run_stdin
+- [x] run.rs::run_package
+- [ ] run.rs::run_zipapp
+- [x] run.rs::run_stdin_args
+- [x] run.rs::run_module
+- [x] run.rs::run_module_stdin
+- [ ] run.rs::virtual_empty
+- [ ] run.rs::run_isolated_incompatible_python
+- [ ] run.rs::run_isolated_does_not_modify_lock
+- [ ] run.rs::run_isolated_with_frozen
+- [ ] run.rs::run_compiled_python_file
+- [x] run.rs::run_exit_code
+- [x] run.rs::run_invalid_project_table
+- [ ] run.rs::run_script_without_build_system
+- [ ] run.rs::run_script_module_conflict
+- [ ] run.rs::run_script_explicit
+- [ ] run.rs::run_script_explicit_stdin
+- [ ] run.rs::run_script_explicit_no_file
+- [ ] run.rs::run_script_explicit_directory
+- [ ] run.rs::run_gui_script_explicit_windows
+- [ ] run.rs::run_gui_script_explicit_stdin_windows
+- [ ] run.rs::run_gui_script_explicit_unix
+- [ ] run.rs::run_linked_environment_path
+- [ ] run.rs::run_active_project_environment
+- [ ] run.rs::run_active_script_environment
+- [ ] run.rs::run_gui_script_explicit_stdin_unix
+- [ ] run.rs::run_remote_pep723_script
+- [ ] run.rs::run_url_like_with_local_file_priority
+- [ ] run.rs::run_stdin_with_pep723
+- [x] run.rs::run_with_env
+- [x] run.rs::run_with_env_file
+- [x] run.rs::run_with_multiple_env_files
+- [ ] run.rs::run_with_env_omitted
+- [x] run.rs::run_with_malformed_env
+- [x] run.rs::run_with_not_existing_env_file
+- [x] run.rs::run_with_extra_conflict
+- [ ] run.rs::run_with_group_conflict
+- [x] run.rs::run_default_groups
+- [ ] run.rs::run_groups_requires_python
+- [ ] run.rs::run_groups_include_requires_python
+- [ ] run.rs::exit_status_signal
+- [ ] run.rs::run_repeated
+- [ ] run.rs::run_without_overlay
+- [ ] run.rs::detect_infinite_recursion
+- [ ] run.rs::run_uv_variable
+- [ ] run.rs::run_windows_legacy_scripts
+- [ ] run.rs::run_pep723_script_with_constraints_lock
+- [ ] run.rs::run_pep723_script_with_constraints
+- [ ] run.rs::run_no_sync_incompatible_python
+- [ ] run.rs::run_python_preference_no_project
+- [ ] run.rs::isolate_child_environment
+- [ ] run.rs::run_only_group_and_extra_conflict
+- [x] run.rs::run_target_workspace_discovery
+- [ ] self_update.rs::check_self_update
+- [x] self_update.rs::test_self_update_offline_error
+- [ ] show_settings.rs::resolve_uv_toml
+- [ ] show_settings.rs::resolve_pyproject_toml
+- [ ] show_settings.rs::resolve_index_url
+- [ ] show_settings.rs::resolve_find_links
+- [ ] show_settings.rs::resolve_top_level
+- [ ] show_settings.rs::resolve_user_configuration
+- [ ] show_settings.rs::resolve_tool
+- [ ] show_settings.rs::resolve_poetry_toml
+- [ ] show_settings.rs::resolve_both
+- [ ] show_settings.rs::resolve_both_special_fields
+- [ ] show_settings.rs::invalid_conflicts
+- [ ] show_settings.rs::valid_conflicts
+- [ ] show_settings.rs::resolve_config_file
+- [ ] show_settings.rs::resolve_skip_empty
+- [ ] show_settings.rs::allow_insecure_host
+- [ ] show_settings.rs::index_priority
+- [ ] show_settings.rs::verify_hashes
+- [ ] show_settings.rs::preview_features
+- [ ] show_settings.rs::upgrade_pip_cli_config_interaction
+- [ ] show_settings.rs::upgrade_project_cli_config_interaction
+- [ ] show_settings.rs::build_isolation_override
+- [x] sync.rs::sync
+- [x] sync.rs::locked
+- [x] sync.rs::frozen
+- [x] sync.rs::empty
+- [x] sync.rs::package
+- [x] sync.rs::multiple_packages
+- [x] sync.rs::sync_json
+- [x] sync.rs::sync_dry_json
+- [ ] sync.rs::mixed_requires_python
+- [ ] sync.rs::group_requires_python_useful_defaults
+- [ ] sync.rs::group_requires_python_useful_non_defaults
+- [x] sync.rs::check
+- [ ] sync.rs::sync_legacy_non_project_dev_dependencies
+- [ ] sync.rs::sync_legacy_non_project_frozen
+- [ ] sync.rs::sync_legacy_non_project_group
+- [ ] sync.rs::sync_legacy_non_project_frozen_modification
+- [ ] sync.rs::sync_build_isolation
+- [ ] sync.rs::sync_build_isolation_package
+- [ ] sync.rs::sync_build_isolation_package_order
+- [ ] sync.rs::sync_build_isolation_extra
+- [ ] sync.rs::sync_extra_build_dependencies
+- [ ] sync.rs::sync_extra_build_dependencies_setuptools_legacy
+- [ ] sync.rs::sync_extra_build_dependencies_setuptools
+- [ ] sync.rs::sync_extra_build_dependencies_sources
+- [ ] sync.rs::sync_extra_build_dependencies_index
+- [ ] sync.rs::sync_extra_build_dependencies_sources_from_child
+- [ ] sync.rs::sync_build_dependencies_module_error_hints
+- [ ] sync.rs::sync_reset_state
+- [ ] sync.rs::sync_relative_wheel
+- [x] sync.rs::sync_environment
+- [x] sync.rs::sync_dev
+- [x] sync.rs::sync_group
+- [x] sync.rs::sync_include_group
+- [x] sync.rs::sync_exclude_group
+- [ ] sync.rs::sync_exclude_group_with_environment_variable
+- [ ] sync.rs::sync_dev_group
+- [x] sync.rs::sync_non_existent_group
+- [ ] sync.rs::sync_corner_groups
+- [x] sync.rs::sync_non_existent_default_group
+- [ ] sync.rs::sync_default_groups
+- [ ] sync.rs::sync_default_groups_all
+- [x] sync.rs::sync_default_groups_gibberish
+- [ ] sync.rs::sync_disable_default_groups_with_environment_variable
+- [ ] sync.rs::sync_disable_default_groups_all_with_environment_variable
+- [ ] sync.rs::sync_group_member
+- [ ] sync.rs::sync_group_legacy_non_project_member
+- [ ] sync.rs::sync_group_self
+- [x] sync.rs::sync_non_existent_extra
+- [x] sync.rs::sync_non_existent_extra_no_optional_dependencies
+- [ ] sync.rs::sync_ignore_extras_check_when_no_provides_extras
+- [x] sync.rs::sync_workspace_members_with_transitive_dependencies
+- [x] sync.rs::sync_non_existent_extra_workspace_member
+- [x] sync.rs::sync_non_existent_extra_non_project_workspace
+- [ ] sync.rs::read_metadata_statically_over_the_cache
+- [x] sync.rs::no_install_project
+- [x] sync.rs::no_install_workspace
+- [ ] sync.rs::no_install_local
+- [ ] sync.rs::no_install_package
+- [ ] sync.rs::no_install_project_no_build
+- [ ] sync.rs::sync_extra_build_dependencies_script
+- [ ] sync.rs::sync_extra_build_dependencies_script_sources
+- [ ] sync.rs::virtual_no_build
+- [x] sync.rs::virtual_empty
+- [x] sync.rs::virtual_dependency_group
+- [ ] sync.rs::virtual_no_build_dynamic_cached
+- [ ] sync.rs::virtual_no_build_dynamic_no_cache
+- [ ] sync.rs::convert_to_virtual
+- [ ] sync.rs::convert_to_package
+- [ ] sync.rs::sync_custom_environment_path
+- [ ] sync.rs::sync_active_project_environment
+- [ ] sync.rs::sync_active_script_environment
+- [ ] sync.rs::sync_active_script_environment_json
+- [x] sync.rs::sync_workspace_custom_environment_path
+- [ ] sync.rs::sync_empty_virtual_environment
+- [ ] sync.rs::sync_legacy_non_project_warning
+- [ ] sync.rs::sync_update_project
+- [ ] sync.rs::sync_environment_prompt
+- [x] sync.rs::no_binary
+- [x] sync.rs::no_binary_error
+- [x] sync.rs::no_build
+- [x] sync.rs::no_build_error
+- [ ] sync.rs::sync_wheel_url_source_error
+- [ ] sync.rs::sync_wheel_path_source_error
+- [ ] sync.rs::sync_override_package
+- [ ] sync.rs::transitive_dev
+- [ ] sync.rs::sync_no_editable
+- [ ] sync.rs::sync_scripts_without_build_system
+- [ ] sync.rs::sync_scripts_project_not_packaged
+- [ ] sync.rs::sync_dynamic_extra
+- [x] sync.rs::build_system_requires_workspace
+- [ ] sync.rs::build_system_requires_path
+- [ ] sync.rs::sync_invalid_environment
+- [ ] sync.rs::sync_partial_environment_delete
+- [ ] sync.rs::sync_no_sources_missing_member
+- [ ] sync.rs::sync_no_sources_package
+- [ ] sync.rs::sync_python_version
+- [x] sync.rs::sync_explicit
+- [ ] sync.rs::sync_all
+- [ ] sync.rs::sync_all_extras
+- [ ] sync.rs::sync_all_extras_dynamic
+- [ ] sync.rs::sync_all_groups
+- [ ] sync.rs::sync_multiple_sources_index_disjoint_extras
+- [ ] sync.rs::sync_derivation_chain
+- [ ] sync.rs::sync_derivation_chain_extra
+- [ ] sync.rs::sync_derivation_chain_group
+- [ ] sync.rs::sync_stale_egg_info
+- [ ] sync.rs::sync_git_repeated_member_static_metadata
+- [ ] sync.rs::sync_git_repeated_member_dynamic_metadata
+- [ ] sync.rs::sync_git_repeated_member_backwards_path
+- [ ] sync.rs::mismatched_name_self_editable
+- [ ] sync.rs::mismatched_name_cached_wheel
+- [ ] sync.rs::sync_git_path_dependency
+- [ ] sync.rs::sync_build_tag
+- [ ] sync.rs::url_hash_mismatch
+- [ ] sync.rs::path_hash_mismatch
+- [ ] sync.rs::find_links_relative_in_config_works_from_subdir
+- [ ] sync.rs::sync_dry_run
+- [ ] sync.rs::sync_dry_run_and_locked
+- [ ] sync.rs::sync_dry_run_and_frozen
+- [ ] sync.rs::sync_script
+- [ ] sync.rs::sync_locked_script
+- [ ] sync.rs::sync_script_with_compatible_build_constraints
+- [ ] sync.rs::sync_script_with_incompatible_build_constraints
+- [ ] sync.rs::unsupported_git_scheme
+- [ ] sync.rs::multiple_group_conflicts
+- [ ] sync.rs::transitive_group_conflicts_shallow
+- [ ] sync.rs::transitive_group_conflicts_deep
+- [ ] sync.rs::transitive_group_conflicts_siblings
+- [ ] sync.rs::transitive_group_conflicts_cycle
+- [ ] sync.rs::prune_cache_url_subdirectory
+- [ ] sync.rs::locked_version_coherence
+- [ ] sync.rs::sync_build_constraints
+- [ ] sync.rs::sync_when_virtual_environment_incompatible_with_interpreter
+- [ ] sync.rs::sync_upload_time
+- [ ] sync.rs::repeated_dev_member_all_packages
+- [ ] sync.rs::direct_url_dependency_metadata
+- [ ] sync.rs::sync_required_environment_hint
+- [ ] sync.rs::sync_url_with_query_parameters
+- [ ] sync.rs::sync_exclude_newer_package
+- [ ] sync.rs::sync_exclude_newer_package_config
+- [ ] sync.rs::read_only
+- [ ] sync.rs::sync_python_platform
+- [ ] sync.rs::conflicting_editable
+- [ ] sync.rs::undeclared_editable
+- [ ] sync.rs::sync_python_preference
+- [ ] sync.rs::sync_python_missing_download_hint
+- [ ] sync.rs::sync_config_settings_package
+- [ ] sync.rs::sync_does_not_remove_empty_virtual_environment_directory
+- [ ] sync.rs::sync_build_dependencies_respect_locked_versions
+- [ ] sync.rs::sync_extra_build_variables
+- [ ] sync.rs::reject_unmatched_runtime
+- [ ] sync.rs::sync_git_lfs
+- [ ] sync.rs::match_runtime_optional
+- [ ] sync.rs::sync_extra_build_dependencies_cache
+- [x] sync.rs::toggle_workspace_editable
+- [x] sync.rs::workspace_editable_conflict
+- [ ] sync.rs::only_group_and_extra_conflict
+- [ ] sync.rs::sync_no_sources_editable_to_package_switch
+- [ ] sync.rs::sync_fails_ambiguous_url
+- [ ] sync.rs::sync_reinstalls_on_version_change
+- [x] tool_dir.rs::tool_dir
+- [x] tool_dir.rs::tool_dir_bin
+- [x] tool_install.rs::tool_install
+- [x] tool_install.rs::tool_install_with_global_python
+- [x] tool_install.rs::tool_install_with_editable
+- [x] tool_install.rs::tool_install_with_compatible_build_constraints
+- [x] tool_install.rs::tool_install_with_incompatible_build_constraints
+- [x] tool_install.rs::tool_install_suggest_other_packages_with_executable
+- [x] tool_install.rs::tool_install_version
+- [x] tool_install.rs::tool_install_editable
+- [x] tool_install.rs::tool_install_remove_on_empty
+- [x] tool_install.rs::tool_install_editable_from
+- [x] tool_install.rs::tool_install_from
+- [x] tool_install.rs::tool_install_already_installed
+- [x] tool_install.rs::tool_install_force
+- [x] tool_install.rs::tool_install_home
+- [x] tool_install.rs::tool_install_xdg_data_home
+- [x] tool_install.rs::tool_install_xdg_bin_home
+- [x] tool_install.rs::tool_install_tool_bin_dir
+- [x] tool_install.rs::tool_install_no_entrypoints
+- [x] tool_install.rs::tool_install_uninstallable
+- [x] tool_install.rs::tool_install_unnamed_package
+- [x] tool_install.rs::tool_install_git
+- [x] tool_install.rs::tool_install_git_lfs
+- [x] tool_install.rs::tool_install_unnamed_conflict
+- [x] tool_install.rs::tool_install_unnamed_from
+- [x] tool_install.rs::tool_install_unnamed_with
+- [x] tool_install.rs::tool_install_with_dependencies_from_script
+- [x] tool_install.rs::tool_install_requirements_txt
+- [x] tool_install.rs::tool_install_requirements_txt_arguments
+- [x] tool_install.rs::tool_install_upgrade
+- [x] tool_install.rs::tool_install_python_requests
+- [x] tool_install.rs::tool_install_python_preference
+- [x] tool_install.rs::tool_install_preserve_environment
+- [x] tool_install.rs::tool_install_warn_path
+- [x] tool_install.rs::tool_install_bad_receipt
+- [x] tool_install.rs::tool_install_malformed_dist_info
+- [x] tool_install.rs::tool_install_settings
+- [x] tool_install.rs::tool_install_at_version
+- [x] tool_install.rs::tool_install_at_latest
+- [x] tool_install.rs::tool_install_from_at_latest
+- [x] tool_install.rs::tool_install_from_at_version
+- [x] tool_install.rs::tool_install_at_latest_upgrade
+- [x] tool_install.rs::tool_install_constraints
+- [x] tool_install.rs::tool_install_overrides
+- [x] tool_install.rs::tool_install_python
+- [x] tool_install.rs::tool_install_mismatched_name
+- [x] tool_install.rs::tool_install_credentials
+- [x] tool_install.rs::tool_install_default_credentials
+- [x] tool_install.rs::tool_install_with_executables_from
+- [x] tool_install.rs::tool_install_with_executables_from_no_entrypoints
+- [x] tool_install.rs::tool_install_find_links
+- [x] tool_install.rs::tool_install_python_platform
+- [x] tool_list.rs::tool_list
+- [x] tool_list.rs::tool_list_paths
+- [x] tool_list.rs::tool_list_paths_windows
+- [x] tool_list.rs::tool_list_empty
+- [x] tool_list.rs::tool_list_missing_receipt
+- [x] tool_list.rs::tool_list_bad_environment
+- [x] tool_list.rs::tool_list_deprecated
+- [x] tool_list.rs::tool_list_show_version_specifiers
+- [x] tool_list.rs::tool_list_show_with
+- [x] tool_list.rs::tool_list_show_extras
+- [x] tool_list.rs::tool_list_show_python
+- [x] tool_list.rs::tool_list_show_all
+- [x] tool_run.rs::tool_run_args
+- [x] tool_run.rs::tool_run_at_version
+- [x] tool_run.rs::tool_run_from_version
+- [x] tool_run.rs::tool_run_constraints
+- [x] tool_run.rs::tool_run_overrides
+- [x] tool_run.rs::tool_run_suggest_valid_commands
+- [x] tool_run.rs::tool_run_warn_executable_not_in_from
+- [x] tool_run.rs::tool_run_from_install
+- [x] tool_run.rs::tool_run_from_install_constraints
+- [x] tool_run.rs::tool_run_cache
+- [x] tool_run.rs::tool_run_url
+- [x] tool_run.rs::tool_run_git
+- [x] tool_run.rs::tool_run_git_lfs
+- [x] tool_run.rs::tool_run_requirements_txt
+- [x] tool_run.rs::tool_run_requirements_txt_arguments
+- [x] tool_run.rs::tool_run_list_installed
+- [x] tool_run.rs::tool_run_without_output
+- [x] tool_run.rs::tool_run_csv_with_shorthand
+- [x] tool_run.rs::tool_run_csv_with
+- [x] tool_run.rs::tool_run_repeated_with
+- [x] tool_run.rs::tool_run_with_editable
+- [x] tool_run.rs::warn_no_executables_found
+- [x] tool_run.rs::tool_run_upgrade_warn
+- [x] tool_run.rs::tool_run_resolution_error
+- [x] tool_run.rs::tool_run_latest
+- [x] tool_run.rs::tool_run_latest_extra
+- [ ] tool_run.rs::tool_run_extra
+- [x] tool_run.rs::tool_run_specifier
+- [x] tool_run.rs::tool_run_python
+- [x] tool_run.rs::tool_run_python_at_version
+- [x] tool_run.rs::tool_run_hint_version_not_available
+- [x] tool_run.rs::tool_run_python_from
+- [x] tool_run.rs::run_with_env_file
+- [x] tool_run.rs::tool_run_from_at
+- [x] tool_run.rs::tool_run_verbatim_name
+- [x] tool_run.rs::tool_run_with_existing_py_script
+- [x] tool_run.rs::tool_run_with_existing_pyw_script
+- [x] tool_run.rs::tool_run_with_nonexistent_py_script
+- [x] tool_run.rs::tool_run_with_nonexistent_pyw_script
+- [x] tool_run.rs::tool_run_with_from_script
+- [x] tool_run.rs::tool_run_with_script_and_from_script
+- [x] tool_run.rs::tool_run_verbose_hint
+- [x] tool_run.rs::tool_run_with_compatible_build_constraints
+- [x] tool_run.rs::tool_run_with_incompatible_build_constraints
+- [x] tool_run.rs::tool_run_with_dependencies_from_script
+- [x] tool_run.rs::tool_run_windows_runnable_types
+- [x] tool_run.rs::tool_run_reresolve_python
+- [x] tool_run.rs::tool_run_windows_dotted_package_name
+- [x] tool_run.rs::tool_run_latest_keyring_auth
+- [x] tool_uninstall.rs::tool_uninstall
+- [x] tool_uninstall.rs::tool_uninstall_multiple_names
+- [x] tool_uninstall.rs::tool_uninstall_not_installed
+- [x] tool_uninstall.rs::tool_uninstall_missing_receipt
+- [x] tool_uninstall.rs::tool_uninstall_all_missing_receipt
+- [x] tool_upgrade.rs::tool_upgrade_empty
+- [x] tool_upgrade.rs::tool_upgrade_name
+- [x] tool_upgrade.rs::tool_upgrade_multiple_names
+- [x] tool_upgrade.rs::tool_upgrade_pinned_hint
+- [x] tool_upgrade.rs::tool_upgrade_pinned_hint_with_mixed_constraint
+- [x] tool_upgrade.rs::tool_upgrade_all
+- [x] tool_upgrade.rs::tool_upgrade_non_existing_package
+- [x] tool_upgrade.rs::tool_upgrade_not_stop_if_upgrade_fails
+- [x] tool_upgrade.rs::tool_upgrade_settings
+- [x] tool_upgrade.rs::tool_upgrade_respect_constraints
+- [x] tool_upgrade.rs::tool_upgrade_constraint
+- [x] tool_upgrade.rs::tool_upgrade_with
+- [x] tool_upgrade.rs::tool_upgrade_python
+- [x] tool_upgrade.rs::tool_upgrade_python_with_all
+- [x] tool_upgrade.rs::test_tool_upgrade_additional_entrypoints
+- [x] tree.rs::nested_dependencies
+- [x] tree.rs::nested_platform_dependencies
+- [x] tree.rs::invert
+- [x] tree.rs::frozen
+- [x] tree.rs::outdated
+- [x] tree.rs::platform_dependencies
+- [x] tree.rs::platform_dependencies_inverted
+- [x] tree.rs::repeated_dependencies
+- [ ] tree.rs::repeated_version
+- [x] tree.rs::dev_dependencies
+- [x] tree.rs::dev_dependencies_inverted
+- [x] tree.rs::optional_dependencies
+- [x] tree.rs::optional_dependencies_inverted
+- [x] tree.rs::package
+- [x] tree.rs::group
+- [x] tree.rs::cycle
+- [ ] tree.rs::workspace_dev
+- [x] tree.rs::non_project
+- [ ] tree.rs::non_project_member
+- [ ] tree.rs::script
+- [x] tree.rs::only_group
+- [x] tree.rs::show_sizes
+- [ ] tree.rs::workspace_circular_dependencies
+- [x] venv.rs::create_venv
+- [x] venv.rs::create_venv_313
+- [x] venv.rs::create_venv_project_environment
+- [x] venv.rs::virtual_empty
+- [x] venv.rs::virtual_dependency_group
+- [x] venv.rs::create_venv_defaults_to_cwd
+- [x] venv.rs::create_venv_ignores_virtual_env_variable
+- [x] venv.rs::create_venv_reads_request_from_python_version_file
+- [x] venv.rs::create_venv_reads_request_from_python_versions_file
+- [x] venv.rs::create_venv_respects_pyproject_requires_python
+- [x] venv.rs::create_venv_respects_group_requires_python
+- [x] venv.rs::create_venv_ignores_missing_pyproject_metadata
+- [x] venv.rs::create_venv_warns_user_on_requires_python_discovery_error
+- [x] venv.rs::create_venv_explicit_request_takes_priority_over_python_version_file
+- [x] venv.rs::seed
+- [x] venv.rs::seed_older_python_version
+- [x] venv.rs::create_venv_with_invalid_http_timeout
+- [x] venv.rs::create_venv_with_invalid_concurrent_installs
+- [x] venv.rs::create_venv_unknown_python_minor
+- [x] venv.rs::create_venv_unknown_python_patch
+- [x] venv.rs::create_venv_python_patch
+- [x] venv.rs::file_exists
+- [x] venv.rs::empty_dir_exists
+- [x] venv.rs::non_empty_dir_exists
+- [x] venv.rs::non_empty_dir_exists_allow_existing
+- [x] venv.rs::create_venv_then_allow_existing
+- [x] venv.rs::windows_shims
+- [x] venv.rs::verify_pyvenv_cfg
+- [x] venv.rs::verify_pyvenv_cfg_relocatable
+- [x] venv.rs::verify_nested_pyvenv_cfg
+- [x] venv.rs::path_with_trailing_space_gives_proper_error
+- [x] venv.rs::create_venv_apostrophe
+- [x] venv.rs::venv_python_preference
+- [x] venv.rs::create_venv_symlink_clear_preservation
+- [x] venv.rs::create_venv_symlink_recreate_preservation
+- [x] venv.rs::create_venv_nested_symlink_preservation
+- [x] venv.rs::create_venv_current_working_directory
+- [x] venv.rs::no_clear_with_existing_directory
+- [x] venv.rs::no_clear_with_non_existent_directory
+- [x] venv.rs::no_clear_overrides_clear
+- [x] venv.rs::no_clear_conflicts_with_allow_existing
+- [x] version.rs::version_get
+- [x] version.rs::version_get_json
+- [x] version.rs::version_get_short
+- [x] version.rs::version_set_value
+- [x] version.rs::version_set_value_short
+- [x] version.rs::version_bump_patch
+- [x] version.rs::version_bump_patch_value
+- [x] version.rs::version_bump_minor_value
+- [x] version.rs::version_bump_major_value
+- [x] version.rs::version_bump_patch_short
+- [x] version.rs::version_bump_patch_value_must_increase
+- [ ] version.rs::version_bump_preserves_preceding_comments
+- [x] version.rs::version_bump_minor
+- [ ] version.rs::version_major_version
+- [x] version.rs::version_patch_uncompleted
+- [x] version.rs::version_minor_uncompleted
+- [x] version.rs::version_major_uncompleted
+- [x] version.rs::version_major_dev
+- [ ] version.rs::version_major_complex_mess
+- [x] version.rs::many_bump_complex
+- [x] version.rs::bump_stable
+- [x] version.rs::bump_alpha
+- [x] version.rs::bump_beta
+- [x] version.rs::bump_beta_with_value_existing
+- [x] version.rs::bump_beta_with_value_new
+- [x] version.rs::bump_rc
+- [x] version.rs::bump_post
+- [x] version.rs::bump_post_with_value_clears_dev
+- [x] version.rs::bump_dev
+- [x] version.rs::bump_dev_with_value
+- [x] version.rs::bump_patch_and_dev_value
+- [ ] version.rs::bump_patch_and_dev_explicit_values_sorted
+- [x] version.rs::version_major_post
+- [x] version.rs::bump_stable_with_value_fails
+- [x] version.rs::bump_empty_value_fails
+- [x] version.rs::bump_invalid_numeric_value_fails
+- [x] version.rs::bump_decrease_stable
+- [x] version.rs::bump_decrease_alpha_beta
+- [x] version.rs::bump_decrease_alpha_stable
+- [x] version.rs::bump_double_major
+- [x] version.rs::bump_double_alpha
+- [x] version.rs::bump_stable_major
+- [x] version.rs::bump_alpha_major
+- [ ] version.rs::bump_minor_major
+- [x] version.rs::bump_alpha_dev
+- [x] version.rs::bump_dev_major
+- [x] version.rs::bump_post_major
+- [x] version.rs::version_set_dry
+- [x] version.rs::version_major_dry
+- [x] version.rs::version_set_invalid
+- [x] version.rs::version_missing_bump
+- [ ] version.rs::version_get_dynamic
+- [ ] version.rs::version_set_dynamic
+- [ ] version.rs::version_get_fallback_unmanaged
+- [ ] version.rs::version_get_fallback_unmanaged_short
+- [ ] version.rs::version_get_fallback_unmanaged_strict
+- [ ] version.rs::version_get_fallback_missing_strict
+- [x] version.rs::version_get_missing_with_hint
+- [x] version.rs::self_version
+- [x] version.rs::self_version_short
+- [ ] version.rs::self_version_json
+- [ ] version.rs::version_get_workspace
+- [ ] version.rs::version_set_workspace
+- [ ] version.rs::version_set_evil_constraints
+- [ ] version.rs::virtual_empty
+- [ ] version.rs::add_virtual_dependency_group
+- [ ] version.rs::version_extras
+- [ ] workflow.rs::packse_add_remove_one_package
+- [ ] workflow.rs::packse_add_remove_existing_package_noop
+- [ ] workflow.rs::packse_promote_transitive_to_direct_then_remove
+- [ ] workflow.rs::jax_instability
+- [ ] workspace.rs::test_albatross_in_examples_bird_feeder
+- [x] workspace.rs::test_albatross_in_examples
+- [x] workspace.rs::test_albatross_just_project
+- [x] workspace.rs::test_albatross_project_in_excluded
+- [x] workspace.rs::test_albatross_root_workspace
+- [x] workspace.rs::test_albatross_root_workspace_bird_feeder
+- [ ] workspace.rs::test_albatross_root_workspace_albatross
+- [x] workspace.rs::test_albatross_virtual_workspace
+- [x] workspace.rs::test_uv_run_with_package_virtual_workspace
+- [x] workspace.rs::test_uv_run_virtual_workspace_root
+- [x] workspace.rs::test_uv_run_with_package_root_workspace
+- [x] workspace.rs::test_uv_run_isolate
+- [ ] workspace.rs::workspace_lock_idempotence_root_workspace
+- [ ] workspace.rs::workspace_lock_idempotence_virtual_workspace
+- [x] workspace.rs::workspace_to_workspace_paths_dependencies
+- [x] workspace.rs::workspace_empty_member
+- [x] workspace.rs::workspace_hidden_files
+- [x] workspace.rs::workspace_hidden_member
+- [x] workspace.rs::workspace_non_included_member
+- [x] workspace.rs::workspace_inherit_sources
+- [x] workspace.rs::workspace_unsatisfiable_member_dependencies
+- [x] workspace.rs::workspace_unsatisfiable_member_dependencies_conflicting
+- [x] workspace.rs::workspace_unsatisfiable_member_dependencies_conflicting_threeway
+- [x] workspace.rs::workspace_unsatisfiable_member_dependencies_conflicting_extra
+- [x] workspace.rs::workspace_unsatisfiable_member_dependencies_conflicting_dev
+- [x] workspace.rs::workspace_member_name_shadows_dependencies
+- [x] workspace.rs::test_path_hopping
+- [x] workspace.rs::transitive_dep_in_git_workspace_no_root
+- [x] workspace.rs::transitive_dep_in_git_workspace_with_root
+- [x] workspace.rs::workspace_members_with_leading_dot_slash
+- [x] workspace.rs::workspace_members_with_parent_directory
+- [x] workspace.rs::workspace_members_with_complex_relative_paths
+- [x] workspace_dir.rs::workspace_dir_simple
+- [x] workspace_dir.rs::workspace_dir_specific_package
+- [x] workspace_dir.rs::workspace_metadata_from_member
+- [x] workspace_dir.rs::workspace_dir_package_doesnt_exist
+- [x] workspace_dir.rs::workspace_metadata_no_project
+- [x] workspace_list.rs::workspace_list_simple
+- [x] workspace_list.rs::workspace_list_root_workspace
+- [x] workspace_list.rs::workspace_list_virtual_workspace
+- [x] workspace_list.rs::workspace_list_from_member
+- [x] workspace_list.rs::workspace_list_multiple_members
+- [x] workspace_list.rs::workspace_list_single_project
+- [x] workspace_list.rs::workspace_list_with_excluded
+- [x] workspace_list.rs::workspace_list_no_project
+- [x] workspace_metadata.rs::workspace_metadata_simple
+- [x] workspace_metadata.rs::workspace_metadata_root_workspace
+- [x] workspace_metadata.rs::workspace_metadata_virtual_workspace
+- [x] workspace_metadata.rs::workspace_metadata_from_member
+- [x] workspace_metadata.rs::workspace_metadata_multiple_members
+- [x] workspace_metadata.rs::workspace_metadata_single_project
+- [x] workspace_metadata.rs::workspace_metadata_with_excluded
+- [x] workspace_metadata.rs::workspace_metadata_no_project
