@@ -6,6 +6,7 @@ use std::{fmt::Display, fmt::Write};
 use anstream::{ColorChoice, stream::IsTerminal};
 use anyhow::{Result, anyhow};
 use clap::CommandFactory;
+use clap::builder::{StyledStr, Styles};
 use itertools::Itertools;
 use owo_colors::OwoColorize;
 use which::which;
@@ -15,8 +16,225 @@ use crate::printer::Printer;
 use uv_cli::Cli;
 use uv_static::EnvVars;
 
+/// Styles for help output, matching uv-cli's STYLES constant.
+const HELP_STYLES: Styles = Styles::styled()
+    .header(
+        clap::builder::styling::AnsiColor::Green
+            .on_default()
+            .effects(clap::builder::styling::Effects::BOLD),
+    )
+    .literal(
+        clap::builder::styling::AnsiColor::Cyan
+            .on_default()
+            .effects(clap::builder::styling::Effects::BOLD),
+    );
+
 // hidden subcommands to show in the help command
 const SHOW_HIDDEN_COMMANDS: &[&str] = &["generate-shell-completion"];
+
+/// Render a nested commands section showing subcommands indented under their parents.
+///
+/// This produces output like:
+/// ```text
+/// Commands:
+///   run                        Run a command or script
+///   pip                        Manage Python packages
+///     pip compile                Compile requirements
+///     pip sync                   Sync an environment
+/// ```
+fn render_nested_commands(cmd: &clap::Command, use_colors: bool) -> String {
+    let mut output = String::new();
+
+    // Get visible subcommands
+    let subcommands: Vec<_> = cmd
+        .get_subcommands()
+        .filter(|sub| !sub.is_hide_set())
+        .collect();
+
+    if subcommands.is_empty() {
+        return output;
+    }
+
+    // Calculate the maximum width for command names (including nested ones)
+    let max_width = calculate_max_command_width(&subcommands, 0);
+
+    // Write the header
+    if use_colors {
+        let header = HELP_STYLES.get_header();
+        let _ = writeln!(output, "{header}Commands:{header:#}");
+    } else {
+        let _ = writeln!(output, "Commands:");
+    }
+
+    // Write each command and its subcommands
+    for sub in &subcommands {
+        write_command_entry(&mut output, sub, 0, max_width, use_colors);
+
+        // Write nested subcommands (one level deep)
+        let nested: Vec<_> = sub
+            .get_subcommands()
+            .filter(|nested| !nested.is_hide_set())
+            .collect();
+
+        for nested_sub in nested {
+            write_command_entry(&mut output, nested_sub, 1, max_width, use_colors);
+        }
+    }
+
+    // Add trailing newline to match clap's output format
+    output.push('\n');
+
+    output
+}
+
+/// Calculate the maximum width needed for command names at all nesting levels.
+fn calculate_max_command_width(commands: &[&clap::Command], depth: usize) -> usize {
+    let mut max_width = 0;
+
+    for cmd in commands {
+        // Width = base indent (2) + depth indent (2 per level) + command name length
+        let name_len = cmd.get_name().len();
+        let total_width = 2 + (depth * 2) + name_len;
+        max_width = max_width.max(total_width);
+
+        // Check nested subcommands (one level deep)
+        if depth == 0 {
+            let nested: Vec<_> = cmd
+                .get_subcommands()
+                .filter(|sub| !sub.is_hide_set())
+                .collect();
+            let nested_max = calculate_max_command_width(&nested, depth + 1);
+            max_width = max_width.max(nested_max);
+        }
+    }
+
+    max_width
+}
+
+/// Write a single command entry with proper indentation and alignment.
+fn write_command_entry(
+    output: &mut String,
+    cmd: &clap::Command,
+    depth: usize,
+    max_width: usize,
+    use_colors: bool,
+) {
+    let name = cmd.get_name();
+    let about = cmd
+        .get_about()
+        .map(StyledStr::to_string)
+        .unwrap_or_default();
+
+    // Base indent is 2 spaces, each nesting level adds 2 more
+    let indent = 2 + (depth * 2);
+    let name_width = indent + name.len();
+    let padding = max_width.saturating_sub(name_width) + 2; // +2 for gap before description
+
+    if use_colors {
+        let literal = HELP_STYLES.get_literal();
+        let _ = writeln!(
+            output,
+            "{:indent$}{literal}{name}{literal:#}{:padding$}{about}",
+            "",
+            "",
+            indent = indent,
+            padding = padding,
+        );
+    } else {
+        let _ = writeln!(
+            output,
+            "{:indent$}{name}{:padding$}{about}",
+            "",
+            "",
+            indent = indent,
+            padding = padding,
+        );
+    }
+}
+
+/// Replace the Commands section in the help output with a nested version.
+fn replace_commands_section(help: &str, cmd: &clap::Command, use_colors: bool) -> String {
+    // Find the start of the Commands section.
+    // The header may contain ANSI escape codes when colors are enabled.
+    // We look for "Commands:" at the start of a line (possibly with ANSI codes before it).
+    let commands_line_start = help
+        .lines()
+        .enumerate()
+        .find(|(_, line)| {
+            let stripped = strip_ansi_codes(line);
+            stripped == "Commands:"
+        })
+        .map(|(i, _)| {
+            // Calculate byte offset to start of this line
+            help.lines()
+                .take(i)
+                .map(|l| l.len() + 1) // +1 for newline
+                .sum::<usize>()
+        });
+
+    let Some(commands_start) = commands_line_start else {
+        return help.to_string();
+    };
+
+    // Find the end of the Commands section by looking for the next section header
+    // (a line that doesn't start with whitespace and ends with ":")
+    let commands_content_start = help[commands_start..]
+        .find('\n')
+        .map(|pos| commands_start + pos + 1)
+        .unwrap_or(help.len());
+
+    let commands_end = help[commands_content_start..]
+        .lines()
+        .enumerate()
+        .find(|(_, line)| {
+            let stripped = strip_ansi_codes(line);
+            // A new section starts when we see a non-indented, non-empty line
+            !stripped.is_empty() && !stripped.starts_with(' ')
+        })
+        .map(|(i, _)| {
+            // Calculate byte offset
+            commands_content_start
+                + help[commands_content_start..]
+                    .lines()
+                    .take(i)
+                    .map(|l| l.len() + 1)
+                    .sum::<usize>()
+        })
+        .unwrap_or(help.len());
+
+    // Build the new help string
+    let mut result = String::new();
+    result.push_str(&help[..commands_start]);
+    result.push_str(&render_nested_commands(cmd, use_colors));
+    result.push_str(&help[commands_end..]);
+
+    result
+}
+
+/// Strip ANSI escape codes from a string for comparison purposes.
+fn strip_ansi_codes(s: &str) -> String {
+    let mut result = String::new();
+    let mut chars = s.chars().peekable();
+
+    while let Some(c) = chars.next() {
+        if c == '\x1b' {
+            // Skip ANSI escape sequence
+            if chars.peek() == Some(&'[') {
+                chars.next();
+                // Skip until we hit a letter (the terminator)
+                for c in chars.by_ref() {
+                    if c.is_ascii_alphabetic() {
+                        break;
+                    }
+                }
+            }
+        } else {
+            result.push(c);
+        }
+    }
+
+    result
+}
 
 pub(crate) fn help(query: &[String], printer: Printer, no_pager: bool) -> Result<ExitStatus> {
     let mut uv: clap::Command = SHOW_HIDDEN_COMMANDS
@@ -70,14 +288,16 @@ pub(crate) fn help(query: &[String], printer: Printer, no_pager: bool) -> Result
         .render_long_help()
     };
 
-    // Reformat inline [env: VAR=] annotations to their own line.
+    // Process the help output:
+    // - For root: replace the Commands section with nested subcommands
+    // - For subcommands: reformat inline [env: VAR=] annotations
     let help_plain = if is_root {
-        help.to_string()
+        replace_commands_section(&help.to_string(), &uv, false)
     } else {
         reformat_env_annotations(&help.to_string())
     };
     let help_ansi = if is_root {
-        help.ansi().to_string()
+        replace_commands_section(&help.ansi().to_string(), &uv, true)
     } else {
         reformat_env_annotations(&help.ansi().to_string())
     };

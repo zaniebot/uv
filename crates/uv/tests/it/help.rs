@@ -17,6 +17,10 @@ fn help() {
 
     Commands:
       auth                       Manage authentication
+        login                    Login to a service
+        logout                   Logout of a service
+        token                    Show the authentication token for a service
+        dir                      Show the path to the uv credentials directory
       run                        Run a command or script
       init                       Create a new project
       add                        Add dependencies to the project
@@ -28,15 +32,45 @@ fn help() {
       tree                       Display the project's dependency tree
       format                     Format Python code in the project
       tool                       Run and install commands provided by Python packages
+        run                      Run a command provided by a Python package
+        install                  Install commands provided by a Python package
+        upgrade                  Upgrade installed tools
+        list                     List installed tools
+        uninstall                Uninstall a tool
+        update-shell             Ensure that the tool executable directory is on the `PATH`
+        dir                      Show the path to the uv tools directory
       python                     Manage Python versions and installations
+        list                     List the available Python installations
+        install                  Download and install Python versions
+        upgrade                  Upgrade installed Python versions
+        find                     Search for a Python installation
+        pin                      Pin to a specific Python version
+        dir                      Show the uv Python installation directory
+        uninstall                Uninstall Python versions
+        update-shell             Ensure that the Python executable directory is on the `PATH`
       pip                        Manage Python packages with a pip-compatible interface
+        compile                  Compile a `requirements.in` file to a `requirements.txt` or `pylock.toml` file
+        sync                     Sync an environment with a `requirements.txt` or `pylock.toml` file
+        install                  Install packages into an environment
+        uninstall                Uninstall packages from an environment
+        freeze                   List, in requirements format, packages installed in an environment
+        list                     List, in tabular format, packages installed in an environment
+        show                     Show information about one or more installed packages
+        tree                     Display the dependency tree for an environment
+        check                    Verify installed packages have compatible dependencies
       venv                       Create a virtual environment
       build                      Build Python packages into source distributions and wheels
       publish                    Upload distributions to an index
       cache                      Manage uv's cache
+        clean                    Clear the cache, removing all entries or those linked to specific packages
+        prune                    Prune all unreachable objects from the cache
+        dir                      Show the cache directory
+        size                     Show the cache size
       self                       Manage the uv executable
-      generate-shell-completion  Generate shell completion
+        update                   Update uv
+        version                  Display uv's version
       help                       Display documentation for a command
+      generate-shell-completion  Generate shell completion
 
     Cache options:
       -n, --no-cache               Avoid reading from or writing to the cache, instead using a temporary
@@ -985,6 +1019,10 @@ fn help_with_global_option() {
 
     Commands:
       auth                       Manage authentication
+        login                    Login to a service
+        logout                   Logout of a service
+        token                    Show the authentication token for a service
+        dir                      Show the path to the uv credentials directory
       run                        Run a command or script
       init                       Create a new project
       add                        Add dependencies to the project
@@ -996,15 +1034,45 @@ fn help_with_global_option() {
       tree                       Display the project's dependency tree
       format                     Format Python code in the project
       tool                       Run and install commands provided by Python packages
+        run                      Run a command provided by a Python package
+        install                  Install commands provided by a Python package
+        upgrade                  Upgrade installed tools
+        list                     List installed tools
+        uninstall                Uninstall a tool
+        update-shell             Ensure that the tool executable directory is on the `PATH`
+        dir                      Show the path to the uv tools directory
       python                     Manage Python versions and installations
+        list                     List the available Python installations
+        install                  Download and install Python versions
+        upgrade                  Upgrade installed Python versions
+        find                     Search for a Python installation
+        pin                      Pin to a specific Python version
+        dir                      Show the uv Python installation directory
+        uninstall                Uninstall Python versions
+        update-shell             Ensure that the Python executable directory is on the `PATH`
       pip                        Manage Python packages with a pip-compatible interface
+        compile                  Compile a `requirements.in` file to a `requirements.txt` or `pylock.toml` file
+        sync                     Sync an environment with a `requirements.txt` or `pylock.toml` file
+        install                  Install packages into an environment
+        uninstall                Uninstall packages from an environment
+        freeze                   List, in requirements format, packages installed in an environment
+        list                     List, in tabular format, packages installed in an environment
+        show                     Show information about one or more installed packages
+        tree                     Display the dependency tree for an environment
+        check                    Verify installed packages have compatible dependencies
       venv                       Create a virtual environment
       build                      Build Python packages into source distributions and wheels
       publish                    Upload distributions to an index
       cache                      Manage uv's cache
+        clean                    Clear the cache, removing all entries or those linked to specific packages
+        prune                    Prune all unreachable objects from the cache
+        dir                      Show the cache directory
+        size                     Show the cache size
       self                       Manage the uv executable
-      generate-shell-completion  Generate shell completion
+        update                   Update uv
+        version                  Display uv's version
       help                       Display documentation for a command
+      generate-shell-completion  Generate shell completion
 
     Cache options:
       -n, --no-cache               Avoid reading from or writing to the cache, instead using a temporary
@@ -1107,6 +1175,10 @@ fn help_with_no_pager() {
 
     Commands:
       auth                       Manage authentication
+        login                    Login to a service
+        logout                   Logout of a service
+        token                    Show the authentication token for a service
+        dir                      Show the path to the uv credentials directory
       run                        Run a command or script
       init                       Create a new project
       add                        Add dependencies to the project
@@ -1118,15 +1190,45 @@ fn help_with_no_pager() {
       tree                       Display the project's dependency tree
       format                     Format Python code in the project
       tool                       Run and install commands provided by Python packages
+        run                      Run a command provided by a Python package
+        install                  Install commands provided by a Python package
+        upgrade                  Upgrade installed tools
+        list                     List installed tools
+        uninstall                Uninstall a tool
+        update-shell             Ensure that the tool executable directory is on the `PATH`
+        dir                      Show the path to the uv tools directory
       python                     Manage Python versions and installations
+        list                     List the available Python installations
+        install                  Download and install Python versions
+        upgrade                  Upgrade installed Python versions
+        find                     Search for a Python installation
+        pin                      Pin to a specific Python version
+        dir                      Show the uv Python installation directory
+        uninstall                Uninstall Python versions
+        update-shell             Ensure that the Python executable directory is on the `PATH`
       pip                        Manage Python packages with a pip-compatible interface
+        compile                  Compile a `requirements.in` file to a `requirements.txt` or `pylock.toml` file
+        sync                     Sync an environment with a `requirements.txt` or `pylock.toml` file
+        install                  Install packages into an environment
+        uninstall                Uninstall packages from an environment
+        freeze                   List, in requirements format, packages installed in an environment
+        list                     List, in tabular format, packages installed in an environment
+        show                     Show information about one or more installed packages
+        tree                     Display the dependency tree for an environment
+        check                    Verify installed packages have compatible dependencies
       venv                       Create a virtual environment
       build                      Build Python packages into source distributions and wheels
       publish                    Upload distributions to an index
       cache                      Manage uv's cache
+        clean                    Clear the cache, removing all entries or those linked to specific packages
+        prune                    Prune all unreachable objects from the cache
+        dir                      Show the cache directory
+        size                     Show the cache size
       self                       Manage the uv executable
-      generate-shell-completion  Generate shell completion
+        update                   Update uv
+        version                  Display uv's version
       help                       Display documentation for a command
+      generate-shell-completion  Generate shell completion
 
     Cache options:
       -n, --no-cache               Avoid reading from or writing to the cache, instead using a temporary
