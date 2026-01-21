@@ -136,11 +136,11 @@ pub struct TopLevelArgs {
     )]
     pub config_file: Option<PathBuf>,
 
-    /// Avoid discovering configuration files (`pyproject.toml`, `uv.toml`).
+    /// Avoid discovering configuration files (`pyproject.toml`, `uv.toml`) [env: UV_NO_CONFIG=]
     ///
     /// Normally, configuration files are discovered in the current directory,
     /// parent directories, or user configuration directories.
-    #[arg(global = true, long, env = EnvVars::UV_NO_CONFIG, value_parser = clap::builder::BoolishValueParser::new(), help_heading = "Global options")]
+    #[arg(global = true, long, value_parser = clap::builder::BoolishValueParser::new(), help_heading = "Global options")]
     pub no_config: bool,
 
     /// Display the concise help for this command.

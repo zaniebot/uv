@@ -156,7 +156,8 @@ fn reformat_env_annotations(help: &str) -> String {
         // so we skip ANSI sequences when checking the first content character.
         let indent = line.len() - line.trim_start().len();
         let first_char = first_non_ansi_char(line, indent);
-        let is_arg_line = indent == 6 && matches!(first_char, Some('-' | '<'));
+        // Argument lines typically have 6 spaces, but -h/--help has 2 spaces
+        let is_arg_line = (indent == 6 || indent == 2) && matches!(first_char, Some('-' | '<'));
         let is_section_header = indent == 0 && line.ends_with(':');
         let is_description_line = indent == 10;
 

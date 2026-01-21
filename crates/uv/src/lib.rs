@@ -47,7 +47,7 @@ use uv_requirements::{GroupsSpecification, RequirementsSource};
 use uv_requirements_txt::RequirementsTxtRequirement;
 use uv_scripts::{Pep723Error, Pep723Item, Pep723Metadata, Pep723Script};
 use uv_settings::{Combine, EnvironmentOptions, FilesystemOptions, Options};
-use uv_static::EnvVars;
+use uv_static::{EnvVars, parse_boolish_environment_variable};
 use uv_warnings::{warn_user, warn_user_once};
 use uv_workspace::{DiscoveryOptions, Workspace, WorkspaceCache};
 
@@ -141,6 +141,10 @@ async fn run(mut cli: Cli) -> Result<ExitStatus> {
         false
     };
 
+    // Parse `UV_NO_CONFIG` environment variable manually (not handled by Clap).
+    let no_config = cli.top_level.no_config
+        || parse_boolish_environment_variable(EnvVars::UV_NO_CONFIG)?.unwrap_or(false);
+
     // Load configuration from the filesystem, prioritizing (in order):
     // 1. The configuration file specified on the command-line.
     // 2. The nearest configuration file (`uv.toml` or `pyproject.toml`) above the workspace root.
@@ -158,7 +162,7 @@ async fn run(mut cli: Cli) -> Result<ExitStatus> {
             );
         }
         Some(FilesystemOptions::from_file(config_file)?)
-    } else if deprecated_isolated || cli.top_level.no_config {
+    } else if deprecated_isolated || no_config {
         None
     } else if matches!(&*cli.command, Commands::Tool(_) | Commands::Self_(_)) {
         // For commands that operate at the user-level, ignore local configuration.
@@ -1165,7 +1169,7 @@ async fn run(mut cli: Cli) -> Result<ExitStatus> {
                 args.install_mirrors,
                 &args.settings,
                 &client_builder.subcommand(vec!["build".to_owned()]),
-                cli.top_level.no_config,
+                no_config,
                 globals.python_preference,
                 globals.python_downloads,
                 globals.concurrency,
@@ -1243,7 +1247,7 @@ async fn run(mut cli: Cli) -> Result<ExitStatus> {
                 on_existing,
                 args.settings.exclude_newer,
                 globals.concurrency,
-                cli.top_level.no_config,
+                no_config,
                 args.no_project,
                 &cache,
                 printer,
@@ -1259,7 +1263,7 @@ async fn run(mut cli: Cli) -> Result<ExitStatus> {
                 run_command,
                 script,
                 globals,
-                cli.top_level.no_config,
+                no_config,
                 cli.top_level.global_args.project.is_some(),
                 client_builder,
                 filesystem,
@@ -1675,7 +1679,7 @@ async fn run(mut cli: Cli) -> Result<ExitStatus> {
                 client_builder.subcommand(vec!["python".to_owned(), "install".to_owned()]),
                 args.default,
                 globals.python_downloads,
-                cli.top_level.no_config,
+                no_config,
                 args.compile_bytecode,
                 &globals.concurrency,
                 &cache,
@@ -1710,7 +1714,7 @@ async fn run(mut cli: Cli) -> Result<ExitStatus> {
                 client_builder.subcommand(vec!["python".to_owned(), "upgrade".to_owned()]),
                 args.default,
                 globals.python_downloads,
-                cli.top_level.no_config,
+                no_config,
                 args.compile_bytecode,
                 &globals.concurrency,
                 &cache,
@@ -1752,7 +1756,7 @@ async fn run(mut cli: Cli) -> Result<ExitStatus> {
                     &client_builder.subcommand(vec!["python".to_owned(), "find".to_owned()]),
                     globals.python_preference,
                     globals.python_downloads,
-                    cli.top_level.no_config,
+                    no_config,
                     &cache,
                     printer,
                     globals.preview,
@@ -1764,7 +1768,7 @@ async fn run(mut cli: Cli) -> Result<ExitStatus> {
                     args.request,
                     args.show_version,
                     args.no_project,
-                    cli.top_level.no_config,
+                    no_config,
                     args.system,
                     globals.python_preference,
                     args.python_downloads_json_url.as_deref(),

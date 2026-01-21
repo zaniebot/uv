@@ -444,7 +444,7 @@ fn help_subcommand() {
               
               Normally, configuration files are discovered in the current directory, parent directories,
               or user configuration directories.
-              
+
               [env: UV_NO_CONFIG=]
 
       -h, --help
@@ -730,7 +730,7 @@ fn help_subsubcommand() {
               
               Normally, configuration files are discovered in the current directory, parent directories,
               or user configuration directories.
-              
+
               [env: UV_NO_CONFIG=]
 
       -h, --help
