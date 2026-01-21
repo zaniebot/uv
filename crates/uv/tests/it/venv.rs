@@ -1888,3 +1888,43 @@ fn no_clear_conflicts_with_allow_existing() {
     "
     );
 }
+
+/// Test that `--system` shows a warning without `--preview` and fails with `--preview`.
+#[test]
+fn system_flag_preview() {
+    let context = TestContext::new_with_versions(&["3.12"]);
+
+    // Without `--preview`, `--system` shows a warning
+    uv_snapshot!(context.filters(), context.venv()
+        .arg(context.venv.as_os_str())
+        .arg("--system")
+        .arg("--python")
+        .arg("3.12"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    warning: The `--system` flag has no effect, a system Python interpreter is always used in `uv venv`
+    Using CPython 3.12.[X] interpreter at: [PYTHON-3.12]
+    Creating virtual environment at: .venv
+    Activate with: source .venv/[BIN]/activate
+    "
+    );
+
+    // With `--preview`, `--system` fails with an error
+    uv_snapshot!(context.filters(), context.venv()
+        .arg(context.venv.as_os_str())
+        .arg("--system")
+        .arg("--preview")
+        .arg("--python")
+        .arg("3.12"), @"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    error: The `--system` flag is not supported with `uv venv`, a system Python interpreter is always used
+    "
+    );
+}

@@ -1185,6 +1185,14 @@ async fn run(mut cli: Cli) -> Result<ExitStatus> {
             }
 
             if args.system {
+                if globals
+                    .preview
+                    .is_enabled(PreviewFeatures::VENV_SYSTEM_FLAG)
+                {
+                    bail!(
+                        "The `--system` flag is not supported with `uv venv`, a system Python interpreter is always used"
+                    );
+                }
                 warn_user_once!(
                     "The `--system` flag has no effect, a system Python interpreter is always used in `uv venv`"
                 );
