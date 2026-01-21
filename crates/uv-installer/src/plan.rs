@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use anyhow::{Result, bail};
 use owo_colors::OwoColorize;
+use rustc_hash::FxHashSet;
 use tracing::{debug, warn};
 
 use uv_cache::{Cache, CacheBucket, WheelCache};
@@ -17,6 +18,7 @@ use uv_distribution_types::{
     RequirementSource, Resolution, ResolvedDist, SourceDist,
 };
 use uv_fs::Simplified;
+use uv_install_wheel::read_record_file;
 use uv_normalize::PackageName;
 use uv_platform_tags::{AbiTag, IncompatibleTag, TagCompatibility, Tags};
 use uv_pypi_types::VerbatimParsedUrl;
@@ -91,6 +93,11 @@ impl<'a> Planner<'a> {
         let mut reinstalls = vec![];
         let mut extraneous = vec![];
 
+        // Track packages that are satisfied and staying installed, along with their resolved dist.
+        // We need this to detect packages that may need reinstallation due to file overlaps with
+        // packages being uninstalled.
+        let mut staying: Vec<(InstalledDist, Arc<Dist>)> = vec![];
+
         // TODO(charlie): There are a few assumptions here that are hard to spot:
         //
         // 1. Apparently, we never return direct URL distributions as [`ResolvedDist::Installed`].
@@ -141,6 +148,11 @@ impl<'a> Planner<'a> {
                             }
                             RequirementSatisfaction::Satisfied => {
                                 debug!("Requirement already installed: {installed}");
+                                // Track this package as staying installed, along with its dist
+                                // so we can reinstall it if needed due to file overlaps.
+                                if let ResolvedDist::Installable { dist: arc_dist, .. } = dist {
+                                    staying.push((installed.clone(), arc_dist.clone()));
+                                }
                                 continue;
                             }
                             RequirementSatisfaction::OutOfDate => {
@@ -157,10 +169,13 @@ impl<'a> Planner<'a> {
                                 // project APIs never return installed distributions during resolution (i.e., the
                                 // resolver is stateless).
                                 // TODO(charlie): Incorporate these checks into the resolver.
-                                if matches!(dist, ResolvedDist::Installed { .. }) {
+                                if let ResolvedDist::Installed { .. } = dist {
                                     warn!(
                                         "Installed distribution was considered out-of-date, but returned by the resolver: {dist}"
                                     );
+                                    // Track this package as staying installed.
+                                    // Note: We can't track the dist here since it's ResolvedDist::Installed,
+                                    // but this case is rare (only in uv pip CLI).
                                     continue;
                                 }
                             }
@@ -515,6 +530,35 @@ impl<'a> Planner<'a> {
             }
         }
 
+        // Check for packages that need reinstallation due to file overlaps with extraneous packages.
+        // This can happen when two packages provide the same files (e.g., `typer` and `typer-slim`
+        // both provide files in the `typer/` directory). When one is uninstalled, the shared files
+        // are deleted, corrupting the other package.
+        if !extraneous.is_empty() && !staying.is_empty() {
+            // Collect all files from packages being uninstalled
+            let mut extraneous_files: FxHashSet<String> = FxHashSet::default();
+            for dist in &extraneous {
+                extraneous_files.extend(collect_record_files(dist));
+            }
+
+            // Find and process staying packages whose files overlap with extraneous packages
+            if !extraneous_files.is_empty() {
+                for (installed_dist, dist) in staying {
+                    let files = collect_record_files(&installed_dist);
+                    if files.iter().any(|f| extraneous_files.contains(f)) {
+                        debug!(
+                            "Package {} needs reinstallation due to file overlap with extraneous packages",
+                            installed_dist.name()
+                        );
+                        reinstalls.push(installed_dist);
+                        // Add the dist to remote to ensure it gets reinstalled.
+                        // The wheel may already be in cache, in which case this will be fast.
+                        remote.push(dist);
+                    }
+                }
+            }
+        }
+
         Ok(Plan {
             cached,
             remote,
@@ -535,6 +579,20 @@ fn is_seed_package(dist_info: &InstalledDist, venv: &PythonEnvironment) -> bool 
             "pip" | "setuptools" | "wheel" | "uv"
         )
     }
+}
+
+/// Collect all file paths from a package's RECORD file.
+///
+/// Returns an empty set if the RECORD file cannot be read.
+fn collect_record_files(dist: &InstalledDist) -> FxHashSet<String> {
+    let record_path = dist.install_path().join("RECORD");
+    let Ok(mut record_file) = fs_err::File::open(&record_path) else {
+        return FxHashSet::default();
+    };
+    let Ok(entries) = read_record_file(&mut record_file) else {
+        return FxHashSet::default();
+    };
+    entries.into_iter().map(|entry| entry.path).collect()
 }
 
 /// Generate a hint for explaining wheel compatibility issues.

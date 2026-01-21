@@ -15567,3 +15567,96 @@ fn sync_reinstalls_on_version_change() -> Result<()> {
 
     Ok(())
 }
+
+/// Test that switching extras doesn't corrupt the environment when packages share files.
+///
+/// This is a regression test for <https://github.com/astral-sh/uv/issues/17645>.
+///
+/// The issue occurs when two packages provide the same files (e.g., `typer` and `typer-slim`
+/// both provide files in the `typer/` directory). When switching extras causes one package
+/// to be uninstalled, the shared files are deleted, corrupting the other package.
+///
+/// The fix detects this situation and reinstalls the affected package.
+#[test]
+fn sync_overlapping_package_files() -> Result<()> {
+    let context = TestContext::new("3.12");
+
+    let pyproject_toml = context.temp_dir.child("pyproject.toml");
+    pyproject_toml.write_str(
+        r#"
+        [project]
+        name = "project"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        dependencies = ["typer>=0.12"]
+
+        [project.optional-dependencies]
+        extra1 = ["typer-slim>=0.12"]
+        extra2 = ["rich>=13"]
+        "#,
+    )?;
+
+    // Initial sync installs typer (which provides files in the typer/ directory)
+    uv_snapshot!(context.filters(), context.sync().env_remove(EnvVars::UV_EXCLUDE_NEWER), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Resolved 11 packages in [TIME]
+    Prepared 8 packages in [TIME]
+    Installed 8 packages in [TIME]
+     + click==8.3.1
+     + markdown-it-py==4.0.0
+     + mdurl==0.1.2
+     + pygments==2.19.2
+     + rich==14.2.0
+     + shellingham==1.5.4
+     + typer==0.21.1
+     + typing-extensions==4.15.0
+    ");
+
+    // Sync with extra1 installs typer-slim (which also provides files in the typer/ directory)
+    uv_snapshot!(context.filters(), context.sync().env_remove(EnvVars::UV_EXCLUDE_NEWER).arg("--extra").arg("extra1"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Resolved 11 packages in [TIME]
+    Prepared 1 package in [TIME]
+    Installed 1 package in [TIME]
+     + typer-slim==0.21.1
+    ");
+
+    // Sync with extra2 removes typer-slim. Before the fix, this would delete the shared
+    // typer/ directory, corrupting the typer package. After the fix, typer should be
+    // reinstalled to restore its files.
+    uv_snapshot!(context.filters(), context.sync().env_remove(EnvVars::UV_EXCLUDE_NEWER).arg("--extra").arg("extra2"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Resolved 11 packages in [TIME]
+    Prepared 1 package in [TIME]
+    Uninstalled 2 packages in [TIME]
+    Installed 1 package in [TIME]
+     ~ typer==0.21.1
+     - typer-slim==0.21.1
+    ");
+
+    // Verify that typer is still functional by importing it
+    uv_snapshot!(context.filters(), context.run().env_remove(EnvVars::UV_EXCLUDE_NEWER).arg("python").arg("-c").arg("import typer; print(f'typer {typer.__version__}')"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    typer 0.21.1
+
+    ----- stderr -----
+    Resolved 11 packages in [TIME]
+    Audited 8 packages in [TIME]
+    ");
+
+    Ok(())
+}
