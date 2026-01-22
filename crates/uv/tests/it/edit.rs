@@ -142,6 +142,51 @@ fn add_registry() -> Result<()> {
     Ok(())
 }
 
+/// Add cffi and verify it can be imported correctly.
+/// Regression test for https://github.com/astral-sh/uv/issues/17650
+#[test]
+fn add_cffi() -> Result<()> {
+    let context = TestContext::new("3.12");
+
+    let pyproject_toml = context.temp_dir.child("pyproject.toml");
+    pyproject_toml.write_str(indoc! {r#"
+        [project]
+        name = "project"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        dependencies = []
+    "#})?;
+
+    // Add cffi
+    uv_snapshot!(context.filters(), context.add().arg("cffi"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Resolved 3 packages in [TIME]
+    Prepared 2 packages in [TIME]
+    Installed 2 packages in [TIME]
+     + cffi==1.16.0
+     + pycparser==2.21
+    ");
+
+    // Verify cffi can be imported and its key attributes are accessible
+    uv_snapshot!(context.filters(), context.run().arg("python").arg("-c").arg("import cffi; print(cffi.__version__); ffi = cffi.FFI(); print(type(ffi).__name__)"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    1.16.0
+    FFI
+
+    ----- stderr -----
+    Resolved 3 packages in [TIME]
+    Audited 2 packages in [TIME]
+    ");
+
+    Ok(())
+}
+
 /// Add a Git requirement.
 #[test]
 #[cfg(feature = "git")]
