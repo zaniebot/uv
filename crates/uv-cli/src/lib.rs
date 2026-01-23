@@ -3370,8 +3370,19 @@ pub struct InitArgs {
     ///
     /// By default, adds a requirement on the system Python version; use `--python` to specify an
     /// alternative Python version requirement.
-    #[arg(long, conflicts_with_all=["app", "lib", "package", "build_backend", "description"])]
+    #[arg(long, conflicts_with_all=["app", "lib", "package", "build_backend", "description", "from_script"])]
     pub r#script: bool,
+
+    /// Create a project from an existing PEP 723 inline script.
+    ///
+    /// Extracts the `requires-python` and `dependencies` from the script's inline metadata and
+    /// adds them to the project's `pyproject.toml`. The script is then copied into the project
+    /// directory.
+    ///
+    /// Can also be used to initialize a project based on a plain Python script without inline
+    /// metadata.
+    #[arg(long, conflicts_with_all=["script", "lib", "name", "package", "build_backend"], value_hint = ValueHint::FilePath)]
+    pub from_script: Option<PathBuf>,
 
     /// Set the project description.
     #[arg(long, conflicts_with = "script", overrides_with = "no_description", value_hint = ValueHint::Other)]

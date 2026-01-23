@@ -382,6 +382,7 @@ pub(crate) struct InitSettings {
     pub(crate) no_workspace: bool,
     pub(crate) python: Option<String>,
     pub(crate) install_mirrors: PythonInstallMirrors,
+    pub(crate) from_script: Option<PathBuf>,
 }
 
 impl InitSettings {
@@ -402,6 +403,7 @@ impl InitSettings {
             app,
             lib,
             script,
+            from_script,
             description,
             no_description,
             vcs,
@@ -415,12 +417,15 @@ impl InitSettings {
             ..
         } = args;
 
-        let kind = match (app, lib, script) {
-            (true, false, false) => InitKind::Project(InitProjectKind::Application),
-            (false, true, false) => InitKind::Project(InitProjectKind::Library),
-            (false, false, true) => InitKind::Script,
-            (false, false, false) => InitKind::default(),
-            (_, _, _) => unreachable!("`app`, `lib`, and `script` are mutually exclusive"),
+        let kind = match (app, lib, script, from_script.is_some()) {
+            (true, false, false, false) => InitKind::Project(InitProjectKind::Application),
+            (false, true, false, false) => InitKind::Project(InitProjectKind::Library),
+            (false, false, true, false) => InitKind::Script,
+            (false, false, false, true) => InitKind::Project(InitProjectKind::Application),
+            (false, false, false, false) => InitKind::default(),
+            (_, _, _, _) => {
+                unreachable!("`app`, `lib`, `script`, and `from_script` are mutually exclusive")
+            }
         };
 
         let package = flag(
@@ -454,6 +459,7 @@ impl InitSettings {
             install_mirrors: environment
                 .install_mirrors
                 .combine(filesystem_install_mirrors),
+            from_script,
         }
     }
 }

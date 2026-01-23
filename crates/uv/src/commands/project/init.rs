@@ -21,6 +21,7 @@ use uv_git::GIT;
 use uv_normalize::PackageName;
 use uv_pep440::Version;
 use uv_preview::Preview;
+use uv_pypi_types::VerbatimParsedUrl;
 use uv_python::{
     EnvironmentPreference, PythonDownloads, PythonEnvironment, PythonInstallation,
     PythonPreference, PythonRequest, PythonVariant, PythonVersionFile, VersionFileDiscoveryOptions,
@@ -57,6 +58,7 @@ pub(crate) async fn init(
     python: Option<String>,
     install_mirrors: PythonInstallMirrors,
     no_workspace: bool,
+    from_script: Option<PathBuf>,
     client_builder: &BaseClientBuilder<'_>,
     python_preference: PythonPreference,
     python_downloads: PythonDownloads,
@@ -65,6 +67,30 @@ pub(crate) async fn init(
     printer: Printer,
     preview: Preview,
 ) -> Result<ExitStatus> {
+    // Handle --from-script if provided
+    if let Some(script_path) = from_script {
+        return init_project_from_script(
+            project_dir,
+            explicit_path,
+            &script_path,
+            vcs,
+            no_readme,
+            author_from,
+            pin_python,
+            python,
+            install_mirrors,
+            no_workspace,
+            client_builder,
+            python_preference,
+            python_downloads,
+            no_config,
+            cache,
+            printer,
+            preview,
+        )
+        .await;
+    }
+
     match init_kind {
         InitKind::Script => {
             let Some(path) = explicit_path.as_deref() else {
@@ -280,6 +306,342 @@ async fn init_script(
     Pep723Script::create(script_path, requires_python.specifiers(), content, bare).await?;
 
     Ok(())
+}
+
+/// Initialize a project from an existing PEP 723 script.
+#[allow(clippy::fn_params_excessive_bools)]
+async fn init_project_from_script(
+    project_dir: &Path,
+    explicit_path: Option<PathBuf>,
+    script_path: &Path,
+    vcs: Option<VersionControlSystem>,
+    no_readme: bool,
+    author_from: Option<AuthorFrom>,
+    pin_python: bool,
+    python: Option<String>,
+    install_mirrors: PythonInstallMirrors,
+    no_workspace: bool,
+    client_builder: &BaseClientBuilder<'_>,
+    python_preference: PythonPreference,
+    python_downloads: PythonDownloads,
+    no_config: bool,
+    cache: &Cache,
+    printer: Printer,
+    preview: Preview,
+) -> Result<ExitStatus> {
+    // Read the script content
+    let script_content = fs_err::tokio::read_to_string(script_path)
+        .await
+        .with_context(|| {
+            format!(
+                "Failed to read script at `{}`",
+                script_path.simplified_display()
+            )
+        })?;
+
+    // Try to parse any existing PEP 723 metadata from the script
+    let script_metadata = Pep723Script::read(script_path).await?;
+
+    // Extract dependencies and requires-python from the script metadata
+    let (script_dependencies, script_requires_python) = if let Some(ref script) = script_metadata {
+        (
+            script.metadata.dependencies.clone(),
+            script.metadata.requires_python.clone(),
+        )
+    } else {
+        (None, None)
+    };
+
+    // Default to the current directory if a path was not provided.
+    let path = match explicit_path {
+        None => project_dir.to_path_buf(),
+        Some(ref path) => std::path::absolute(path)?,
+    };
+
+    // Make sure a project does not already exist in the given directory.
+    if path.join("pyproject.toml").exists() {
+        let path = std::path::absolute(&path).unwrap_or_else(|_| path.simplified().to_path_buf());
+        anyhow::bail!(
+            "Project is already initialized in `{}` (`pyproject.toml` file exists)",
+            path.display().cyan()
+        );
+    }
+
+    // Determine the project name from the target directory name
+    let name = {
+        let directory_name = path
+            .file_name()
+            .and_then(|path| path.to_str())
+            .context("Missing directory name")?;
+
+        // Pre-normalize the package name by removing any leading or trailing
+        // whitespace, and replacing any internal whitespace with hyphens.
+        let candidate = directory_name.trim().replace(' ', "-");
+
+        if let Ok(name) = PackageName::from_owned(candidate) {
+            name
+        } else {
+            let directory_description = if explicit_path.is_some() {
+                "target directory"
+            } else {
+                "current directory"
+            };
+            anyhow::bail!(
+                "The {directory_description} (`{directory_name}`) is not a valid package name. Please provide a package name by specifying a target directory."
+            );
+        }
+    };
+
+    // Create the project directory
+    fs_err::tokio::create_dir_all(&path).await?;
+
+    // Discover the current workspace, if it exists.
+    let workspace_cache = WorkspaceCache::default();
+    let workspace = {
+        let parent = path.parent().expect("Project path has no parent");
+        match Workspace::discover(
+            parent,
+            &DiscoveryOptions {
+                members: MemberDiscovery::Ignore(std::iter::once(path.clone()).collect()),
+                ..DiscoveryOptions::default()
+            },
+            &workspace_cache,
+        )
+        .await
+        {
+            Ok(workspace) => {
+                if no_workspace {
+                    debug!("Ignoring discovered workspace due to `--no-workspace`");
+                    None
+                } else {
+                    Some(workspace)
+                }
+            }
+            Err(WorkspaceError::MissingPyprojectToml | WorkspaceError::NonWorkspace(_)) => {
+                if no_workspace {
+                    warn!("`--no-workspace` was provided, but no workspace was found");
+                }
+                None
+            }
+            Err(err) => {
+                if no_workspace {
+                    warn!("Ignoring workspace discovery error due to `--no-workspace`: {err}");
+                    None
+                } else {
+                    return Err(err).with_context(|| {
+                        format!(
+                            "Failed to discover parent workspace; use `{}` to ignore",
+                            "uv init --no-workspace".green()
+                        )
+                    });
+                }
+            }
+        }
+    };
+
+    let reporter = PythonDownloadReporter::single(printer);
+
+    // Determine Python version: use script's requires-python, or explicit --python, or discover
+    let python_request = if let Some(request) = python {
+        Some(PythonRequest::parse(&request))
+    } else if let Some(ref specifiers) = script_requires_python {
+        // Use the script's requires-python as a version range request
+        Some(PythonRequest::Version(VersionRequest::Range(
+            specifiers.clone(),
+            PythonVariant::Default,
+        )))
+    } else if let Some(file) = PythonVersionFile::discover(
+        &path,
+        &VersionFileDiscoveryOptions::default()
+            .with_stop_discovery_at(
+                workspace
+                    .as_ref()
+                    .map(Workspace::install_path)
+                    .map(PathBuf::as_ref),
+            )
+            .with_no_config(no_config),
+    )
+    .await?
+    {
+        file.into_version()
+    } else {
+        None
+    };
+
+    let (requires_python, python_pin) = determine_requires_python(
+        &path,
+        pin_python,
+        install_mirrors,
+        client_builder,
+        python_preference,
+        python_downloads,
+        cache,
+        preview,
+        workspace.as_ref(),
+        &reporter,
+        python_request,
+    )
+    .await?;
+
+    // Initialize VCS first so Git configuration can be read
+    init_vcs(&path, vcs)?;
+
+    let author = get_author_info(&path, author_from.unwrap_or_default());
+
+    // Generate the pyproject.toml with dependencies from the script
+    let pyproject = pyproject_project_from_script(
+        &name,
+        &requires_python,
+        author.as_ref(),
+        !no_readme,
+        script_dependencies.as_deref(),
+    );
+
+    fs_err::write(path.join("pyproject.toml"), pyproject)?;
+
+    // Create the README.md if requested
+    if !no_readme {
+        let readme = path.join("README.md");
+        if !readme.exists() {
+            fs_err::write(readme, String::new())?;
+        }
+    }
+
+    // Copy the script into the project directory as main.py
+    // Strip any PEP 723 metadata block from the content
+    let script_content_without_metadata = if let Some(script) = script_metadata {
+        // Reconstruct script without the metadata block
+        format!("{}{}", script.prelude, script.postlude)
+    } else {
+        script_content
+    };
+    fs_err::write(path.join("main.py"), script_content_without_metadata)?;
+
+    // Handle workspace membership
+    if let Some(workspace) = workspace {
+        if workspace.excludes(&path)? {
+            writeln!(
+                printer.stderr(),
+                "Project `{}` is excluded by workspace `{}`",
+                name.cyan(),
+                workspace.install_path().simplified_display().cyan()
+            )?;
+        } else if workspace.includes(&path)? {
+            writeln!(
+                printer.stderr(),
+                "Project `{}` is already a member of workspace `{}`",
+                name.cyan(),
+                workspace.install_path().simplified_display().cyan()
+            )?;
+        } else {
+            let mut pyproject = PyProjectTomlMut::from_toml(
+                &workspace.pyproject_toml().raw,
+                DependencyTarget::PyProjectToml,
+            )?;
+            pyproject.add_workspace(path.strip_prefix(workspace.install_path())?)?;
+
+            fs_err::write(
+                workspace.install_path().join("pyproject.toml"),
+                pyproject.to_string(),
+            )?;
+
+            writeln!(
+                printer.stderr(),
+                "Adding `{}` as member of workspace `{}`",
+                name.cyan(),
+                workspace.install_path().simplified_display().cyan()
+            )?;
+        }
+
+        if let Some(python_request) = python_pin {
+            if PythonVersionFile::discover(&path, &VersionFileDiscoveryOptions::default())
+                .await?
+                .filter(|file| {
+                    file.version()
+                        .is_some_and(|version| *version == python_request)
+                        && file.path().parent().is_some_and(|parent| {
+                            parent == workspace.install_path() || parent == path
+                        })
+                })
+                .is_none()
+            {
+                PythonVersionFile::new(path.join(".python-version"))
+                    .with_versions(vec![python_request.clone()])
+                    .write()
+                    .await?;
+            }
+        }
+    } else if let Some(python_request) = python_pin {
+        if PythonVersionFile::discover(&path, &VersionFileDiscoveryOptions::default())
+            .await?
+            .filter(|file| file.version().is_some())
+            .filter(|file| file.path().parent().is_some_and(|parent| parent == path))
+            .is_none()
+        {
+            PythonVersionFile::new(path.join(".python-version"))
+                .with_versions(vec![python_request.clone()])
+                .write()
+                .await?;
+        }
+    }
+
+    // Print success message
+    match explicit_path {
+        None => {
+            writeln!(
+                printer.stderr(),
+                "Initialized project `{}` from `{}`",
+                name.cyan(),
+                script_path.simplified_display().cyan()
+            )?;
+        }
+        Some(path) => {
+            let path =
+                std::path::absolute(&path).unwrap_or_else(|_| path.simplified().to_path_buf());
+            writeln!(
+                printer.stderr(),
+                "Initialized project `{}` at `{}` from `{}`",
+                name.cyan(),
+                path.display().cyan(),
+                script_path.simplified_display().cyan()
+            )?;
+        }
+    }
+
+    Ok(ExitStatus::Success)
+}
+
+/// Generate the `[project]` section of a `pyproject.toml` from a script.
+fn pyproject_project_from_script(
+    name: &PackageName,
+    requires_python: &RequiresPython,
+    author: Option<&Author>,
+    include_readme: bool,
+    dependencies: Option<&[uv_pep508::Requirement<VerbatimParsedUrl>]>,
+) -> String {
+    let deps_str = if let Some(deps) = dependencies {
+        if deps.is_empty() {
+            "[]".to_string()
+        } else {
+            let deps_list: Vec<String> = deps.iter().map(|d| format!("    \"{d}\",")).collect();
+            format!("[\n{}\n]", deps_list.join("\n"))
+        }
+    } else {
+        "[]".to_string()
+    };
+
+    indoc::formatdoc! {r#"
+        [project]
+        name = "{name}"
+        version = "0.1.0"
+        description = "Add your description here"{readme}{authors}
+        requires-python = "{requires_python}"
+        dependencies = {deps_str}
+    "#,
+        readme = if include_readme { "\nreadme = \"README.md\"" } else { "" },
+        authors = author.map_or_else(String::new, |author| format!("\nauthors = [\n    {}\n]", author.to_toml_string())),
+        requires_python = requires_python.specifiers(),
+    }
 }
 
 /// Initialize a project (and, implicitly, a workspace root) at the given path.

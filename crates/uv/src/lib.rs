@@ -2006,6 +2006,7 @@ async fn run_project(
                 args.python,
                 args.install_mirrors,
                 args.no_workspace,
+                args.from_script,
                 &client_builder.subcommand(vec!["init".to_owned()]),
                 globals.python_preference,
                 globals.python_downloads,

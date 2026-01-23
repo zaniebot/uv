@@ -4181,3 +4181,289 @@ fn init_working_directory_change() -> Result<()> {
 
     Ok(())
 }
+
+/// Create a project from a PEP 723 script using `--from-script`.
+#[test]
+fn init_from_script() -> Result<()> {
+    let context = TestContext::new("3.12");
+
+    // Create a script with PEP 723 metadata
+    let script = context.temp_dir.child("myscript.py");
+    script.write_str(indoc! {r#"
+        # /// script
+        # requires-python = ">=3.11"
+        # dependencies = [
+        #   "requests>=2.25.0",
+        #   "rich",
+        # ]
+        # ///
+
+        import requests
+        from rich import print
+
+        print("Hello, World!")
+    "#})?;
+
+    uv_snapshot!(context.filters(), context.init().arg("myproject").arg("--from-script").arg("myscript.py"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Initialized project `myproject` at `[TEMP_DIR]/myproject` from `myscript.py`
+    ");
+
+    let pyproject = context.read("myproject/pyproject.toml");
+    insta::with_settings!({
+        filters => context.filters(),
+    }, {
+        assert_snapshot!(
+            pyproject, @r#"
+        [project]
+        name = "myproject"
+        version = "0.1.0"
+        description = "Add your description here"
+        readme = "README.md"
+        requires-python = ">=3.11"
+        dependencies = [
+            "requests>=2.25.0",
+            "rich",
+        ]
+        "#
+        );
+    });
+
+    // Verify that main.py was created without the PEP 723 metadata block
+    let main_py = context.read("myproject/main.py");
+    assert_snapshot!(
+        main_py, @r#"
+
+        import requests
+        from rich import print
+
+        print("Hello, World!")
+        "#
+    );
+
+    // Verify README.md was created
+    context
+        .temp_dir
+        .child("myproject/README.md")
+        .assert(predicate::path::is_file());
+
+    Ok(())
+}
+
+/// Create a project from a script without PEP 723 metadata using `--from-script`.
+#[test]
+fn init_from_script_no_metadata() -> Result<()> {
+    let context = TestContext::new("3.12");
+
+    // Create a plain Python script without PEP 723 metadata
+    let script = context.temp_dir.child("plain.py");
+    script.write_str(indoc! {r#"
+        print("Hello, World!")
+    "#})?;
+
+    uv_snapshot!(context.filters(), context.init().arg("myproject").arg("--from-script").arg("plain.py"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Initialized project `myproject` at `[TEMP_DIR]/myproject` from `plain.py`
+    ");
+
+    let pyproject = context.read("myproject/pyproject.toml");
+    insta::with_settings!({
+        filters => context.filters(),
+    }, {
+        assert_snapshot!(
+            pyproject, @r#"
+        [project]
+        name = "myproject"
+        version = "0.1.0"
+        description = "Add your description here"
+        readme = "README.md"
+        requires-python = ">=3.12"
+        dependencies = []
+        "#
+        );
+    });
+
+    // Verify that main.py was created with the original content
+    let main_py = context.read("myproject/main.py");
+    assert_snapshot!(
+        main_py, @r#"
+        print("Hello, World!")
+        "#
+    );
+
+    Ok(())
+}
+
+/// Create a project from a script in the current directory using `--from-script`.
+#[test]
+fn init_from_script_current_dir() -> Result<()> {
+    let context = TestContext::new("3.12");
+
+    // Create a project directory first
+    let project_dir = context.temp_dir.child("myproject");
+    project_dir.create_dir_all()?;
+
+    // Create a script with PEP 723 metadata
+    let script = context.temp_dir.child("tool.py");
+    script.write_str(indoc! {r#"
+        # /// script
+        # requires-python = ">=3.10"
+        # dependencies = ["click"]
+        # ///
+
+        import click
+
+        @click.command()
+        def main():
+            click.echo("Hello!")
+
+        if __name__ == "__main__":
+            main()
+    "#})?;
+
+    uv_snapshot!(context.filters(), context.init().current_dir(&project_dir).arg("--from-script").arg("../tool.py"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Initialized project `myproject` from `../tool.py`
+    ");
+
+    let pyproject = context.read("myproject/pyproject.toml");
+    insta::with_settings!({
+        filters => context.filters(),
+    }, {
+        assert_snapshot!(
+            pyproject, @r#"
+        [project]
+        name = "myproject"
+        version = "0.1.0"
+        description = "Add your description here"
+        readme = "README.md"
+        requires-python = ">=3.10"
+        dependencies = [
+            "click",
+        ]
+        "#
+        );
+    });
+
+    Ok(())
+}
+
+/// Fail when using `--from-script` with `--script` flag.
+#[test]
+fn init_from_script_conflicts_with_script() {
+    let context = TestContext::new("3.12");
+
+    // Just verify that the command fails due to conflicting arguments
+    let result = context
+        .init()
+        .arg("--script")
+        .arg("foo.py")
+        .arg("--from-script")
+        .arg("myscript.py")
+        .assert()
+        .failure();
+
+    // Check that the error message mentions the conflict
+    result.stderr(predicate::str::contains(
+        "the argument '--script' cannot be used with '--from-script",
+    ));
+}
+
+/// Error when script file does not exist.
+#[test]
+fn init_from_script_missing_file() {
+    let context = TestContext::new("3.12");
+
+    // Just verify that the command fails when the script file doesn't exist
+    context
+        .init()
+        .arg("myproject")
+        .arg("--from-script")
+        .arg("nonexistent.py")
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("Failed to read script"))
+        .stderr(predicate::str::contains("nonexistent.py"));
+}
+
+/// Create a project from a script with a shebang using `--from-script`.
+#[test]
+fn init_from_script_with_shebang() -> Result<()> {
+    let context = TestContext::new("3.12");
+
+    // Create a script with a shebang and PEP 723 metadata
+    let script = context.temp_dir.child("cli.py");
+    script.write_str(indoc! {r#"
+        #!/usr/bin/env python3
+        # /// script
+        # requires-python = ">=3.9"
+        # dependencies = ["typer"]
+        # ///
+
+        import typer
+
+        def main(name: str):
+            typer.echo(f"Hello {name}!")
+
+        if __name__ == "__main__":
+            typer.run(main)
+    "#})?;
+
+    uv_snapshot!(context.filters(), context.init().arg("myproject").arg("--from-script").arg("cli.py"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Initialized project `myproject` at `[TEMP_DIR]/myproject` from `cli.py`
+    ");
+
+    let pyproject = context.read("myproject/pyproject.toml");
+    insta::with_settings!({
+        filters => context.filters(),
+    }, {
+        assert_snapshot!(
+            pyproject, @r#"
+        [project]
+        name = "myproject"
+        version = "0.1.0"
+        description = "Add your description here"
+        readme = "README.md"
+        requires-python = ">=3.9"
+        dependencies = [
+            "typer",
+        ]
+        "#
+        );
+    });
+
+    // Verify main.py has the shebang but not the PEP 723 metadata
+    let main_py = context.read("myproject/main.py");
+    assert_snapshot!(
+        main_py, @r#"
+        #!/usr/bin/env python3
+
+        import typer
+
+        def main(name: str):
+            typer.echo(f"Hello {name}!")
+
+        if __name__ == "__main__":
+            typer.run(main)
+        "#
+    );
+
+    Ok(())
+}
