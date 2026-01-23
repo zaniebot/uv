@@ -31,6 +31,10 @@ The temporary directory is used for ephemeral data.
 
 The cache directory is used for data that is disposable, but is useful to be long-lived.
 
+The cache directory can be overridden with `UV_CACHE_DIR`. If set, the specified directory will be
+used instead of the system default. See the
+[cache documentation](../concepts/cache.md#cache-directory) for the full precedence order.
+
 === "Unix"
 
     1. `$XDG_CACHE_HOME/uv`
@@ -107,10 +111,12 @@ should be on the `PATH`.
 
 uv uses a local cache to avoid re-downloading and re-building dependencies.
 
-By default, the cache is stored in the [cache directory](#cache-directory) but it can be overridden
-via command line arguments, environment variables, or settings as detailed in
-[the cache documentation](../concepts/cache.md#cache-directory). When the cache is disabled, the
-cache will be stored in a [temporary directory](#temporary-directory).
+By default, the cache is stored in the [cache directory](#cache-directory). The cache location can
+be overridden with `--cache-dir`, `UV_CACHE_DIR`, or the
+[`cache-dir`](../reference/settings.md#cache-dir) setting. When the cache is disabled via
+`--no-cache`, a [temporary directory](#temporary-directory) is used instead.
+
+See [the cache documentation](../concepts/cache.md#cache-directory) for more details.
 
 Use `uv cache dir` to show the current cache directory path.
 
