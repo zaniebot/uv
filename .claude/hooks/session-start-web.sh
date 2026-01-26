@@ -1,6 +1,9 @@
 #!/bin/bash
 set -euo pipefail
 
+# Fix /tmp permissions (container may have incorrect ownership)
+chmod 1777 /tmp 2>/dev/null || true
+
 # Install `gh`
 if ! command -v gh &> /dev/null; then
     apt-get update -qq
