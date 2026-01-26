@@ -48,3 +48,4 @@ profile.json.gz
 # IDE
 .idea
 .vscode
+.prism/
