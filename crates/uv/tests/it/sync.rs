@@ -15567,3 +15567,70 @@ fn sync_reinstalls_on_version_change() -> Result<()> {
 
     Ok(())
 }
+
+/// Regression test for <https://github.com/astral-sh/uv/issues/17705>
+///
+/// When `extra-build-dependencies` uses a marker like `extra == 'test'` with
+/// `match-runtime = true`, the marker should be properly evaluated. If the marker
+/// is not satisfied, the dependency should be skipped entirely and not cause an
+/// error about the package not being found in the resolution.
+#[test]
+fn sync_extra_build_dependencies_match_runtime_with_marker() -> Result<()> {
+    let context = TestContext::new("3.12").with_filtered_counts();
+
+    // Write a test package that optionally requires `iniconfig` at build time
+    let child = context.temp_dir.child("child");
+    child.create_dir_all()?;
+    let child_pyproject_toml = child.child("pyproject.toml");
+    child_pyproject_toml.write_str(indoc! {r#"
+        [project]
+        name = "child"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+
+        [build-system]
+        requires = ["hatchling"]
+        build-backend = "hatchling.build"
+    "#})?;
+    child.child("src/child/__init__.py").touch()?;
+
+    // Create a project with `iniconfig` as an optional dependency under the `test` extra.
+    // The extra-build-dependency for `iniconfig` has a marker that depends on this extra.
+    let pyproject_toml = context.temp_dir.child("pyproject.toml");
+    pyproject_toml.write_str(indoc! {r#"
+        [project]
+        name = "parent"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        dependencies = ["child"]
+
+        [project.optional-dependencies]
+        test = ["iniconfig"]
+
+        [tool.uv.sources]
+        child = { path = "child" }
+
+        [tool.uv.extra-build-dependencies]
+        child = [{ requirement = "iniconfig; extra == 'test'", match-runtime = true }]
+    "#})?;
+
+    // Running `uv sync` WITHOUT the `test` extra should succeed.
+    // The marker `extra == 'test'` is NOT satisfied, so the extra-build-dependency
+    // should be skipped entirely.
+    //
+    // BUG(#17705): This currently fails because the marker is not evaluated before
+    // checking for match-runtime. The expected behavior is that this should succeed
+    // since the marker condition is not satisfied.
+    uv_snapshot!(context.filters(), context.sync(), @"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    warning: The `extra-build-dependencies` option is experimental and may change without warning. Pass `--preview-features extra-build-dependencies` to disable this warning.
+    Resolved [N] packages in [TIME]
+    error: `iniconfig` was declared as an extra build dependency with `match-runtime = true`, but was not found in the resolution
+    ");
+
+    Ok(())
+}
