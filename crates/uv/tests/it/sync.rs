@@ -15617,19 +15617,36 @@ fn sync_extra_build_dependencies_match_runtime_with_marker() -> Result<()> {
     // Running `uv sync` WITHOUT the `test` extra should succeed.
     // The marker `extra == 'test'` is NOT satisfied, so the extra-build-dependency
     // should be skipped entirely.
-    //
-    // BUG(#17705): This currently fails because the marker is not evaluated before
-    // checking for match-runtime. The expected behavior is that this should succeed
-    // since the marker condition is not satisfied.
     uv_snapshot!(context.filters(), context.sync(), @"
-    success: false
-    exit_code: 2
+    success: true
+    exit_code: 0
     ----- stdout -----
 
     ----- stderr -----
     warning: The `extra-build-dependencies` option is experimental and may change without warning. Pass `--preview-features extra-build-dependencies` to disable this warning.
     Resolved [N] packages in [TIME]
-    error: `iniconfig` was declared as an extra build dependency with `match-runtime = true`, but was not found in the resolution
+    Prepared [N] packages in [TIME]
+    Installed [N] packages in [TIME]
+     + child==0.1.0 (from file://[TEMP_DIR]/child)
+    ");
+
+    // Running `uv sync --extra test` should also succeed because:
+    // 1. The marker `extra == 'test'` is satisfied
+    // 2. `iniconfig` is in the resolution (from optional-dependencies)
+    // 3. The build dependency should use the resolved version
+    uv_snapshot!(context.filters(), context.sync().arg("--extra").arg("test"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    warning: The `extra-build-dependencies` option is experimental and may change without warning. Pass `--preview-features extra-build-dependencies` to disable this warning.
+    Resolved [N] packages in [TIME]
+    Prepared [N] packages in [TIME]
+    Uninstalled [N] packages in [TIME]
+    Installed [N] packages in [TIME]
+     ~ child==0.1.0 (from file://[TEMP_DIR]/child)
+     + iniconfig==2.0.0
     ");
 
     Ok(())

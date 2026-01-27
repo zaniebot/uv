@@ -516,7 +516,9 @@ pub(crate) async fn pip_sync(
     };
 
     // Constrain any build requirements marked as `match-runtime = true`.
-    let extra_build_requires = extra_build_requires.match_runtime(&resolution)?;
+    // For pip sync, we don't have project-level extras, so pass an empty slice.
+    let extra_build_requires =
+        extra_build_requires.match_runtime(&resolution, Some(marker_env.markers()), &[])?;
 
     // Create a build dispatch.
     let build_dispatch = BuildDispatch::new(

@@ -763,8 +763,20 @@ pub(super) async fn do_sync(
     // If necessary, convert editable to non-editable distributions.
     let resolution = apply_editable_mode(resolution, editable);
 
+    // Collect the activated extras from the root packages for marker evaluation.
+    let activated_extras: Vec<_> = target
+        .roots()
+        .filter_map(|root_name| target.lock().find_by_name(root_name).ok().flatten())
+        .flat_map(|dist| extras.extra_names(dist.optional_dependencies().keys()))
+        .cloned()
+        .collect();
+
     // Constrain any build requirements marked as `match-runtime = true`.
-    let extra_build_requires = extra_build_requires.match_runtime(&resolution)?;
+    let extra_build_requires = extra_build_requires.match_runtime(
+        &resolution,
+        Some(marker_env.markers()),
+        &activated_extras,
+    )?;
 
     // Populate credentials from the target.
     store_credentials_from_target(target, &client_builder);

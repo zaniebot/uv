@@ -3,7 +3,8 @@ use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 
 use uv_cache_key::{CacheKey, CacheKeyHasher};
-use uv_normalize::PackageName;
+use uv_normalize::{ExtraName, PackageName};
+use uv_pep508::MarkerEnvironment;
 
 use crate::{Name, Requirement, RequirementSource, Resolution};
 
@@ -81,13 +82,24 @@ impl CacheKey for ExtraBuildRequirement {
 
 impl ExtraBuildRequires {
     /// Apply runtime constraints from a resolution to the extra build requirements.
-    pub fn match_runtime(self, resolution: &Resolution) -> Result<Self, ExtraBuildRequiresError> {
+    ///
+    /// The `marker_env` and `extras` parameters are used to evaluate markers on
+    /// extra build requirements. Requirements whose markers are not satisfied
+    /// will be filtered out.
+    pub fn match_runtime(
+        self,
+        resolution: &Resolution,
+        marker_env: Option<&MarkerEnvironment>,
+        extras: &[ExtraName],
+    ) -> Result<Self, ExtraBuildRequiresError> {
         self.into_iter()
             .filter(|(_, requirements)| !requirements.is_empty())
             .filter(|(name, _)| resolution.distributions().any(|dist| dist.name() == name))
             .map(|(name, requirements)| {
                 let requirements = requirements
                     .into_iter()
+                    // Filter out requirements whose markers are not satisfied.
+                    .filter(|req| req.requirement.evaluate_markers(marker_env, extras))
                     .map(|requirement| match requirement {
                         ExtraBuildRequirement {
                             requirement,
