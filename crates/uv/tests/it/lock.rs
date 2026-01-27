@@ -33329,3 +33329,131 @@ fn lock_check_multiple_default_indexes_explicit_assignment_dependency_group() ->
 
     Ok(())
 }
+
+/// Test the behavior when removing `exclude-newer` from `pyproject.toml`.
+///
+/// Currently, when `exclude-newer` is removed from the pyproject.toml, the lockfile
+/// is re-resolved (packages may be upgraded) because the removal of `exclude-newer`
+/// is treated as a change that invalidates the lockfile.
+///
+/// Uses idna which has releases at:
+/// - 3.6: 2023-11-25
+/// - 3.7: 2024-04-11
+#[test]
+fn lock_remove_exclude_newer_from_pyproject() -> Result<()> {
+    let context = TestContext::new("3.12");
+
+    let pyproject_toml = context.temp_dir.child("pyproject.toml");
+    pyproject_toml.write_str(
+        r#"
+        [project]
+        name = "project"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        dependencies = ["idna"]
+
+        [tool.uv]
+        exclude-newer = "2024-01-01T00:00:00Z"
+        "#,
+    )?;
+
+    // Lock with exclude-newer set in pyproject.toml (before idna 3.7)
+    uv_snapshot!(context.filters(), context
+        .lock()
+        .env_remove(EnvVars::UV_EXCLUDE_NEWER), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Resolved 2 packages in [TIME]
+    ");
+
+    let lock = context.read("uv.lock");
+    // Should resolve to idna 3.6 (released 2023-11-25, before cutoff of 2024-01-01)
+    assert_snapshot!(lock, @r#"
+    version = 1
+    revision = 3
+    requires-python = ">=3.12"
+
+    [options]
+    exclude-newer = "2024-01-01T00:00:00Z"
+
+    [[package]]
+    name = "idna"
+    version = "3.6"
+    source = { registry = "https://pypi.org/simple" }
+    sdist = { url = "https://files.pythonhosted.org/packages/bf/3f/ea4b9117521a1e9c50344b909be7886dd00a519552724809bb1f486986c2/idna-3.6.tar.gz", hash = "sha256:9ecdbbd083b06798ae1e86adcbfe8ab1479cf864e4ee30fe4e46a003d12491ca", size = 175426, upload-time = "2023-11-25T15:40:54.902Z" }
+    wheels = [
+        { url = "https://files.pythonhosted.org/packages/c2/e7/a82b05cf63a603df6e68d59ae6a68bf5064484a0718ea5033660af4b54a9/idna-3.6-py3-none-any.whl", hash = "sha256:c05567e9c24a6b9faaa835c4821bad0590fbb9d5779e7caa6e1cc4978e7eb24f", size = 61567, upload-time = "2023-11-25T15:40:52.604Z" },
+    ]
+
+    [[package]]
+    name = "project"
+    version = "0.1.0"
+    source = { virtual = "." }
+    dependencies = [
+        { name = "idna" },
+    ]
+
+    [package.metadata]
+    requires-dist = [{ name = "idna" }]
+    "#);
+
+    // Now remove exclude-newer from pyproject.toml
+    pyproject_toml.write_str(
+        r#"
+        [project]
+        name = "project"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        dependencies = ["idna"]
+        "#,
+    )?;
+
+    // Running `uv lock` after removing exclude-newer triggers a re-resolution
+    // because the removal of global exclude-newer invalidates the lockfile.
+    uv_snapshot!(context.filters(), context
+        .lock()
+        .env_remove(EnvVars::UV_EXCLUDE_NEWER), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Ignoring existing lockfile due to removal of global exclude newer
+    Resolved 2 packages in [TIME]
+    Updated idna v3.6 -> v3.11
+    ");
+
+    let lock = context.read("uv.lock");
+    // The lockfile is updated to the latest idna because the removal of
+    // exclude-newer triggers a fresh resolution.
+    assert_snapshot!(lock, @r#"
+    version = 1
+    revision = 3
+    requires-python = ">=3.12"
+
+    [[package]]
+    name = "idna"
+    version = "3.11"
+    source = { registry = "https://pypi.org/simple" }
+    sdist = { url = "https://files.pythonhosted.org/packages/6f/6d/0703ccc57f3a7233505399edb88de3cbd678da106337b9fcde432b65ed60/idna-3.11.tar.gz", hash = "sha256:795dafcc9c04ed0c1fb032c2aa73654d8e8c5023a7df64a53f39190ada629902", size = 194582, upload-time = "2025-10-12T14:55:20.501Z" }
+    wheels = [
+        { url = "https://files.pythonhosted.org/packages/0e/61/66938bbb5fc52dbdf84594873d5b51fb1f7c7794e9c0f5bd885f30bc507b/idna-3.11-py3-none-any.whl", hash = "sha256:771a87f49d9defaf64091e6e6fe9c18d4833f140bd19464795bc32d966ca37ea", size = 71008, upload-time = "2025-10-12T14:55:18.883Z" },
+    ]
+
+    [[package]]
+    name = "project"
+    version = "0.1.0"
+    source = { virtual = "." }
+    dependencies = [
+        { name = "idna" },
+    ]
+
+    [package.metadata]
+    requires-dist = [{ name = "idna" }]
+    "#);
+
+    Ok(())
+}
