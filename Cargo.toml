@@ -338,3 +338,11 @@ codegen-units = 1
 # The profile that 'cargo dist' will build with.
 [profile.dist]
 inherits = "release"
+
+# Patch hyper-util to use the latest version from git, which includes a fix
+# for panics when running in macOS sandboxes (e.g., Claude Code sandbox).
+# See: https://github.com/astral-sh/uv/issues/16916
+# See: https://github.com/hyperium/hyper-util/pull/256
+# TODO(zanieb): Remove this patch when hyper-util 0.1.20+ is released.
+[patch.crates-io]
+hyper-util = { git = "https://github.com/hyperium/hyper-util.git", branch = "master" }
