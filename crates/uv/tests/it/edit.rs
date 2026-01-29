@@ -15039,6 +15039,117 @@ fn remove_via_uv_workspace_toml() -> Result<()> {
     Ok(())
 }
 
+/// Add a dependency to a workspace member that uses `uv-workspace.toml`.
+#[test]
+fn add_workspace_member_uv_workspace_toml() -> Result<()> {
+    let context = TestContext::new("3.12");
+
+    // Create a workspace root with uv-workspace.toml.
+    let root_uv_workspace = context.temp_dir.child("uv-workspace.toml");
+    root_uv_workspace.write_str(indoc! {r#"
+        [project]
+        name = "parent"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        dependencies = []
+
+        [workspace]
+        members = ["child"]
+    "#})?;
+
+    // Create a child member with uv-workspace.toml (no pyproject.toml — it should be generated).
+    let child_dir = context.temp_dir.child("child");
+    child_dir.create_dir_all()?;
+    let child_uv_workspace = child_dir.child("uv-workspace.toml");
+    child_uv_workspace.write_str(indoc! {r#"
+        [project]
+        name = "child"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        dependencies = []
+
+        [build-system]
+        requires = ["hatchling"]
+        build-backend = "hatchling.build"
+    "#})?;
+    child_dir
+        .child("src")
+        .child("child")
+        .child("__init__.py")
+        .touch()?;
+
+    let child = context.temp_dir.join("child");
+
+    // Add a dependency to the child member.
+    uv_snapshot!(context.filters(), context.add().arg("anyio==3.7.0").current_dir(&child), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Resolved 5 packages in [TIME]
+    Prepared 4 packages in [TIME]
+    Installed 4 packages in [TIME]
+     + anyio==3.7.0
+     + child==0.1.0 (from file://[TEMP_DIR]/child)
+     + idna==3.6
+     + sniffio==1.3.1
+    ");
+
+    // The child uv-workspace.toml should have the new dependency.
+    let child_uv_workspace_content = fs_err::read_to_string(child.join("uv-workspace.toml"))?;
+    insta::with_settings!({
+        filters => context.filters(),
+    }, {
+        assert_snapshot!(
+            child_uv_workspace_content, @r#"
+        [project]
+        name = "child"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        dependencies = [
+            "anyio==3.7.0",
+        ]
+
+        [build-system]
+        requires = ["hatchling"]
+        build-backend = "hatchling.build"
+        "#
+        );
+    });
+
+    // The child pyproject.toml should have been generated/synced.
+    let child_pyproject_content = fs_err::read_to_string(child.join("pyproject.toml"))?;
+    insta::with_settings!({
+        filters => context.filters(),
+    }, {
+        assert_snapshot!(
+            child_pyproject_content, @r#"
+        [project]
+        name = "child"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        dependencies = [
+            "anyio==3.7.0",
+        ]
+
+        [build-system]
+        requires = ["hatchling"]
+        build-backend = "hatchling.build"
+        "#
+        );
+    });
+
+    // The root pyproject.toml should have been generated too.
+    let root_pyproject_content = context.read("pyproject.toml");
+    assert!(
+        root_pyproject_content.contains("name = \"parent\""),
+        "Root pyproject.toml should exist and contain the parent project, got:\n{root_pyproject_content}"
+    );
+
+    Ok(())
+}
+
 /// Add a dev dependency via `uv-workspace.toml` — dev-dependencies should be at the top level.
 #[test]
 fn add_dev_via_uv_workspace_toml() -> Result<()> {

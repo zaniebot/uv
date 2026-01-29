@@ -289,7 +289,7 @@ impl PyProjectTomlMut {
                     .as_table_mut()
                     .ok_or(Error::MalformedSources)?
                     .entry("uv")
-                    .or_insert(Item::Table(Table::new()))
+                    .or_insert(implicit())
                     .as_table_mut()
                     .ok_or(Error::MalformedSources)?;
                 Ok(table)

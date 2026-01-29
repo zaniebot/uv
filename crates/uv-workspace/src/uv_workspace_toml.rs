@@ -107,6 +107,26 @@ pub fn read_uv_workspace_toml(root: &Path) -> Result<String, std::io::Error> {
     fs_err::read_to_string(root.join(UV_WORKSPACE_TOML))
 }
 
+/// If a `uv-workspace.toml` exists at the given root, sync it to `pyproject.toml`
+/// and return the synced pyproject.toml content. Otherwise return `None`.
+///
+/// This ensures the `pyproject.toml` is up-to-date before workspace discovery reads it.
+pub fn sync_if_needed(root: &Path) -> Result<Option<String>, std::io::Error> {
+    let uv_workspace_path = root.join(UV_WORKSPACE_TOML);
+    if !uv_workspace_path.is_file() {
+        return Ok(None);
+    }
+
+    let uv_workspace_content = fs_err::read_to_string(&uv_workspace_path)?;
+    let pyproject_content =
+        sync_to_pyproject(&uv_workspace_content).map_err(std::io::Error::other)?;
+
+    // Write the synced pyproject.toml to disk so other tools can read it.
+    fs_err::write(root.join("pyproject.toml"), &pyproject_content)?;
+
+    Ok(Some(pyproject_content))
+}
+
 /// Write the updated content to both the `uv-workspace.toml` and the synced `pyproject.toml`.
 ///
 /// Returns `true` if either file was modified.

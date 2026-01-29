@@ -23,6 +23,7 @@ use crate::dependency_groups::{DependencyGroupError, FlatDependencyGroup, FlatDe
 use crate::pyproject::{
     Project, PyProjectToml, PyprojectTomlError, Source, Sources, ToolUvSources, ToolUvWorkspace,
 };
+use crate::uv_workspace_toml;
 
 type WorkspaceMembers = Arc<BTreeMap<PackageName, WorkspaceMember>>;
 
@@ -208,9 +209,15 @@ impl Workspace {
 
         let project_path = path
             .ancestors()
-            .find(|path| path.join("pyproject.toml").is_file())
+            .find(|path| {
+                path.join("pyproject.toml").is_file()
+                    || path.join(uv_workspace_toml::UV_WORKSPACE_TOML).is_file()
+            })
             .ok_or(WorkspaceError::MissingPyprojectToml)?
             .to_path_buf();
+
+        // If a `uv-workspace.toml` exists, sync it to `pyproject.toml` first.
+        uv_workspace_toml::sync_if_needed(&project_path)?;
 
         let pyproject_path = project_path.join("pyproject.toml");
         let contents = fs_err::tokio::read_to_string(&pyproject_path).await?;
@@ -963,6 +970,9 @@ impl Workspace {
         // Add the project at the workspace root, if it exists and if it's distinct from the current
         // project. If it is the current project, it is added as such in the next step.
         if let Some(project) = &workspace_pyproject_toml.project {
+            // Sync uv-workspace.toml if present.
+            uv_workspace_toml::sync_if_needed(workspace_root)?;
+
             let pyproject_path = workspace_root.join("pyproject.toml");
             let contents = fs_err::read_to_string(&pyproject_path)?;
             let pyproject_toml = PyProjectToml::from_string(contents)
@@ -1033,6 +1043,9 @@ impl Workspace {
                     "Processing workspace member: `{}`",
                     member_root.user_display()
                 );
+
+                // Sync uv-workspace.toml if present, generating pyproject.toml.
+                uv_workspace_toml::sync_if_needed(&member_root)?;
 
                 // Read the member `pyproject.toml`.
                 let pyproject_path = member_root.join("pyproject.toml");
@@ -1274,7 +1287,10 @@ impl ProjectWorkspace {
                     .map(|stop_discovery_at| stop_discovery_at != *path)
                     .unwrap_or(true)
             })
-            .find(|path| path.join("pyproject.toml").is_file())
+            .find(|path| {
+                path.join("pyproject.toml").is_file()
+                    || path.join(uv_workspace_toml::UV_WORKSPACE_TOML).is_file()
+            })
             .ok_or(WorkspaceError::MissingPyprojectToml)?;
 
         debug!(
@@ -1291,6 +1307,9 @@ impl ProjectWorkspace {
         options: &DiscoveryOptions,
         cache: &WorkspaceCache,
     ) -> Result<Self, WorkspaceError> {
+        // Sync uv-workspace.toml if present.
+        uv_workspace_toml::sync_if_needed(project_root)?;
+
         // Read the current `pyproject.toml`.
         let pyproject_path = project_root.join("pyproject.toml");
         let contents = fs_err::tokio::read_to_string(&pyproject_path).await?;
@@ -1501,6 +1520,9 @@ async fn find_workspace(
         })
         .skip(1)
     {
+        // Sync uv-workspace.toml if present at this ancestor.
+        uv_workspace_toml::sync_if_needed(workspace_root)?;
+
         let pyproject_path = workspace_root.join("pyproject.toml");
         if !pyproject_path.is_file() {
             continue;
@@ -1666,13 +1688,19 @@ impl VirtualProject {
                     .map(|stop_discovery_at| stop_discovery_at != *path)
                     .unwrap_or(true)
             })
-            .find(|path| path.join("pyproject.toml").is_file())
+            .find(|path| {
+                path.join("pyproject.toml").is_file()
+                    || path.join(uv_workspace_toml::UV_WORKSPACE_TOML).is_file()
+            })
             .ok_or(WorkspaceError::MissingPyprojectToml)?;
 
         debug!(
             "Found project root: `{}`",
             project_root.simplified_display()
         );
+
+        // Sync uv-workspace.toml if present.
+        uv_workspace_toml::sync_if_needed(project_root)?;
 
         // Read the current `pyproject.toml`.
         let pyproject_path = project_root.join("pyproject.toml");
