@@ -40,6 +40,7 @@ use uv_types::{BuildIsolation, HashStrategy};
 use uv_warnings::warn_user_once;
 use uv_workspace::pyproject::{DependencyType, Source, SourceError, Sources, ToolUvSources};
 use uv_workspace::pyproject_mut::{AddBoundsKind, ArrayEdit, DependencyTarget, PyProjectTomlMut};
+use uv_workspace::uv_workspace_toml;
 use uv_workspace::{DiscoveryOptions, VirtualProject, Workspace, WorkspaceCache};
 
 use crate::commands::pip::loggers::{
@@ -561,10 +562,16 @@ pub(crate) async fn add(
             unreachable!("`--workspace` and `--script` are conflicting options");
         };
 
-        let mut toml = PyProjectTomlMut::from_toml(
-            &project.workspace().pyproject_toml().raw,
-            DependencyTarget::PyProjectToml,
-        )?;
+        let workspace_root = project.workspace().install_path();
+        let mut toml = if uv_workspace_toml::has_uv_workspace_toml(workspace_root) {
+            let content = uv_workspace_toml::read_uv_workspace_toml(workspace_root)?;
+            PyProjectTomlMut::from_toml(&content, DependencyTarget::UvWorkspaceToml)?
+        } else {
+            PyProjectTomlMut::from_toml(
+                &project.workspace().pyproject_toml().raw,
+                DependencyTarget::PyProjectToml,
+            )?
+        };
 
         // Check each requirement to see if it's a path dependency
         for requirement in &requirements {
@@ -608,10 +615,18 @@ pub(crate) async fn add(
         // the discovered members, etc.
         target = if modified {
             let workspace_content = toml.to_string();
-            fs_err::write(
-                project.workspace().install_path().join("pyproject.toml"),
-                &workspace_content,
-            )?;
+            if toml.target() == DependencyTarget::UvWorkspaceToml {
+                uv_workspace_toml::write_uv_workspace_toml(
+                    workspace_root,
+                    &workspace_content,
+                    &uv_workspace_toml::read_uv_workspace_toml(workspace_root).unwrap_or_default(),
+                )?;
+            } else {
+                fs_err::write(
+                    project.workspace().install_path().join("pyproject.toml"),
+                    &workspace_content,
+                )?;
+            }
 
             AddTarget::Project(
                 VirtualProject::discover(
@@ -631,10 +646,17 @@ pub(crate) async fn add(
         AddTarget::Script(script, _) => {
             PyProjectTomlMut::from_toml(&script.metadata.raw, DependencyTarget::Script)
         }
-        AddTarget::Project(project, _) => PyProjectTomlMut::from_toml(
-            &project.pyproject_toml().raw,
-            DependencyTarget::PyProjectToml,
-        ),
+        AddTarget::Project(project, _) => {
+            if uv_workspace_toml::has_uv_workspace_toml(project.root()) {
+                let content = uv_workspace_toml::read_uv_workspace_toml(project.root())?;
+                PyProjectTomlMut::from_toml(&content, DependencyTarget::UvWorkspaceToml)
+            } else {
+                PyProjectTomlMut::from_toml(
+                    &project.pyproject_toml().raw,
+                    DependencyTarget::PyProjectToml,
+                )
+            }
+        }
     }?;
 
     let edits = edits(
@@ -698,10 +720,11 @@ pub(crate) async fn add(
         }
     }
 
+    let dependency_target = toml.target();
     let content = toml.to_string();
 
-    // Save the modified `pyproject.toml` or script.
-    modified |= target.write(&content)?;
+    // Save the modified `pyproject.toml` (or `uv-workspace.toml`) or script.
+    modified |= target.write(&content, dependency_target)?;
 
     // If `--frozen`, exit early. There's no reason to lock and sync, since we don't need a `uv.lock`
     // to exist at all.
@@ -719,7 +742,13 @@ pub(crate) async fn add(
     };
 
     // Update the `pypackage.toml` in-memory.
-    let target = target.update(&content)?;
+    let pyproject_content = if dependency_target == DependencyTarget::UvWorkspaceToml {
+        uv_workspace_toml::sync_to_pyproject(&content)
+            .map_err(|e| anyhow::anyhow!("Failed to sync uv-workspace.toml: {e}"))?
+    } else {
+        content.clone()
+    };
+    let target = target.update(&pyproject_content)?;
 
     // Set the Ctrl-C handler to revert changes on exit.
     let _ = ctrlc::set_handler({
@@ -1121,11 +1150,18 @@ async fn lock_and_sync(
         if modified {
             let content = toml.to_string();
 
-            // Write the updated `pyproject.toml` to disk.
-            target.write(&content)?;
+            // Write the updated `pyproject.toml` (or `uv-workspace.toml`) to disk.
+            let dep_target = toml.target();
+            target.write(&content, dep_target)?;
 
             // Update the `pypackage.toml` in-memory.
-            target = target.update(&content)?;
+            let pyproject_content = if dep_target == DependencyTarget::UvWorkspaceToml {
+                uv_workspace_toml::sync_to_pyproject(&content)
+                    .map_err(|e| anyhow::anyhow!("Failed to sync uv-workspace.toml: {e}"))?
+            } else {
+                content
+            };
+            target = target.update(&pyproject_content)?;
 
             // Invalidate the project metadata.
             if let AddTarget::Project(VirtualProject::Project(ref project), _) = target {
@@ -1326,7 +1362,7 @@ impl AddTarget {
     /// Write the updated content to the target.
     ///
     /// Returns `true` if the content was modified.
-    fn write(&self, content: &str) -> Result<bool, io::Error> {
+    fn write(&self, content: &str, target: DependencyTarget) -> Result<bool, io::Error> {
         match self {
             Self::Script(script, _) => {
                 if content == script.metadata.raw {
@@ -1338,7 +1374,11 @@ impl AddTarget {
                 }
             }
             Self::Project(project, _) => {
-                if content == project.pyproject_toml().raw {
+                if target == DependencyTarget::UvWorkspaceToml {
+                    let original = uv_workspace_toml::read_uv_workspace_toml(project.root())
+                        .unwrap_or_default();
+                    uv_workspace_toml::write_uv_workspace_toml(project.root(), content, &original)
+                } else if content == project.pyproject_toml().raw {
                     debug!("No changes to dependencies; skipping update");
                     Ok(false)
                 } else {

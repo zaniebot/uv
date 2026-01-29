@@ -14886,3 +14886,225 @@ fn add_git_lfs_error() -> Result<()> {
 
     Ok(())
 }
+
+/// Add a PyPI requirement via `uv-workspace.toml`.
+#[test]
+fn add_via_uv_workspace_toml() -> Result<()> {
+    let context = TestContext::new("3.12");
+
+    // Create a uv-workspace.toml with project metadata and sources at the top level.
+    let uv_workspace_toml = context.temp_dir.child("uv-workspace.toml");
+    uv_workspace_toml.write_str(indoc! {r#"
+        [project]
+        name = "project"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        dependencies = []
+    "#})?;
+
+    // Create a minimal pyproject.toml (will be overwritten by sync).
+    let pyproject_toml = context.temp_dir.child("pyproject.toml");
+    pyproject_toml.write_str(indoc! {r#"
+        [project]
+        name = "project"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        dependencies = []
+    "#})?;
+
+    uv_snapshot!(context.filters(), context.add().arg("anyio==3.7.0"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Resolved 4 packages in [TIME]
+    Prepared 3 packages in [TIME]
+    Installed 3 packages in [TIME]
+     + anyio==3.7.0
+     + idna==3.6
+     + sniffio==1.3.1
+    ");
+
+    // The uv-workspace.toml should have been updated with the new dependency.
+    let uv_workspace_content = context.read("uv-workspace.toml");
+    insta::with_settings!({
+        filters => context.filters(),
+    }, {
+        assert_snapshot!(
+            uv_workspace_content, @r#"
+        [project]
+        name = "project"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        dependencies = [
+            "anyio==3.7.0",
+        ]
+        "#
+        );
+    });
+
+    // The pyproject.toml should have been synced.
+    let pyproject_content = context.read("pyproject.toml");
+    insta::with_settings!({
+        filters => context.filters(),
+    }, {
+        assert_snapshot!(
+            pyproject_content, @r#"
+        [project]
+        name = "project"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        dependencies = [
+            "anyio==3.7.0",
+        ]
+        "#
+        );
+    });
+
+    Ok(())
+}
+
+/// Remove a PyPI requirement via `uv-workspace.toml`.
+#[test]
+fn remove_via_uv_workspace_toml() -> Result<()> {
+    let context = TestContext::new("3.12");
+
+    // Create a uv-workspace.toml with a dependency.
+    let uv_workspace_toml = context.temp_dir.child("uv-workspace.toml");
+    uv_workspace_toml.write_str(indoc! {r#"
+        [project]
+        name = "project"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        dependencies = [
+            "anyio==3.7.0",
+        ]
+    "#})?;
+
+    // Create a matching pyproject.toml.
+    let pyproject_toml = context.temp_dir.child("pyproject.toml");
+    pyproject_toml.write_str(indoc! {r#"
+        [project]
+        name = "project"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        dependencies = [
+            "anyio==3.7.0",
+        ]
+    "#})?;
+
+    uv_snapshot!(context.filters(), context.remove().arg("anyio"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Resolved 1 package in [TIME]
+    Audited in [TIME]
+    ");
+
+    // The uv-workspace.toml should have the dependency removed.
+    let uv_workspace_content = context.read("uv-workspace.toml");
+    insta::with_settings!({
+        filters => context.filters(),
+    }, {
+        assert_snapshot!(
+            uv_workspace_content, @r#"
+        [project]
+        name = "project"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        dependencies = []
+        "#
+        );
+    });
+
+    // The pyproject.toml should have been synced.
+    let pyproject_content = context.read("pyproject.toml");
+    insta::with_settings!({
+        filters => context.filters(),
+    }, {
+        assert_snapshot!(
+            pyproject_content, @r#"
+        [project]
+        name = "project"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        dependencies = []
+        "#
+        );
+    });
+
+    Ok(())
+}
+
+/// Add a dev dependency via `uv-workspace.toml` — dev-dependencies should be at the top level.
+#[test]
+fn add_dev_via_uv_workspace_toml() -> Result<()> {
+    let context = TestContext::new("3.12");
+
+    // Create a uv-workspace.toml.
+    let uv_workspace_toml = context.temp_dir.child("uv-workspace.toml");
+    uv_workspace_toml.write_str(indoc! {r#"
+        [project]
+        name = "project"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        dependencies = []
+    "#})?;
+
+    // Create a pyproject.toml.
+    let pyproject_toml = context.temp_dir.child("pyproject.toml");
+    pyproject_toml.write_str(indoc! {r#"
+        [project]
+        name = "project"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        dependencies = []
+    "#})?;
+
+    uv_snapshot!(context.filters(), context.add().arg("anyio==3.7.0").arg("--dev"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Resolved 4 packages in [TIME]
+    Prepared 3 packages in [TIME]
+    Installed 3 packages in [TIME]
+     + anyio==3.7.0
+     + idna==3.6
+     + sniffio==1.3.1
+    ");
+
+    // The uv-workspace.toml should have dependency-groups at the top level.
+    let uv_workspace_content = context.read("uv-workspace.toml");
+    insta::with_settings!({
+        filters => context.filters(),
+    }, {
+        assert_snapshot!(
+            uv_workspace_content, @r#"
+        [project]
+        name = "project"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        dependencies = []
+
+        [dependency-groups]
+        dev = [
+            "anyio==3.7.0",
+        ]
+        "#
+        );
+    });
+
+    // The pyproject.toml should also have dependency-groups at the top level.
+    let pyproject_content = context.read("pyproject.toml");
+    assert!(
+        pyproject_content.contains("[dependency-groups]"),
+        "pyproject.toml should have [dependency-groups], got:\n{pyproject_content}"
+    );
+
+    Ok(())
+}

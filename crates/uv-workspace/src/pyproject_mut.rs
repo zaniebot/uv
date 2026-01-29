@@ -250,13 +250,16 @@ impl AddBoundsKind {
     }
 }
 
-/// Specifies whether dependencies are added to a script file or a `pyproject.toml` file.
+/// Specifies whether dependencies are added to a script file, a `pyproject.toml` file,
+/// or a `uv-workspace.toml` file.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum DependencyTarget {
     /// A PEP 723 script, with inline metadata.
     Script,
     /// A project with a `pyproject.toml`.
     PyProjectToml,
+    /// A project with a `uv-workspace.toml` (where `[tool.uv.*]` keys are top-level).
+    UvWorkspaceToml,
 }
 
 impl PyProjectTomlMut {
@@ -268,19 +271,88 @@ impl PyProjectTomlMut {
         })
     }
 
+    /// Returns the `DependencyTarget` of this document.
+    pub fn target(&self) -> DependencyTarget {
+        self.target
+    }
+
+    /// Returns a mutable reference to the table that corresponds to `tool.uv` in a
+    /// `pyproject.toml`, or the root table in a `uv-workspace.toml`.
+    fn tool_uv_entry(&mut self) -> Result<&mut Table, Error> {
+        match self.target {
+            DependencyTarget::UvWorkspaceToml => Ok(self.doc.as_table_mut()),
+            DependencyTarget::PyProjectToml | DependencyTarget::Script => {
+                let table = self
+                    .doc
+                    .entry("tool")
+                    .or_insert(implicit())
+                    .as_table_mut()
+                    .ok_or(Error::MalformedSources)?
+                    .entry("uv")
+                    .or_insert(Item::Table(Table::new()))
+                    .as_table_mut()
+                    .ok_or(Error::MalformedSources)?;
+                Ok(table)
+            }
+        }
+    }
+
+    /// Returns an optional mutable reference to the table that corresponds to `tool.uv`
+    /// in a `pyproject.toml`, or the root table in a `uv-workspace.toml`.
+    fn tool_uv_get_mut(&mut self) -> Result<Option<&mut Table>, Error> {
+        match self.target {
+            DependencyTarget::UvWorkspaceToml => Ok(Some(self.doc.as_table_mut())),
+            DependencyTarget::PyProjectToml | DependencyTarget::Script => self
+                .doc
+                .get_mut("tool")
+                .map(|tool| tool.as_table_mut().ok_or(Error::MalformedSources))
+                .transpose()?
+                .and_then(|tool| tool.get_mut("uv"))
+                .map(|uv| uv.as_table_mut().ok_or(Error::MalformedSources))
+                .transpose(),
+        }
+    }
+
+    /// Returns an optional reference to the table that corresponds to `tool.uv`
+    /// in a `pyproject.toml`, or the root table in a `uv-workspace.toml`.
+    fn tool_uv_get(&self) -> Option<&Table> {
+        match self.target {
+            DependencyTarget::UvWorkspaceToml => Some(self.doc.as_table()),
+            DependencyTarget::PyProjectToml | DependencyTarget::Script => self
+                .doc
+                .get("tool")
+                .and_then(Item::as_table)
+                .and_then(|tool| tool.get("uv"))
+                .and_then(Item::as_table),
+        }
+    }
+
+    /// Remove a key from the `tool.uv` table (or root table for uv-workspace.toml).
+    fn tool_uv_remove(&mut self, key: &str) -> Result<(), Error> {
+        match self.target {
+            DependencyTarget::UvWorkspaceToml => {
+                self.doc.as_table_mut().remove(key);
+            }
+            DependencyTarget::PyProjectToml | DependencyTarget::Script => {
+                if let Some(uv) = self
+                    .doc
+                    .get_mut("tool")
+                    .and_then(|t| t.as_table_mut())
+                    .and_then(|tool| tool.get_mut("uv"))
+                    .and_then(|u| u.as_table_mut())
+                {
+                    uv.remove(key);
+                }
+            }
+        }
+        Ok(())
+    }
+
     /// Adds a project to the workspace.
     pub fn add_workspace(&mut self, path: impl AsRef<Path>) -> Result<(), Error> {
-        // Get or create `tool.uv.workspace.members`.
+        // Get or create `tool.uv.workspace.members` (or `workspace.members` for uv-workspace.toml).
         let members = self
-            .doc
-            .entry("tool")
-            .or_insert(implicit())
-            .as_table_mut()
-            .ok_or(Error::MalformedWorkspace)?
-            .entry("uv")
-            .or_insert(implicit())
-            .as_table_mut()
-            .ok_or(Error::MalformedWorkspace)?
+            .tool_uv_entry()?
             .entry("workspace")
             .or_insert(Item::Table(Table::new()))
             .as_table_mut()
@@ -305,7 +377,7 @@ impl PyProjectTomlMut {
     fn project(&mut self) -> Result<&mut Table, Error> {
         let doc = match self.target {
             DependencyTarget::Script => self.doc.as_table_mut(),
-            DependencyTarget::PyProjectToml => self
+            DependencyTarget::PyProjectToml | DependencyTarget::UvWorkspaceToml => self
                 .doc
                 .entry("project")
                 .or_insert(Item::Table(Table::new()))
@@ -322,7 +394,7 @@ impl PyProjectTomlMut {
     fn project_mut(&mut self) -> Result<Option<&mut Table>, Error> {
         let doc = match self.target {
             DependencyTarget::Script => Some(self.doc.as_table_mut()),
-            DependencyTarget::PyProjectToml => self
+            DependencyTarget::PyProjectToml | DependencyTarget::UvWorkspaceToml => self
                 .doc
                 .get_mut("project")
                 .map(|project| project.as_table_mut().ok_or(Error::MalformedSources))
@@ -366,17 +438,9 @@ impl PyProjectTomlMut {
         source: Option<&Source>,
         raw: bool,
     ) -> Result<ArrayEdit, Error> {
-        // Get or create `tool.uv.dev-dependencies`.
+        // Get or create `tool.uv.dev-dependencies` (or `dev-dependencies` for uv-workspace.toml).
         let dev_dependencies = self
-            .doc
-            .entry("tool")
-            .or_insert(implicit())
-            .as_table_mut()
-            .ok_or(Error::MalformedSources)?
-            .entry("uv")
-            .or_insert(Item::Table(Table::new()))
-            .as_table_mut()
-            .ok_or(Error::MalformedSources)?
+            .tool_uv_entry()?
             .entry("dev-dependencies")
             .or_insert(Item::Value(Value::Array(Array::new())))
             .as_array_mut()
@@ -391,19 +455,11 @@ impl PyProjectTomlMut {
         Ok(edit)
     }
 
-    /// Add an [`Index`] to `tool.uv.index`.
+    /// Add an [`Index`] to `tool.uv.index` (or `index` for uv-workspace.toml).
     pub fn add_index(&mut self, index: &Index) -> Result<(), Error> {
         let size = self.doc.len();
         let existing = self
-            .doc
-            .entry("tool")
-            .or_insert(implicit())
-            .as_table_mut()
-            .ok_or(Error::MalformedSources)?
-            .entry("uv")
-            .or_insert(implicit())
-            .as_table_mut()
-            .ok_or(Error::MalformedSources)?
+            .tool_uv_entry()?
             .entry("index")
             .or_insert(Item::ArrayOfTables(ArrayOfTables::new()))
             .as_array_of_tables_mut()
@@ -820,19 +876,10 @@ impl PyProjectTomlMut {
         Ok(dependencies)
     }
 
-    /// Get the TOML array for `tool.uv.dev-dependencies`.
+    /// Get the TOML array for `tool.uv.dev-dependencies` (or `dev-dependencies` for uv-workspace.toml).
     fn dev_dependencies_array(&mut self) -> Result<&mut Array, Error> {
-        // Get or create `tool.uv.dev-dependencies`.
         let dev_dependencies = self
-            .doc
-            .entry("tool")
-            .or_insert(implicit())
-            .as_table_mut()
-            .ok_or(Error::MalformedSources)?
-            .entry("uv")
-            .or_insert(Item::Table(Table::new()))
-            .as_table_mut()
-            .ok_or(Error::MalformedSources)?
+            .tool_uv_entry()?
             .entry("dev-dependencies")
             .or_insert(Item::Value(Value::Array(Array::new())))
             .as_array_mut()
@@ -899,19 +946,11 @@ impl PyProjectTomlMut {
         Ok(group)
     }
 
-    /// Adds a source to `tool.uv.sources`.
+    /// Adds a source to `tool.uv.sources` (or `sources` for uv-workspace.toml).
     fn add_source(&mut self, name: &PackageName, source: &Source) -> Result<(), Error> {
-        // Get or create `tool.uv.sources`.
+        // Get or create `tool.uv.sources` (or `sources` for uv-workspace.toml).
         let sources = self
-            .doc
-            .entry("tool")
-            .or_insert(implicit())
-            .as_table_mut()
-            .ok_or(Error::MalformedSources)?
-            .entry("uv")
-            .or_insert(implicit())
-            .as_table_mut()
-            .ok_or(Error::MalformedSources)?
+            .tool_uv_entry()?
             .entry("sources")
             .or_insert(Item::Table(Table::new()))
             .as_table_mut()
@@ -949,16 +988,10 @@ impl PyProjectTomlMut {
 
     /// Removes all occurrences of development dependencies with the given name.
     pub fn remove_dev_dependency(&mut self, name: &PackageName) -> Result<Vec<Requirement>, Error> {
-        // Try to get `tool.uv.dev-dependencies`.
+        // Try to get `tool.uv.dev-dependencies` (or `dev-dependencies` for uv-workspace.toml).
         let Some(dev_dependencies) = self
-            .doc
-            .get_mut("tool")
-            .map(|tool| tool.as_table_mut().ok_or(Error::MalformedDependencies))
-            .transpose()?
-            .and_then(|tool| tool.get_mut("uv"))
-            .map(|tool_uv| tool_uv.as_table_mut().ok_or(Error::MalformedDependencies))
-            .transpose()?
-            .and_then(|tool_uv| tool_uv.get_mut("dev-dependencies"))
+            .tool_uv_get_mut()?
+            .and_then(|uv| uv.get_mut("dev-dependencies"))
             .map(|dependencies| {
                 dependencies
                     .as_array_mut()
@@ -1057,7 +1090,7 @@ impl PyProjectTomlMut {
         Ok(requirements)
     }
 
-    /// Remove a matching source from `tool.uv.sources`, if it exists.
+    /// Remove a matching source from `tool.uv.sources` (or `sources` for uv-workspace.toml), if it exists.
     fn remove_source(&mut self, name: &PackageName) -> Result<(), Error> {
         // If the dependency is still in use, don't remove the source.
         if !self.find_dependency(name, None).is_empty() {
@@ -1065,32 +1098,17 @@ impl PyProjectTomlMut {
         }
 
         if let Some(sources) = self
-            .doc
-            .get_mut("tool")
-            .map(|tool| tool.as_table_mut().ok_or(Error::MalformedSources))
-            .transpose()?
-            .and_then(|tool| tool.get_mut("uv"))
-            .map(|tool_uv| tool_uv.as_table_mut().ok_or(Error::MalformedSources))
-            .transpose()?
-            .and_then(|tool_uv| tool_uv.get_mut("sources"))
+            .tool_uv_get_mut()?
+            .and_then(|uv| uv.get_mut("sources"))
             .map(|sources| sources.as_table_mut().ok_or(Error::MalformedSources))
             .transpose()?
         {
             if let Some(key) = find_source(name, sources) {
                 sources.remove(&key);
 
-                // Remove the `tool.uv.sources` table if it is empty.
+                // Remove the `sources` table if it is empty.
                 if sources.is_empty() {
-                    self.doc
-                        .entry("tool")
-                        .or_insert(implicit())
-                        .as_table_mut()
-                        .ok_or(Error::MalformedSources)?
-                        .entry("uv")
-                        .or_insert(implicit())
-                        .as_table_mut()
-                        .ok_or(Error::MalformedSources)?
-                        .remove("sources");
+                    self.tool_uv_remove("sources")?;
                 }
             }
         }
@@ -1098,13 +1116,9 @@ impl PyProjectTomlMut {
         Ok(())
     }
 
-    /// Returns `true` if the `tool.uv.dev-dependencies` table is present.
+    /// Returns `true` if the `tool.uv.dev-dependencies` (or `dev-dependencies`) table is present.
     pub fn has_dev_dependencies(&self) -> bool {
-        self.doc
-            .get("tool")
-            .and_then(Item::as_table)
-            .and_then(|tool| tool.get("uv"))
-            .and_then(Item::as_table)
+        self.tool_uv_get()
             .and_then(|uv| uv.get("dev-dependencies"))
             .is_some()
     }
@@ -1174,13 +1188,9 @@ impl PyProjectTomlMut {
             }
         }
 
-        // Check `tool.uv.dev-dependencies`.
+        // Check `tool.uv.dev-dependencies` (or `dev-dependencies` for uv-workspace.toml).
         if let Some(dev_dependencies) = self
-            .doc
-            .get("tool")
-            .and_then(Item::as_table)
-            .and_then(|tool| tool.get("uv"))
-            .and_then(Item::as_table)
+            .tool_uv_get()
             .and_then(|uv| uv.get("dev-dependencies"))
             .and_then(Item::as_array)
         {
