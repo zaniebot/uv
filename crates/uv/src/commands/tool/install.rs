@@ -21,7 +21,7 @@ use uv_installer::{InstallationStrategy, SatisfiesResult, SitePackages};
 use uv_normalize::PackageName;
 use uv_pep440::{VersionSpecifier, VersionSpecifiers};
 use uv_pep508::MarkerTree;
-use uv_preview::Preview;
+use uv_preview::{Preview, PreviewFeature};
 use uv_python::{
     EnvironmentPreference, PythonDownloads, PythonInstallation, PythonPreference, PythonRequest,
 };
@@ -110,8 +110,21 @@ pub(crate) async fn install(
     // Parse the input requirement.
     let request = ToolRequest::parse(&package, from.as_deref())?;
 
+    // When the `tool-install-latest-default` preview flag is enabled, treat unversioned
+    // installs (e.g., `uv tool install ruff`) as if `@latest` was specified.
+    let treat_as_latest = request.is_latest()
+        || (!editable
+            && preview.is_enabled(PreviewFeature::ToolInstallLatestDefault)
+            && matches!(
+                &request,
+                ToolRequest::Package {
+                    target: Target::Unspecified(_),
+                    ..
+                }
+            ));
+
     // If the user passed, e.g., `ruff@latest`, refresh the cache.
-    let cache = if request.is_latest() {
+    let cache = if treat_as_latest {
         cache.with_refresh(Refresh::All(Timestamp::now()))
     } else {
         cache
@@ -233,12 +246,10 @@ pub(crate) async fn install(
         }
     };
 
-    // For `@latest`, fetch the latest version and create a constraint.
-    let latest = if let ToolRequest::Package {
-        target: Target::Latest(_, name, _),
-        ..
-    } = &request
-    {
+    // For `@latest` (or unversioned installs with `tool-install-latest-default`), fetch the
+    // latest version and create a constraint.
+    let latest = if treat_as_latest {
+        let name = &requirement.name;
         // Build the registry client to fetch the latest version.
         let client = RegistryClientBuilder::new(
             client_builder
@@ -297,7 +308,7 @@ pub(crate) async fn install(
     let package_name = &requirement.name;
 
     // If the user passed, e.g., `ruff@latest`, we need to mark it as upgradable.
-    let settings = if request.is_latest() {
+    let settings = if treat_as_latest {
         ResolverInstallerSettings {
             resolver: ResolverSettings {
                 upgrade: Upgrade::package(package_name.clone()).combine(settings.resolver.upgrade),
