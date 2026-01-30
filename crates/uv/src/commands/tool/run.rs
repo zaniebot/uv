@@ -812,8 +812,28 @@ async fn get_or_create_environment(
             target,
         } => {
             let (executable, requirement) = match target {
-                // Ex) `ruff>=0.6.0`
-                Target::Unspecified(requirement) => {
+                // Ex) `ruff`
+                Target::Unspecified(executable, name, extras) => {
+                    let executable = request_executable
+                        .map(ToString::to_string)
+                        .unwrap_or_else(|| (*executable).to_string());
+                    let requirement = Requirement {
+                        name: name.clone(),
+                        extras: extras.clone(),
+                        groups: Box::new([]),
+                        marker: MarkerTree::default(),
+                        source: RequirementSource::Registry {
+                            specifier: VersionSpecifiers::empty(),
+                            index: None,
+                            conflict: None,
+                        },
+                        origin: None,
+                    };
+
+                    (executable, requirement)
+                }
+                // Ex) `ruff>=0.6.0` or `git+https://...`
+                Target::Requirement(requirement) => {
                     let spec = RequirementsSpecification::parse_package(requirement)?;
 
                     // Extract the verbatim executable name, if possible.

@@ -87,8 +87,11 @@ impl<'a> ToolRequest<'a> {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum Target<'a> {
-    /// e.g., `ruff`
-    Unspecified(&'a str),
+    /// A bare package name, e.g., `ruff` or `flask[dotenv]`.
+    Unspecified(&'a str, PackageName, Box<[ExtraName]>),
+    /// A raw requirement string that needs PEP 508 / URL / path parsing,
+    /// e.g., `ruff>=0.6.0`, `git+https://...`, or `./local-path`.
+    Requirement(&'a str),
     /// e.g., `ruff[extra]@0.6.0`
     Version(&'a str, PackageName, Box<[ExtraName]>, Version),
     /// e.g., `ruff[extra]@latest`
@@ -98,15 +101,15 @@ pub(crate) enum Target<'a> {
 impl<'a> Target<'a> {
     /// Parse a target into a command name and a requirement.
     pub(crate) fn parse(target: &'a str) -> Self {
-        // e.g. `ruff`, no special handling
+        // If there's no `@`, try to parse as a bare package name (with optional extras).
         let Some((name, version)) = target.split_once('@') else {
-            return Self::Unspecified(target);
+            return Self::parse_bare(target);
         };
 
         // e.g. `ruff@`, warn and treat the whole thing as the command
         if version.is_empty() {
             debug!("Ignoring empty version request in command");
-            return Self::Unspecified(target);
+            return Self::parse_bare(target);
         }
 
         // Split into name and extras (e.g., `flask[dotenv]`).
@@ -114,7 +117,7 @@ impl<'a> Target<'a> {
             Some((executable, extras)) => {
                 let Some(extras) = extras.strip_suffix(']') else {
                     // e.g., ignore `flask[dotenv`.
-                    return Self::Unspecified(target);
+                    return Self::parse_bare(target);
                 };
                 (executable, extras)
             }
@@ -124,7 +127,7 @@ impl<'a> Target<'a> {
         // e.g., ignore `git+https://github.com/astral-sh/ruff.git@main`
         let Ok(name) = PackageName::from_str(executable) else {
             debug!("Ignoring non-package name `{name}` in command");
-            return Self::Unspecified(target);
+            return Self::parse_bare(target);
         };
 
         // e.g., ignore `ruff[1.0.0]` or any other invalid extra.
@@ -136,7 +139,7 @@ impl<'a> Target<'a> {
             .collect::<Result<Box<_>, _>>()
         else {
             debug!("Ignoring invalid extras `{extras}` in command");
-            return Self::Unspecified(target);
+            return Self::parse_bare(target);
         };
 
         match version {
@@ -149,24 +152,21 @@ impl<'a> Target<'a> {
                 } else {
                     // e.g. `ruff@invalid`, warn and treat the whole thing as the command
                     debug!("Ignoring invalid version request `{version}` in command");
-                    Self::Unspecified(target)
+                    Self::parse_bare(target)
                 }
             }
         }
     }
 
-    /// Convert an [`Unspecified`](Target::Unspecified) target to [`Latest`](Target::Latest), if
-    /// the target is a valid package name (with optional extras).
-    pub(crate) fn into_latest(self) -> Self {
-        let Self::Unspecified(target) = self else {
-            return self;
-        };
-
+    /// Try to parse `target` as a bare package name with optional extras (e.g., `ruff` or
+    /// `flask[dotenv]`). Falls back to [`Requirement`](Target::Requirement) for anything
+    /// that doesn't parse as a valid package name.
+    fn parse_bare(target: &'a str) -> Self {
         // Split into name and extras (e.g., `flask[dotenv]`).
-        let (name, extras) = match target.split_once('[') {
-            Some((name, extras)) => {
-                let Some(extras) = extras.strip_suffix(']') else {
-                    return Self::Unspecified(target);
+        let (name, extras_str) = match target.split_once('[') {
+            Some((name, rest)) => {
+                let Some(extras) = rest.strip_suffix(']') else {
+                    return Self::Requirement(target);
                 };
                 (name, extras)
             }
@@ -174,20 +174,30 @@ impl<'a> Target<'a> {
         };
 
         let Ok(package_name) = PackageName::from_str(name) else {
-            return Self::Unspecified(target);
+            return Self::Requirement(target);
         };
 
-        let Ok(extras) = extras
+        let Ok(extras) = extras_str
             .split(',')
             .map(str::trim)
             .filter(|extra| !extra.is_empty())
             .map(ExtraName::from_str)
             .collect::<Result<Box<_>, _>>()
         else {
-            return Self::Unspecified(target);
+            return Self::Requirement(target);
         };
 
-        Self::Latest(name, package_name, extras)
+        Self::Unspecified(name, package_name, extras)
+    }
+
+    /// Convert an [`Unspecified`](Target::Unspecified) target to [`Latest`](Target::Latest).
+    pub(crate) fn into_latest(self) -> Self {
+        match self {
+            Self::Unspecified(name, package_name, extras) => {
+                Self::Latest(name, package_name, extras)
+            }
+            other => other,
+        }
     }
 }
 
@@ -197,10 +207,33 @@ mod tests {
 
     #[test]
     fn parse_target() {
+        // Bare package name.
         let target = Target::parse("flask");
-        let expected = Target::Unspecified("flask");
+        let expected = Target::Unspecified(
+            "flask",
+            PackageName::from_str("flask").unwrap(),
+            Box::new([]),
+        );
         assert_eq!(target, expected);
 
+        // Bare package name with extras.
+        let target = Target::parse("flask[dotenv]");
+        let expected = Target::Unspecified(
+            "flask",
+            PackageName::from_str("flask").unwrap(),
+            Box::new([ExtraName::from_str("dotenv").unwrap()]),
+        );
+        assert_eq!(target, expected);
+
+        // PEP 508 specifier falls back to Requirement.
+        let target = Target::parse("ruff>=0.5");
+        assert_eq!(target, Target::Requirement("ruff>=0.5"));
+
+        // URL falls back to Requirement.
+        let target = Target::parse("./local-path");
+        assert_eq!(target, Target::Requirement("./local-path"));
+
+        // Version pinned via `@`.
         let target = Target::parse("flask@3.0.0");
         let expected = Target::Version(
             "flask",
@@ -210,15 +243,7 @@ mod tests {
         );
         assert_eq!(target, expected);
 
-        let target = Target::parse("flask@3.0.0");
-        let expected = Target::Version(
-            "flask",
-            PackageName::from_str("flask").unwrap(),
-            Box::new([]),
-            Version::new([3, 0, 0]),
-        );
-        assert_eq!(target, expected);
-
+        // Latest via `@latest`.
         let target = Target::parse("flask@latest");
         let expected = Target::Latest(
             "flask",
@@ -227,6 +252,7 @@ mod tests {
         );
         assert_eq!(target, expected);
 
+        // Version with extras.
         let target = Target::parse("flask[dotenv]@3.0.0");
         let expected = Target::Version(
             "flask",
@@ -236,6 +262,7 @@ mod tests {
         );
         assert_eq!(target, expected);
 
+        // Latest with extras.
         let target = Target::parse("flask[dotenv]@latest");
         let expected = Target::Latest(
             "flask",
@@ -244,15 +271,13 @@ mod tests {
         );
         assert_eq!(target, expected);
 
-        // Missing a closing `]`.
+        // Missing a closing `]` falls back to Requirement.
         let target = Target::parse("flask[dotenv");
-        let expected = Target::Unspecified("flask[dotenv");
-        assert_eq!(target, expected);
+        assert_eq!(target, Target::Requirement("flask[dotenv"));
 
-        // Too many `]`.
+        // Too many `]` falls back to Requirement.
         let target = Target::parse("flask[dotenv]]");
-        let expected = Target::Unspecified("flask[dotenv]]");
-        assert_eq!(target, expected);
+        assert_eq!(target, Target::Requirement("flask[dotenv]]"));
     }
 
     #[test]
@@ -276,8 +301,8 @@ mod tests {
         let target = Target::parse("ruff@0.6.0").into_latest();
         assert!(matches!(target, Target::Version(..)));
 
-        // Non-package-name strings (e.g., PEP 508 with specifiers) remain unspecified.
+        // Raw requirement strings are unchanged.
         let target = Target::parse("ruff>=0.5").into_latest();
-        assert!(matches!(target, Target::Unspecified(_)));
+        assert!(matches!(target, Target::Requirement(_)));
     }
 }

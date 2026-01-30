@@ -129,8 +129,30 @@ pub(crate) async fn install(
     let requirement = match &request {
         // Ex) `ruff`
         ToolRequest::Package {
+            target: Target::Unspecified(.., name, extras),
+            ..
+        } => {
+            if editable {
+                bail!("`--editable` is only supported for local packages");
+            }
+
+            Requirement {
+                name: name.clone(),
+                extras: extras.clone(),
+                groups: Box::new([]),
+                marker: MarkerTree::default(),
+                source: RequirementSource::Registry {
+                    specifier: VersionSpecifiers::empty(),
+                    index: None,
+                    conflict: None,
+                },
+                origin: None,
+            }
+        }
+        // Ex) `ruff>=0.6.0` or `git+https://...`
+        ToolRequest::Package {
             executable,
-            target: Target::Unspecified(from),
+            target: Target::Requirement(from),
         } => {
             let source = if editable {
                 RequirementsSource::from_editable(from)?
