@@ -112,19 +112,14 @@ pub(crate) async fn install(
 
     // When the `tool-install-latest-default` preview flag is enabled, treat unversioned
     // installs (e.g., `uv tool install ruff`) as if `@latest` was specified.
-    let treat_as_latest = request.is_latest()
-        || (!editable
-            && preview.is_enabled(PreviewFeature::ToolInstallLatestDefault)
-            && matches!(
-                &request,
-                ToolRequest::Package {
-                    target: Target::Unspecified(_),
-                    ..
-                }
-            ));
+    let request = if preview.is_enabled(PreviewFeature::ToolInstallLatestDefault) {
+        request.into_latest()
+    } else {
+        request
+    };
 
     // If the user passed, e.g., `ruff@latest`, refresh the cache.
-    let cache = if treat_as_latest {
+    let cache = if request.is_latest() {
         cache.with_refresh(Refresh::All(Timestamp::now()))
     } else {
         cache
@@ -246,10 +241,12 @@ pub(crate) async fn install(
         }
     };
 
-    // For `@latest` (or unversioned installs with `tool-install-latest-default`), fetch the
-    // latest version and create a constraint.
-    let latest = if treat_as_latest {
-        let name = &requirement.name;
+    // For `@latest`, fetch the latest version and create a constraint.
+    let latest = if let ToolRequest::Package {
+        target: Target::Latest(_, name, _),
+        ..
+    } = &request
+    {
         // Build the registry client to fetch the latest version.
         let client = RegistryClientBuilder::new(
             client_builder
@@ -308,7 +305,7 @@ pub(crate) async fn install(
     let package_name = &requirement.name;
 
     // If the user passed, e.g., `ruff@latest`, we need to mark it as upgradable.
-    let settings = if treat_as_latest {
+    let settings = if request.is_latest() {
         ResolverInstallerSettings {
             resolver: ResolverSettings {
                 upgrade: Upgrade::package(package_name.clone()).combine(settings.resolver.upgrade),

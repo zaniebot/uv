@@ -72,6 +72,17 @@ impl<'a> ToolRequest<'a> {
             }
         )
     }
+
+    /// Convert an [`Unspecified`](Target::Unspecified) target to [`Latest`](Target::Latest).
+    pub(crate) fn into_latest(self) -> Self {
+        match self {
+            Self::Package { executable, target } => Self::Package {
+                executable,
+                target: target.into_latest(),
+            },
+            other => other,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -143,6 +154,41 @@ impl<'a> Target<'a> {
             }
         }
     }
+
+    /// Convert an [`Unspecified`](Target::Unspecified) target to [`Latest`](Target::Latest), if
+    /// the target is a valid package name (with optional extras).
+    pub(crate) fn into_latest(self) -> Self {
+        let Self::Unspecified(target) = self else {
+            return self;
+        };
+
+        // Split into name and extras (e.g., `flask[dotenv]`).
+        let (name, extras) = match target.split_once('[') {
+            Some((name, extras)) => {
+                let Some(extras) = extras.strip_suffix(']') else {
+                    return Self::Unspecified(target);
+                };
+                (name, extras)
+            }
+            None => (target, ""),
+        };
+
+        let Ok(package_name) = PackageName::from_str(name) else {
+            return Self::Unspecified(target);
+        };
+
+        let Ok(extras) = extras
+            .split(',')
+            .map(str::trim)
+            .filter(|extra| !extra.is_empty())
+            .map(ExtraName::from_str)
+            .collect::<Result<Box<_>, _>>()
+        else {
+            return Self::Unspecified(target);
+        };
+
+        Self::Latest(name, package_name, extras)
+    }
 }
 
 #[cfg(test)]
@@ -207,5 +253,31 @@ mod tests {
         let target = Target::parse("flask[dotenv]]");
         let expected = Target::Unspecified("flask[dotenv]]");
         assert_eq!(target, expected);
+    }
+
+    #[test]
+    fn target_into_latest() {
+        // Simple package name is converted.
+        let target = Target::parse("ruff").into_latest();
+        assert_eq!(
+            target,
+            Target::Latest("ruff", PackageName::from_str("ruff").unwrap(), Box::new([]))
+        );
+
+        // Package with extras is converted.
+        let target = Target::parse("flask[dotenv]").into_latest();
+        assert!(matches!(target, Target::Latest("flask", _, _)));
+
+        // Already-latest is unchanged.
+        let target = Target::parse("ruff@latest").into_latest();
+        assert!(matches!(target, Target::Latest("ruff", _, _)));
+
+        // Version-pinned is unchanged.
+        let target = Target::parse("ruff@0.6.0").into_latest();
+        assert!(matches!(target, Target::Version(..)));
+
+        // Non-package-name strings (e.g., PEP 508 with specifiers) remain unspecified.
+        let target = Target::parse("ruff>=0.5").into_latest();
+        assert!(matches!(target, Target::Unspecified(_)));
     }
 }
