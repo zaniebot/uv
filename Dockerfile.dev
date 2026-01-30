@@ -1,0 +1,23 @@
+FROM rust:bookworm
+
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends \
+    cmake \
+    pkg-config \
+    libssl-dev \
+    gdb \
+  && apt-get clean \
+  && rm -rf /var/lib/apt/lists/*
+
+# Install the toolchain required by the project
+COPY rust-toolchain.toml .
+RUN rustup toolchain install && rustup default "$(grep channel rust-toolchain.toml | sed 's/.*= *"\(.*\)"/\1/')"
+
+# Install Python versions needed for tests
+ENV PATH="/root/.local/bin:${PATH}"
+RUN uv python install 3.9 3.10 3.11 3.12 3.13 3.14
+
+WORKDIR /src
+ENTRYPOINT ["/bin/bash"]
