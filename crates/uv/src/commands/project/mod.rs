@@ -271,6 +271,9 @@ pub(crate) enum ProjectError {
     #[error("Attempted to drop a temporary virtual environment while still in-use")]
     DroppedEnvironment,
 
+    #[error("Operation cancelled by user")]
+    OperationCancelled,
+
     #[error(transparent)]
     DependencyGroup(#[from] DependencyGroupError),
 
@@ -1454,6 +1457,21 @@ impl ProjectEnvironment {
 
                 // Remove the existing virtual environment if it doesn't meet the requirements.
                 if replace {
+                    // If we're about to remove the active environment, prompt for confirmation.
+                    if active == Some(true) {
+                        let term = console::Term::stderr();
+                        if term.is_term() {
+                            let prompt = format!(
+                                "The active environment at `{}` will be removed and recreated. Do you want to continue?",
+                                root.user_display(),
+                            );
+                            let confirmed = uv_console::confirm(&prompt, &term, true)?;
+                            if !confirmed {
+                                return Err(ProjectError::OperationCancelled);
+                            }
+                        }
+                    }
+
                     match remove_virtualenv(&root) {
                         Ok(()) => {
                             writeln!(
@@ -1646,6 +1664,21 @@ impl ScriptEnvironment {
                     } else {
                         Self::WouldCreate(root, environment, temp_dir)
                     });
+                }
+
+                // If we're about to remove the active environment, prompt for confirmation.
+                if active == Some(true) && root.join("pyvenv.cfg").try_exists().unwrap_or(false) {
+                    let term = console::Term::stderr();
+                    if term.is_term() {
+                        let prompt = format!(
+                            "The active environment at `{}` will be removed and recreated. Do you want to continue?",
+                            root.user_display(),
+                        );
+                        let confirmed = uv_console::confirm(&prompt, &term, true)?;
+                        if !confirmed {
+                            return Err(ProjectError::OperationCancelled);
+                        }
+                    }
                 }
 
                 // Remove the existing virtual environment.
