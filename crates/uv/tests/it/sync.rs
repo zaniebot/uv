@@ -15440,13 +15440,6 @@ fn sync_fails_ambiguous_url() -> Result<()> {
     ----- stdout -----
 
     ----- stderr -----
-    warning: Failed to parse `pyproject.toml` during settings discovery:
-      TOML parse error at line 10, column 15
-         |
-      10 |         url = "https://user/name:password@domain/a/b/c"
-         |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-      ambiguous user/pass authority in URL (not percent-encoded?): https:***@domain/a/b/c
-
     error: Failed to parse: `pyproject.toml`
       Caused by: TOML parse error at line 10, column 15
        |

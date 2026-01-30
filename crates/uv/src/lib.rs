@@ -49,7 +49,7 @@ use uv_scripts::{Pep723Error, Pep723Item, Pep723Metadata, Pep723Script};
 use uv_settings::{Combine, EnvironmentOptions, FilesystemOptions, Options};
 use uv_static::EnvVars;
 use uv_warnings::{warn_user, warn_user_once};
-use uv_workspace::{DiscoveryOptions, Workspace, WorkspaceCache};
+use uv_workspace::{DiscoveryOptions, Workspace, WorkspaceCache, WorkspaceError};
 
 use crate::commands::{ExitStatus, RunCommand, ScriptPath, ToolRunCommand};
 use crate::printer::Printer;
@@ -163,15 +163,19 @@ async fn run(mut cli: Cli) -> Result<ExitStatus> {
     } else if matches!(&*cli.command, Commands::Tool(_) | Commands::Self_(_)) {
         // For commands that operate at the user-level, ignore local configuration.
         FilesystemOptions::user()?.combine(FilesystemOptions::system()?)
-    } else if let Ok(workspace) =
-        Workspace::discover(&project_dir, &DiscoveryOptions::default(), &workspace_cache).await
-    {
-        let project = FilesystemOptions::find(workspace.install_path())?;
-        let system = FilesystemOptions::system()?;
-        let user = FilesystemOptions::user()?;
-        project.combine(user).combine(system)
     } else {
-        let project = FilesystemOptions::find(&project_dir)?;
+        let workspace_result =
+            Workspace::discover(&project_dir, &DiscoveryOptions::default(), &workspace_cache).await;
+        let (project, warnings) = match &workspace_result {
+            Ok(workspace) => FilesystemOptions::find(workspace.install_path())?,
+            Err(_) => FilesystemOptions::find(&project_dir)?,
+        };
+        // Suppress settings discovery warnings when workspace discovery failed
+        // with a TOML parse error, since the same error will be reported later
+        // by the command itself.
+        if !matches!(&workspace_result, Err(WorkspaceError::Toml(_, _))) {
+            FilesystemOptions::emit_warnings(&warnings);
+        }
         let system = FilesystemOptions::system()?;
         let user = FilesystemOptions::user()?;
         project.combine(user).combine(system)

@@ -7,6 +7,7 @@ use uv_dirs::{system_config_file, user_config_dir};
 use uv_flags::EnvironmentFlags;
 use uv_fs::Simplified;
 use uv_static::{EnvVars, InvalidEnvironmentVariable, parse_boolish_environment_variable};
+use uv_warnings::owo_colors::OwoColorize;
 use uv_warnings::warn_user;
 
 pub use crate::combine::*;
@@ -79,22 +80,25 @@ impl FilesystemOptions {
     ///
     /// The search starts at the given path and goes up the directory tree until a `uv.toml` file or
     /// `pyproject.toml` file is found.
-    pub fn find(path: &Path) -> Result<Option<Self>, Error> {
+    pub fn find(path: &Path) -> Result<(Option<Self>, Vec<String>), Error> {
+        let mut warnings = Vec::new();
         for ancestor in path.ancestors() {
             match Self::from_directory(ancestor) {
                 Ok(Some(options)) => {
-                    return Ok(Some(options));
+                    return Ok((Some(options), warnings));
                 }
                 Ok(None) => {
                     // Continue traversing the directory tree.
                 }
                 Err(Error::PyprojectToml(path, err)) => {
-                    // If we see an invalid `pyproject.toml`, warn but continue.
-                    warn_user!(
+                    // If we see an invalid `pyproject.toml`, stash the warning and
+                    // continue. The caller decides whether to emit it, since the same
+                    // error may be reported later during workspace discovery.
+                    warnings.push(format!(
                         "Failed to parse `{}` during settings discovery:\n{}",
                         path.user_display().cyan(),
                         textwrap::indent(&err.to_string(), "  ")
-                    );
+                    ));
                 }
                 Err(err) => {
                     // Otherwise, warn and stop.
@@ -102,7 +106,14 @@ impl FilesystemOptions {
                 }
             }
         }
-        Ok(None)
+        Ok((None, warnings))
+    }
+
+    /// Emit any stashed settings discovery warnings.
+    pub fn emit_warnings(warnings: &[String]) {
+        for warning in warnings {
+            warn_user!("{warning}");
+        }
     }
 
     /// Load a [`FilesystemOptions`] from a directory, preferring a `uv.toml` file over a

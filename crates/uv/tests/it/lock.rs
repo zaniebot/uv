@@ -18624,13 +18624,6 @@ fn lock_invalid_index() -> Result<()> {
     ----- stdout -----
 
     ----- stderr -----
-    warning: Failed to parse `pyproject.toml` during settings discovery:
-      TOML parse error at line 12, column 16
-         |
-      12 |         name = "internal proxy"
-         |                ^^^^^^^^^^^^^^^^
-      Index names may only contain letters, digits, hyphens, underscores, and periods, but found unsupported character (` `) in: `internal proxy`
-
     error: Failed to parse: `pyproject.toml`
       Caused by: TOML parse error at line 9, column 31
       |
@@ -21434,13 +21427,6 @@ fn lock_duplicate_sources() -> Result<()> {
     ----- stdout -----
 
     ----- stderr -----
-    warning: Failed to parse `pyproject.toml` during settings discovery:
-      TOML parse error at line 9, column 9
-        |
-      9 |         python-multipart = { url = "https://files.pythonhosted.org/packages/c0/3e/9fbfd74e7f5b54f653f7ca99d44ceb56e718846920162165061c4c22b71a/python_multipart-0.0.8-py3-none-any.whl" }
-        |         ^^^^^^^^^^^^^^^^
-      duplicate key
-
     error: Failed to parse: `pyproject.toml`
       Caused by: TOML parse error at line 9, column 9
       |

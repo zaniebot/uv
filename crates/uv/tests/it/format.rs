@@ -268,13 +268,6 @@ fn format_fails_malformed_pyproject() -> Result<()> {
     ----- stdout -----
 
     ----- stderr -----
-    warning: Failed to parse `pyproject.toml` during settings discovery:
-      TOML parse error at line 1, column 11
-        |
-      1 | malformed pyproject.toml
-        |           ^
-      key with no value, expected `=`
-
     warning: `uv format` is experimental and may change without warning. Pass `--preview-features format` to disable this warning.
     error: Failed to parse: `pyproject.toml`
       Caused by: TOML parse error at line 1, column 11

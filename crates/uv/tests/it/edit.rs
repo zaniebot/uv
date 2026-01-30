@@ -13338,13 +13338,6 @@ fn add_invalid_ignore_error_code() -> Result<()> {
     ----- stdout -----
 
     ----- stderr -----
-    warning: Failed to parse `pyproject.toml` during settings discovery:
-      TOML parse error at line 9, column 22
-        |
-      9 | ignore-error-codes = [401, 403, 1234]
-        |                      ^^^^^^^^^^^^^^^^
-      1234 is not a valid HTTP status code
-
     error: Failed to parse: `pyproject.toml`
       Caused by: TOML parse error at line 9, column 22
       |
