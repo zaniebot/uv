@@ -624,7 +624,9 @@ fn validate_script_requires_python(
 #[expect(clippy::large_enum_variant)]
 pub(crate) enum ScriptInterpreter {
     /// An interpreter to use to create a new script environment.
-    Interpreter(Interpreter),
+    ///
+    /// The optional string describes why the existing environment is being replaced.
+    Interpreter(Interpreter, Option<String>),
     /// An interpreter from an existing script environment.
     Environment(PythonEnvironment),
 }
@@ -740,6 +742,7 @@ impl ScriptInterpreter {
         } = ScriptPython::from_request(python_request, workspace, script, no_config).await?;
 
         let root = Self::root(script, active, cache);
+        let mut incompatibility_reason = None;
         match PythonEnvironment::from_root(&root, cache) {
             Ok(venv) => {
                 match environment_is_usable(
@@ -762,6 +765,7 @@ impl ScriptInterpreter {
                     }
                     Err(err) => {
                         debug!("{err}");
+                        incompatibility_reason = Some(err.to_string());
                     }
                 }
             }
@@ -805,13 +809,13 @@ impl ScriptInterpreter {
             warn_user!("{err}");
         }
 
-        Ok(Self::Interpreter(interpreter))
+        Ok(Self::Interpreter(interpreter, incompatibility_reason))
     }
 
     /// Consume the [`PythonInstallation`] and return the [`Interpreter`].
     pub(crate) fn into_interpreter(self) -> Interpreter {
         match self {
-            Self::Interpreter(interpreter) => interpreter,
+            Self::Interpreter(interpreter, _) => interpreter,
             Self::Environment(venv) => venv.into_interpreter(),
         }
     }
@@ -879,6 +883,45 @@ pub(crate) enum EnvironmentIncompatibilityError {
     PythonPreference(EnvironmentKind, PythonPreference),
 }
 
+/// Prompt the user for confirmation before removing the active environment.
+///
+/// Returns `Ok(())` if the user confirms, the environment is not active, or no TTY is available.
+/// Returns `Err(ProjectError::OperationCancelled)` if the user declines.
+fn confirm_active_environment_removal(
+    root: &Path,
+    active: Option<bool>,
+    incompatibility_reason: &Option<String>,
+) -> Result<(), ProjectError> {
+    if active != Some(true) {
+        return Ok(());
+    }
+
+    let term = console::Term::stderr();
+    if !term.is_term() {
+        return Ok(());
+    }
+
+    let reason = if let Some(reason) = incompatibility_reason {
+        let mut reason = reason.clone();
+        if let Some(first) = reason.get_mut(..1) {
+            first.make_ascii_lowercase();
+        }
+        reason
+    } else {
+        "it is incompatible".to_string()
+    };
+
+    let prompt = format!(
+        "The active environment at `{}` will be removed and recreated because {reason}. Do you want to continue?",
+        root.user_display(),
+    );
+    let confirmed = uv_console::confirm(&prompt, &term, true)?;
+    if !confirmed {
+        return Err(ProjectError::OperationCancelled);
+    }
+    Ok(())
+}
+
 /// Whether an environment is usable for a project or script, i.e., if it matches the requirements.
 fn environment_is_usable(
     environment: &PythonEnvironment,
@@ -944,7 +987,9 @@ fn environment_is_usable(
 #[expect(clippy::large_enum_variant)]
 pub(crate) enum ProjectInterpreter {
     /// An interpreter from outside the project, to create a new project virtual environment.
-    Interpreter(Interpreter),
+    ///
+    /// The optional string describes why the existing environment is being replaced.
+    Interpreter(Interpreter, Option<String>),
     /// An interpreter from an existing project virtual environment.
     Environment(PythonEnvironment),
 }
@@ -983,6 +1028,7 @@ impl ProjectInterpreter {
 
         // Read from the virtual environment first.
         let root = workspace.venv(active);
+        let mut incompatibility_reason = None;
         match PythonEnvironment::from_root(&root, cache) {
             Ok(venv) => {
                 match environment_is_usable(
@@ -1003,6 +1049,7 @@ impl ProjectInterpreter {
                     }
                     Err(err) => {
                         debug!("{err}");
+                        incompatibility_reason = Some(err.to_string());
                     }
                 }
             }
@@ -1101,13 +1148,13 @@ impl ProjectInterpreter {
             )?;
         }
 
-        Ok(Self::Interpreter(interpreter))
+        Ok(Self::Interpreter(interpreter, incompatibility_reason))
     }
 
     /// Convert the [`ProjectInterpreter`] into an [`Interpreter`].
     pub(crate) fn into_interpreter(self) -> Interpreter {
         match self {
-            Self::Interpreter(interpreter) => interpreter,
+            Self::Interpreter(interpreter, _) => interpreter,
             Self::Environment(venv) => venv.into_interpreter(),
         }
     }
@@ -1381,7 +1428,7 @@ impl ProjectEnvironment {
             ProjectInterpreter::Environment(environment) => Ok(Self::Existing(environment)),
 
             // Otherwise, create a virtual environment with the discovered interpreter.
-            ProjectInterpreter::Interpreter(interpreter) => {
+            ProjectInterpreter::Interpreter(interpreter, incompatibility_reason) => {
                 let root = workspace.venv(active);
 
                 // Avoid removing things that are not virtual environments
@@ -1458,19 +1505,7 @@ impl ProjectEnvironment {
                 // Remove the existing virtual environment if it doesn't meet the requirements.
                 if replace {
                     // If we're about to remove the active environment, prompt for confirmation.
-                    if active == Some(true) {
-                        let term = console::Term::stderr();
-                        if term.is_term() {
-                            let prompt = format!(
-                                "The active environment at `{}` will be removed and recreated. Do you want to continue?",
-                                root.user_display(),
-                            );
-                            let confirmed = uv_console::confirm(&prompt, &term, true)?;
-                            if !confirmed {
-                                return Err(ProjectError::OperationCancelled);
-                            }
-                        }
-                    }
+                    confirm_active_environment_removal(&root, active, &incompatibility_reason)?;
 
                     match remove_virtualenv(&root) {
                         Ok(()) => {
@@ -1629,7 +1664,7 @@ impl ScriptEnvironment {
             ScriptInterpreter::Environment(environment) => Ok(Self::Existing(environment)),
 
             // Otherwise, create a virtual environment with the discovered interpreter.
-            ScriptInterpreter::Interpreter(interpreter) => {
+            ScriptInterpreter::Interpreter(interpreter, incompatibility_reason) => {
                 let root = ScriptInterpreter::root(script, active, cache);
 
                 // Determine a prompt for the environment, in order of preference:
@@ -1667,18 +1702,8 @@ impl ScriptEnvironment {
                 }
 
                 // If we're about to remove the active environment, prompt for confirmation.
-                if active == Some(true) && root.join("pyvenv.cfg").try_exists().unwrap_or(false) {
-                    let term = console::Term::stderr();
-                    if term.is_term() {
-                        let prompt = format!(
-                            "The active environment at `{}` will be removed and recreated. Do you want to continue?",
-                            root.user_display(),
-                        );
-                        let confirmed = uv_console::confirm(&prompt, &term, true)?;
-                        if !confirmed {
-                            return Err(ProjectError::OperationCancelled);
-                        }
-                    }
+                if root.join("pyvenv.cfg").try_exists().unwrap_or(false) {
+                    confirm_active_environment_removal(&root, active, &incompatibility_reason)?;
                 }
 
                 // Remove the existing virtual environment.

@@ -153,7 +153,7 @@ pub(crate) async fn find_script(
             writeln!(printer.stderr(), "{error}")?;
             return Ok(ExitStatus::Failure);
         }
-        Ok(ScriptInterpreter::Interpreter(interpreter)) => interpreter,
+        Ok(ScriptInterpreter::Interpreter(interpreter, _)) => interpreter,
         Ok(ScriptInterpreter::Environment(environment)) => environment.into_interpreter(),
     };
 
