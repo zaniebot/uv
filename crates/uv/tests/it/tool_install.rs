@@ -4550,3 +4550,73 @@ fn tool_install_python_platform() {
     Installed 2 executables: black, blackd
     ");
 }
+
+/// Test that workspace member dependencies are installed non-editable by default
+/// when using `uv tool install`.
+#[test]
+fn tool_install_workspace_non_editable() {
+    let context = TestContext::new("3.12").with_filtered_exe_suffix();
+    let tool_dir = context.temp_dir.child("tools");
+    let bin_dir = context.temp_dir.child("bin");
+
+    // Copy the workspace fixture to a temp directory.
+    let workspace_dir = context.temp_dir.child("workspace");
+    copy_dir_all(
+        context.workspace_root.join("test/packages/workspace_tool"),
+        &workspace_dir,
+    )
+    .unwrap();
+
+    // Install the tool from the workspace.
+    uv_snapshot!(context.filters(), context.tool_install()
+        .arg(workspace_dir.join("packages/mytool"))
+        .env(EnvVars::UV_TOOL_DIR, tool_dir.as_os_str())
+        .env(EnvVars::XDG_BIN_HOME, bin_dir.as_os_str())
+        .env(EnvVars::PATH, bin_dir.as_os_str()), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Resolved 2 packages in [TIME]
+    Prepared 2 packages in [TIME]
+    Installed 2 packages in [TIME]
+     + mylib==0.1.0 (from file://[TEMP_DIR]/workspace/packages/mylib)
+     + mytool==0.1.0 (from file://[TEMP_DIR]/workspace/packages/mytool)
+    Installed 1 executable: mytool
+    ");
+
+    // Verify the tool works.
+    uv_snapshot!(context.filters(), Command::new("mytool").env(EnvVars::PATH, bin_dir.as_os_str()), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    Hello from mylib!
+
+    ----- stderr -----
+    ");
+
+    // Verify `mylib` is NOT installed as editable (no .pth file for it).
+    // Walk the tool environment to find any .pth files referencing mylib.
+    let tool_env = tool_dir.join("mytool");
+    let has_editable_pth = walkdir::WalkDir::new(&tool_env)
+        .into_iter()
+        .filter_map(|e| e.ok())
+        .any(|entry| {
+            let name = entry.file_name().to_string_lossy();
+            if name.ends_with(".pth") {
+                // Read the .pth file and check if it points to mylib source
+                if let Ok(contents) = fs_err::read_to_string(entry.path()) {
+                    contents.contains("mylib")
+                } else {
+                    false
+                }
+            } else {
+                false
+            }
+        });
+    assert!(
+        !has_editable_pth,
+        "Expected no .pth files for mylib (non-editable install)"
+    );
+}

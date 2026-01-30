@@ -355,6 +355,7 @@ async fn upgrade_tool(
             Box::new(SummaryResolveLogger),
             concurrency,
             cache,
+            Some(false),
             printer,
             preview,
         )

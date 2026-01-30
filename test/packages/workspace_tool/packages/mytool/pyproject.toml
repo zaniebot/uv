@@ -1,0 +1,15 @@
+[project]
+name = "mytool"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = ["mylib"]
+
+[project.scripts]
+mytool = "mytool:main"
+
+[tool.uv.sources]
+mylib = { workspace = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

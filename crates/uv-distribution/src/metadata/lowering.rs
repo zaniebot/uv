@@ -45,6 +45,7 @@ impl LoweredRequirement {
         workspace: &'data Workspace,
         git_member: Option<&'data GitWorkspaceMember<'data>>,
         credentials_cache: &'data CredentialsCache,
+        workspace_member_editable: Option<bool>,
     ) -> impl Iterator<Item = Result<Self, LoweringError>> + use<'data> + 'data {
         // Identify the source from the `tool.uv.sources` table.
         let (sources, origin) = if let Some(source) = project_sources.get(&requirement.name) {
@@ -292,42 +293,45 @@ impl LoweredRequirement {
                                 ))
                             })?;
 
-                            let source = if let Some(git_member) = &git_member {
-                                // If the workspace comes from a Git dependency, all workspace
-                                // members need to be Git dependencies, too.
-                                let subdirectory =
-                                    uv_fs::relative_to(member.root(), git_member.fetch_root)
-                                        .expect("Workspace member must be relative");
-                                let subdirectory = uv_fs::normalize_path_buf(subdirectory);
-                                RequirementSource::Git {
-                                    git: git_member.git_source.git.clone(),
-                                    subdirectory: if subdirectory == PathBuf::new() {
-                                        None
-                                    } else {
-                                        Some(subdirectory.into_boxed_path())
-                                    },
-                                    url,
-                                }
-                            } else {
-                                let value = workspace.required_members().get(&requirement.name);
-                                let is_required_member = value.is_some();
-                                let editability = value.copied().flatten();
-                                if member.pyproject_toml().is_package(!is_required_member) {
-                                    RequirementSource::Directory {
-                                        install_path: install_path.into_boxed_path(),
+                            let source =
+                                if let Some(git_member) = &git_member {
+                                    // If the workspace comes from a Git dependency, all workspace
+                                    // members need to be Git dependencies, too.
+                                    let subdirectory =
+                                        uv_fs::relative_to(member.root(), git_member.fetch_root)
+                                            .expect("Workspace member must be relative");
+                                    let subdirectory = uv_fs::normalize_path_buf(subdirectory);
+                                    RequirementSource::Git {
+                                        git: git_member.git_source.git.clone(),
+                                        subdirectory: if subdirectory == PathBuf::new() {
+                                            None
+                                        } else {
+                                            Some(subdirectory.into_boxed_path())
+                                        },
                                         url,
-                                        editable: Some(editability.unwrap_or(true)),
-                                        r#virtual: Some(false),
                                     }
                                 } else {
-                                    RequirementSource::Directory {
-                                        install_path: install_path.into_boxed_path(),
-                                        url,
-                                        editable: Some(false),
-                                        r#virtual: Some(true),
+                                    let value = workspace.required_members().get(&requirement.name);
+                                    let is_required_member = value.is_some();
+                                    let editability = value.copied().flatten();
+                                    if member.pyproject_toml().is_package(!is_required_member) {
+                                        RequirementSource::Directory {
+                                            install_path: install_path.into_boxed_path(),
+                                            url,
+                                            editable: Some(editability.unwrap_or(
+                                                workspace_member_editable.unwrap_or(true),
+                                            )),
+                                            r#virtual: Some(false),
+                                        }
+                                    } else {
+                                        RequirementSource::Directory {
+                                            install_path: install_path.into_boxed_path(),
+                                            url,
+                                            editable: Some(false),
+                                            r#virtual: Some(true),
+                                        }
                                     }
-                                }
-                            };
+                                };
                             (source, marker)
                         }
                     };

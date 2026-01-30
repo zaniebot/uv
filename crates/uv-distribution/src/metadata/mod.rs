@@ -93,6 +93,7 @@ impl Metadata {
         sources: NoSources,
         cache: &WorkspaceCache,
         credentials_cache: &CredentialsCache,
+        workspace_member_editable: Option<bool>,
     ) -> Result<Self, MetadataError> {
         // Lower the requirements.
         let requires_dist = uv_pypi_types::RequiresDist {
@@ -115,6 +116,7 @@ impl Metadata {
             sources,
             cache,
             credentials_cache,
+            workspace_member_editable,
         )
         .await?;
 

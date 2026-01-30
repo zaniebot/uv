@@ -1291,6 +1291,7 @@ impl<'a, T: BuildContext> SourceDistributionBuilder<'a, T> {
                         self.build_context.sources().clone(),
                         self.build_context.workspace_cache(),
                         credentials_cache,
+                        self.build_context.workspace_member_editable(),
                     )
                     .await?,
                 ));
@@ -1345,6 +1346,7 @@ impl<'a, T: BuildContext> SourceDistributionBuilder<'a, T> {
                             self.build_context.sources().clone(),
                             self.build_context.workspace_cache(),
                             credentials_cache,
+                            self.build_context.workspace_member_editable(),
                         )
                         .await?,
                     ));
@@ -1395,6 +1397,7 @@ impl<'a, T: BuildContext> SourceDistributionBuilder<'a, T> {
                     self.build_context.sources().clone(),
                     self.build_context.workspace_cache(),
                     credentials_cache,
+                    self.build_context.workspace_member_editable(),
                 )
                 .await?,
             ));
@@ -1457,6 +1460,7 @@ impl<'a, T: BuildContext> SourceDistributionBuilder<'a, T> {
                 self.build_context.sources().clone(),
                 self.build_context.workspace_cache(),
                 credentials_cache,
+                self.build_context.workspace_member_editable(),
             )
             .await?,
         ))
@@ -1533,6 +1537,7 @@ impl<'a, T: BuildContext> SourceDistributionBuilder<'a, T> {
                     self.build_context.sources().clone(),
                     self.build_context.workspace_cache(),
                     credentials_cache,
+                    self.build_context.workspace_member_editable(),
                 )
                 .await?;
                 Ok(Some(requires_dist))
@@ -1855,6 +1860,7 @@ impl<'a, T: BuildContext> SourceDistributionBuilder<'a, T> {
                             self.build_context.sources().clone(),
                             self.build_context.workspace_cache(),
                             credentials_cache,
+                            self.build_context.workspace_member_editable(),
                         )
                         .await?,
                     ));
@@ -1889,6 +1895,7 @@ impl<'a, T: BuildContext> SourceDistributionBuilder<'a, T> {
                                 self.build_context.sources().clone(),
                                 self.build_context.workspace_cache(),
                                 credentials_cache,
+                                self.build_context.workspace_member_editable(),
                             )
                             .await?,
                         ));
@@ -1942,6 +1949,7 @@ impl<'a, T: BuildContext> SourceDistributionBuilder<'a, T> {
                     self.build_context.sources().clone(),
                     self.build_context.workspace_cache(),
                     credentials_cache,
+                    self.build_context.workspace_member_editable(),
                 )
                 .await?,
             ));
@@ -2004,6 +2012,7 @@ impl<'a, T: BuildContext> SourceDistributionBuilder<'a, T> {
                 self.build_context.sources().clone(),
                 self.build_context.workspace_cache(),
                 credentials_cache,
+                self.build_context.workspace_member_editable(),
             )
             .await?,
         ))

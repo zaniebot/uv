@@ -44,6 +44,7 @@ impl BuildRequires {
         sources: &NoSources,
         cache: &WorkspaceCache,
         credentials_cache: &CredentialsCache,
+        workspace_member_editable: Option<bool>,
     ) -> Result<Self, MetadataError> {
         let discovery = if sources.all() {
             DiscoveryOptions {
@@ -65,6 +66,7 @@ impl BuildRequires {
             locations,
             sources,
             credentials_cache,
+            workspace_member_editable,
         )
     }
 
@@ -75,6 +77,7 @@ impl BuildRequires {
         locations: &IndexLocations,
         sources: &NoSources,
         credentials_cache: &CredentialsCache,
+        workspace_member_editable: Option<bool>,
     ) -> Result<Self, MetadataError> {
         // Collect any `tool.uv.index` entries.
         let empty = vec![];
@@ -133,6 +136,7 @@ impl BuildRequires {
                             project_workspace.workspace(),
                             None,
                             credentials_cache,
+                            workspace_member_editable,
                         )
                         .map(move |requirement| match requirement {
                             Ok(requirement) => Ok(requirement.into_inner()),
@@ -207,6 +211,7 @@ impl BuildRequires {
                         workspace,
                         None,
                         credentials_cache,
+                        None,
                     )
                     .map(move |requirement| match requirement {
                         Ok(requirement) => Ok(requirement.into_inner()),
@@ -295,6 +300,7 @@ impl LoweredExtraBuildDependencies {
                                     workspace,
                                     None,
                                     credentials_cache,
+                                    None,
                                 )
                                 .map(move |requirement| {
                                     match requirement {

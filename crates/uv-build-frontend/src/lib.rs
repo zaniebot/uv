@@ -593,6 +593,7 @@ impl SourceBuild {
                             no_sources,
                             workspace_cache,
                             credentials_cache,
+                            None,
                         )
                         .await
                         .map_err(Error::Lowering)?;
@@ -1055,6 +1056,7 @@ async fn create_pep517_build_environment(
             &no_sources,
             workspace_cache,
             credentials_cache,
+            build_context.workspace_member_editable(),
         )
         .await
         .map_err(Error::Lowering)?;
