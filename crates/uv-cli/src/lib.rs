@@ -1047,6 +1047,20 @@ pub enum ProjectCommand {
         after_long_help = ""
     )]
     Run(RunArgs),
+    /// Launch a shell in the project environment.
+    ///
+    /// Ensures the project environment is up-to-date before spawning an interactive shell
+    /// with the virtual environment activated.
+    ///
+    /// The spawned shell inherits all user configuration (`.bashrc`, `.zshrc`, plugins, etc.)
+    /// and activates the virtual environment on top.
+    ///
+    /// Exit the shell with `exit` or Ctrl+D to return to the original environment.
+    #[command(
+        after_help = "Use `uv help shell` for more details.",
+        after_long_help = ""
+    )]
+    Shell(ShellArgs),
     /// Create a new project.
     ///
     /// Follows the `pyproject.toml` specification.
@@ -3772,6 +3786,206 @@ pub struct RunArgs {
     /// `--python-platform` option is intended for advanced use cases.
     #[arg(long)]
     pub python_platform: Option<TargetTriple>,
+}
+
+#[derive(Args)]
+#[allow(clippy::struct_excessive_bools)]
+pub struct ShellArgs {
+    /// Include optional dependencies from the specified extra name.
+    ///
+    /// May be provided more than once.
+    #[arg(
+        long,
+        conflicts_with = "all_extras",
+        value_parser = extra_name_with_clap_error,
+        value_hint = ValueHint::Other,
+    )]
+    pub extra: Option<Vec<ExtraName>>,
+
+    /// Include all optional dependencies.
+    #[arg(long, conflicts_with = "extra")]
+    pub all_extras: bool,
+
+    /// Exclude the specified optional dependencies, if `--all-extras` is supplied.
+    #[arg(long, value_hint = ValueHint::Other)]
+    pub no_extra: Vec<ExtraName>,
+
+    #[arg(long, overrides_with("all_extras"), hide = true)]
+    pub no_all_extras: bool,
+
+    /// Include the development dependency group.
+    #[arg(long, overrides_with("no_dev"), hide = true, value_parser = clap::builder::BoolishValueParser::new())]
+    pub dev: bool,
+
+    /// Disable the development dependency group.
+    #[arg(long, overrides_with("dev"), value_parser = clap::builder::BoolishValueParser::new())]
+    pub no_dev: bool,
+
+    /// Include dependencies from the specified dependency group.
+    #[arg(long, conflicts_with_all = ["only_group", "only_dev"], value_hint = ValueHint::Other)]
+    pub group: Vec<GroupName>,
+
+    /// Disable the specified dependency group.
+    #[arg(long, env = EnvVars::UV_NO_GROUP, value_delimiter = ' ', value_hint = ValueHint::Other)]
+    pub no_group: Vec<GroupName>,
+
+    /// Ignore the default dependency groups.
+    #[arg(long, env = EnvVars::UV_NO_DEFAULT_GROUPS)]
+    pub no_default_groups: bool,
+
+    /// Only include dependencies from the specified dependency group.
+    #[arg(long, conflicts_with_all = ["group", "dev", "all_groups"], value_hint = ValueHint::Other)]
+    pub only_group: Vec<GroupName>,
+
+    /// Include dependencies from all dependency groups.
+    #[arg(long, conflicts_with_all = ["only_group", "only_dev"])]
+    pub all_groups: bool,
+
+    /// Only include the development dependency group.
+    #[arg(long, conflicts_with_all = ["group", "all_groups", "no_dev"])]
+    pub only_dev: bool,
+
+    /// Install any non-editable dependencies, including the project and any workspace members, as
+    /// editable.
+    #[arg(long, overrides_with = "no_editable", hide = true)]
+    pub editable: bool,
+
+    /// Install any editable dependencies, including the project and any workspace members, as
+    /// non-editable.
+    #[arg(long, overrides_with = "editable", value_parser = clap::builder::BoolishValueParser::new())]
+    pub no_editable: bool,
+
+    /// Do not remove extraneous packages present in the environment.
+    #[arg(long, overrides_with("exact"), alias = "no-exact", hide = true)]
+    pub inexact: bool,
+
+    /// Perform an exact sync, removing extraneous packages.
+    #[arg(long, overrides_with("inexact"))]
+    pub exact: bool,
+
+    /// Include all packages when syncing.
+    #[arg(long)]
+    pub all_packages: bool,
+
+    /// Run with the given package as the project.
+    #[arg(long, value_hint = ValueHint::Other)]
+    pub package: Option<PackageName>,
+
+    /// Avoid discovering the project or workspace.
+    ///
+    /// Instead of searching for projects in the current directory and parent directories, launch
+    /// a shell without activating a project environment.
+    ///
+    /// If a virtual environment is active or found in a current or parent directory, it will be
+    /// used as if there was no project or workspace.
+    #[arg(long, alias = "no_workspace", conflicts_with = "package")]
+    pub no_project: bool,
+
+    /// Skip updating the project environment.
+    #[arg(long, env = EnvVars::UV_NO_SYNC)]
+    pub no_sync: bool,
+
+    /// Require that the project's lockfile is up-to-date.
+    #[arg(long, env = EnvVars::UV_LOCKED)]
+    pub locked: bool,
+
+    /// Run without updating the `uv.lock` file.
+    #[arg(long, env = EnvVars::UV_FROZEN)]
+    pub frozen: bool,
+
+    #[command(flatten)]
+    pub installer: ResolverInstallerArgs,
+
+    #[command(flatten)]
+    pub build: BuildOptionsArgs,
+
+    /// The Python interpreter to use for the project environment.
+    ///
+    /// See `uv help python` to view supported request formats.
+    #[arg(
+        long,
+        short,
+        env = EnvVars::UV_PYTHON,
+        verbatim_doc_comment,
+        help_heading = "Python options",
+        value_parser = parse_maybe_string,
+        value_hint = ValueHint::Other,
+    )]
+    pub python: Option<Maybe<String>>,
+
+    /// Load environment variables from a `.env` file.
+    ///
+    /// Can be provided multiple times, with subsequent files overriding values defined in previous
+    /// files.
+    #[arg(long, env = EnvVars::UV_ENV_FILE, value_hint = ValueHint::FilePath)]
+    pub env_file: Vec<String>,
+
+    /// Avoid reading environment variables from a `.env` file [env: UV_NO_ENV_FILE=]
+    #[arg(long, value_parser = clap::builder::BoolishValueParser::new())]
+    pub no_env_file: bool,
+
+    /// Run with the given packages installed.
+    ///
+    /// When used in a project, these dependencies will be layered on top of the project environment
+    /// in a separate, ephemeral environment. These dependencies are allowed to conflict with those
+    /// specified by the project.
+    #[arg(short = 'w', long, value_hint = ValueHint::Other)]
+    pub with: Vec<comma::CommaSeparatedRequirements>,
+
+    /// Run with the given packages installed in editable mode.
+    ///
+    /// When used in a project, these dependencies will be layered on top of the project environment
+    /// in a separate, ephemeral environment. These dependencies are allowed to conflict with those
+    /// specified by the project.
+    #[arg(long, value_hint = ValueHint::DirPath)]
+    pub with_editable: Vec<comma::CommaSeparatedRequirements>,
+
+    /// Run with the packages listed in the given files.
+    ///
+    /// The following formats are supported: `requirements.txt`, `.py` files with inline metadata,
+    /// and `pylock.toml`.
+    ///
+    /// The same environment semantics as `--with` apply.
+    ///
+    /// Using `pyproject.toml`, `setup.py`, or `setup.cfg` files is not allowed.
+    #[arg(long, value_delimiter = ',', value_parser = parse_maybe_file_path, value_hint = ValueHint::FilePath)]
+    pub with_requirements: Vec<Maybe<PathBuf>>,
+
+    /// Run the shell in an isolated virtual environment [env: UV_ISOLATED=]
+    ///
+    /// Usually, the project environment is reused for performance. This option forces a fresh
+    /// environment to be used for the project, enforcing strict isolation between dependencies and
+    /// declaration of requirements.
+    ///
+    /// An editable installation is still used for the project.
+    ///
+    /// When used with `--with` or `--with-requirements`, the additional dependencies will still be
+    /// layered in a second environment.
+    #[arg(long, value_parser = clap::builder::BoolishValueParser::new())]
+    pub isolated: bool,
+
+    /// Prefer the active virtual environment over the project's virtual environment.
+    ///
+    /// If the project virtual environment is active or no virtual environment is active, this has
+    /// no effect.
+    #[arg(long, overrides_with = "no_active")]
+    pub active: bool,
+
+    /// Prefer project's virtual environment over an active environment.
+    ///
+    /// This is the default behavior.
+    #[arg(long, overrides_with = "active", hide = true)]
+    pub no_active: bool,
+
+    /// Whether to show resolver and installer output from any environment modifications [env:
+    /// UV_SHOW_RESOLUTION=]
+    ///
+    /// By default, environment modifications are omitted, but enabled under `--verbose`.
+    #[arg(long, value_parser = clap::builder::BoolishValueParser::new(), hide = true)]
+    pub show_resolution: bool,
+
+    #[command(flatten)]
+    pub refresh: RefreshArgs,
 }
 
 #[derive(Args)]

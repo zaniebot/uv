@@ -1344,7 +1344,7 @@ hint: If you are running a script with `{}` in the shebang, you may need to incl
 }
 
 /// Returns `true` if we can skip creating an additional ephemeral environment in `uv run`.
-fn can_skip_ephemeral(
+pub(crate) fn can_skip_ephemeral(
     spec: &RequirementsSpecification,
     interpreter: &Interpreter,
     site_packages: &SitePackages,
@@ -1897,7 +1897,7 @@ fn read_recursion_depth_from_environment_variable() -> anyhow::Result<u32> {
 }
 
 #[derive(Error, Debug)]
-enum CopyEntrypointError {
+pub(crate) enum CopyEntrypointError {
     #[error(transparent)]
     Io(#[from] std::io::Error),
     #[cfg(windows)]
@@ -1912,7 +1912,7 @@ enum CopyEntrypointError {
 ///
 /// Note on Windows, the entrypoints do not use shebangs and require a rewrite of the trampoline.
 #[cfg(unix)]
-fn copy_entrypoint(
+pub(crate) fn copy_entrypoint(
     source: &Path,
     target: &Path,
     previous_executable: &Path,
@@ -2002,7 +2002,7 @@ fn copy_entrypoint(
 /// Create a copy of the entrypoint at `source` at `target`, if it's a Python script launcher,
 /// replacing the target Python executable with a new one.
 #[cfg(windows)]
-fn copy_entrypoint(
+pub(crate) fn copy_entrypoint(
     source: &Path,
     target: &Path,
     _previous_executable: &Path,

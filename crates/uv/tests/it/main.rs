@@ -108,6 +108,9 @@ mod python_upgrade;
 #[cfg(all(feature = "python", feature = "pypi"))]
 mod run;
 
+#[cfg(all(feature = "python", feature = "pypi"))]
+mod shell;
+
 #[cfg(feature = "self-update")]
 mod self_update;
 

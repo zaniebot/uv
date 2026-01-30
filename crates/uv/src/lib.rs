@@ -2082,6 +2082,70 @@ async fn run_project(
             ))
             .await
         }
+        ProjectCommand::Shell(args) => {
+            // Resolve the settings from the command-line arguments and workspace configuration.
+            let args = settings::ShellSettings::resolve(args, filesystem, environment);
+            show_settings!(args);
+
+            // Check for conflicts between offline and refresh.
+            globals
+                .network_settings
+                .check_refresh_conflict(&args.refresh);
+
+            // Initialize the cache.
+            let cache = cache.init().await?.with_refresh(
+                args.refresh
+                    .combine(Refresh::from(args.settings.reinstall.clone()))
+                    .combine(Refresh::from(args.settings.resolver.upgrade.clone())),
+            );
+
+            let mut requirements = Vec::with_capacity(
+                args.with.len() + args.with_editable.len() + args.with_requirements.len(),
+            );
+            for package in args.with {
+                requirements.push(RequirementsSource::from_with_package_argument(&package)?);
+            }
+            for package in args.with_editable {
+                requirements.push(RequirementsSource::from_editable(&package)?);
+            }
+            requirements.extend(
+                args.with_requirements
+                    .into_iter()
+                    .map(RequirementsSource::from_requirements_file)
+                    .collect::<Result<Vec<_>, _>>()?,
+            );
+
+            Box::pin(commands::shell(
+                project_dir,
+                args.lock_check,
+                args.frozen,
+                args.no_project,
+                args.no_sync,
+                args.show_resolution || globals.verbose > 0,
+                args.active,
+                args.isolated,
+                requirements,
+                args.all_packages,
+                args.package,
+                args.extras,
+                args.groups,
+                args.editable,
+                args.modifications,
+                args.python,
+                args.install_mirrors,
+                args.settings,
+                client_builder.subcommand(vec!["shell".to_owned()]),
+                globals.python_preference,
+                globals.python_downloads,
+                globals.installer_metadata,
+                globals.concurrency,
+                cache,
+                printer,
+                args.env_file,
+                globals.preview,
+            ))
+            .await
+        }
         ProjectCommand::Sync(args) => {
             // Resolve the settings from the command-line arguments and workspace configuration.
             let args = settings::SyncSettings::resolve(args, filesystem, environment);

@@ -1335,6 +1335,14 @@ impl TestContext {
         command
     }
 
+    /// Create a `uv shell` command with options shared across scenarios.
+    pub fn shell(&self) -> Command {
+        let mut command = Self::new_command();
+        command.arg("shell");
+        self.add_shared_options(&mut command, true);
+        command
+    }
+
     /// Create a `uv tool run` command with options shared across scenarios.
     pub fn tool_run(&self) -> Command {
         let mut command = Self::new_command();

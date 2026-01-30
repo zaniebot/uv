@@ -150,6 +150,7 @@ zip = { workspace = true }
 
 [target.'cfg(unix)'.dependencies]
 nix = { workspace = true }
+uv-pty = { workspace = true }
 uv-unix = { workspace = true }
 
 [features]

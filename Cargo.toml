@@ -55,6 +55,7 @@ uv-platform-tags = { version = "0.0.17", path = "crates/uv-platform-tags" }
 uv-preview = { version = "0.0.17", path = "crates/uv-preview" }
 uv-publish = { version = "0.0.17", path = "crates/uv-publish" }
 uv-pypi-types = { version = "0.0.17", path = "crates/uv-pypi-types" }
+uv-pty = { version = "0.0.17", path = "crates/uv-pty" }
 uv-python = { version = "0.0.17", path = "crates/uv-python" }
 uv-redacted = { version = "0.0.17", path = "crates/uv-redacted" }
 uv-requirements = { version = "0.0.17", path = "crates/uv-requirements" }
@@ -132,12 +133,13 @@ indoc = { version = "2.0.5" }
 itertools = { version = "0.14.0" }
 jiff = { version = "0.2.0", features = ["serde"] }
 junction = { version = "1.2.0" }
+libc = { version = "0.2" }
 mailparse = { version = "0.16.0" }
 md-5 = { version = "0.10.6" }
 memchr = { version = "2.7.4" }
 miette = { version = "7.2.0", features = ["fancy-no-backtrace"] }
 nanoid = { version = "0.4.0" }
-nix = { version = "0.30.0", features = ["resource", "signal"] }
+nix = { version = "0.30.0", features = ["fs", "poll", "resource", "signal", "term"] }
 open = { version = "5.3.2" }
 owo-colors = { version = "4.1.0" }
 path-slash = { version = "0.2.1" }
@@ -168,6 +170,7 @@ seahash = { version = "4.1.0" }
 secret-service = { version = "5.0.0", features = ["rt-tokio-crypto-rust"] }
 security-framework = { version = "3" }
 self-replace = { version = "1.5.0" }
+signal-hook = { version = "0.3" }
 serde = { version = "1.0.210", features = ["derive", "rc"] }
 serde-untagged = { version = "0.1.6" }
 serde_json = { version = "1.0.128" }

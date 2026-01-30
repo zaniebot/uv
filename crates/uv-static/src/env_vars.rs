@@ -1156,6 +1156,13 @@ impl EnvVars {
     #[attr_added_in("0.5.31")]
     pub const UV_RUN_MAX_RECURSION_DEPTH: &'static str = "UV_RUN_MAX_RECURSION_DEPTH";
 
+    /// Indicates that a `uv shell` session is currently active.
+    ///
+    /// This environment variable is set to `1` when `uv shell` is used to activate a project
+    /// environment. Used to detect and warn about nested shell sessions.
+    #[attr_added_in("0.9.28")]
+    pub const UV_SHELL_ACTIVE: &'static str = "UV_SHELL_ACTIVE";
+
     /// Overrides terminal width used for wrapping. This variable is not read by uv directly.
     ///
     /// This is a quasi-standard variable, described, e.g., in `ncurses(3x)`.

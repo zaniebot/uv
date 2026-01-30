@@ -72,6 +72,7 @@ pub(crate) mod lock;
 mod lock_target;
 pub(crate) mod remove;
 pub(crate) mod run;
+pub(crate) mod shell;
 pub(crate) mod sync;
 pub(crate) mod tree;
 pub(crate) mod version;

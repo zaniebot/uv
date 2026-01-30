@@ -281,6 +281,43 @@ impl Shell {
             )),
         }
     }
+
+    /// Returns the shell executable name.
+    pub fn executable(self) -> &'static str {
+        match self {
+            Self::Bash => "bash",
+            Self::Zsh => "zsh",
+            Self::Fish => "fish",
+            Self::Ksh => "ksh",
+            Self::Csh => "csh",
+            Self::Nushell => "nu",
+            Self::Powershell => "pwsh",
+            Self::Cmd => "cmd",
+        }
+    }
+
+    /// Returns the arguments to start an interactive shell session.
+    pub fn interactive_args(self) -> &'static [&'static str] {
+        match self {
+            Self::Bash | Self::Zsh | Self::Ksh | Self::Csh => &["-i"],
+            Self::Fish | Self::Nushell => &[],
+            Self::Powershell => &["-NoLogo"],
+            Self::Cmd => &[],
+        }
+    }
+
+    /// Returns the command to source a file in this shell.
+    pub fn source_command(self, path: &Path) -> String {
+        let path_str = path.display();
+        match self {
+            Self::Bash | Self::Zsh | Self::Ksh => format!(" source \"{path_str}\""),
+            Self::Fish => format!(" source \"{path_str}\""),
+            Self::Csh => format!(" source \"{path_str}\""),
+            Self::Nushell => format!(" source \"{path_str}\""),
+            Self::Powershell => format!(" . \"{path_str}\""),
+            Self::Cmd => format!("\"{path_str}\""),
+        }
+    }
 }
 
 impl std::fmt::Display for Shell {

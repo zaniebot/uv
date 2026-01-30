@@ -16,9 +16,9 @@ use uv_cli::{
     GlobalArgs, InitArgs, ListFormat, LockArgs, Maybe, PipCheckArgs, PipCompileArgs, PipFreezeArgs,
     PipInstallArgs, PipListArgs, PipShowArgs, PipSyncArgs, PipTreeArgs, PipUninstallArgs,
     PythonFindArgs, PythonInstallArgs, PythonListArgs, PythonListFormat, PythonPinArgs,
-    PythonUninstallArgs, PythonUpgradeArgs, RemoveArgs, RunArgs, SyncArgs, SyncFormat, ToolDirArgs,
-    ToolInstallArgs, ToolListArgs, ToolRunArgs, ToolUninstallArgs, TreeArgs, VenvArgs, VersionArgs,
-    VersionBumpSpec, VersionFormat,
+    PythonUninstallArgs, PythonUpgradeArgs, RemoveArgs, RunArgs, ShellArgs, SyncArgs, SyncFormat,
+    ToolDirArgs, ToolInstallArgs, ToolListArgs, ToolRunArgs, ToolUninstallArgs, TreeArgs, VenvArgs,
+    VersionArgs, VersionBumpSpec, VersionFormat,
 };
 use uv_cli::{
     AuthorFrom, BuildArgs, ExportArgs, FormatArgs, PublishArgs, PythonDirArgs,
@@ -1544,6 +1544,154 @@ impl PythonPinSettings {
             install_mirrors: environment
                 .install_mirrors
                 .combine(filesystem_install_mirrors),
+        }
+    }
+}
+
+/// The resolved settings to use for a `shell` invocation.
+#[derive(Debug, Clone)]
+pub(crate) struct ShellSettings {
+    pub(crate) lock_check: LockCheck,
+    pub(crate) frozen: Option<FrozenSource>,
+    pub(crate) extras: ExtrasSpecification,
+    pub(crate) groups: DependencyGroups,
+    pub(crate) editable: Option<EditableMode>,
+    pub(crate) modifications: Modifications,
+    pub(crate) with: Vec<String>,
+    pub(crate) with_editable: Vec<String>,
+    pub(crate) with_requirements: Vec<PathBuf>,
+    pub(crate) isolated: bool,
+    pub(crate) show_resolution: bool,
+    pub(crate) active: Option<bool>,
+    pub(crate) all_packages: bool,
+    pub(crate) package: Option<PackageName>,
+    pub(crate) no_project: bool,
+    pub(crate) no_sync: bool,
+    pub(crate) python: Option<String>,
+    pub(crate) install_mirrors: PythonInstallMirrors,
+    pub(crate) refresh: Refresh,
+    pub(crate) settings: ResolverInstallerSettings,
+    pub(crate) env_file: EnvFile,
+}
+
+impl ShellSettings {
+    /// Resolve the [`ShellSettings`] from the CLI and filesystem configuration.
+    pub(crate) fn resolve(
+        args: ShellArgs,
+        filesystem: Option<FilesystemOptions>,
+        environment: EnvironmentOptions,
+    ) -> Self {
+        let ShellArgs {
+            extra,
+            all_extras,
+            no_extra,
+            no_all_extras,
+            dev,
+            no_dev,
+            group,
+            no_group,
+            no_default_groups,
+            only_group,
+            all_groups,
+            only_dev,
+            editable,
+            no_editable,
+            inexact,
+            exact,
+            env_file,
+            no_env_file,
+            with,
+            with_editable,
+            with_requirements,
+            isolated,
+            active,
+            no_active,
+            show_resolution,
+            all_packages,
+            package,
+            no_project,
+            no_sync,
+            locked,
+            frozen,
+            installer,
+            build,
+            python,
+            refresh,
+        } = args;
+
+        let filesystem_install_mirrors = filesystem
+            .clone()
+            .map(|fs| fs.install_mirrors.clone())
+            .unwrap_or_default();
+
+        let locked = resolve_flag(locked, "locked", environment.locked);
+        let frozen = resolve_flag(frozen, "frozen", environment.frozen);
+        let no_sync = resolve_flag(no_sync, "no-sync", environment.no_sync);
+
+        check_conflicts(locked, frozen);
+
+        let dev = dev || environment.dev.value == Some(true);
+        let no_dev = no_dev || environment.no_dev.value == Some(true);
+        let no_editable = no_editable || environment.no_editable.value == Some(true);
+        let isolated = isolated || environment.isolated.value == Some(true);
+        let show_resolution = show_resolution || environment.show_resolution.value == Some(true);
+        let no_env_file = no_env_file || environment.no_env_file.value == Some(true);
+
+        Self {
+            lock_check: resolve_lock_check(locked),
+            frozen: resolve_frozen(frozen),
+            extras: ExtrasSpecification::from_args(
+                extra.unwrap_or_default(),
+                no_extra,
+                false,
+                vec![],
+                flag(all_extras, no_all_extras, "all-extras").unwrap_or_default(),
+            ),
+            groups: DependencyGroups::from_args(
+                dev,
+                no_dev,
+                only_dev,
+                group,
+                no_group,
+                no_default_groups,
+                only_group,
+                all_groups,
+            ),
+            editable: flag(editable, no_editable, "editable").map(EditableMode::from),
+            modifications: if flag(exact, inexact, "inexact").unwrap_or(false) {
+                Modifications::Exact
+            } else {
+                Modifications::Sufficient
+            },
+            with: with
+                .into_iter()
+                .flat_map(CommaSeparatedRequirements::into_iter)
+                .collect(),
+            with_editable: with_editable
+                .into_iter()
+                .flat_map(CommaSeparatedRequirements::into_iter)
+                .collect(),
+            with_requirements: with_requirements
+                .into_iter()
+                .filter_map(Maybe::into_option)
+                .collect(),
+            isolated,
+            show_resolution,
+            active: flag(active, no_active, "active"),
+            all_packages,
+            package,
+            no_project,
+            no_sync: no_sync.is_enabled(),
+            python: python.and_then(Maybe::into_option),
+            refresh: Refresh::from(refresh),
+            settings: ResolverInstallerSettings::combine(
+                resolver_installer_options(installer, build),
+                filesystem,
+            ),
+            install_mirrors: environment
+                .install_mirrors
+                .combine(filesystem_install_mirrors),
+            env_file: EnvFile::from_args(env_file, no_env_file),
         }
     }
 }
