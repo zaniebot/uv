@@ -743,7 +743,7 @@ pub(crate) async fn add(
 
     // Update the `pypackage.toml` in-memory.
     let pyproject_content = if dependency_target == DependencyTarget::UvWorkspaceToml {
-        uv_workspace_toml::sync_to_pyproject(&content)
+        uv_workspace_toml::sync_to_pyproject(&content, None)
             .map_err(|e| anyhow::anyhow!("Failed to sync uv-workspace.toml: {e}"))?
     } else {
         content.clone()
@@ -1156,7 +1156,7 @@ async fn lock_and_sync(
 
             // Update the `pypackage.toml` in-memory.
             let pyproject_content = if dep_target == DependencyTarget::UvWorkspaceToml {
-                uv_workspace_toml::sync_to_pyproject(&content)
+                uv_workspace_toml::sync_to_pyproject(&content, None)
                     .map_err(|e| anyhow::anyhow!("Failed to sync uv-workspace.toml: {e}"))?
             } else {
                 content

@@ -15219,3 +15219,94 @@ fn add_dev_via_uv_workspace_toml() -> Result<()> {
 
     Ok(())
 }
+
+/// Test workspace dependency inheritance: `{ workspace = "pkg" }` in member deps
+/// resolves to PEP 508 strings using `[workspace.dependencies]` from root.
+#[test]
+fn workspace_dependency_inheritance() -> Result<()> {
+    let context = TestContext::new("3.12");
+
+    // Create a workspace root with `[workspace.dependencies]`.
+    let root_uv_workspace = context.temp_dir.child("uv-workspace.toml");
+    root_uv_workspace.write_str(indoc! {r#"
+        [project]
+        name = "parent"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        dependencies = []
+
+        [workspace]
+        members = ["child"]
+
+        [workspace.dependencies]
+        anyio = ">=3.7.0"
+        sniffio = ">=1.3.0"
+    "#})?;
+
+    // Create a child member that uses `{ workspace = "pkg" }` in its dependencies.
+    let child_dir = context.temp_dir.child("child");
+    child_dir.create_dir_all()?;
+    let child_uv_workspace = child_dir.child("uv-workspace.toml");
+    child_uv_workspace.write_str(indoc! {r#"
+        [project]
+        name = "child"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        dependencies = [
+            { workspace = "anyio" },
+            { workspace = "sniffio" },
+        ]
+
+        [build-system]
+        requires = ["hatchling"]
+        build-backend = "hatchling.build"
+    "#})?;
+    child_dir
+        .child("src")
+        .child("child")
+        .child("__init__.py")
+        .touch()?;
+
+    // Run `uv sync` to trigger workspace discovery and member syncing.
+    uv_snapshot!(context.filters(), context.sync().current_dir(context.temp_dir.path()), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Resolved 5 packages in [TIME]
+    Audited in [TIME]
+    ");
+
+    // The child pyproject.toml should have resolved workspace deps to PEP 508 strings.
+    let child_pyproject_content = fs_err::read_to_string(child_dir.join("pyproject.toml"))?;
+    insta::with_settings!({
+        filters => context.filters(),
+    }, {
+        assert_snapshot!(
+            child_pyproject_content, @r#"
+        [project]
+        name = "child"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        dependencies = [
+            "anyio>=3.7.0",
+            "sniffio>=1.3.0",
+        ]
+
+        [build-system]
+        requires = ["hatchling"]
+        build-backend = "hatchling.build"
+        "#
+        );
+    });
+
+    // The root pyproject.toml should NOT have workspace.dependencies (it's stripped).
+    let root_pyproject_content = context.read("pyproject.toml");
+    assert!(
+        !root_pyproject_content.contains("workspace.dependencies"),
+        "Root pyproject.toml should not contain workspace.dependencies, got:\n{root_pyproject_content}"
+    );
+
+    Ok(())
+}

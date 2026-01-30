@@ -967,6 +967,10 @@ impl Workspace {
         // Avoid reading a `pyproject.toml` more than once.
         let mut seen = FxHashSet::default();
 
+        // Read workspace-level dependency constraints for resolving `{ workspace = "pkg" }`
+        // references in member dependency arrays.
+        let workspace_deps = uv_workspace_toml::read_workspace_dependencies(workspace_root)?;
+
         // Add the project at the workspace root, if it exists and if it's distinct from the current
         // project. If it is the current project, it is added as such in the next step.
         if let Some(project) = &workspace_pyproject_toml.project {
@@ -1045,7 +1049,8 @@ impl Workspace {
                 );
 
                 // Sync uv-workspace.toml if present, generating pyproject.toml.
-                uv_workspace_toml::sync_if_needed(&member_root)?;
+                // Pass workspace-level dependencies to resolve `{ workspace = "pkg" }` references.
+                uv_workspace_toml::sync_if_needed_with_deps(&member_root, workspace_deps.as_ref())?;
 
                 // Read the member `pyproject.toml`.
                 let pyproject_path = member_root.join("pyproject.toml");
