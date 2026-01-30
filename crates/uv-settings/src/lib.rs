@@ -133,7 +133,9 @@ impl FilesystemOptions {
                 validate_uv_toml(&path, &options)?;
                 return Ok(Some(Self(options)));
             }
-            Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
+            Err(err)
+                if err.kind() == std::io::ErrorKind::NotFound
+                    || err.kind() == std::io::ErrorKind::NotADirectory => {}
             Err(err) => return Err(err.into()),
         }
 
@@ -164,7 +166,9 @@ impl FilesystemOptions {
                 tracing::debug!("Found workspace configuration at `{}`", path.display());
                 return Ok(Some(Self(options)));
             }
-            Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
+            Err(err)
+                if err.kind() == std::io::ErrorKind::NotFound
+                    || err.kind() == std::io::ErrorKind::NotADirectory => {}
             Err(err) => return Err(err.into()),
         }
 
@@ -805,5 +809,33 @@ impl From<&EnvironmentOptions> for EnvironmentFlags {
             flags.insert(Self::HIDE_BUILD_OUTPUT);
         }
         flags
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    #[test]
+    fn find_skips_file_path() {
+        // When `find` is given a file path, it should skip it and continue
+        // to ancestor directories rather than failing with ENOTDIR.
+        let tmp = TempDir::new().unwrap();
+        let file_path = tmp.path().join("not-a-directory");
+        std::fs::write(&file_path, "").unwrap();
+
+        // Should not error — just returns None since no config exists.
+        let result = FilesystemOptions::find(&file_path).unwrap();
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn find_skips_nonexistent_path() {
+        let tmp = TempDir::new().unwrap();
+        let missing = tmp.path().join("does-not-exist");
+
+        let result = FilesystemOptions::find(&missing).unwrap();
+        assert!(result.is_none());
     }
 }

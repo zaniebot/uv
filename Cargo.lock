@@ -6997,6 +6997,7 @@ dependencies = [
  "fs-err",
  "schemars",
  "serde",
+ "tempfile",
  "textwrap",
  "thiserror 2.0.18",
  "toml",
