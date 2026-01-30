@@ -7,7 +7,6 @@ use uv_dirs::{system_config_file, user_config_dir};
 use uv_flags::EnvironmentFlags;
 use uv_fs::Simplified;
 use uv_static::{EnvVars, InvalidEnvironmentVariable, parse_boolish_environment_variable};
-use uv_warnings::owo_colors::OwoColorize;
 use uv_warnings::warn_user;
 
 pub use crate::combine::*;
@@ -80,7 +79,7 @@ impl FilesystemOptions {
     ///
     /// The search starts at the given path and goes up the directory tree until a `uv.toml` file or
     /// `pyproject.toml` file is found.
-    pub fn find(path: &Path) -> Result<(Option<Self>, Vec<String>), Error> {
+    pub fn find(path: &Path) -> Result<(Option<Self>, Vec<Error>), Error> {
         let mut warnings = Vec::new();
         for ancestor in path.ancestors() {
             match Self::from_directory(ancestor) {
@@ -90,15 +89,12 @@ impl FilesystemOptions {
                 Ok(None) => {
                     // Continue traversing the directory tree.
                 }
-                Err(Error::PyprojectToml(path, err)) => {
-                    // If we see an invalid `pyproject.toml`, stash the warning and
-                    // continue. The caller decides whether to emit it, since the same
-                    // error may be reported later during workspace discovery.
-                    warnings.push(format!(
-                        "Failed to parse `{}` during settings discovery:\n{}",
-                        path.user_display().cyan(),
-                        textwrap::indent(&err.to_string(), "  ")
-                    ));
+                Err(err @ Error::PyprojectToml(_, _)) => {
+                    // If we see an invalid `pyproject.toml`, stash the error and
+                    // continue. The caller decides whether to emit it as a warning,
+                    // since the same error may be reported later during workspace
+                    // discovery.
+                    warnings.push(err);
                 }
                 Err(err) => {
                     // Otherwise, warn and stop.
@@ -109,10 +105,16 @@ impl FilesystemOptions {
         Ok((None, warnings))
     }
 
-    /// Emit any stashed settings discovery warnings.
-    pub fn emit_warnings(warnings: &[String]) {
+    /// Emit stashed settings discovery errors as warnings.
+    pub fn emit_warnings(warnings: &[Error]) {
         for warning in warnings {
-            warn_user!("{warning}");
+            if let Error::PyprojectToml(path, err) = warning {
+                warn_user!(
+                    "Failed to parse `{}` during settings discovery:\n{}",
+                    path.user_display().cyan(),
+                    textwrap::indent(&err.to_string(), "  ")
+                );
+            }
         }
     }
 
