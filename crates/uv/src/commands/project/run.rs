@@ -38,7 +38,7 @@ use uv_redacted::DisplaySafeUrl;
 use uv_requirements::{RequirementsSource, RequirementsSpecification};
 use uv_resolver::{Installable, Lock, Preference};
 use uv_scripts::Pep723Item;
-use uv_settings::PythonInstallMirrors;
+use uv_settings::{FilesystemOptions, PythonInstallMirrors};
 use uv_shell::runnable::WindowsRunnable;
 use uv_static::EnvVars;
 use uv_warnings::warn_user;
@@ -110,6 +110,7 @@ pub(crate) async fn run(
     env_file: EnvFile,
     preview: Preview,
     max_recursion_depth: u32,
+    settings_errors: &[uv_settings::Error],
 ) -> anyhow::Result<ExitStatus> {
     // Check if max recursion depth was exceeded. This most commonly happens
     // for scripts with a shebang line like `#!/usr/bin/env -S uv run`, so try
@@ -606,6 +607,12 @@ hint: If you are running a script with `{}` in the shebang, you may need to incl
                 }
             }
         };
+
+        // Emit any stashed settings discovery warnings, now that we know
+        // workspace discovery succeeded.
+        if project.is_some() {
+            FilesystemOptions::emit_warnings(settings_errors);
+        }
 
         if no_project {
             // If the user ran with `--no-project` and provided a project-only setting, warn.

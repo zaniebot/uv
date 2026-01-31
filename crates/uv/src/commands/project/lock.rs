@@ -35,7 +35,7 @@ use uv_resolver::{
     ResolverEnvironment, ResolverManifest, SatisfiesResult, UniversalMarker,
 };
 use uv_scripts::Pep723Script;
-use uv_settings::PythonInstallMirrors;
+use uv_settings::{FilesystemOptions, PythonInstallMirrors};
 use uv_types::{BuildContext, BuildIsolation, EmptyInstalledPackages, HashStrategy};
 use uv_warnings::{warn_user, warn_user_once};
 use uv_workspace::{DiscoveryOptions, Editability, Workspace, WorkspaceCache, WorkspaceMember};
@@ -96,6 +96,7 @@ pub(crate) async fn lock(
     cache: &Cache,
     printer: Printer,
     preview: Preview,
+    settings_errors: &[uv_settings::Error],
 ) -> anyhow::Result<ExitStatus> {
     // If necessary, initialize the PEP 723 script.
     let script = match script {
@@ -132,6 +133,10 @@ pub(crate) async fn lock(
                 .await?;
         LockTarget::Workspace(&workspace)
     };
+
+    // Emit any stashed settings discovery warnings, now that we know
+    // workspace discovery succeeded.
+    FilesystemOptions::emit_warnings(settings_errors);
 
     // Determine the lock mode.
     let interpreter;

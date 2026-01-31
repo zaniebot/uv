@@ -19,7 +19,7 @@ use uv_python::{PythonDownloads, PythonPreference, PythonRequest};
 use uv_requirements::is_pylock_toml;
 use uv_resolver::{PylockToml, RequirementsTxtExport, cyclonedx_json};
 use uv_scripts::Pep723Script;
-use uv_settings::PythonInstallMirrors;
+use uv_settings::{FilesystemOptions, PythonInstallMirrors};
 use uv_workspace::{DiscoveryOptions, MemberDiscovery, VirtualProject, Workspace, WorkspaceCache};
 
 use crate::commands::pip::loggers::DefaultResolveLogger;
@@ -84,6 +84,7 @@ pub(crate) async fn export(
     cache: &Cache,
     printer: Printer,
     preview: Preview,
+    settings_errors: &[uv_settings::Error],
 ) -> Result<ExitStatus> {
     // Identify the target.
     let workspace_cache = WorkspaceCache::default();
@@ -125,6 +126,10 @@ pub(crate) async fn export(
         };
         ExportTarget::Project(project)
     };
+
+    // Emit any stashed settings discovery warnings, now that we know
+    // workspace discovery succeeded.
+    FilesystemOptions::emit_warnings(settings_errors);
 
     // Determine the default groups to include.
     let default_groups = match &target {

@@ -20,7 +20,7 @@ use uv_normalize::PackageName;
 use uv_pep440::{BumpCommand, PrereleaseKind, Version};
 use uv_preview::Preview;
 use uv_python::{PythonDownloads, PythonPreference, PythonRequest};
-use uv_settings::PythonInstallMirrors;
+use uv_settings::{FilesystemOptions, PythonInstallMirrors};
 use uv_workspace::pyproject_mut::Error;
 use uv_workspace::{
     DiscoveryOptions, WorkspaceCache, WorkspaceError,
@@ -79,9 +79,16 @@ pub(crate) async fn project_version(
     cache: &Cache,
     printer: Printer,
     preview: Preview,
+    settings_errors: &[uv_settings::Error],
 ) -> Result<ExitStatus> {
     // Read the metadata
-    let project = find_target(project_dir, package.as_ref(), explicit_project).await?;
+    let project = find_target(
+        project_dir,
+        package.as_ref(),
+        explicit_project,
+        settings_errors,
+    )
+    .await?;
 
     let pyproject_path = project.root().join("pyproject.toml");
     let Some(name) = project.project_name().cloned() else {
@@ -366,6 +373,7 @@ async fn find_target(
     project_dir: &Path,
     package: Option<&PackageName>,
     explicit_project: bool,
+    settings_errors: &[uv_settings::Error],
 ) -> Result<VirtualProject> {
     // Find the project in the workspace.
     // No workspace caching since `uv version` changes the workspace definition.
@@ -396,6 +404,11 @@ async fn find_target(
         .await
         .map_err(|err| hint_uv_self_version(err, explicit_project))?
     };
+
+    // Emit any stashed settings discovery warnings, now that we know
+    // workspace discovery succeeded.
+    FilesystemOptions::emit_warnings(settings_errors);
+
     Ok(project)
 }
 

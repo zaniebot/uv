@@ -9,6 +9,7 @@ use uv_cache::Cache;
 use uv_client::BaseClientBuilder;
 use uv_pep440::Version;
 use uv_preview::{Preview, PreviewFeature};
+use uv_settings::FilesystemOptions;
 use uv_warnings::warn_user;
 use uv_workspace::{DiscoveryOptions, VirtualProject, WorkspaceCache, WorkspaceError};
 
@@ -29,6 +30,7 @@ pub(crate) async fn format(
     printer: Printer,
     preview: Preview,
     no_project: bool,
+    settings_errors: &[uv_settings::Error],
 ) -> Result<ExitStatus> {
     // Check if the format feature is in preview
     if !preview.is_enabled(PreviewFeature::Format) {
@@ -48,7 +50,12 @@ pub(crate) async fn format(
             .await
         {
             // If we found a project, we use the project root
-            Ok(proj) => proj.root().to_owned(),
+            Ok(proj) => {
+                // Emit any stashed settings discovery warnings, now that we know
+                // workspace discovery succeeded.
+                FilesystemOptions::emit_warnings(settings_errors);
+                proj.root().to_owned()
+            }
             // If there is a problem finding a project, we just use the provided directory,
             // e.g., for unmanaged projects
             Err(

@@ -26,7 +26,7 @@ use uv_python::{
     EnvironmentPreference, PythonDownloads, PythonInstallation, PythonPreference, PythonRequest,
 };
 use uv_resolver::{ExcludeNewer, FlatIndex};
-use uv_settings::PythonInstallMirrors;
+use uv_settings::{FilesystemOptions, PythonInstallMirrors};
 use uv_shell::{Shell, shlex_posix, shlex_windows};
 use uv_types::{AnyErrorBuild, BuildContext, BuildIsolation, BuildStack, HashStrategy};
 use uv_virtualenv::OnExisting;
@@ -84,6 +84,7 @@ pub(crate) async fn venv(
     printer: Printer,
     relocatable: bool,
     preview: Preview,
+    settings_errors: &[uv_settings::Error],
 ) -> Result<ExitStatus> {
     let workspace_cache = WorkspaceCache::default();
     let project = if no_project {
@@ -92,7 +93,12 @@ pub(crate) async fn venv(
         match VirtualProject::discover(project_dir, &DiscoveryOptions::default(), &workspace_cache)
             .await
         {
-            Ok(project) => Some(project),
+            Ok(project) => {
+                // Emit any stashed settings discovery warnings, now that we know
+                // workspace discovery succeeded.
+                FilesystemOptions::emit_warnings(settings_errors);
+                Some(project)
+            }
             Err(WorkspaceError::MissingProject(_)) => None,
             Err(WorkspaceError::MissingPyprojectToml) => None,
             Err(WorkspaceError::NonWorkspace(_)) => None,

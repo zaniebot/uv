@@ -15,7 +15,7 @@ use uv_preview::Preview;
 use uv_python::{PythonDownloads, PythonPreference, PythonRequest, PythonVersion};
 use uv_resolver::{PackageMap, TreeDisplay};
 use uv_scripts::Pep723Script;
-use uv_settings::PythonInstallMirrors;
+use uv_settings::{FilesystemOptions, PythonInstallMirrors};
 use uv_workspace::{DiscoveryOptions, Workspace, WorkspaceCache};
 
 use crate::commands::pip::latest::LatestClient;
@@ -62,6 +62,7 @@ pub(crate) async fn tree(
     cache: &Cache,
     printer: Printer,
     preview: Preview,
+    settings_errors: &[uv_settings::Error],
 ) -> Result<ExitStatus> {
     // Find the project requirements.
     let workspace_cache = WorkspaceCache::default();
@@ -74,6 +75,10 @@ pub(crate) async fn tree(
                 .await?;
         LockTarget::Workspace(&workspace)
     };
+
+    // Emit any stashed settings discovery warnings, now that we know
+    // workspace discovery succeeded.
+    FilesystemOptions::emit_warnings(settings_errors);
 
     // Determine the groups to include.
     let default_groups = match target {

@@ -16,7 +16,7 @@ use uv_python::{
     EnvironmentPreference, PYTHON_VERSION_FILENAME, PythonDownloads, PythonInstallation,
     PythonPreference, PythonRequest, PythonVersionFile, VersionFileDiscoveryOptions,
 };
-use uv_settings::PythonInstallMirrors;
+use uv_settings::{FilesystemOptions, PythonInstallMirrors};
 use uv_warnings::warn_user_once;
 use uv_workspace::{DiscoveryOptions, VirtualProject, WorkspaceCache};
 
@@ -41,6 +41,7 @@ pub(crate) async fn pin(
     cache: &Cache,
     printer: Printer,
     preview: Preview,
+    settings_errors: &[uv_settings::Error],
 ) -> Result<ExitStatus> {
     let workspace_cache = WorkspaceCache::default();
     let virtual_project = if no_project {
@@ -49,7 +50,12 @@ pub(crate) async fn pin(
         match VirtualProject::discover(project_dir, &DiscoveryOptions::default(), &workspace_cache)
             .await
         {
-            Ok(virtual_project) => Some(virtual_project),
+            Ok(virtual_project) => {
+                // Emit any stashed settings discovery warnings, now that we know
+                // workspace discovery succeeded.
+                FilesystemOptions::emit_warnings(settings_errors);
+                Some(virtual_project)
+            }
             Err(err) => {
                 debug!("Failed to discover virtual project: {err}");
                 None

@@ -7,6 +7,7 @@ use owo_colors::OwoColorize;
 use uv_fs::Simplified;
 use uv_normalize::PackageName;
 use uv_preview::{Preview, PreviewFeature};
+use uv_settings::FilesystemOptions;
 use uv_warnings::warn_user;
 use uv_workspace::{DiscoveryOptions, Workspace, WorkspaceCache};
 
@@ -19,6 +20,7 @@ pub(crate) async fn dir(
     project_dir: &Path,
     preview: Preview,
     printer: Printer,
+    settings_errors: &[uv_settings::Error],
 ) -> Result<ExitStatus> {
     if !preview.is_enabled(PreviewFeature::WorkspaceDir) {
         warn_user!(
@@ -30,6 +32,10 @@ pub(crate) async fn dir(
     let workspace_cache = WorkspaceCache::default();
     let workspace =
         Workspace::discover(project_dir, &DiscoveryOptions::default(), &workspace_cache).await?;
+
+    // Emit any stashed settings discovery warnings, now that we know
+    // workspace discovery succeeded.
+    FilesystemOptions::emit_warnings(settings_errors);
 
     let dir = match package_name {
         None => workspace.install_path(),

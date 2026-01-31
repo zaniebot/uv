@@ -30,7 +30,7 @@ use uv_pypi_types::{ParsedArchiveUrl, ParsedGitUrl, ParsedUrl};
 use uv_python::{PythonDownloads, PythonEnvironment, PythonPreference, PythonRequest};
 use uv_resolver::{FlatIndex, ForkStrategy, Installable, Lock, PrereleaseMode, ResolutionMode};
 use uv_scripts::Pep723Script;
-use uv_settings::PythonInstallMirrors;
+use uv_settings::{FilesystemOptions, PythonInstallMirrors};
 use uv_types::{BuildIsolation, HashStrategy};
 use uv_warnings::{warn_user, warn_user_once};
 use uv_workspace::pyproject::Source;
@@ -84,6 +84,7 @@ pub(crate) async fn sync(
     printer: Printer,
     preview: Preview,
     output_format: SyncFormat,
+    settings_errors: &[uv_settings::Error],
 ) -> Result<ExitStatus> {
     if preview.is_enabled(PreviewFeature::JsonOutput) && matches!(output_format, SyncFormat::Json) {
         warn_user!(
@@ -131,6 +132,10 @@ pub(crate) async fn sync(
 
             project
         };
+
+        // Emit any stashed settings discovery warnings, now that we know
+        // workspace discovery succeeded.
+        FilesystemOptions::emit_warnings(settings_errors);
 
         // TODO(lucab): improve warning content
         // <https://github.com/astral-sh/uv/issues/7428>

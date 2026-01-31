@@ -38,7 +38,7 @@ use uv_python::{
 };
 use uv_requirements::RequirementsSource;
 use uv_resolver::{ExcludeNewer, FlatIndex};
-use uv_settings::PythonInstallMirrors;
+use uv_settings::{FilesystemOptions, PythonInstallMirrors};
 use uv_types::{AnyErrorBuild, BuildContext, BuildStack, HashStrategy};
 use uv_workspace::pyproject::ExtraBuildDependencies;
 use uv_workspace::{DiscoveryOptions, Workspace, WorkspaceCache, WorkspaceError};
@@ -123,6 +123,7 @@ pub(crate) async fn build_frontend(
     cache: &Cache,
     printer: Printer,
     preview: Preview,
+    settings_errors: &[uv_settings::Error],
 ) -> Result<ExitStatus> {
     let build_result = build_impl(
         project_dir,
@@ -150,6 +151,7 @@ pub(crate) async fn build_frontend(
         cache,
         printer,
         preview,
+        settings_errors,
     )
     .await?;
 
@@ -197,6 +199,7 @@ async fn build_impl(
     cache: &Cache,
     printer: Printer,
     preview: Preview,
+    settings_errors: &[uv_settings::Error],
 ) -> Result<BuildResult> {
     // Extract the resolver settings.
     let ResolverSettings {
@@ -250,6 +253,12 @@ async fn build_impl(
         &workspace_cache,
     )
     .await;
+
+    // Emit any stashed settings discovery warnings, now that we know
+    // workspace discovery succeeded.
+    if workspace.is_ok() {
+        FilesystemOptions::emit_warnings(settings_errors);
+    }
 
     // If a `--package` or `--all-packages` was provided, adjust the source directory.
     let packages = if let Some(package) = package {

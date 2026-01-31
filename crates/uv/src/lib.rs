@@ -497,6 +497,24 @@ async fn run(mut cli: Cli) -> Result<ExitStatus> {
     .https_proxy(globals.network_settings.https_proxy.clone())
     .no_proxy(globals.network_settings.no_proxy.clone());
 
+    // Emit any stashed settings discovery warnings for commands that don't perform
+    // their own workspace discovery. Commands that do workspace discovery handle
+    // these warnings themselves, emitting them only if discovery succeeds (to avoid
+    // duplicating an error that will be reported by the discovery failure).
+    if !matches!(
+        &*cli.command,
+        Commands::Project(_)
+            | Commands::Venv(_)
+            | Commands::BuildBackend { .. }
+            | Commands::Build(_)
+            | Commands::Workspace(_)
+            | Commands::Python(PythonNamespace {
+                command: PythonCommand::Find(_) | PythonCommand::Pin(_),
+            })
+    ) {
+        FilesystemOptions::emit_warnings(&globals.settings_errors);
+    }
+
     match *cli.command {
         Commands::Auth(AuthNamespace {
             command: AuthCommand::Login(args),
@@ -1178,6 +1196,7 @@ async fn run(mut cli: Cli) -> Result<ExitStatus> {
                 &cache,
                 printer,
                 globals.preview,
+                &globals.settings_errors,
             )
             .await
         }
@@ -1255,6 +1274,7 @@ async fn run(mut cli: Cli) -> Result<ExitStatus> {
                 printer,
                 args.relocatable,
                 globals.preview,
+                &globals.settings_errors,
             )
             .await
         }
@@ -1778,6 +1798,7 @@ async fn run(mut cli: Cli) -> Result<ExitStatus> {
                     &cache,
                     printer,
                     globals.preview,
+                    &globals.settings_errors,
                 )
                 .await
             }
@@ -1805,6 +1826,7 @@ async fn run(mut cli: Cli) -> Result<ExitStatus> {
                 &cache,
                 printer,
                 globals.preview,
+                &globals.settings_errors,
             )
             .await
         }
@@ -1876,13 +1898,33 @@ async fn run(mut cli: Cli) -> Result<ExitStatus> {
         }
         Commands::Workspace(WorkspaceNamespace { command }) => match command {
             WorkspaceCommand::Metadata(_args) => {
-                commands::metadata(&project_dir, globals.preview, printer).await
+                commands::metadata(
+                    &project_dir,
+                    globals.preview,
+                    printer,
+                    &globals.settings_errors,
+                )
+                .await
             }
             WorkspaceCommand::Dir(args) => {
-                commands::dir(args.package, &project_dir, globals.preview, printer).await
+                commands::dir(
+                    args.package,
+                    &project_dir,
+                    globals.preview,
+                    printer,
+                    &globals.settings_errors,
+                )
+                .await
             }
             WorkspaceCommand::List(args) => {
-                commands::list(&project_dir, args.paths, globals.preview, printer).await
+                commands::list(
+                    &project_dir,
+                    args.paths,
+                    globals.preview,
+                    printer,
+                    &globals.settings_errors,
+                )
+                .await
             }
         },
         Commands::BuildBackend { command } => spawn_blocking(move || match command {
@@ -2016,6 +2058,7 @@ async fn run_project(
                 &cache,
                 printer,
                 globals.preview,
+                &globals.settings_errors,
             )
             .await
         }
@@ -2085,6 +2128,7 @@ async fn run_project(
                 args.env_file,
                 globals.preview,
                 args.max_recursion_depth,
+                &globals.settings_errors,
             ))
             .await
         }
@@ -2140,6 +2184,7 @@ async fn run_project(
                 printer,
                 globals.preview,
                 args.output_format,
+                &globals.settings_errors,
             ))
             .await
         }
@@ -2191,6 +2236,7 @@ async fn run_project(
                 &cache,
                 printer,
                 globals.preview,
+                &globals.settings_errors,
             ))
             .await
         }
@@ -2325,6 +2371,7 @@ async fn run_project(
                 &cache,
                 printer,
                 globals.preview,
+                &globals.settings_errors,
             ))
             .await
         }
@@ -2374,6 +2421,7 @@ async fn run_project(
                 &cache,
                 printer,
                 globals.preview,
+                &globals.settings_errors,
             ))
             .await
         }
@@ -2419,6 +2467,7 @@ async fn run_project(
                 &cache,
                 printer,
                 globals.preview,
+                &globals.settings_errors,
             ))
             .await
         }
@@ -2464,6 +2513,7 @@ async fn run_project(
                 &cache,
                 printer,
                 globals.preview,
+                &globals.settings_errors,
             ))
             .await
         }
@@ -2511,6 +2561,7 @@ async fn run_project(
                 &cache,
                 printer,
                 globals.preview,
+                &globals.settings_errors,
             )
             .boxed_local()
             .await
@@ -2534,6 +2585,7 @@ async fn run_project(
                 printer,
                 globals.preview,
                 args.no_project,
+                &globals.settings_errors,
             ))
             .await
         }

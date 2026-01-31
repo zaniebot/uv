@@ -18,7 +18,7 @@ use uv_normalize::{DEV_DEPENDENCIES, DefaultExtras, DefaultGroups};
 use uv_preview::Preview;
 use uv_python::{PythonDownloads, PythonPreference, PythonRequest};
 use uv_scripts::{Pep723Metadata, Pep723Script};
-use uv_settings::PythonInstallMirrors;
+use uv_settings::{FilesystemOptions, PythonInstallMirrors};
 use uv_warnings::warn_user_once;
 use uv_workspace::pyproject::DependencyType;
 use uv_workspace::pyproject_mut::{DependencyTarget, PyProjectTomlMut};
@@ -61,6 +61,7 @@ pub(crate) async fn remove(
     cache: &Cache,
     printer: Printer,
     preview: Preview,
+    settings_errors: &[uv_settings::Error],
 ) -> Result<ExitStatus> {
     let target = if let Some(script) = script {
         // If we found a PEP 723 script and the user provided a project-only setting, warn.
@@ -107,6 +108,10 @@ pub(crate) async fn remove(
             )
             .await?
         };
+
+        // Emit any stashed settings discovery warnings, now that we know
+        // workspace discovery succeeded.
+        FilesystemOptions::emit_warnings(settings_errors);
 
         RemoveTarget::Project(project)
     };

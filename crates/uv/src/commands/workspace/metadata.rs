@@ -7,6 +7,7 @@ use serde::Serialize;
 use uv_fs::PortablePathBuf;
 use uv_normalize::PackageName;
 use uv_preview::{Preview, PreviewFeature};
+use uv_settings::FilesystemOptions;
 use uv_warnings::warn_user;
 use uv_workspace::{DiscoveryOptions, Workspace, WorkspaceCache};
 
@@ -54,6 +55,7 @@ pub(crate) async fn metadata(
     project_dir: &Path,
     preview: Preview,
     printer: Printer,
+    settings_errors: &[uv_settings::Error],
 ) -> Result<ExitStatus> {
     if !preview.is_enabled(PreviewFeature::WorkspaceMetadata) {
         warn_user!(
@@ -65,6 +67,10 @@ pub(crate) async fn metadata(
     let workspace_cache = WorkspaceCache::default();
     let workspace =
         Workspace::discover(project_dir, &DiscoveryOptions::default(), &workspace_cache).await?;
+
+    // Emit any stashed settings discovery warnings, now that we know
+    // workspace discovery succeeded.
+    FilesystemOptions::emit_warnings(settings_errors);
 
     let members = workspace
         .packages()

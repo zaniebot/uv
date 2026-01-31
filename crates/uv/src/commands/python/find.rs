@@ -12,7 +12,7 @@ use uv_python::{
     EnvironmentPreference, PythonDownloads, PythonInstallation, PythonPreference, PythonRequest,
 };
 use uv_scripts::Pep723ItemRef;
-use uv_settings::PythonInstallMirrors;
+use uv_settings::{FilesystemOptions, PythonInstallMirrors};
 use uv_warnings::{warn_user, warn_user_once};
 use uv_workspace::{DiscoveryOptions, VirtualProject, WorkspaceCache, WorkspaceError};
 
@@ -37,6 +37,7 @@ pub(crate) async fn find(
     cache: &Cache,
     printer: Printer,
     preview: Preview,
+    settings_errors: &[uv_settings::Error],
 ) -> Result<ExitStatus> {
     let environment_preference = if system {
         EnvironmentPreference::OnlySystem
@@ -51,7 +52,12 @@ pub(crate) async fn find(
         match VirtualProject::discover(project_dir, &DiscoveryOptions::default(), &workspace_cache)
             .await
         {
-            Ok(project) => Some(project),
+            Ok(project) => {
+                // Emit any stashed settings discovery warnings, now that we know
+                // workspace discovery succeeded.
+                FilesystemOptions::emit_warnings(settings_errors);
+                Some(project)
+            }
             Err(WorkspaceError::MissingProject(_)) => None,
             Err(WorkspaceError::MissingPyprojectToml) => None,
             Err(WorkspaceError::NonWorkspace(_)) => None,

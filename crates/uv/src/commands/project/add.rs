@@ -35,7 +35,7 @@ use uv_redacted::DisplaySafeUrl;
 use uv_requirements::{NamedRequirementsResolver, RequirementsSource, RequirementsSpecification};
 use uv_resolver::FlatIndex;
 use uv_scripts::{Pep723Metadata, Pep723Script};
-use uv_settings::PythonInstallMirrors;
+use uv_settings::{FilesystemOptions, PythonInstallMirrors};
 use uv_types::{BuildIsolation, HashStrategy};
 use uv_warnings::warn_user_once;
 use uv_workspace::pyproject::{DependencyType, Source, SourceError, Sources, ToolUvSources};
@@ -102,6 +102,7 @@ pub(crate) async fn add(
     cache: &Cache,
     printer: Printer,
     preview: Preview,
+    settings_errors: &[uv_settings::Error],
 ) -> Result<ExitStatus> {
     if bounds.is_some() && !preview.is_enabled(PreviewFeature::AddBounds) {
         warn_user_once!(
@@ -264,6 +265,10 @@ pub(crate) async fn add(
             )
             .await?
         };
+
+        // Emit any stashed settings discovery warnings, now that we know
+        // workspace discovery succeeded.
+        FilesystemOptions::emit_warnings(settings_errors);
 
         // For non-project workspace roots, allow dev dependencies, but nothing else.
         // TODO(charlie): Automatically "upgrade" the project by adding a `[project]` table.
