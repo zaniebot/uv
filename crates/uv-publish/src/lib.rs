@@ -284,6 +284,13 @@ pub struct UploadDistribution {
 fn unroll_paths(paths: Vec<String>) -> Result<Vec<PathBuf>, PublishError> {
     let mut files = BTreeSet::default();
     for path in paths {
+        // If the path is a directory, search for files within it.
+        let path = if Path::new(&path).is_dir() {
+            let sep = std::path::MAIN_SEPARATOR;
+            format!("{}{sep}*", path.trim_end_matches(sep))
+        } else {
+            path
+        };
         for file in glob(&path).map_err(|err| PublishError::Pattern(path.clone(), err))? {
             let file = file?;
             if !file.is_file() {
@@ -1471,7 +1478,7 @@ mod tests {
 
     use crate::{
         FormMetadata, PublishError, Reporter, UploadDistribution, build_upload_request,
-        group_files, upload,
+        group_files, unroll_paths, upload,
     };
     use tokio::sync::Semaphore;
     use uv_warnings::owo_colors::AnsiColors;
@@ -1805,6 +1812,30 @@ mod tests {
             ]
             "#);
         }
+    }
+
+    #[test]
+    fn test_unroll_paths_directory() {
+        let temp_dir = std::env::temp_dir().join("uv-publish-test-unroll");
+        let _ = std::fs::remove_dir_all(&temp_dir);
+        std::fs::create_dir_all(&temp_dir).unwrap();
+
+        // Create some files in the directory.
+        std::fs::write(temp_dir.join("foo-1.0.0.tar.gz"), b"").unwrap();
+        std::fs::write(temp_dir.join("foo-1.0.0-py3-none-any.whl"), b"").unwrap();
+
+        let dir_path = temp_dir.to_str().unwrap().to_string();
+
+        // Passing the directory should find files within it.
+        let files = unroll_paths(vec![dir_path.clone()]).unwrap();
+        assert_eq!(files.len(), 2);
+
+        // Passing with a trailing separator should also work.
+        let files = unroll_paths(vec![format!("{dir_path}{}", std::path::MAIN_SEPARATOR)]).unwrap();
+        assert_eq!(files.len(), 2);
+
+        // Clean up.
+        std::fs::remove_dir_all(&temp_dir).unwrap();
     }
 
     /// Snapshot the data we send for an upload request for a source distribution.

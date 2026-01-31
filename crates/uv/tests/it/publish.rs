@@ -210,6 +210,41 @@ fn dubious_filenames() {
     );
 }
 
+/// When given a directory path (not a glob), `uv publish` should search for
+/// distributions within it.
+#[test]
+fn publish_directory_argument() {
+    let context = TestContext::new("3.12");
+
+    let dist_dir = context.temp_dir.child("my_dist");
+    std::fs::create_dir_all(dist_dir.path()).unwrap();
+    std::fs::copy(
+        dummy_wheel(),
+        dist_dir.path().join("ok-1.0.0-py3-none-any.whl"),
+    )
+    .unwrap();
+
+    uv_snapshot!(context.filters(), context.publish()
+        .arg("-u")
+        .arg("dummy")
+        .arg("-p")
+        .arg("dummy")
+        .arg("--publish-url")
+        .arg("https://test.pypi.org/legacy/")
+        .arg(dist_dir.path()), @"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    Publishing 1 file to https://test.pypi.org/legacy/
+    Uploading ok-1.0.0-py3-none-any.whl ([SIZE])
+    error: Failed to publish `my_dist/ok-1.0.0-py3-none-any.whl` to https://test.pypi.org/legacy/
+      Caused by: Upload failed with status code 403 Forbidden. Server says: 403 Username/Password authentication is no longer supported. Migrate to API Tokens or Trusted Publishers instead. See https://test.pypi.org/help/#apitoken and https://test.pypi.org/help/#trusted-publishers
+    "
+    );
+}
+
 /// Check that we (don't) use the keyring and warn for missing keyring behaviors correctly.
 #[test]
 fn check_keyring_behaviours() {
