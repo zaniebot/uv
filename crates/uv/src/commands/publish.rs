@@ -455,7 +455,7 @@ async fn gather_credentials(
             // * The user forgot to forward the secrets as env vars (or used the wrong ones).
             // * The trusted publishing configuration is wrong.
             writeln!(
-                printer.stderr(),
+                printer.stderr_important(),
                 "Note: Neither credentials nor keyring are configured, and there was an error \
                 fetching the trusted publishing token. If you don't want to use trusted \
                 publishing, you can ignore this error, but you need to provide credentials."
@@ -466,7 +466,7 @@ async fn gather_credentials(
                 anyhow::Error::from(err)
                     .context("Trusted publishing failed")
                     .as_ref(),
-                printer.stderr(),
+                printer.stderr_important(),
                 "error",
                 AnsiColors::Red,
             )?;
