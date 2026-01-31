@@ -49,7 +49,7 @@ use uv_scripts::{Pep723Error, Pep723Item, Pep723Metadata, Pep723Script};
 use uv_settings::{Combine, EnvironmentOptions, FilesystemOptions, Options};
 use uv_static::EnvVars;
 use uv_warnings::{warn_user, warn_user_once};
-use uv_workspace::{DiscoveryOptions, Workspace, WorkspaceCache, WorkspaceError};
+use uv_workspace::{DiscoveryOptions, Workspace, WorkspaceCache};
 
 use crate::commands::{ExitStatus, RunCommand, ScriptPath, ToolRunCommand};
 use crate::printer::Printer;
@@ -148,7 +148,9 @@ async fn run(mut cli: Cli) -> Result<ExitStatus> {
     // 3. The nearest configuration file (`uv.toml` or `pyproject.toml`) in the directory tree,
     //    starting from the current directory.
     let workspace_cache = WorkspaceCache::default();
-    let filesystem = if let Some(config_file) = cli.top_level.config_file.as_ref() {
+    let (filesystem, settings_errors) = if let Some(config_file) =
+        cli.top_level.config_file.as_ref()
+    {
         if config_file
             .file_name()
             .is_some_and(|file_name| file_name == "pyproject.toml")
@@ -157,28 +159,27 @@ async fn run(mut cli: Cli) -> Result<ExitStatus> {
                 "The `--config-file` argument expects to receive a `uv.toml` file, not a `pyproject.toml`. If you're trying to run a command from another project, use the `--project` argument instead."
             );
         }
-        Some(FilesystemOptions::from_file(config_file)?)
+        (Some(FilesystemOptions::from_file(config_file)?), Vec::new())
     } else if deprecated_isolated || cli.top_level.no_config {
-        None
+        (None, Vec::new())
     } else if matches!(&*cli.command, Commands::Tool(_) | Commands::Self_(_)) {
         // For commands that operate at the user-level, ignore local configuration.
-        FilesystemOptions::user()?.combine(FilesystemOptions::system()?)
-    } else {
-        let workspace_result =
-            Workspace::discover(&project_dir, &DiscoveryOptions::default(), &workspace_cache).await;
-        let (project, warnings) = match &workspace_result {
-            Ok(workspace) => FilesystemOptions::find(workspace.install_path())?,
-            Err(_) => FilesystemOptions::find(&project_dir)?,
-        };
-        // Suppress settings discovery warnings when workspace discovery failed
-        // with a TOML parse error, since the same error will be reported later
-        // by the command itself.
-        if !matches!(&workspace_result, Err(WorkspaceError::Toml(_, _))) {
-            FilesystemOptions::emit_warnings(&warnings);
-        }
+        (
+            FilesystemOptions::user()?.combine(FilesystemOptions::system()?),
+            Vec::new(),
+        )
+    } else if let Ok(workspace) =
+        Workspace::discover(&project_dir, &DiscoveryOptions::default(), &workspace_cache).await
+    {
+        let (project, settings_errors) = FilesystemOptions::find(workspace.install_path())?;
         let system = FilesystemOptions::system()?;
         let user = FilesystemOptions::user()?;
-        project.combine(user).combine(system)
+        (project.combine(user).combine(system), settings_errors)
+    } else {
+        let (project, settings_errors) = FilesystemOptions::find(&project_dir)?;
+        let system = FilesystemOptions::system()?;
+        let user = FilesystemOptions::user()?;
+        (project.combine(user).combine(system), settings_errors)
     };
 
     // Parse the external command, if necessary.
@@ -336,11 +337,12 @@ async fn run(mut cli: Cli) -> Result<ExitStatus> {
         .combine(filesystem);
 
     // Resolve the global settings.
-    let globals = GlobalSettings::resolve(
+    let mut globals = GlobalSettings::resolve(
         &cli.top_level.global_args,
         filesystem.as_ref(),
         &environment,
     );
+    globals.settings_errors = settings_errors;
 
     // Adjust open file limits on Unix if the preview feature is enabled.
     #[cfg(unix)]

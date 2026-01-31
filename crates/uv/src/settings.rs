@@ -68,7 +68,7 @@ use crate::commands::{InitKind, InitProjectKind, pip::operations::Modifications}
 const PYPI_PUBLISH_URL: &str = "https://upload.pypi.org/legacy/";
 
 /// The resolved global settings to use for any invocation of the CLI.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub(crate) struct GlobalSettings {
     pub(crate) required_version: Option<RequiredVersion>,
     pub(crate) quiet: u8,
@@ -82,6 +82,10 @@ pub(crate) struct GlobalSettings {
     pub(crate) python_downloads: PythonDownloads,
     pub(crate) no_progress: bool,
     pub(crate) installer_metadata: bool,
+    /// Errors encountered during settings discovery that could not be raised
+    /// immediately. Command handlers should emit these as warnings unless the
+    /// same error is reported during workspace discovery.
+    pub(crate) settings_errors: Vec<uv_settings::Error>,
 }
 
 impl GlobalSettings {
@@ -170,6 +174,7 @@ impl GlobalSettings {
                 environment.no_installer_metadata,
             )
             .is_enabled(),
+            settings_errors: Vec::new(),
         }
     }
 }
