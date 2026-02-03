@@ -6719,6 +6719,8 @@ dependencies = [
  "uv-extract",
  "uv-fs",
  "uv-metadata",
+ "uv-normalize",
+ "uv-pep440",
  "uv-pypi-types",
  "uv-redacted",
  "uv-static",

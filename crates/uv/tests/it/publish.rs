@@ -686,11 +686,13 @@ async fn upload_error_problem_details() {
 }
 
 /// Warn when a wheel has a non-normalized filename (e.g., leading zeros in version).
+/// The file is also invalid (empty), so metadata reading will fail.
 #[test]
 fn non_normalized_filename_warning() {
     let context = TestContext::new("3.12");
 
     // Create a wheel file with a non-normalized version (leading zero: 1.01.0 -> 1.1.0).
+    // The file is empty (invalid), so metadata reading will fail.
     let wheel = context.temp_dir.child("ok-1.01.0-py3-none-any.whl");
     wheel.touch().unwrap();
 
@@ -709,7 +711,6 @@ fn non_normalized_filename_warning() {
     ----- stderr -----
     Publishing 1 file to https://test.pypi.org/legacy/
     warning: `ok-1.01.0-py3-none-any.whl` has a non-normalized filename (expected `ok-1.1.0-py3-none-any.whl`). Pass `--preview-features publish-require-normalized` to skip such files.
-    Uploading ok-1.1.0-py3-none-any.whl ([SIZE])
     error: Failed to publish: `ok-1.01.0-py3-none-any.whl`
       Caused by: Failed to read metadata
       Caused by: Failed to read from zip file
@@ -744,6 +745,85 @@ fn non_normalized_filename_skip() {
     ----- stderr -----
     Publishing 1 file to https://test.pypi.org/legacy/
     warning: `ok-1.01.0-py3-none-any.whl` has a non-normalized filename (expected `ok-1.1.0-py3-none-any.whl`), skipping
+    "
+    );
+}
+
+/// When multiple distributions for the same package version are uploaded, and one fails validation,
+/// all distributions in that group should be skipped (with grouped validation enabled).
+#[test]
+fn skip_package_group_on_validation_failure() {
+    let context = TestContext::new("3.12");
+
+    // Create an invalid wheel (empty file that can't be read as a zip)
+    let invalid_wheel = context
+        .temp_dir
+        .child("foo-1.0.0-cp39-cp39-linux_x86_64.whl");
+    invalid_wheel.touch().unwrap();
+
+    // Create another invalid wheel for the same package version
+    let another_invalid_wheel = context
+        .temp_dir
+        .child("foo-1.0.0-cp310-cp310-linux_x86_64.whl");
+    another_invalid_wheel.touch().unwrap();
+
+    // Both should be skipped because they're in the same package group and both fail validation
+    uv_snapshot!(context.filters(), context.publish()
+        .arg("--preview-features")
+        .arg("publish-validate-grouped")
+        .arg("-u")
+        .arg("dummy")
+        .arg("-p")
+        .arg("dummy")
+        .arg("--publish-url")
+        .arg("https://test.pypi.org/legacy/")
+        .arg(invalid_wheel.path())
+        .arg(another_invalid_wheel.path()), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Publishing 2 files to https://test.pypi.org/legacy/
+    warning: Skipping foo 1.0.0 due to 2 validation errors:
+      - `[TEMP_DIR]/foo-1.0.0-cp310-cp310-linux_x86_64.whl`: metadata error: Failed to read from zip file
+      - `[TEMP_DIR]/foo-1.0.0-cp39-cp39-linux_x86_64.whl`: metadata error: Failed to read from zip file
+    "
+    );
+}
+
+/// When one distribution in a package group fails but another package version succeeds,
+/// only the failing group should be skipped (with grouped validation enabled).
+#[test]
+fn skip_only_failing_package_group() {
+    let context = TestContext::new("3.12");
+
+    // Create an invalid wheel
+    let invalid_wheel = context.temp_dir.child("bad-1.0.0-py3-none-any.whl");
+    invalid_wheel.touch().unwrap();
+
+    // Use a valid wheel from the test fixtures for a different package
+    uv_snapshot!(context.filters(), context.publish()
+        .arg("--preview-features")
+        .arg("publish-validate-grouped")
+        .arg("-u")
+        .arg("dummy")
+        .arg("-p")
+        .arg("dummy")
+        .arg("--publish-url")
+        .arg("https://test.pypi.org/legacy/")
+        .arg(invalid_wheel.path())
+        .arg(dummy_wheel()), @"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    Publishing 2 files to https://test.pypi.org/legacy/
+    warning: Skipping bad 1.0.0 due to validation error: `[TEMP_DIR]/bad-1.0.0-py3-none-any.whl`: metadata error: Failed to read from zip file
+    Uploading ok-1.0.0-py3-none-any.whl ([SIZE])
+    error: Failed to publish `[WORKSPACE]/test/links/ok-1.0.0-py3-none-any.whl` to https://test.pypi.org/legacy/
+      Caused by: Server returned status code 403 Forbidden. Server says: 403 Username/Password authentication is no longer supported. Migrate to API Tokens or Trusted Publishers instead. See https://test.pypi.org/help/#apitoken and https://test.pypi.org/help/#trusted-publishers
     "
     );
 }

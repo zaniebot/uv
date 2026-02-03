@@ -15,8 +15,9 @@ use uv_configuration::{KeyringProviderType, TrustedPublishing};
 use uv_distribution_types::{IndexCapabilities, IndexLocations, IndexUrl};
 use uv_preview::{Preview, PreviewFeature};
 use uv_publish::{
-    CheckUrlClient, FormMetadata, PublishError, TrustedPublishResult, check_trusted_publishing,
-    group_files_for_publishing, upload, upload_two_phase,
+    CheckUrlClient, FormMetadata, PublishError, PublishPrepareError, RetryPolicy,
+    TrustedPublishResult, UploadDistribution, check_trusted_publishing,
+    group_distributions_by_package, group_files_for_publishing, upload, upload_two_phase,
 };
 use uv_redacted::DisplaySafeUrl;
 use uv_settings::EnvironmentOptions;
@@ -195,154 +196,334 @@ pub(crate) async fn publish(
         None
     };
 
-    for group in groups {
-        // Check if the filename is normalized (e.g., version `2025.09.4` should be `2025.9.4`).
-        let normalized_filename = group.filename.to_string();
-        if group.raw_filename != normalized_filename {
-            if preview.is_enabled(PreviewFeature::PublishRequireNormalized) {
+    if preview.is_enabled(PreviewFeature::PublishValidateGrouped) {
+        // Group distributions by package name and version for validation.
+        // If any distribution in a group fails validation, all distributions in that group are skipped.
+        let package_groups = group_distributions_by_package(groups);
+
+        for package_group in package_groups {
+            // Validate all distributions in the package group upfront.
+            // If any fails validation, skip the entire group.
+            let validated_distributions =
+                match validate_package_group(&package_group.distributions, preview).await {
+                    Ok(distributions) => distributions,
+                    Err(errors) => {
+                        // Log the error and skip the entire package group.
+                        if errors.len() == 1 {
+                            warn_user_once!(
+                                "Skipping {} {} due to validation error: {}",
+                                package_group.name,
+                                package_group.version,
+                                errors[0]
+                            );
+                        } else {
+                            let error_list = errors
+                                .iter()
+                                .map(|e| format!("  - {e}"))
+                                .collect::<Vec<_>>()
+                                .join("\n");
+                            warn_user_once!(
+                                "Skipping {} {} due to {} validation errors:\n{}",
+                                package_group.name,
+                                package_group.version,
+                                errors.len(),
+                                error_list
+                            );
+                        }
+                        continue;
+                    }
+                };
+
+            // If all distributions were filtered out (e.g., all had non-normalized filenames), skip.
+            if validated_distributions.is_empty() {
+                continue;
+            }
+
+            // Now process each validated distribution in the group.
+            for (dist, form_metadata) in validated_distributions {
+                upload_distribution(
+                    dist,
+                    &form_metadata,
+                    check_url_client.as_ref(),
+                    &download_concurrency,
+                    dry_run,
+                    direct,
+                    &publish_url,
+                    &token_store,
+                    &upload_client,
+                    &s3_client,
+                    retry_policy,
+                    &credentials,
+                    printer,
+                )
+                .await?;
+            }
+        }
+    } else {
+        // Process each distribution individually (default behavior).
+        for dist in groups {
+            // Check if the filename is normalized (e.g., version `2025.09.4` should be `2025.9.4`).
+            if dist.has_non_normalized_filename() {
+                let normalized_filename = dist.filename.to_string();
+                if preview.is_enabled(PreviewFeature::PublishRequireNormalized) {
+                    warn_user_once!(
+                        "`{}` has a non-normalized filename (expected `{normalized_filename}`), skipping",
+                        dist.raw_filename
+                    );
+                    continue;
+                }
                 warn_user_once!(
-                    "`{}` has a non-normalized filename (expected `{normalized_filename}`), skipping",
-                    group.raw_filename
+                    "`{}` has a non-normalized filename (expected `{normalized_filename}`). \
+                    Pass `--preview-features {}` to skip such files.",
+                    dist.raw_filename,
+                    PreviewFeature::PublishRequireNormalized
                 );
+            }
+
+            // Collect the metadata for the file.
+            let form_metadata = FormMetadata::read_from_file(&dist.file, &dist.filename)
+                .await
+                .map_err(|err| PublishError::PublishPrepare(dist.file.clone(), Box::new(err)))?;
+
+            upload_distribution(
+                &dist,
+                &form_metadata,
+                check_url_client.as_ref(),
+                &download_concurrency,
+                dry_run,
+                direct,
+                &publish_url,
+                &token_store,
+                &upload_client,
+                &s3_client,
+                retry_policy,
+                &credentials,
+                printer,
+            )
+            .await?;
+        }
+    }
+
+    Ok(ExitStatus::Success)
+}
+
+/// Upload a single distribution to the registry.
+#[allow(clippy::too_many_arguments)]
+async fn upload_distribution(
+    dist: &UploadDistribution,
+    form_metadata: &FormMetadata,
+    check_url_client: Option<&CheckUrlClient<'_>>,
+    download_concurrency: &Semaphore,
+    dry_run: bool,
+    direct: bool,
+    publish_url: &DisplaySafeUrl,
+    token_store: &PyxTokenStore,
+    upload_client: &BaseClient,
+    s3_client: &BaseClient,
+    retry_policy: RetryPolicy,
+    credentials: &Credentials,
+    printer: Printer,
+) -> Result<()> {
+    if let Some(check_url_client) = check_url_client {
+        if uv_publish::check_url(
+            check_url_client,
+            &dist.file,
+            &dist.filename,
+            download_concurrency,
+        )
+        .await?
+        {
+            writeln!(
+                printer.stderr(),
+                "File {} already exists, skipping",
+                dist.filename
+            )?;
+            return Ok(());
+        }
+    }
+
+    let size = fs_err::metadata(&dist.file)?.len();
+    let (bytes, unit) = human_readable_bytes(size);
+    if dry_run {
+        writeln!(
+            printer.stderr(),
+            "{} {} {}",
+            "Checking".bold().cyan(),
+            dist.filename,
+            format!("({bytes:.1}{unit})").dimmed()
+        )?;
+    } else {
+        writeln!(
+            printer.stderr(),
+            "{} {} {}",
+            "Uploading".bold().green(),
+            dist.filename,
+            format!("({bytes:.1}{unit})").dimmed()
+        )?;
+    }
+
+    let uploaded = if direct {
+        if dry_run {
+            // For dry run, call validate since we won't call reserve.
+            let should_upload = uv_publish::validate(
+                &dist.file,
+                form_metadata,
+                &dist.raw_filename,
+                publish_url,
+                token_store,
+                upload_client,
+                credentials,
+            )
+            .await?;
+            if !should_upload {
+                writeln!(
+                    printer.stderr(),
+                    "{}",
+                    "File already exists, skipping".dimmed()
+                )?;
+            }
+            return Ok(());
+        }
+
+        debug!("Using two-phase upload (direct mode)");
+        let reporter = PublishReporter::single(printer);
+        upload_two_phase(
+            dist,
+            form_metadata,
+            publish_url,
+            upload_client,
+            s3_client,
+            retry_policy,
+            credentials,
+            // Needs to be an `Arc` because the reqwest `Body` static lifetime requirement
+            Arc::new(reporter),
+        )
+        .await?
+    } else {
+        // Run validation checks on the file, but don't upload it (if possible).
+        let should_upload = uv_publish::validate(
+            &dist.file,
+            form_metadata,
+            &dist.raw_filename,
+            publish_url,
+            token_store,
+            upload_client,
+            credentials,
+        )
+        .await?;
+
+        if dry_run {
+            return Ok(());
+        }
+
+        // If validation indicates the file already exists, skip the upload.
+        if !should_upload {
+            false
+        } else {
+            let reporter = PublishReporter::single(printer);
+            upload(
+                dist,
+                form_metadata,
+                publish_url,
+                upload_client,
+                retry_policy,
+                credentials,
+                check_url_client,
+                download_concurrency,
+                // Needs to be an `Arc` because the reqwest `Body` static lifetime requirement
+                Arc::new(reporter),
+            )
+            .await? // Filename and/or URL are already attached, if applicable.
+        }
+    };
+    info!("Upload succeeded");
+
+    if !uploaded {
+        writeln!(
+            printer.stderr(),
+            "{}",
+            "File already exists, skipping".dimmed()
+        )?;
+    }
+
+    Ok(())
+}
+
+/// Validate all distributions in a package group upfront.
+///
+/// This reads the metadata from each distribution file and checks for non-normalized filenames.
+/// If any distribution fails validation, an error is returned and the entire group should be skipped.
+///
+/// Returns a list of validated distributions paired with their form metadata, or a list of
+/// validation errors if any distribution fails validation.
+async fn validate_package_group(
+    distributions: &[UploadDistribution],
+    preview: Preview,
+) -> Result<Vec<(&UploadDistribution, FormMetadata)>, Vec<String>> {
+    let mut validated = Vec::with_capacity(distributions.len());
+    let mut errors = Vec::new();
+
+    for dist in distributions {
+        // Check if the filename is normalized (e.g., version `2025.09.4` should be `2025.9.4`).
+        if dist.has_non_normalized_filename() {
+            let normalized_filename = dist.filename.to_string();
+            if preview.is_enabled(PreviewFeature::PublishRequireNormalized) {
+                // With the preview flag, a non-normalized filename causes validation to fail.
+                errors.push(format!(
+                    "`{}` has a non-normalized filename (expected `{normalized_filename}`)",
+                    dist.raw_filename
+                ));
                 continue;
             }
             warn_user_once!(
                 "`{}` has a non-normalized filename (expected `{normalized_filename}`). \
                 Pass `--preview-features {}` to skip such files.",
-                group.raw_filename,
+                dist.raw_filename,
                 PreviewFeature::PublishRequireNormalized
             );
         }
 
-        if let Some(check_url_client) = &check_url_client {
-            if uv_publish::check_url(
-                check_url_client,
-                &group.file,
-                &group.filename,
-                &download_concurrency,
-            )
-            .await?
-            {
-                writeln!(
-                    printer.stderr(),
-                    "File {} already exists, skipping",
-                    group.filename
-                )?;
-                continue;
+        // Read the metadata from the distribution file.
+        match FormMetadata::read_from_file(&dist.file, &dist.filename).await {
+            Ok(form_metadata) => {
+                validated.push((dist, form_metadata));
             }
-        }
-
-        let size = fs_err::metadata(&group.file)?.len();
-        let (bytes, unit) = human_readable_bytes(size);
-        if dry_run {
-            writeln!(
-                printer.stderr(),
-                "{} {} {}",
-                "Checking".bold().cyan(),
-                group.filename,
-                format!("({bytes:.1}{unit})").dimmed()
-            )?;
-        } else {
-            writeln!(
-                printer.stderr(),
-                "{} {} {}",
-                "Uploading".bold().green(),
-                group.filename,
-                format!("({bytes:.1}{unit})").dimmed()
-            )?;
-        }
-
-        // Collect the metadata for the file.
-        let form_metadata = FormMetadata::read_from_file(&group.file, &group.filename)
-            .await
-            .map_err(|err| PublishError::PublishPrepare(group.file.clone(), Box::new(err)))?;
-
-        let uploaded = if direct {
-            if dry_run {
-                // For dry run, call validate since we won't call reserve.
-                let should_upload = uv_publish::validate(
-                    &group.file,
-                    &form_metadata,
-                    &group.raw_filename,
-                    &publish_url,
-                    &token_store,
-                    &upload_client,
-                    &credentials,
-                )
-                .await?;
-                if !should_upload {
-                    writeln!(
-                        printer.stderr(),
-                        "{}",
-                        "File already exists, skipping".dimmed()
-                    )?;
-                }
-                continue;
+            Err(err) => {
+                errors.push(format!(
+                    "`{}`: {}",
+                    dist.file.display(),
+                    format_publish_prepare_error(&err)
+                ));
             }
-
-            debug!("Using two-phase upload (direct mode)");
-            let reporter = PublishReporter::single(printer);
-            upload_two_phase(
-                &group,
-                &form_metadata,
-                &publish_url,
-                &upload_client,
-                &s3_client,
-                retry_policy,
-                &credentials,
-                // Needs to be an `Arc` because the reqwest `Body` static lifetime requirement
-                Arc::new(reporter),
-            )
-            .await?
-        } else {
-            // Run validation checks on the file, but don't upload it (if possible).
-            let should_upload = uv_publish::validate(
-                &group.file,
-                &form_metadata,
-                &group.raw_filename,
-                &publish_url,
-                &token_store,
-                &upload_client,
-                &credentials,
-            )
-            .await?;
-
-            if dry_run {
-                continue;
-            }
-
-            // If validation indicates the file already exists, skip the upload.
-            if !should_upload {
-                false
-            } else {
-                let reporter = PublishReporter::single(printer);
-                upload(
-                    &group,
-                    &form_metadata,
-                    &publish_url,
-                    &upload_client,
-                    retry_policy,
-                    &credentials,
-                    check_url_client.as_ref(),
-                    &download_concurrency,
-                    // Needs to be an `Arc` because the reqwest `Body` static lifetime requirement
-                    Arc::new(reporter),
-                )
-                .await? // Filename and/or URL are already attached, if applicable.
-            }
-        };
-        info!("Upload succeeded");
-
-        if !uploaded {
-            writeln!(
-                printer.stderr(),
-                "{}",
-                "File already exists, skipping".dimmed()
-            )?;
         }
     }
 
-    Ok(ExitStatus::Success)
+    if errors.is_empty() {
+        Ok(validated)
+    } else {
+        Err(errors)
+    }
+}
+
+/// Format a [`PublishPrepareError`] for display.
+fn format_publish_prepare_error(err: &PublishPrepareError) -> String {
+    match err {
+        PublishPrepareError::Io(e) => format!("I/O error: {e}"),
+        PublishPrepareError::Metadata(e) => format!("metadata error: {e}"),
+        PublishPrepareError::Metadata23(e) => format!("metadata error: {e}"),
+        PublishPrepareError::InvalidExtension(f) => {
+            format!("only files ending in `.tar.gz` are valid source distributions: `{f}`")
+        }
+        PublishPrepareError::MissingPkgInfo => "no PKG-INFO file found".to_string(),
+        PublishPrepareError::MultiplePkgInfo(s) => format!("multiple PKG-INFO files found: `{s}`"),
+        PublishPrepareError::Read(path, e) => format!("failed to read `{path}`: {e}"),
+        PublishPrepareError::InvalidAttestation(path, e) => {
+            format!(
+                "invalid PEP 740 attestation (not JSON): `{}`: {e}",
+                path.display()
+            )
+        }
+    }
 }
 
 /// Whether to allow prompting for username and password.

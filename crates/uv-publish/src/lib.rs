@@ -14,6 +14,8 @@ use reqwest::multipart::Part;
 use reqwest::{Body, Response, StatusCode};
 use reqwest_retry::RetryError;
 use reqwest_retry::policies::ExponentialBackoff;
+
+pub use reqwest_retry::policies::ExponentialBackoff as RetryPolicy;
 use rustc_hash::FxHashMap;
 use serde::Deserialize;
 use thiserror::Error;
@@ -35,6 +37,8 @@ use uv_distribution_types::{IndexCapabilities, IndexUrl};
 use uv_extract::hash::{HashReader, Hasher};
 use uv_fs::{ProgressReader, Simplified};
 use uv_metadata::read_metadata_async_seek;
+use uv_normalize::PackageName;
+use uv_pep440::Version;
 use uv_pypi_types::{HashAlgorithm, HashDigest, Metadata23, MetadataError};
 use uv_redacted::{DisplaySafeUrl, DisplaySafeUrlError};
 use uv_warnings::warn_user;
@@ -278,6 +282,63 @@ pub struct UploadDistribution {
     pub filename: DistFilename,
     /// Zero or more paths to PEP 740 attestations for the distribution.
     pub attestations: Vec<PathBuf>,
+}
+
+impl UploadDistribution {
+    /// Returns whether the distribution has a non-normalized filename.
+    ///
+    /// For example, version `2025.09.4` should be normalized to `2025.9.4`.
+    pub fn has_non_normalized_filename(&self) -> bool {
+        self.raw_filename != self.filename.to_string()
+    }
+}
+
+/// A group of distributions that share the same package name and version.
+///
+/// When validating distributions for publishing, if any distribution in a group
+/// fails validation, all distributions in that group should be skipped.
+#[derive(Debug)]
+pub struct PackageGroup {
+    /// The package name shared by all distributions in this group.
+    pub name: PackageName,
+    /// The version shared by all distributions in this group.
+    pub version: Version,
+    /// The distributions in this group.
+    pub distributions: Vec<UploadDistribution>,
+}
+
+/// Group upload distributions by their package name and version.
+///
+/// This enables skipping all distributions in a group if any one fails validation,
+/// which is the expected behavior when multiple wheels/sdists exist for the same
+/// package release.
+///
+/// Groups are returned in a deterministic order (sorted by name, then version).
+pub fn group_distributions_by_package(distributions: Vec<UploadDistribution>) -> Vec<PackageGroup> {
+    let mut groups: FxHashMap<(PackageName, Version), Vec<UploadDistribution>> =
+        FxHashMap::default();
+
+    for dist in distributions {
+        let key = (
+            dist.filename.name().clone(),
+            dist.filename.version().clone(),
+        );
+        groups.entry(key).or_default().push(dist);
+    }
+
+    let mut result: Vec<_> = groups
+        .into_iter()
+        .map(|((name, version), distributions)| PackageGroup {
+            name,
+            version,
+            distributions,
+        })
+        .collect();
+
+    // Sort for deterministic ordering
+    result.sort_by(|a, b| (&a.name, &a.version).cmp(&(&b.name, &b.version)));
+
+    result
 }
 
 /// Given a list of paths (which may contain globs), unroll them into

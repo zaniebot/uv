@@ -37,6 +37,7 @@ pub enum PreviewFeature {
     AdjustUlimit = 1 << 22,
     SpecialCondaEnvNames = 1 << 23,
     PublishRequireNormalized = 1 << 24,
+    PublishValidateGrouped = 1 << 25,
 }
 
 impl PreviewFeature {
@@ -68,6 +69,7 @@ impl PreviewFeature {
             Self::AdjustUlimit => "adjust-ulimit",
             Self::SpecialCondaEnvNames => "special-conda-env-names",
             Self::PublishRequireNormalized => "publish-require-normalized",
+            Self::PublishValidateGrouped => "publish-validate-grouped",
         }
     }
 }
@@ -112,6 +114,7 @@ impl FromStr for PreviewFeature {
             "adjust-ulimit" => Self::AdjustUlimit,
             "special-conda-env-names" => Self::SpecialCondaEnvNames,
             "publish-require-normalized" => Self::PublishRequireNormalized,
+            "publish-validate-grouped" => Self::PublishValidateGrouped,
             _ => return Err(PreviewFeatureParseError),
         })
     }
@@ -342,6 +345,10 @@ mod tests {
         assert_eq!(
             PreviewFeature::PublishRequireNormalized.as_str(),
             "publish-require-normalized"
+        );
+        assert_eq!(
+            PreviewFeature::PublishValidateGrouped.as_str(),
+            "publish-validate-grouped"
         );
     }
 }
