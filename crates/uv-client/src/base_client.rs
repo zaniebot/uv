@@ -34,7 +34,7 @@ use url::Url;
 
 use uv_auth::{AuthMiddleware, Credentials, CredentialsCache, Indexes, PyxTokenStore};
 use uv_configuration::ProxyUrlKind;
-use uv_configuration::{KeyringProviderType, ProxyUrl, TrustedHost};
+use uv_configuration::{KeyringProviderType, ProxyUrl, TlsBackend, TrustedHost};
 use uv_fs::Simplified;
 use uv_pep508::MarkerEnvironment;
 use uv_platform_tags::Platform;
@@ -76,7 +76,7 @@ pub struct BaseClientBuilder<'a> {
     keyring: KeyringProviderType,
     preview: Preview,
     allow_insecure_host: Vec<TrustedHost>,
-    native_tls: bool,
+    tls_backend: TlsBackend,
     retries: u32,
     pub connectivity: Connectivity,
     markers: Option<&'a MarkerEnvironment>,
@@ -145,7 +145,7 @@ impl Default for BaseClientBuilder<'_> {
             keyring: KeyringProviderType::default(),
             preview: Preview::default(),
             allow_insecure_host: vec![],
-            native_tls: false,
+            tls_backend: TlsBackend::default(),
             connectivity: Connectivity::Online,
             retries: DEFAULT_RETRIES,
             markers: None,
@@ -171,7 +171,7 @@ impl Default for BaseClientBuilder<'_> {
 impl<'a> BaseClientBuilder<'a> {
     pub fn new(
         connectivity: Connectivity,
-        native_tls: bool,
+        tls_backend: TlsBackend,
         allow_insecure_host: Vec<TrustedHost>,
         preview: Preview,
         timeout: Duration,
@@ -180,7 +180,7 @@ impl<'a> BaseClientBuilder<'a> {
         Self {
             preview,
             allow_insecure_host,
-            native_tls,
+            tls_backend,
             retries,
             connectivity,
             timeout,
@@ -224,8 +224,8 @@ impl<'a> BaseClientBuilder<'a> {
     }
 
     #[must_use]
-    pub fn native_tls(mut self, native_tls: bool) -> Self {
-        self.native_tls = native_tls;
+    pub fn tls_backend(mut self, tls_backend: TlsBackend) -> Self {
+        self.tls_backend = tls_backend;
         self
     }
 
@@ -333,8 +333,8 @@ impl<'a> BaseClientBuilder<'a> {
         self.credentials_cache.store_credentials(url, credentials);
     }
 
-    pub fn is_native_tls(&self) -> bool {
-        self.native_tls
+    pub fn get_tls_backend(&self) -> TlsBackend {
+        self.tls_backend
     }
 
     pub fn is_offline(&self) -> bool {
@@ -781,10 +781,10 @@ impl<'a> BaseClientBuilder<'a> {
         };
 
         // Choose TLS backend:
-        // - Use native-tls when explicitly requested via --native-tls flag (uses system certs)
+        // - Use native-tls when explicitly requested via --tls-backend native-tls (uses system certs)
         // - Otherwise use rustls with webpki-roots (bundled Mozilla root certificates)
         //   plus any custom certs from SSL_CERT_FILE/SSL_CERT_DIR and mTLS from SSL_CLIENT_CERT
-        let client_builder = if self.native_tls {
+        let client_builder = if self.tls_backend == TlsBackend::NativeTls {
             // For native-tls, load custom certs and merge with system certs
             let custom_certs = Self::load_certs_from_env_as_reqwest();
             let builder = client_builder.tls_backend_native();

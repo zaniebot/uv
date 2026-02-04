@@ -7,6 +7,7 @@ use url::Url;
 use uv_cache::Cache;
 use uv_client::BaseClientBuilder;
 use uv_client::RegistryClientBuilder;
+use uv_configuration::TlsBackend;
 use uv_redacted::DisplaySafeUrl;
 use uv_static::EnvVars;
 
@@ -475,9 +476,11 @@ async fn native_tls_ssl_env_vars() -> Result<()> {
     let (server_task, addr) = start_https_user_agent_server(&standalone_server_cert).await?;
     let url = DisplaySafeUrl::from_str(&format!("https://{addr}"))?;
     let cache = Cache::temp()?.init().await?;
-    // Use native_tls(true) to enable the native-tls backend, disable retries
+    // Use tls_backend(NativeTls) to enable the native-tls backend, disable retries
     let client = RegistryClientBuilder::new(
-        BaseClientBuilder::default().native_tls(true).retries(0),
+        BaseClientBuilder::default()
+            .tls_backend(TlsBackend::NativeTls)
+            .retries(0),
         cache,
     )
     .build();
@@ -529,8 +532,11 @@ async fn native_tls_ssl_env_vars() -> Result<()> {
 async fn native_tls_public_https() -> Result<()> {
     // Create a client with native-tls backend (uses system cert store)
     let cache = Cache::temp()?.init().await?;
-    let client =
-        RegistryClientBuilder::new(BaseClientBuilder::default().native_tls(true), cache).build();
+    let client = RegistryClientBuilder::new(
+        BaseClientBuilder::default().tls_backend(TlsBackend::NativeTls),
+        cache,
+    )
+    .build();
 
     // Connect to PyPI - this should work because native-tls uses system certs
     let url = DisplaySafeUrl::from_str("https://pypi.org/simple/")?;

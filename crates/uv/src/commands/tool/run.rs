@@ -315,8 +315,8 @@ pub(crate) async fn run(
             // If the user ran `uvx run ...`, the `run` is likely a mistake. Show a dedicated hint.
             if from.is_none() && invocation_source == ToolRunCommand::Uvx && target == "run" {
                 let rest = args.iter().map(|s| s.to_string_lossy()).join(" ");
-                return diagnostics::OperationDiagnostic::native_tls(
-                    client_builder.is_native_tls(),
+                return diagnostics::OperationDiagnostic::with_tls_backend(
+                    client_builder.get_tls_backend(),
                 )
                 .with_hint(format!(
                     "`{}` invokes the `{}` package. Did you mean `{}`?",
@@ -329,8 +329,9 @@ pub(crate) async fn run(
                 .map_or(Ok(ExitStatus::Failure), |err| Err(err.into()));
             }
 
-            let diagnostic =
-                diagnostics::OperationDiagnostic::native_tls(client_builder.is_native_tls());
+            let diagnostic = diagnostics::OperationDiagnostic::with_tls_backend(
+                client_builder.get_tls_backend(),
+            );
             let diagnostic = if let Some(verbose_flag) = find_verbose_flag(args) {
                 diagnostic.with_hint(format!(
                     "You provided `{}` to `{}`. Did you mean to provide it to `{}`? e.g., `{}`",

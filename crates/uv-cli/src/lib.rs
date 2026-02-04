@@ -15,7 +15,8 @@ use uv_auth::Service;
 use uv_cache::CacheArgs;
 use uv_configuration::{
     ExportFormat, IndexStrategy, KeyringProviderType, PackageNameSpecifier, PipCompileFormat,
-    ProjectBuildBackend, TargetTriple, TrustedHost, TrustedPublishing, VersionControlSystem,
+    ProjectBuildBackend, TargetTriple, TlsBackend, TrustedHost, TrustedPublishing,
+    VersionControlSystem,
 };
 use uv_distribution_types::{
     ConfigSettingEntry, ConfigSettingPackageEntry, Index, IndexUrl, Origin, PipExtraIndex,
@@ -244,11 +245,25 @@ pub struct GlobalArgs {
     /// However, in some cases, you may want to use the platform's native certificate store,
     /// especially if you're relying on a corporate trust root (e.g., for a mandatory proxy) that's
     /// included in your system's certificate store.
-    #[arg(global = true, long, value_parser = clap::builder::BoolishValueParser::new(), overrides_with("no_native_tls"))]
+    ///
+    /// Deprecated: Use `--tls-backend native-tls` instead.
+    #[arg(global = true, long, value_parser = clap::builder::BoolishValueParser::new(), overrides_with("no_native_tls"), hide = true)]
     pub native_tls: bool,
 
     #[arg(global = true, long, overrides_with("native_tls"), hide = true)]
     pub no_native_tls: bool,
+
+    /// Choose the TLS backend.
+    ///
+    /// By default, uv uses `rustls` with certificates from the bundled `webpki-roots` crate.
+    /// The `webpki-roots` are a reliable set of trust roots from Mozilla, and including them
+    /// in uv improves portability and performance (especially on macOS).
+    ///
+    /// Set to `native-tls` to use the platform's native certificate store. This is useful
+    /// if you're relying on a corporate trust root (e.g., for a mandatory proxy) that's
+    /// included in your system's certificate store.
+    #[arg(global = true, long, value_enum, env = EnvVars::UV_TLS_BACKEND, conflicts_with_all = ["native_tls", "no_native_tls"])]
+    pub tls_backend: Option<TlsBackend>,
 
     /// Disable network access [env: UV_OFFLINE=]
     ///

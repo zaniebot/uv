@@ -33,8 +33,8 @@ use uv_configuration::{
     BuildIsolation, BuildOptions, Concurrency, DependencyGroups, DryRun, EditableMode, EnvFile,
     ExportFormat, ExtrasSpecification, GitLfsSetting, HashCheckingMode, IndexStrategy,
     InstallOptions, KeyringProviderType, NoBinary, NoBuild, NoSources, PipCompileFormat,
-    ProjectBuildBackend, ProxyUrl, Reinstall, RequiredVersion, TargetTriple, TrustedHost,
-    TrustedPublishing, Upgrade, VersionControlSystem,
+    ProjectBuildBackend, ProxyUrl, Reinstall, RequiredVersion, TargetTriple, TlsBackend,
+    TrustedHost, TrustedPublishing, Upgrade, VersionControlSystem,
 };
 use uv_distribution_types::{
     ConfigSettings, DependencyMetadata, ExtraBuildVariables, Index, IndexLocations, IndexUrl,
@@ -240,7 +240,7 @@ fn resolve_preview(
 pub(crate) struct NetworkSettings {
     pub(crate) connectivity: Connectivity,
     pub(crate) offline: Flag,
-    pub(crate) native_tls: bool,
+    pub(crate) tls_backend: TlsBackend,
     pub(crate) http_proxy: Option<ProxyUrl>,
     pub(crate) https_proxy: Option<ProxyUrl>,
     pub(crate) no_proxy: Option<Vec<String>>,
@@ -282,17 +282,32 @@ impl NetworkSettings {
         } else {
             Connectivity::Online
         };
-        let native_tls = match flag(args.native_tls, args.no_native_tls, "native-tls") {
-            Some(value) => value,
-            None => {
-                if environment.native_tls.value == Some(true) {
-                    true
-                } else {
-                    workspace
-                        .and_then(|workspace| workspace.globals.native_tls)
-                        .unwrap_or(false)
-                }
+
+        // Resolve TLS backend from CLI, environment variable, and workspace config.
+        // --tls-backend takes precedence over --native-tls (deprecated).
+        let tls_backend = if let Some(backend) = args.tls_backend {
+            backend
+        } else if let Some(value) = flag(args.native_tls, args.no_native_tls, "native-tls") {
+            if value {
+                TlsBackend::NativeTls
+            } else {
+                TlsBackend::Rustls
             }
+        } else if let Ok(backend) = std::env::var(EnvVars::UV_TLS_BACKEND) {
+            backend.parse().unwrap_or_else(|err| {
+                warn_user_once!("{err}");
+                TlsBackend::default()
+            })
+        } else if environment.native_tls.value == Some(true) {
+            TlsBackend::NativeTls
+        } else if let Some(native_tls) = workspace.and_then(|w| w.globals.native_tls) {
+            if native_tls {
+                TlsBackend::NativeTls
+            } else {
+                TlsBackend::Rustls
+            }
+        } else {
+            TlsBackend::default()
         };
         let allow_insecure_host = args
             .allow_insecure_host
@@ -318,7 +333,7 @@ impl NetworkSettings {
         Self {
             connectivity,
             offline,
-            native_tls,
+            tls_backend,
             http_proxy,
             https_proxy,
             no_proxy,

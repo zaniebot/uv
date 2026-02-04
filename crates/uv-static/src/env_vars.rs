@@ -109,8 +109,16 @@ impl EnvVars {
 
     /// Equivalent to the `--native-tls` command-line argument. If set to `true`, uv will
     /// use the system's trust store instead of the bundled `webpki-roots` crate.
+    ///
+    /// Deprecated: Use `UV_TLS_BACKEND=native-tls` instead.
     #[attr_added_in("0.1.19")]
     pub const UV_NATIVE_TLS: &'static str = "UV_NATIVE_TLS";
+
+    /// Equivalent to the `--tls-backend` command-line argument.
+    ///
+    /// Controls which TLS backend to use. Valid values are `rustls` (default) and `native-tls`.
+    #[attr_added_in("0.9.29")]
+    pub const UV_TLS_BACKEND: &'static str = "UV_TLS_BACKEND";
 
     /// Equivalent to the `--index-strategy` command-line argument.
     ///

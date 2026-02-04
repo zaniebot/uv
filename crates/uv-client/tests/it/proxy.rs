@@ -5,7 +5,7 @@ use wiremock::matchers::{any, method};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
 use uv_client::BaseClientBuilder;
-use uv_configuration::ProxyUrl;
+use uv_configuration::{ProxyUrl, TlsBackend};
 
 #[tokio::test]
 async fn http_proxy() -> Result<()> {
@@ -26,7 +26,7 @@ async fn http_proxy() -> Result<()> {
     // Create a client with the proxy.
     let client = BaseClientBuilder::new(
         uv_client::Connectivity::Online,
-        false,
+        TlsBackend::default(),
         vec![],
         uv_preview::Preview::default(),
         std::time::Duration::from_secs(30),
@@ -73,7 +73,7 @@ async fn no_proxy() -> Result<()> {
     // Create a client with the proxy.
     let client = BaseClientBuilder::new(
         uv_client::Connectivity::Online,
-        false,
+        TlsBackend::default(),
         vec![],
         uv_preview::Preview::default(),
         std::time::Duration::from_secs(30),
