@@ -201,6 +201,9 @@ fn write_source_dist(
     for warning in pyproject_toml.check_build_system(uv_version) {
         warn_user_once!("{warning}");
     }
+    if let Some(warning) = pyproject_toml.check_version_upper_bound(uv_version) {
+        warn_user_once!("{warning}");
+    }
     let settings = pyproject_toml
         .settings()
         .cloned()

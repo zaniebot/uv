@@ -205,6 +205,11 @@ impl PyProjectToml {
         self.build_system.check_build_system(uv_version)
     }
 
+    /// See [`BuildSystem::check_version_upper_bound`].
+    pub fn check_version_upper_bound(&self, uv_version: &str) -> Option<String> {
+        self.build_system.check_version_upper_bound(uv_version)
+    }
+
     /// Validate and convert a `pyproject.toml` to core metadata.
     ///
     /// <https://packaging.python.org/en/latest/guides/writing-pyproject-toml/>
@@ -845,8 +850,6 @@ impl BuildSystem {
 
         let uv_version =
             Version::from_str(uv_version).expect("uv's own version is not PEP 440 compliant");
-        let next_minor = uv_version.release().get(1).copied().unwrap_or_default() + 1;
-        let next_breaking = Version::new([0, next_minor]);
 
         let expected = || {
             format!(
@@ -863,45 +866,65 @@ impl BuildSystem {
             warnings.push(expected());
             return warnings;
         }
-        let bounded = match &uv_requirement.version_or_url {
-            None => false,
-            Some(VersionOrUrl::Url(_)) => {
-                // We can't validate the url
-                true
-            }
-            Some(VersionOrUrl::VersionSpecifier(specifier)) => {
-                // We don't check how wide the range is (that's up to the user), we just
-                // check that the current version is compliant, to avoid accidentally using a
-                // too new or too old uv, and we check that an upper bound exists. The latter
-                // is very important to allow making breaking changes in uv without breaking
-                // the existing immutable source distributions on pypi.
-                if !specifier.contains(&uv_version) {
-                    // This is allowed to happen when testing prereleases, but we should still warn.
-                    warnings.push(format!(
-                        r#"`build_system.requires = ["{uv_requirement}"]` does not contain the
+        if let Some(VersionOrUrl::VersionSpecifier(specifier)) =
+            &uv_requirement.version_or_url
+        {
+            // We don't check how wide the range is (that's up to the user), we just
+            // check that the current version is compliant, to avoid accidentally using a
+            // too new or too old uv.
+            if !specifier.contains(&uv_version) {
+                // This is allowed to happen when testing prereleases, but we should still warn.
+                warnings.push(format!(
+                    r#"`build_system.requires = ["{uv_requirement}"]` does not contain the
                         current uv version {uv_version}"#,
-                    ));
-                }
-                Ranges::from(specifier.clone())
-                    .bounding_range()
-                    .map(|bounding_range| bounding_range.1 != Bound::Unbounded)
-                    .unwrap_or(false)
+                ));
             }
-        };
-
-        if !bounded {
-            warnings.push(format!(
-                "`build_system.requires = [\"{}\"]` is missing an \
-                upper bound on the `uv_build` version such as `<{next_breaking}`. \
-                Without bounding the `uv_build` version, the source distribution will break \
-                when a future, breaking version of `uv_build` is released.",
-                // Use an underscore consistently, to avoid confusing users between a package name with dash and a
-                // module name with underscore
-                uv_requirement.verbatim()
-            ));
         }
 
         warnings
+    }
+
+    /// Check if the `uv-build` version specifier has an upper bound, and return a warning if not.
+    ///
+    /// An upper bound is important to allow making breaking changes in uv without breaking
+    /// the existing immutable source distributions on PyPI.
+    ///
+    /// This is separate from [`check_build_system`] because a missing upper bound should not
+    /// prevent using the fast path in [`check_direct_build`], where only the current version's
+    /// compatibility matters.
+    pub(crate) fn check_version_upper_bound(&self, uv_version: &str) -> Option<String> {
+        let uv_version =
+            Version::from_str(uv_version).expect("uv's own version is not PEP 440 compliant");
+        let next_minor = uv_version.release().get(1).copied().unwrap_or_default() + 1;
+        let next_breaking = Version::new([0, next_minor]);
+
+        let [uv_requirement] = &self.requires.as_slice() else {
+            return None;
+        };
+        if uv_requirement.name.as_str() != "uv-build" {
+            return None;
+        }
+
+        let bounded = match &uv_requirement.version_or_url {
+            None => false,
+            Some(VersionOrUrl::Url(_)) => true,
+            Some(VersionOrUrl::VersionSpecifier(specifier)) => Ranges::from(specifier.clone())
+                .bounding_range()
+                .map(|bounding_range| bounding_range.1 != Bound::Unbounded)
+                .unwrap_or(false),
+        };
+
+        if bounded {
+            return None;
+        }
+
+        Some(format!(
+            "`build_system.requires = [\"{}\"]` is missing an \
+            upper bound on the `uv_build` version such as `<{next_breaking}`. \
+            Without bounding the `uv_build` version, the source distribution will break \
+            when a future, breaking version of `uv_build` is released.",
+            uv_requirement.verbatim()
+        ))
     }
 }
 
@@ -1295,10 +1318,23 @@ mod tests {
             build-backend = "uv_build"
         "#};
         let pyproject_toml: PyProjectToml = toml::from_str(contents).unwrap();
+        // Missing upper bound is not an error in `check_build_system` (it doesn't block
+        // the fast path), but it is reported by `check_version_upper_bound`.
         assert_snapshot!(
             pyproject_toml.check_build_system("0.4.15+test").join("\n"),
+            @""
+        );
+        assert_snapshot!(
+            pyproject_toml.check_version_upper_bound("0.4.15+test").unwrap(),
             @r#"`build_system.requires = ["uv_build"]` is missing an upper bound on the `uv_build` version such as `<0.5`. Without bounding the `uv_build` version, the source distribution will break when a future, breaking version of `uv_build` is released."#
         );
+    }
+
+    #[test]
+    fn build_system_valid_has_upper_bound() {
+        let contents = extend_project("");
+        let pyproject_toml: PyProjectToml = toml::from_str(&contents).unwrap();
+        assert!(pyproject_toml.check_version_upper_bound("0.4.15+test").is_none());
     }
 
     #[test]
