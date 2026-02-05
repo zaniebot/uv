@@ -35,7 +35,7 @@ pub fn build_wheel(
     preview: Preview,
 ) -> Result<WheelFilename, Error> {
     let pyproject_toml = PyProjectToml::parse(&source_tree.join("pyproject.toml"))?;
-    for warning in pyproject_toml.check_build_system(uv_version) {
+    for warning in pyproject_toml.check_build_system(uv_version, true) {
         warn_user_once!("{warning}");
     }
     crate::check_metadata_directory(source_tree, metadata_directory, &pyproject_toml)?;
@@ -86,7 +86,7 @@ pub fn list_wheel(
     preview: Preview,
 ) -> Result<(WheelFilename, FileList), Error> {
     let pyproject_toml = PyProjectToml::parse(&source_tree.join("pyproject.toml"))?;
-    for warning in pyproject_toml.check_build_system(uv_version) {
+    for warning in pyproject_toml.check_build_system(uv_version, true) {
         warn_user_once!("{warning}");
     }
 
@@ -291,7 +291,7 @@ pub fn build_editable(
     preview: Preview,
 ) -> Result<WheelFilename, Error> {
     let pyproject_toml = PyProjectToml::parse(&source_tree.join("pyproject.toml"))?;
-    for warning in pyproject_toml.check_build_system(uv_version) {
+    for warning in pyproject_toml.check_build_system(uv_version, true) {
         warn_user_once!("{warning}");
     }
     let settings = pyproject_toml
@@ -364,7 +364,7 @@ pub fn metadata(
     preview: Preview,
 ) -> Result<String, Error> {
     let pyproject_toml = PyProjectToml::parse(&source_tree.join("pyproject.toml"))?;
-    for warning in pyproject_toml.check_build_system(uv_version) {
+    for warning in pyproject_toml.check_build_system(uv_version, true) {
         warn_user_once!("{warning}");
     }
 
