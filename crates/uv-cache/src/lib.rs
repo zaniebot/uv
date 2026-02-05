@@ -445,10 +445,26 @@ impl Cache {
         // We have to put this below the gitignore. Otherwise, if the build backend uses the rust
         // ignore crate it will walk up to the top level .gitignore and ignore its python source
         // files.
-        fs_err::OpenOptions::new().create(true).write(true).open(
-            root.join(CacheBucket::SourceDistributions.to_str())
-                .join(".git"),
-        )?;
+        let phony_git = root
+            .join(CacheBucket::SourceDistributions.to_str())
+            .join(".git");
+        // We try to create the file, and if we get a read-only filesystem error, we check if the
+        // file already exists. This handles read-only cache support (e.g., sandboxed environments)
+        // and avoids a TOCTOU race condition where another process might create the file between
+        // our check and our create.
+        match fs_err::OpenOptions::new()
+            .create(true)
+            .write(true)
+            .open(&phony_git)
+        {
+            Ok(_) => {}
+            Err(err) if err.kind() == io::ErrorKind::ReadOnlyFilesystem => {
+                if !phony_git.exists() {
+                    return Err(err);
+                }
+            }
+            Err(err) => return Err(err),
+        }
 
         Ok(())
     }
