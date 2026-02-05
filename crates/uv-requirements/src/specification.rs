@@ -370,13 +370,12 @@ impl RequirementsSpecification {
 
                     if requirements_txt == RequirementsTxt::default() {
                         if path == Path::new("-") {
-                            warn_user!("No dependencies found in stdin");
-                        } else {
-                            warn_user!(
-                                "Requirements file `{}` does not contain any dependencies",
-                                path.user_display()
-                            );
+                            return Err(anyhow::anyhow!("No dependencies found in stdin"));
                         }
+                        warn_user!(
+                            "Requirements file `{}` does not contain any dependencies",
+                            path.user_display()
+                        );
                     }
 
                     Self::from_requirements_txt(requirements_txt)

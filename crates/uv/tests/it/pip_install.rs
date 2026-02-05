@@ -617,6 +617,29 @@ fn install_from_stdin() -> Result<()> {
     Ok(())
 }
 
+/// When stdin is empty, `pip install -r -` should fail with an error rather than
+/// silently succeeding. This prevents "pipe fatality" scenarios where the upstream
+/// command in a pipeline fails (producing no output) and `uv pip install` exits 0.
+///
+/// See: <https://github.com/astral-sh/uv/issues/17883>
+#[test]
+fn install_empty_stdin() {
+    let context = TestContext::new("3.12");
+
+    uv_snapshot!(context.pip_install()
+        .arg("-r")
+        .arg("-")
+        .stdin(std::process::Stdio::piped()), @"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    error: No dependencies found in stdin
+    "
+    );
+}
+
 /// Install a package from a `requirements.txt` passed via `-r /dev/stdin` into a virtual environment.
 #[test]
 #[cfg(not(windows))]
@@ -13803,6 +13826,49 @@ fn install_missing_python_version_with_target() {
      + sniffio==1.3.1
     "
     );
+}
+
+/// Test that `pip install --target -r -` exits non-zero when a managed Python download fails,
+/// rather than silently falling back and exiting 0.
+///
+/// See: <https://github.com/astral-sh/uv/issues/17883>
+#[cfg(feature = "python-managed")]
+#[tokio::test]
+async fn install_target_stdin_download_error() {
+    let context = TestContext::new("3.12")
+        .with_managed_python_dirs();
+
+    let server = MockServer::start().await;
+
+    Mock::given(method("GET"))
+        .respond_with(ResponseTemplate::new(http::StatusCode::INTERNAL_SERVER_ERROR))
+        .mount(&server)
+        .await;
+
+    let target_dir = context.temp_dir.child("target-dir");
+
+    let requirements_txt = context.temp_dir.child("requirements.txt");
+    requirements_txt.write_str("anyio==3.7.0").unwrap();
+
+    // When the Python download fails, the command should fail with a non-zero
+    // exit code rather than silently falling back to an available interpreter.
+    uv_snapshot!(context.filters(), context
+        .pip_install()
+        .arg("-r").arg("-")
+        .arg("--python").arg("3.10")
+        .arg("--target").arg(target_dir.path())
+        .env(EnvVars::UV_PYTHON_INSTALL_MIRROR, server.uri())
+        .env(EnvVars::UV_HTTP_RETRIES, "0")
+        .env(EnvVars::UV_TEST_NO_HTTP_RETRY_DELAY, "true")
+        .stdin(std::fs::File::open(&requirements_txt).unwrap()), @r"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    error: Failed to download http://[LOCALHOST]/20260127/cpython-3.10.19%2B20260127-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz
+      Caused by: HTTP status server error (500 Internal Server Error) for url (http://[LOCALHOST]/20260127/cpython-3.10.19%2B20260127-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz)
+    ");
 }
 
 /// Use a wheel that is only compatible with Python 3.13 with Python 3.12 or Python 3.13 to simulate
