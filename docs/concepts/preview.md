@@ -62,19 +62,48 @@ The following preview features are available:
 
 - `add-bounds`: Allows configuring the
   [default bounds for `uv add`](../reference/settings.md#add-bounds) invocations.
+- `adjust-ulimit`: Automatically raises the open file descriptor limit to the hard limit on Unix
+  systems, preventing "too many open files" errors.
+- `auth-helper`: Enables `uv auth helper`, which implements the
+  [Bazel credential helper protocol](https://github.com/bazelbuild/proposals/blob/main/designs/2022-06-07-bazel-credential-helpers.md)
+  for providing credentials to external tools.
+- `cache-size`: Allows using `uv cache size` to display the total size of the uv cache directory.
+- `detect-module-conflicts`: Warns when multiple installed packages provide modules with the same
+  name.
+- `direct-publish`: Allows using `uv publish --direct` to upload packages directly to storage using
+  a two-phase upload protocol, bypassing the registry's upload endpoint.
+- `extra-build-dependencies`: Allows
+  [augmenting build dependencies](./projects/config.md#augmenting-build-dependencies) for packages
+  that assume the presence of undeclared build requirements.
+- `format`: Allows using `uv format`.
+- `gcs-endpoint`: Enables Google Cloud Storage endpoint support for package indexes, configured via
+  the `UV_GCS_ENDPOINT_URL` environment variable.
+- `init-project-flag`: Enforces the removal of the deprecated `--project` flag in `uv init`,
+  erroring instead of warning. Use `--directory` or a positional path argument instead.
 - `json-output`: Allows `--output-format json` for various uv commands.
+- `metadata-json`: Generates JSON versions of wheel metadata files (`WHEEL.json` and
+  `METADATA.json`) alongside the standard text format when building wheels with the uv build
+  backend.
+- `native-auth`: Enables storage of credentials in a
+  [system-native location](../concepts/authentication/http.md#the-uv-credentials-store).
 - `package-conflicts`: Allows defining workspace conflicts at the package level.
 - `pylock`: Allows installing from `pylock.toml` files.
 - `python-install-default`: Allows
   [installing `python` and `python3` executables](./python-versions.md#installing-python-executables).
 - `python-upgrade`: Allows
   [transparent Python version upgrades](./python-versions.md#upgrading-python-versions).
-- `format`: Allows using `uv format`.
-- `native-auth`: Enables storage of credentials in a
-  [system-native location](../concepts/authentication/http.md#the-uv-credentials-store).
-- `workspace-metadata`: Allows using `uv workspace metadata`.
+- `s3-endpoint`: Enables AWS S3 endpoint support for package indexes, configured via the
+  `UV_S3_ENDPOINT_URL` environment variable.
+- `sbom-export`: Allows exporting dependency lockfiles as a
+  [Software Bill of Materials (SBOM)](./projects/export.md#cyclonedx-sbom-format) in CycloneDX
+  format via `uv export --format cyclonedx1.5`.
+- `special-conda-env-names`: Changes Conda environment detection to use path-based logic rather than
+  treating "base" and "root" environment names as special cases.
+- `target-workspace-discovery`: Changes `uv run` to discover the workspace starting from the target
+  script's directory rather than the current working directory.
 - `workspace-dir`: Allows using `uv workspace dir`.
 - `workspace-list`: Allows using `uv workspace list`.
+- `workspace-metadata`: Allows using `uv workspace metadata`.
 
 ## Disabling preview features
 
