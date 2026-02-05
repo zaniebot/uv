@@ -18223,17 +18223,12 @@ fn compile_missing_python_version_default_fallback() -> Result<()> {
     Ok(())
 }
 
-/// Test that pip compile warns on download errors
+/// Test that pip compile fails when a managed Python download errors
 #[cfg(feature = "python-managed")]
 #[tokio::test]
-async fn compile_missing_python_download_error_warning() {
+async fn compile_missing_python_download_error() {
     let context = TestContext::new("3.12")
-        .with_managed_python_dirs()
-        .with_filter((
-            r"(https://github\.com/astral-sh/python-build-standalone/releases/download/).*"
-                .to_string(),
-            "$1[FILE-PATH]".to_string(),
-        ));
+        .with_managed_python_dirs();
 
     let server = MockServer::start().await;
 
@@ -18245,12 +18240,12 @@ async fn compile_missing_python_download_error_warning() {
     let requirements_in = context.temp_dir.child("requirements.in");
     requirements_in.write_str("anyio==3.7.0").unwrap();
 
-    // This produces an error in the end because we've just broken ALL network
-    // traffic. But the goal here is to check the warning.
+    // When the Python download fails, the command should fail with a non-zero
+    // exit code rather than silently falling back to an available interpreter.
     uv_snapshot!(context.filters(), context
         .pip_compile()
         .arg("--python-version").arg("3.10")
-        .env("ALL_PROXY", server.uri())
+        .env(EnvVars::UV_PYTHON_INSTALL_MIRROR, server.uri())
         .env(EnvVars::UV_HTTP_RETRIES, "0")
         .env(EnvVars::UV_TEST_NO_HTTP_RETRY_DELAY, "true")
         .arg("requirements.in"), @r"
@@ -18259,23 +18254,15 @@ async fn compile_missing_python_download_error_warning() {
     ----- stdout -----
 
     ----- stderr -----
-    warning: A managed Python download is available for Python 3.10, but an error occurred when attempting to download it.
-      Caused by: Failed to download https://github.com/astral-sh/python-build-standalone/releases/download/[FILE-PATH]
-      Caused by: error sending request for url (https://github.com/astral-sh/python-build-standalone/releases/download/[FILE-PATH]
-      Caused by: client error (Connect)
-      Caused by: tunnel error: unsuccessful
-    warning: The requested Python version 3.10 is not available; 3.12.[X] will be used to build dependencies instead.
-    error: Failed to fetch: `https://pypi.org/simple/anyio/`
-      Caused by: error sending request for url (https://pypi.org/simple/anyio/)
-      Caused by: client error (Connect)
-      Caused by: tunnel error: unsuccessful
+    error: Failed to download http://[LOCALHOST]/20260127/cpython-3.10.19%2B20260127-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz
+      Caused by: HTTP status server error (500 Internal Server Error) for url (http://[LOCALHOST]/20260127/cpython-3.10.19%2B20260127-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz)
     ");
 
     // Also check for the patch fallback
     uv_snapshot!(context.filters(), context
         .pip_compile()
         .arg("--python-version").arg("3.10.99")
-        .env("ALL_PROXY", server.uri())
+        .env(EnvVars::UV_PYTHON_INSTALL_MIRROR, server.uri())
         .env(EnvVars::UV_HTTP_RETRIES, "0")
         .env(EnvVars::UV_TEST_NO_HTTP_RETRY_DELAY, "true")
         .arg("requirements.in"), @r"
@@ -18284,23 +18271,15 @@ async fn compile_missing_python_download_error_warning() {
     ----- stdout -----
 
     ----- stderr -----
-    warning: A managed Python download is available for Python 3.10, but an error occurred when attempting to download it.
-      Caused by: Failed to download https://github.com/astral-sh/python-build-standalone/releases/download/[FILE-PATH]
-      Caused by: error sending request for url (https://github.com/astral-sh/python-build-standalone/releases/download/[FILE-PATH]
-      Caused by: client error (Connect)
-      Caused by: tunnel error: unsuccessful
-    warning: The requested Python version 3.10.99 is not available; 3.12.[X] will be used to build dependencies instead.
-    error: Failed to fetch: `https://pypi.org/simple/anyio/`
-      Caused by: error sending request for url (https://pypi.org/simple/anyio/)
-      Caused by: client error (Connect)
-      Caused by: tunnel error: unsuccessful
+    error: Failed to download http://[LOCALHOST]/20260127/cpython-3.10.19%2B20260127-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz
+      Caused by: HTTP status server error (500 Internal Server Error) for url (http://[LOCALHOST]/20260127/cpython-3.10.19%2B20260127-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz)
     ");
 
-    // Check that looking up a valid patch version only warns once
+    // Check that looking up a valid patch version also fails
     uv_snapshot!(context.filters(), context
         .pip_compile()
         .arg("--python-version").arg("3.10.19")
-        .env("ALL_PROXY", server.uri())
+        .env(EnvVars::UV_PYTHON_INSTALL_MIRROR, server.uri())
         .env(EnvVars::UV_HTTP_RETRIES, "0")
         .env(EnvVars::UV_TEST_NO_HTTP_RETRY_DELAY, "true")
         .arg("requirements.in"), @r"
@@ -18309,15 +18288,7 @@ async fn compile_missing_python_download_error_warning() {
     ----- stdout -----
 
     ----- stderr -----
-    warning: A managed Python download is available for Python 3.10.19, but an error occurred when attempting to download it.
-      Caused by: Failed to download https://github.com/astral-sh/python-build-standalone/releases/download/[FILE-PATH]
-      Caused by: error sending request for url (https://github.com/astral-sh/python-build-standalone/releases/download/[FILE-PATH]
-      Caused by: client error (Connect)
-      Caused by: tunnel error: unsuccessful
-    warning: The requested Python version 3.10.19 is not available; 3.12.[X] will be used to build dependencies instead.
-    error: Failed to fetch: `https://pypi.org/simple/anyio/`
-      Caused by: error sending request for url (https://pypi.org/simple/anyio/)
-      Caused by: client error (Connect)
-      Caused by: tunnel error: unsuccessful
+    error: Failed to download http://[LOCALHOST]/20260127/cpython-3.10.19%2B20260127-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz
+      Caused by: HTTP status server error (500 Internal Server Error) for url (http://[LOCALHOST]/20260127/cpython-3.10.19%2B20260127-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz)
     ");
 }

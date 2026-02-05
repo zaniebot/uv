@@ -1,5 +1,4 @@
 use itertools::{Either, Itertools};
-use owo_colors::AnsiColors;
 use regex::Regex;
 use reqwest_retry::policies::ExponentialBackoff;
 use rustc_hash::{FxBuildHasher, FxHashSet};
@@ -21,7 +20,6 @@ use uv_pep440::{
 };
 use uv_preview::Preview;
 use uv_static::EnvVars;
-use uv_warnings::anstream;
 use uv_warnings::warn_user_once;
 use which::{which, which_all};
 
@@ -1470,8 +1468,6 @@ pub(crate) async fn find_best_python_installation(
     debug!("Starting Python discovery for {request}");
     let original_request = request;
 
-    let mut previous_fetch_failed = false;
-
     let request_without_patch = match request {
         PythonRequest::Version(version) => {
             if version.has_patch() {
@@ -1513,7 +1509,6 @@ pub(crate) async fn find_best_python_installation(
 
         // Attempt to download the version if downloads are enabled
         if downloads_enabled
-            && !previous_fetch_failed
             && let Some(download_request) = PythonDownloadRequest::from_request(request)
         {
             let download = download_request
@@ -1541,39 +1536,10 @@ pub(crate) async fn find_best_python_installation(
             if let Ok(Some(installation)) = result {
                 return Ok(installation);
             }
-            // Emit a warning instead of failing since we may find a suitable
-            // interpreter on the system after relaxing the request further.
-            // Additionally, uv did not previously attempt downloads in this
-            // code path and we want to minimize the fatal cases for
-            // backwards compatibility.
-            // Errors encountered here are either network errors or quirky
-            // configuration problems.
+            // If the download failed, propagate the error instead of
+            // silently falling back to a different Python version.
             if let Err(error) = result {
-                // This is a hack to get `write_error_chain` to format things the way we want.
-                #[derive(Debug, thiserror::Error)]
-                #[error(
-                    "A managed Python download is available for {0}, but an error occurred when attempting to download it."
-                )]
-                struct WrappedError<'a>(&'a PythonRequest, #[source] crate::Error);
-
-                // If the request was for the default or any version, propagate
-                // the error as nothing else we are about to do will help the
-                // situation.
-                if matches!(request, PythonRequest::Default | PythonRequest::Any) {
-                    return Err(error);
-                }
-
-                let mut error_chain = String::new();
-                // Writing to a string can't fail with errors (panics on allocation failure)
-                uv_warnings::write_error_chain(
-                    &WrappedError(request, error),
-                    &mut error_chain,
-                    "warning",
-                    AnsiColors::Yellow,
-                )
-                .unwrap();
-                anstream::eprint!("{}", error_chain);
-                previous_fetch_failed = true;
+                return Err(error);
             }
         }
 
