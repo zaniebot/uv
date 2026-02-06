@@ -814,14 +814,7 @@ impl InitProjectKind {
         // read conditional includes that depend on the repository path.
         init_vcs(path, vcs)?;
 
-        // Do no fill in `authors` for non-packaged applications unless explicitly requested.
-        let author_from = author_from.unwrap_or_else(|| {
-            if package {
-                AuthorFrom::default()
-            } else {
-                AuthorFrom::None
-            }
-        });
+        let author_from = author_from.unwrap_or_default();
         let author = get_author_info(path, author_from);
 
         // Create the `pyproject.toml`

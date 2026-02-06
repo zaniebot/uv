@@ -2955,7 +2955,7 @@ fn init_with_author() {
         .assert()
         .success();
 
-    // `authors` is not filled for non-package application by default,
+    // `authors` is filled for non-package application by default.
     context.init().arg("foo").assert().success();
     let pyproject = context.read("foo/pyproject.toml");
     insta::with_settings!({
@@ -2968,13 +2968,16 @@ fn init_with_author() {
         version = "0.1.0"
         description = "Add your description here"
         readme = "README.md"
+        authors = [
+            { name = "Alice", email = "alice@example.com" }
+        ]
         requires-python = ">=3.12"
         dependencies = []
         "#
         );
     });
 
-    // use `--author-from auto` to explicitly fill it.
+    // `--author-from auto` also fills authors (same as default).
     context
         .init()
         .arg("bar")
@@ -3028,7 +3031,7 @@ fn init_with_author() {
         );
     });
 
-    // use `--authors-from none` to prevent it.
+    // use `--author-from none` to prevent it on a library.
     context
         .init()
         .arg("qux")
@@ -3054,6 +3057,31 @@ fn init_with_author() {
         [build-system]
         requires = ["uv_build>=[CURRENT_VERSION],<[NEXT_BREAKING]"]
         build-backend = "uv_build"
+        "#
+        );
+    });
+
+    // use `--author-from none` to prevent it on a non-packaged application.
+    context
+        .init()
+        .arg("quux")
+        .arg("--author-from")
+        .arg("none")
+        .assert()
+        .success();
+    let pyproject = context.read("quux/pyproject.toml");
+    insta::with_settings!({
+        filters => context.filters(),
+    }, {
+        assert_snapshot!(
+            pyproject, @r#"
+        [project]
+        name = "quux"
+        version = "0.1.0"
+        description = "Add your description here"
+        readme = "README.md"
+        requires-python = ">=3.12"
+        dependencies = []
         "#
         );
     });
