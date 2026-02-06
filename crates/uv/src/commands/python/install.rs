@@ -538,7 +538,7 @@ async fn perform_install(
                 {
                     if matches_build(request.download.build(), installation.build()) {
                         debug!("Found `{}` for request `{}`", installation.key(), request);
-                        satisfied.push(installation);
+                        satisfied.push((request, installation));
                     } else {
                         // Key matches but build version differs - track as existing for reinstall
                         debug!(
@@ -557,7 +557,7 @@ async fn perform_install(
                 .find(|inst| request.matches_installation(inst))
             {
                 debug!("Found `{}` for request `{}`", installation.key(), request);
-                satisfied.push(installation);
+                satisfied.push((request, installation));
             } else {
                 debug!("No installation found for request `{}`", request);
                 unsatisfied.push(Cow::Borrowed(request));
@@ -572,6 +572,7 @@ async fn perform_install(
     if let Some(ref sender) = bytecode_compilation_sender {
         satisfied
             .iter()
+            .map(|(_, inst)| inst)
             .copied()
             .cloned()
             .try_for_each(|installation| sender.send(installation))?;
@@ -670,7 +671,10 @@ async fn perform_install(
         Some(python_executable_dir()?)
     };
 
-    let installations: Vec<_> = downloaded.iter().chain(satisfied.iter().copied()).collect();
+    let installations: Vec<_> = downloaded
+        .iter()
+        .chain(satisfied.iter().map(|(_, inst)| *inst))
+        .collect();
 
     // Ensure that the installations are _complete_ for both downloaded installations and existing
     // installations that match the request
@@ -771,13 +775,25 @@ async fn perform_install(
                 "There are no installed versions to upgrade"
             )?;
         } else if let [request] = requests.as_slice() {
-            // Convert to the inner request
-            let request = &request.request;
             if is_unspecified_upgrade {
                 writeln!(
                     printer.stderr(),
                     "All versions already on latest supported patch release"
                 )?;
+            } else if let Some((_, installation)) = satisfied.first() {
+                if matches!(upgrade, PythonUpgrade::Enabled(_)) {
+                    writeln!(
+                        printer.stderr(),
+                        "`{}` is already on the latest supported patch release",
+                        installation.minor_version_key()
+                    )?;
+                } else {
+                    writeln!(
+                        printer.stderr(),
+                        "`{}` is already installed",
+                        installation.minor_version_key()
+                    )?;
+                }
             } else if matches!(upgrade, PythonUpgrade::Enabled(_)) {
                 writeln!(
                     printer.stderr(),

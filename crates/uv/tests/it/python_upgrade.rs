@@ -53,7 +53,7 @@ fn python_upgrade() {
     ----- stdout -----
 
     ----- stderr -----
-    Python 3.10 is already on the latest supported patch release
+    `cpython-3.10-[PLATFORM]` is already on the latest supported patch release
     ");
 
     // Should reinstall on `--reinstall`
@@ -799,7 +799,7 @@ fn python_upgrade_build_version() {
     ----- stdout -----
 
     ----- stderr -----
-    Python 3.12 is already on the latest supported patch release
+    `cpython-3.12-[PLATFORM]` is already on the latest supported patch release
     ");
 
     // Overwrite the BUILD file with an older build version
@@ -828,6 +828,6 @@ fn python_upgrade_build_version() {
     ----- stdout -----
 
     ----- stderr -----
-    Python 3.12 is already on the latest supported patch release
+    `cpython-3.12-[PLATFORM]` is already on the latest supported patch release
     ");
 }
