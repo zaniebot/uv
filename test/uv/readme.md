@@ -3,7 +3,7 @@
 Tests to verify mdtest features are working correctly.
 
 ```toml
-# mdtest
+#! mdtest
 
 [environment]
 python-versions = "3.12"
@@ -118,12 +118,31 @@ dest = "black_editable"
 
 The `source` path supports variable substitution. The `dest` path is relative to the test directory.
 
+### Content Directives
+
+Code block metadata is specified using `#! key` and `#! key: value` directive lines at the top of the
+block content. Only the language identifier goes in the code fence — all other metadata uses content
+directives. Directives are stripped from content before processing.
+
+| Directive                | Type    | Description                                    |
+| ------------------------ | ------- | ---------------------------------------------- |
+| `#! file: <path>`        | keyed   | Names the file (for creation or verification)  |
+| `#! mdtest`              | boolean | Marks block as test configuration              |
+| `#! snapshot`            | boolean | Marks block as a file snapshot verification    |
+| `#! assert: contains`    | keyed   | Marks block as a content assertion             |
+| `#! working-dir: <path>` | keyed   | Sets working directory for commands            |
+| `#! tree [snapshot=true] [depth=N]` | with args | Tree block (create by default, snapshot to verify) |
+| `#! copy`               | boolean | Copy block (content: `source -> dest`)         |
+
+Directives must appear at the top of the code block. An optional blank line after the last directive
+is consumed and not included in the content. Parsing stops at the first non-directive line.
+
 ## Basic command execution
 
 Basic command execution should capture success/failure and output.
 
 ```toml
-# file: pyproject.toml
+#! file: pyproject.toml
 
 [project]
 name = "test-project"
@@ -134,11 +153,6 @@ dependencies = []
 
 ```console
 $ uv lock
-success: true
-exit_code: 0
------ stdout -----
-
------ stderr -----
 Resolved 1 package in [TIME]
 ```
 
@@ -147,7 +161,7 @@ Resolved 1 package in [TIME]
 Commands that fail should report the correct exit code.
 
 ```toml
-# file: pyproject.toml
+#! file: pyproject.toml
 
 [project]
 name = "will-fail"
@@ -158,13 +172,10 @@ dependencies = ["nonexistent-package-xyz-12345"]
 
 ```console
 $ uv lock
-success: false
-exit_code: 1
------ stdout -----
-
------ stderr -----
   × No solution found when resolving dependencies:
   ╰─▶ Because nonexistent-package-xyz-12345 was not found in the package registry and your project depends on nonexistent-package-xyz-12345, we can conclude that your project's requirements are unsatisfiable.
+
+[command failed with exit code 1]
 ```
 
 ## Multiple commands in sequence
@@ -172,7 +183,7 @@ exit_code: 1
 Multiple commands in the same section should run in sequence.
 
 ```toml
-# file: pyproject.toml
+#! file: pyproject.toml
 
 [project]
 name = "multi-cmd"
@@ -183,21 +194,11 @@ dependencies = []
 
 ```console
 $ uv lock
-success: true
-exit_code: 0
------ stdout -----
-
------ stderr -----
 Resolved 1 package in [TIME]
 ```
 
 ```console
 $ uv sync
-success: true
-exit_code: 0
------ stdout -----
-
------ stderr -----
 Resolved 1 package in [TIME]
 Audited in [TIME]
 ```
@@ -207,7 +208,7 @@ Audited in [TIME]
 Files can be created in nested directories.
 
 ```toml
-# file: pyproject.toml
+#! file: pyproject.toml
 
 [project]
 name = "nested-files"
@@ -220,7 +221,7 @@ members = ["packages/*"]
 ```
 
 ```toml
-# file: packages/alpha/pyproject.toml
+#! file: packages/alpha/pyproject.toml
 
 [project]
 name = "alpha"
@@ -231,11 +232,6 @@ dependencies = []
 
 ```console
 $ uv lock
-success: true
-exit_code: 0
------ stdout -----
-
------ stderr -----
 Resolved 2 packages in [TIME]
 ```
 
@@ -244,7 +240,7 @@ Resolved 2 packages in [TIME]
 File snapshots verify that output files have expected content.
 
 ```toml
-# file: pyproject.toml
+#! file: pyproject.toml
 
 [project]
 name = "snapshot-test"
@@ -255,11 +251,6 @@ dependencies = []
 
 ```console
 $ uv add iniconfig
-success: true
-exit_code: 0
------ stdout -----
-
------ stderr -----
 Resolved 2 packages in [TIME]
 Prepared 1 package in [TIME]
 Installed 1 package in [TIME]
@@ -268,7 +259,10 @@ Installed 1 package in [TIME]
 
 The pyproject.toml should be updated with the new dependency.
 
-```toml title="pyproject.toml" snapshot=true
+```toml
+#! file: pyproject.toml
+#! snapshot
+
 [project]
 name = "snapshot-test"
 version = "0.1.0"
@@ -285,7 +279,7 @@ Each section is independent - files don't carry over from previous sections.
 ### First section
 
 ```toml
-# file: pyproject.toml
+#! file: pyproject.toml
 
 [project]
 name = "section-a"
@@ -296,11 +290,6 @@ dependencies = []
 
 ```console
 $ uv lock
-success: true
-exit_code: 0
------ stdout -----
-
------ stderr -----
 Resolved 1 package in [TIME]
 ```
 
@@ -309,7 +298,7 @@ Resolved 1 package in [TIME]
 This section has its own pyproject.toml - it doesn't inherit from previous section.
 
 ```toml
-# file: pyproject.toml
+#! file: pyproject.toml
 
 [project]
 name = "section-b"
@@ -320,11 +309,6 @@ dependencies = ["iniconfig"]
 
 ```console
 $ uv lock
-success: true
-exit_code: 0
------ stdout -----
-
------ stderr -----
 Resolved 2 packages in [TIME]
 ```
 
@@ -333,7 +317,7 @@ Resolved 2 packages in [TIME]
 The [TIME] filter is applied to timing output.
 
 ```toml
-# file: pyproject.toml
+#! file: pyproject.toml
 
 [project]
 name = "time-filter"
@@ -344,11 +328,6 @@ dependencies = ["iniconfig"]
 
 ```console
 $ uv lock
-success: true
-exit_code: 0
------ stdout -----
-
------ stderr -----
 Resolved 2 packages in [TIME]
 ```
 
@@ -357,7 +336,7 @@ Resolved 2 packages in [TIME]
 Temporary directory paths should be filtered.
 
 ```toml
-# file: pyproject.toml
+#! file: pyproject.toml
 
 [project]
 name = "path-filter"
@@ -368,11 +347,6 @@ dependencies = []
 
 ```console
 $ uv sync
-success: true
-exit_code: 0
------ stdout -----
-
------ stderr -----
 Resolved 1 package in [TIME]
 Audited in [TIME]
 ```
@@ -382,14 +356,14 @@ Audited in [TIME]
 Python version can be overridden in a section-level mdtest.toml config.
 
 ```toml
-# mdtest
+#! mdtest
 
 [environment]
-python-version = "3.11"
+python-versions = "3.11"
 ```
 
 ```toml
-# file: pyproject.toml
+#! file: pyproject.toml
 
 [project]
 name = "py-version"
@@ -400,11 +374,6 @@ dependencies = []
 
 ```console
 $ uv lock
-success: true
-exit_code: 0
------ stdout -----
-
------ stderr -----
 Resolved 1 package in [TIME]
 ```
 
@@ -414,17 +383,17 @@ The `[filters]` section can enable additional output filters. With `counts = tru
 are replaced with `[N]`.
 
 ```toml
-# mdtest
+#! mdtest
 
 [environment]
-python-version = "3.12"
+python-versions = "3.12"
 
 [filters]
 counts = true
 ```
 
 ```toml
-# file: pyproject.toml
+#! file: pyproject.toml
 
 [project]
 name = "filter-counts"
@@ -435,11 +404,6 @@ dependencies = ["requests"]
 
 ```console
 $ uv sync
-success: true
-exit_code: 0
------ stdout -----
-
------ stderr -----
 Resolved [N] packages in [TIME]
 Prepared [N] packages in [TIME]
 Installed [N] packages in [TIME]
@@ -450,20 +414,20 @@ Installed [N] packages in [TIME]
  + urllib3==2.2.1
 ```
 
-## Content assertion with assert=contains
+## Content assertion with `#! assert: contains`
 
-The `assert=contains` attribute checks that a file contains specific content without requiring an
+The `#! assert: contains` directive checks that a file contains specific content without requiring an
 exact match. This is useful for checking specific lines in configuration files.
 
 ```toml
-# mdtest
+#! mdtest
 
 [environment]
 create-venv = false
 ```
 
 ```toml
-# file: pyproject.toml
+#! file: pyproject.toml
 
 [project]
 name = "assert-test"
@@ -474,11 +438,6 @@ dependencies = []
 
 ```console
 $ uv venv
-success: true
-exit_code: 0
------ stdout -----
-
------ stderr -----
 Using CPython 3.12.[X] interpreter at: [PYTHON-3.12]
 Creating virtual environment at: .venv
 Activate with: source .venv/[BIN]/activate
@@ -486,14 +445,17 @@ Activate with: source .venv/[BIN]/activate
 
 The pyvenv.cfg file should contain the uv version:
 
-```text title=".venv/pyvenv.cfg" assert=contains
+```text
+#! file: .venv/pyvenv.cfg
+#! assert: contains
+
 uv =
 ```
 
 ## Tree snapshots
 
-Tree snapshots verify the directory structure after commands run. Use the `tree` language identifier
-with an optional `depth` parameter.
+Tree snapshots verify the directory structure after commands run. Use the `#! tree` directive
+with `snapshot=true` (and optionally `depth=N`).
 
 In tree output:
 
@@ -508,7 +470,7 @@ The `[tree]` configuration section allows excluding paths and toggling default f
   - Normalizes `bin`/`Scripts` to `[BIN]` inside virtual environments
 
 ```toml
-# mdtest
+#! mdtest
 
 [environment]
 create-venv = false
@@ -518,7 +480,7 @@ exclude = ["cache"]
 ```
 
 ```toml
-# file: pyproject.toml
+#! file: pyproject.toml
 
 [project]
 name = "tree-test"
@@ -529,11 +491,6 @@ dependencies = []
 
 ```console
 $ uv venv
-success: true
-exit_code: 0
------ stdout -----
-
------ stderr -----
 Using CPython 3.12.[X] interpreter at: [PYTHON-3.12]
 Creating virtual environment at: .venv
 Activate with: source .venv/[BIN]/activate
@@ -541,7 +498,9 @@ Activate with: source .venv/[BIN]/activate
 
 The directory should contain a .venv folder with the standard structure:
 
-```tree depth=2
+```text
+#! tree snapshot=true depth=2
+
 .
 ├── .venv/
 │   ├── .gitignore
@@ -555,10 +514,10 @@ The directory should contain a .venv folder with the standard structure:
 ## Tree creation
 
 Tree creation allows you to pre-create directory structures (including symlinks) before running
-commands. Use `create=true` on a tree block to create the structure instead of verifying it.
+commands. Tree blocks default to creation mode (use `snapshot=true` to verify instead).
 
 ```toml
-# mdtest
+#! mdtest
 
 [environment]
 create-venv = false
@@ -567,7 +526,9 @@ create-venv = false
 exclude = ["cache"]
 ```
 
-```tree create=true
+```text
+#! tree
+
 .
 ├── packages/
 │   ├── alpha/
@@ -584,7 +545,7 @@ In tree creation blocks:
 This is useful for setting up complex directory structures before adding file content:
 
 ```toml
-# file: packages/alpha/pyproject.toml
+#! file: packages/alpha/pyproject.toml
 
 [project]
 name = "alpha"
@@ -594,18 +555,15 @@ requires-python = ">=3.12"
 
 ```console
 $ uv lock --directory packages/alpha
-success: true
-exit_code: 0
------ stdout -----
-
------ stderr -----
 Using CPython 3.12.[X] interpreter at: [PYTHON-3.12]
 Resolved 1 package in [TIME]
 ```
 
 Verify the resulting structure (note directories have `/` suffix):
 
-```tree
+```text
+#! tree snapshot=true
+
 .
 ├── packages/
 │   ├── alpha/
@@ -624,7 +582,7 @@ In this example, we first run `uv venv` with only the mdtest.toml (no pyproject.
 pyproject.toml and run `uv venv --clear` to verify the behavior changes.
 
 ```toml
-# mdtest
+#! mdtest
 
 [environment]
 create-venv = false
@@ -634,11 +592,6 @@ First command runs without pyproject.toml:
 
 ```console
 $ uv venv
-success: true
-exit_code: 0
------ stdout -----
-
------ stderr -----
 Using CPython 3.12.[X] interpreter at: [PYTHON-3.12]
 Creating virtual environment at: .venv
 Activate with: source .venv/[BIN]/activate
@@ -647,7 +600,7 @@ Activate with: source .venv/[BIN]/activate
 Now create pyproject.toml with requires-python:
 
 ```toml
-# file: pyproject.toml
+#! file: pyproject.toml
 
 [project]
 name = "order-test"
@@ -659,11 +612,6 @@ Second command sees the pyproject.toml and respects requires-python:
 
 ```console
 $ uv venv --clear
-success: true
-exit_code: 0
------ stdout -----
-
------ stderr -----
 Using CPython 3.12.[X] interpreter at: [PYTHON-3.12]
 Creating virtual environment at: .venv
 Activate with: source .venv/[BIN]/activate
@@ -671,6 +619,9 @@ Activate with: source .venv/[BIN]/activate
 
 Snapshots also execute in document order. Here we verify the pyvenv.cfg exists:
 
-```text title=".venv/pyvenv.cfg" assert=contains
+```text
+#! file: .venv/pyvenv.cfg
+#! assert: contains
+
 home =
 ```

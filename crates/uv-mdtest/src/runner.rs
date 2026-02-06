@@ -4,18 +4,18 @@
 //! integration with the test framework happens in the test entry point.
 
 use std::collections::HashMap;
+use std::io::Read;
+#[cfg(unix)]
+use std::os::unix::io::FromRawFd;
 use std::path::{Path, PathBuf};
+use std::process::{Command, ExitStatus, Stdio};
 
 use fs_err as fs;
-use std::process::{Command, Output};
-
 use regex::Regex;
 use thiserror::Error;
 
 pub use crate::types::MarkdownTest;
-use crate::types::{
-    AssertKind, PythonVersions, TestConfig, TestStep, TreeConfig, TreeCreation, TreeEntry,
-};
+use crate::types::{AssertKind, TestStep, TreeConfig, TreeCreation, TreeEntry};
 
 /// Errors that can occur during test execution.
 #[derive(Debug, Error)]
@@ -178,55 +178,7 @@ pub enum MismatchKind {
     TreeSnapshot,
 }
 
-/// Configuration for running tests.
-pub struct RunConfig {
-    /// Base directory for test execution.
-    pub temp_dir: PathBuf,
-    /// Path to the uv binary.
-    pub uv_binary: PathBuf,
-    /// Cache directory.
-    pub cache_dir: PathBuf,
-    /// Output filters (regex patterns).
-    pub filters: Vec<(Regex, String)>,
-    /// Extra environment variables.
-    pub env: HashMap<String, String>,
-    /// Variable substitutions for command lines (e.g., `${GITHUB_TOKEN}` -> actual token).
-    pub substitutions: HashMap<String, String>,
-}
-
-impl RunConfig {
-    /// Apply filters to output.
-    pub fn apply_filters(&self, mut output: String) -> String {
-        for (regex, replacement) in &self.filters {
-            output = regex.replace_all(&output, replacement.as_str()).to_string();
-        }
-        output
-    }
-}
-
 impl MarkdownTest {
-    /// Run this markdown test.
-    pub fn run(&self, config: &RunConfig) -> Result<TestResult, RunError> {
-        // Create the test directory
-        let test_dir = &config.temp_dir;
-        fs::create_dir_all(test_dir).map_err(|e| RunError::CreateDir {
-            path: test_dir.clone(),
-            source: e,
-        })?;
-
-        let command_runner = |cmd_str: &str, working_dir: &Path| {
-            run_command(cmd_str, config, working_dir, &self.config)
-        };
-        let filter_applier = |output: String| config.apply_filters(output);
-
-        self.run_steps(
-            test_dir,
-            &config.substitutions,
-            command_runner,
-            filter_applier,
-        )
-    }
-
     /// Run this test using a custom command builder.
     ///
     /// This allows integration with external test frameworks like `TestContext`.
@@ -302,6 +254,13 @@ impl MarkdownTest {
                         Some(rel_dir) => test_dir.join(rel_dir),
                         None => test_dir.to_path_buf(),
                     };
+                    // Create the working directory if it doesn't exist
+                    if !working_dir.exists() {
+                        fs::create_dir_all(&working_dir).map_err(|e| RunError::CreateDir {
+                            path: working_dir.clone(),
+                            source: e,
+                        })?;
+                    }
                     let result = run_cmd(&cmd.command, &working_dir)?;
                     let filtered_output = apply_filter(result);
 
@@ -434,32 +393,6 @@ fn substitute_vars(input: &str, vars: &HashMap<String, String>) -> String {
     }
 
     result
-}
-
-/// Get built-in platform-specific template variables.
-///
-/// These variables are automatically available in all tests for cross-platform compatibility:
-/// - `VENV_BIN`: Virtual environment bin directory (`bin` on Unix, `Scripts` on Windows)
-/// - `PATH_SEP`: PATH separator character (`:` on Unix, `;` on Windows)
-/// - `EXE_SUFFIX`: Executable suffix (empty on Unix, `.exe` on Windows)
-///
-/// Note: Other variables like `${SHELL}`, `${HOME}`, `${USER}` are available via environment
-/// variable passthrough - see [`substitute_vars`].
-pub fn get_platform_variables() -> HashMap<String, String> {
-    let mut vars = HashMap::new();
-
-    // Virtual environment bin directory
-    if cfg!(unix) {
-        vars.insert("VENV_BIN".to_string(), "bin".to_string());
-        vars.insert("PATH_SEP".to_string(), ":".to_string());
-        vars.insert("EXE_SUFFIX".to_string(), String::new());
-    } else if cfg!(windows) {
-        vars.insert("VENV_BIN".to_string(), "Scripts".to_string());
-        vars.insert("PATH_SEP".to_string(), ";".to_string());
-        vars.insert("EXE_SUFFIX".to_string(), ".exe".to_string());
-    }
-
-    vars
 }
 
 /// Recursively copy a file or directory.
@@ -636,94 +569,7 @@ where
     let mut cmd = command_builder(&command_line);
     cmd.current_dir(working_dir);
 
-    let output = cmd
-        .output()
-        .map_err(|e| RunError::ExecuteCommand { source: e })?;
-
-    Ok(format_output(&output))
-}
-
-/// Run a uv command and return the formatted output.
-fn run_command(
-    command_line: &str,
-    config: &RunConfig,
-    working_dir: &Path,
-    test_config: &TestConfig,
-) -> Result<String, RunError> {
-    // Apply variable substitutions (e.g., ${GITHUB_TOKEN} -> actual token)
-    let command_line = substitute_vars(command_line, &config.substitutions);
-
-    // Parse the command line using shlex to properly handle quoted strings
-    let parts = shlex::split(&command_line).ok_or_else(|| RunError::ExecuteCommand {
-        source: std::io::Error::new(std::io::ErrorKind::InvalidInput, "Invalid command syntax"),
-    })?;
-    if parts.is_empty() {
-        return Err(RunError::ExecuteCommand {
-            source: std::io::Error::new(std::io::ErrorKind::InvalidInput, "Empty command"),
-        });
-    }
-
-    let program = &parts[0];
-    let args = &parts[1..];
-
-    // Handle built-in commands that need Rust implementation for cross-platform support
-    if program == "rm" {
-        return run_rm_command(args, working_dir);
-    }
-
-    // Build the command
-    let mut cmd = if program == "uv" {
-        let mut c = Command::new(&config.uv_binary);
-        c.arg("--cache-dir").arg(&config.cache_dir);
-        c.args(args);
-        c
-    } else {
-        let mut c = Command::new(program);
-        c.args(args);
-        c
-    };
-
-    // Set working directory
-    cmd.current_dir(working_dir);
-
-    // Set environment variables
-    cmd.env_clear();
-
-    // Set basic environment
-    cmd.env("HOME", working_dir);
-    cmd.env("UV_NO_WRAP", "1");
-    cmd.env("COLUMNS", "100");
-
-    // Set exclude-newer if configured
-    if let Some(exclude_newer) = &test_config.environment.exclude_newer {
-        cmd.env("UV_EXCLUDE_NEWER", exclude_newer);
-    }
-
-    // Set managed-python-versions if configured
-    if let PythonVersions::Only(versions) = &test_config.environment.managed_python_versions {
-        cmd.env("UV_INTERNAL__TEST_PYTHON_MANAGED", versions.join(" "));
-    }
-
-    // Set additional env from config
-    for (key, value) in &config.env {
-        cmd.env(key, value);
-    }
-
-    // Set env from test config
-    for (key, value) in &test_config.environment.env {
-        cmd.env(key, value);
-    }
-
-    // Preserve PATH
-    if let Ok(path) = std::env::var("PATH") {
-        cmd.env("PATH", path);
-    }
-
-    // Execute and capture output
-    let output = cmd
-        .output()
-        .map_err(|e| RunError::ExecuteCommand { source: e })?;
-
+    let output = run_combined(cmd)?;
     Ok(format_output(&output))
 }
 
@@ -918,22 +764,104 @@ fn generate_tree_recursive(
 }
 
 /// Format command output in the `uv_snapshot` format.
-fn format_output(output: &Output) -> String {
-    let success = output.status.success();
-    let exit_code = output.status.code().unwrap_or(-1);
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let stderr = String::from_utf8_lossy(&output.stderr);
+/// Result of running a command with combined stdout+stderr.
+struct CommandOutput {
+    /// Interleaved stdout and stderr (via shared pipe).
+    combined: String,
+    /// Process exit status.
+    status: ExitStatus,
+}
 
-    format!(
-        "success: {success}\n\
-         exit_code: {exit_code}\n\
-         ----- stdout -----\n\
-         {stdout}\n\
-         ----- stderr -----\n\
-         {stderr}"
-    )
-    .trim_end()
-    .to_string()
+/// Run a `Command` with stdout and stderr merged into a single pipe.
+///
+/// Uses `pipe()` + `dup()` to point both stdout and stderr at the same OS pipe,
+/// giving true interleaved output in write order (deterministic).
+///
+/// # Safety
+///
+/// Uses `pipe()`, `dup()`, `close()`, and `from_raw_fd()` — all standard POSIX
+/// operations on file descriptors created within this function. Each fd is created
+/// once and ownership is transferred exactly once via `File::from_raw_fd`.
+#[expect(unsafe_code)]
+fn run_combined(mut cmd: Command) -> Result<CommandOutput, RunError> {
+    // SAFETY: pipe() creates a unidirectional pipe, returning two file descriptors.
+    // dup() duplicates a file descriptor. Both are standard POSIX and cannot cause UB
+    // when given valid fd values (which pipe() guarantees).
+    let (read_fd, write_fd) = {
+        let mut fds = [0i32; 2];
+        let ret = unsafe { libc::pipe(fds.as_mut_ptr()) };
+        if ret != 0 {
+            return Err(RunError::ExecuteCommand {
+                source: std::io::Error::last_os_error(),
+            });
+        }
+        (fds[0], fds[1])
+    };
+
+    let write_fd2 = unsafe { libc::dup(write_fd) };
+    if write_fd2 < 0 {
+        unsafe { libc::close(read_fd) };
+        unsafe { libc::close(write_fd) };
+        return Err(RunError::ExecuteCommand {
+            source: std::io::Error::last_os_error(),
+        });
+    }
+
+    // SAFETY: from_raw_fd takes ownership of the fd. We created write_fd/write_fd2
+    // above via pipe()/dup() and transfer ownership exactly once each.
+    // Stdio::from(File) consumes the File; spawn() will dup2 the fd for the child
+    // and then the File (inside Stdio, inside Command) closes the parent's copy on drop.
+    cmd.stdout(unsafe { Stdio::from(std::fs::File::from_raw_fd(write_fd)) });
+    cmd.stderr(unsafe { Stdio::from(std::fs::File::from_raw_fd(write_fd2)) });
+
+    let mut child = cmd
+        .spawn()
+        .map_err(|e| RunError::ExecuteCommand { source: e })?;
+
+    // IMPORTANT: drop cmd now. spawn() takes &mut self, so cmd is still alive.
+    // The Command struct holds the Stdio objects which own the parent's write fds.
+    // Until cmd is dropped, the write fds stay open in the parent, and the reader
+    // will never see EOF. Dropping cmd closes the parent's write fds.
+    drop(cmd);
+
+    // SAFETY: from_raw_fd takes ownership of read_fd, created by pipe() above.
+    let read_file = unsafe { std::fs::File::from_raw_fd(read_fd) };
+
+    // Read in a thread to avoid deadlock (pipe buffer could fill before child exits).
+    let reader = std::thread::spawn(move || {
+        let mut buf = String::new();
+        let mut f = std::io::BufReader::new(read_file);
+        f.read_to_string(&mut buf).map(|_| buf)
+    });
+
+    let status = child
+        .wait()
+        .map_err(|e| RunError::ExecuteCommand { source: e })?;
+
+    let combined = reader
+        .join()
+        .map_err(|_| RunError::ExecuteCommand {
+            source: std::io::Error::new(std::io::ErrorKind::Other, "reader thread panicked"),
+        })?
+        .map_err(|e| RunError::ExecuteCommand { source: e })?;
+
+    Ok(CommandOutput { combined, status })
+}
+
+/// Format command output: combined text, with exit code appended for failures.
+///
+/// For exit code 0: just the output text.
+/// For non-zero: output text + blank line + `[command failed with exit code N]`.
+fn format_output(output: &CommandOutput) -> String {
+    let mut result = output.combined.trim_end().to_string();
+    let exit_code = output.status.code().unwrap_or(-1);
+    if exit_code != 0 {
+        if !result.is_empty() {
+            result.push('\n');
+        }
+        result.push_str(&format!("\n[command failed with exit code {exit_code}]"));
+    }
+    result
 }
 
 /// Compare two strings and generate a diff if they differ.
@@ -972,20 +900,27 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_format_output() {
-        let output = Output {
+    fn test_format_output_success() {
+        let output = CommandOutput {
+            combined: "hello\nworld\n".to_string(),
             status: std::process::ExitStatus::default(),
-            stdout: b"hello\n".to_vec(),
-            stderr: b"world\n".to_vec(),
         };
 
         let formatted = format_output(&output);
-        assert!(formatted.contains("success: "));
-        assert!(formatted.contains("exit_code: "));
-        assert!(formatted.contains("----- stdout -----"));
-        assert!(formatted.contains("----- stderr -----"));
-        assert!(formatted.contains("hello"));
-        assert!(formatted.contains("world"));
+        assert_eq!(formatted, "hello\nworld");
+        // No exit code line for success
+        assert!(!formatted.contains("[command failed"));
+    }
+
+    #[test]
+    fn test_format_output_empty_success() {
+        let output = CommandOutput {
+            combined: String::new(),
+            status: std::process::ExitStatus::default(),
+        };
+
+        let formatted = format_output(&output);
+        assert_eq!(formatted, "");
     }
 
     #[test]
@@ -1002,27 +937,20 @@ mod tests {
 
     #[test]
     fn test_apply_filters() {
-        let config = RunConfig {
-            temp_dir: PathBuf::from("/tmp"),
-            uv_binary: PathBuf::from("uv"),
-            cache_dir: PathBuf::from("/cache"),
-            filters: vec![
-                (Regex::new(r"\d+ms").unwrap(), "[TIME]".to_string()),
-                (Regex::new(r"\d+\.\d+s").unwrap(), "[TIME]".to_string()),
-            ],
-            env: HashMap::new(),
-            substitutions: HashMap::new(),
-        };
+        let filters = vec![
+            (Regex::new(r"\d+ms").unwrap(), "[TIME]".to_string()),
+            (Regex::new(r"\d+\.\d+s").unwrap(), "[TIME]".to_string()),
+        ];
 
         let output = "Resolved in 123ms";
         assert_eq!(
-            config.apply_filters(output.to_string()),
+            apply_filters(&filters, output.to_string()),
             "Resolved in [TIME]"
         );
 
         let output = "Resolved in 1.5s";
         assert_eq!(
-            config.apply_filters(output.to_string()),
+            apply_filters(&filters, output.to_string()),
             "Resolved in [TIME]"
         );
     }
@@ -1265,31 +1193,6 @@ mod tests {
             assert!(msg.contains("missing operand"));
         } else {
             panic!("Expected Custom error");
-        }
-    }
-
-    #[test]
-    fn test_platform_variables() {
-        let vars = get_platform_variables();
-
-        // Verify all expected variables exist
-        assert!(vars.contains_key("VENV_BIN"));
-        assert!(vars.contains_key("PATH_SEP"));
-        assert!(vars.contains_key("EXE_SUFFIX"));
-
-        // Verify platform-specific values
-        #[cfg(unix)]
-        {
-            assert_eq!(vars.get("VENV_BIN").unwrap(), "bin");
-            assert_eq!(vars.get("PATH_SEP").unwrap(), ":");
-            assert_eq!(vars.get("EXE_SUFFIX").unwrap(), "");
-        }
-
-        #[cfg(windows)]
-        {
-            assert_eq!(vars.get("VENV_BIN").unwrap(), "Scripts");
-            assert_eq!(vars.get("PATH_SEP").unwrap(), ";");
-            assert_eq!(vars.get("EXE_SUFFIX").unwrap(), ".exe");
         }
     }
 }

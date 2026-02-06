@@ -3,7 +3,7 @@
 Tests for various options during `uv init`.
 
 ```toml
-# mdtest
+#! mdtest
 
 [environment]
 python-version = "3.12"
@@ -17,11 +17,6 @@ The `--no-readme` flag skips creating a README file.
 
 ```console
 $ uv init --no-readme foo
-success: true
-exit_code: 0
------ stdout -----
-
------ stderr -----
 Initialized project `foo` at `[TEMP_DIR]/foo`
 ```
 
@@ -40,12 +35,7 @@ No README.md file is created:
 
 ```console
 $ test -f foo/README.md && echo "exists" || echo "missing"
-success: true
-exit_code: 0
------ stdout -----
 missing
-
------ stderr -----
 ```
 
 ## No pin Python
@@ -56,11 +46,6 @@ The `--no-pin-python` flag skips creating a .python-version file.
 
 ```console
 $ uv init --no-pin-python foo
-success: true
-exit_code: 0
------ stdout -----
-
------ stderr -----
 Initialized project `foo` at `[TEMP_DIR]/foo`
 ```
 
@@ -80,12 +65,7 @@ No .python-version file is created:
 
 ```console
 $ test -f foo/.python-version && echo "exists" || echo "missing"
-success: true
-exit_code: 0
------ stdout -----
 missing
-
------ stderr -----
 ```
 
 ## With author
@@ -98,40 +78,20 @@ Initialize a Git repository with author configuration:
 
 ```console
 $ git init
-success: true
-exit_code: 0
------ stdout -----
-
------ stderr -----
 ```
 
 ```console
 $ git config --local user.name Alice
-success: true
-exit_code: 0
------ stdout -----
-
------ stderr -----
 ```
 
 ```console
 $ git config --local user.email alice@example.com
-success: true
-exit_code: 0
------ stdout -----
-
------ stderr -----
 ```
 
 By default, authors is not filled for non-package applications:
 
 ```console
 $ uv init foo
-success: true
-exit_code: 0
------ stdout -----
-
------ stderr -----
 Initialized project `foo` at `[TEMP_DIR]/foo`
 ```
 
@@ -149,11 +109,6 @@ Use `--author-from auto` to explicitly fill it:
 
 ```console
 $ uv init --author-from auto bar
-success: true
-exit_code: 0
------ stdout -----
-
------ stderr -----
 Initialized project `bar` at `[TEMP_DIR]/bar`
 ```
 
@@ -174,11 +129,6 @@ Authors are filled for libraries by default:
 
 ```console
 $ uv init --lib baz
-success: true
-exit_code: 0
------ stdout -----
-
------ stderr -----
 Initialized project `baz` at `[TEMP_DIR]/baz`
 ```
 
@@ -203,11 +153,6 @@ Use `--author-from none` to prevent it:
 
 ```console
 $ uv init --lib --author-from none qux
-success: true
-exit_code: 0
------ stdout -----
-
------ stderr -----
 Initialized project `qux` at `[TEMP_DIR]/qux`
 ```
 
@@ -296,7 +241,7 @@ build-backend = "uv_build"
 The `--isolated` flag is deprecated but still adds to workspace.
 
 ```toml
-# file: pyproject.toml
+#! file: pyproject.toml
 [project]
 name = "project"
 version = "0.1.0"
@@ -336,18 +281,13 @@ members = [
 When the parent workspace has `managed = false`, projects are not added to the workspace.
 
 ```toml
-# file: pyproject.toml
+#! file: pyproject.toml
 [tool.uv]
 managed = false
 ```
 
 ```console
 $ uv init foo
-success: true
-exit_code: 0
------ stdout -----
-
------ stderr -----
 Initialized project `foo` at `[TEMP_DIR]/foo`
 ```
 

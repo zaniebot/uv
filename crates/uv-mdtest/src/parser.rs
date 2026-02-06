@@ -3,23 +3,14 @@
 //! Parses markdown files into test definitions using pulldown-cmark.
 
 use pulldown_cmark::{CodeBlockKind, Event, HeadingLevel, Options, Parser, Tag, TagEnd};
-use serde::Deserialize;
 use std::path::PathBuf;
 use thiserror::Error;
 
 use crate::types::{
-    CodeBlockAttributes, Command, ContentAssertion, CopyFrom, EmbeddedFile, FileSnapshot,
-    MarkdownTest, MarkdownTestFile, TestConfig, TestStep, TreeCreation, TreeEntry, TreeSnapshot,
+    AssertKind, CodeBlockAttributes, Command, ContentAssertion, CopyFrom, EmbeddedFile,
+    FileSnapshot, MarkdownTest, MarkdownTestFile, TestConfig, TestStep, TreeCreation, TreeEntry,
+    TreeSnapshot,
 };
-
-/// Configuration for a copy block.
-#[derive(Debug, Deserialize)]
-struct CopyBlockConfig {
-    /// Source path (may contain variable references like `${WORKSPACE}`).
-    source: String,
-    /// Destination path relative to the test directory.
-    dest: String,
-}
 
 /// Errors that can occur during parsing.
 #[derive(Debug, Error)]
@@ -218,85 +209,82 @@ impl<'a> ParserState<'a> {
         line_number: usize,
     ) -> Result<(), ParseError> {
         let attrs = CodeBlockAttributes::parse(info_string);
+        if !attrs.extra.is_empty() {
+            // Skip code blocks with fence attributes — they need to be migrated
+            // to content directives. Log for visibility but don't fail the parse.
+            eprintln!(
+                "Warning: code fence attributes at line {line_number} are not supported: {:?}. \
+                 Use content directives instead (e.g., `#! file: path`, `#! snapshot`).",
+                attrs.extra
+            );
+            return Ok(());
+        }
         let content = content.trim_end_matches('\n').to_string();
 
-        // Check if this is a config block (either via title attribute or # mdtest marker)
-        let is_config_by_title = attrs.title.as_deref() == Some("mdtest.toml");
-        let mdtest_content = extract_mdtest_content(&content);
+        // Extract directives from content (# file:, # mdtest, # snapshot, etc.)
+        let (directives, content) = extract_directives(&content);
 
-        if is_config_by_title || mdtest_content.is_some() {
-            let config_content = mdtest_content.as_deref().unwrap_or(&content);
-            let config: TestConfig =
-                toml::from_str(config_content).map_err(|e| ParseError::InvalidConfig {
+        // Check if this is a config block
+        if directives.is_mdtest {
+            let config =
+                TestConfig::from_toml(&content).map_err(|e| ParseError::InvalidConfig {
                     line: line_number,
                     message: e.to_string(),
                 })?;
 
             if self.seen_section_header {
-                // Config in a section - merge with file config for this section only
                 self.section_config = Some(self.file_config.merge(&config));
             } else {
-                // Config before any section headers (level 2+) - this is file-level config
                 self.file_config = self.file_config.merge(&config);
             }
             return Ok(());
         }
 
-        // Extract title from content (# file: prefix) if not in attributes
-        let (title_from_content, content) = extract_title_from_content(&content);
-        let title = attrs.title.or(title_from_content);
-
         // Check if this is a command block (starts with `$ `)
         if content.starts_with("$ ") {
-            let working_dir = attrs.working_dir.map(PathBuf::from);
+            let working_dir = directives.working_dir.map(PathBuf::from);
             let command = parse_command_block(&content, line_number, working_dir)?;
             self.current_steps.push(TestStep::RunCommand(command));
             return Ok(());
         }
 
-        // Check if this is a tree block
-        if attrs.language.as_deref() == Some("tree") {
-            if attrs.create {
-                // Parse tree content into entries for creation
+        // Check if this is a tree block (# tree [snapshot=true] [depth=N])
+        if let Some(tree) = directives.tree {
+            if tree.snapshot {
+                self.current_steps
+                    .push(TestStep::CheckTreeSnapshot(TreeSnapshot {
+                        expected_content: content,
+                        depth: tree.depth,
+                        line_number,
+                    }));
+            } else {
                 let entries = parse_tree_content(&content);
                 self.current_steps.push(TestStep::CreateTree(TreeCreation {
                     entries,
                     line_number,
                 }));
-            } else {
-                // Regular tree snapshot for verification
-                self.current_steps
-                    .push(TestStep::CheckTreeSnapshot(TreeSnapshot {
-                        expected_content: content,
-                        depth: attrs.depth,
-                        line_number,
-                    }));
             }
             return Ok(());
         }
 
-        // Check if this is a copy block
-        if attrs.language.as_deref() == Some("copy") {
-            let copy_config: CopyBlockConfig =
-                toml::from_str(&content).map_err(|e| ParseError::InvalidConfig {
-                    line: line_number,
-                    message: format!("Invalid copy block: {e}"),
-                })?;
+        // Check if this is a copy block (# copy, content: source -> dest)
+        if directives.copy {
+            let (source, dest) = parse_copy_content(&content, line_number)?;
             self.current_steps.push(TestStep::CopyFrom(CopyFrom {
-                source: copy_config.source,
-                dest: PathBuf::from(copy_config.dest),
+                source,
+                dest: PathBuf::from(dest),
                 line_number,
             }));
             return Ok(());
         }
 
         // Check if this is a content assertion
-        if let Some(assert_kind) = attrs.assert {
-            if let Some(ref title) = title {
+        if let Some(kind) = directives.assert_kind {
+            if let Some(ref path) = directives.file {
                 self.current_steps
                     .push(TestStep::CheckContentAssertion(ContentAssertion {
-                        path: PathBuf::from(title),
-                        kind: assert_kind,
+                        path: PathBuf::from(path),
+                        kind,
                         expected: content,
                         line_number,
                     }));
@@ -305,11 +293,11 @@ impl<'a> ParserState<'a> {
         }
 
         // Check if this is a file snapshot
-        if attrs.snapshot {
-            if let Some(ref title) = title {
+        if directives.snapshot {
+            if let Some(ref path) = directives.file {
                 self.current_steps
                     .push(TestStep::CheckFileSnapshot(FileSnapshot {
-                        path: PathBuf::from(title),
+                        path: PathBuf::from(path),
                         expected_content: content,
                         line_number,
                     }));
@@ -318,9 +306,9 @@ impl<'a> ParserState<'a> {
         }
 
         // Check if this is an embedded file
-        if let Some(title) = title {
+        if let Some(path) = directives.file {
             self.current_steps.push(TestStep::WriteFile(EmbeddedFile {
-                path: PathBuf::from(title),
+                path: PathBuf::from(path),
                 content,
                 line_number,
             }));
@@ -412,6 +400,23 @@ fn parse_command_block(
     })
 }
 
+/// Parse copy block content in `source -> dest` format.
+fn parse_copy_content(content: &str, line_number: usize) -> Result<(String, String), ParseError> {
+    for line in content.lines() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        if let Some((source, dest)) = trimmed.split_once(" -> ") {
+            return Ok((source.trim().to_string(), dest.trim().to_string()));
+        }
+    }
+    Err(ParseError::InvalidConfig {
+        line: line_number,
+        message: "Copy block must contain `source -> dest`".to_string(),
+    })
+}
+
 fn heading_level_to_usize(level: HeadingLevel) -> usize {
     match level {
         HeadingLevel::H1 => 1,
@@ -423,44 +428,156 @@ fn heading_level_to_usize(level: HeadingLevel) -> usize {
     }
 }
 
-/// Extract title from content that starts with `# file: filename`.
+/// Known directives.
 ///
-/// Returns the extracted title (if any) and the remaining content with
-/// the title line and optional blank line removed.
-fn extract_title_from_content(content: &str) -> (Option<String>, String) {
-    let lines: Vec<&str> = content.lines().collect();
-    if let Some(first_line) = lines.first() {
-        if let Some(filename) = first_line.strip_prefix("# file: ") {
-            // Skip title line and optional blank line after it
-            let start = if lines.get(1).is_some_and(|l| l.is_empty()) {
-                2
-            } else {
-                1
-            };
-            let remaining = lines[start..].join("\n");
-            return (Some(filename.to_string()), remaining);
-        }
+/// Simple directives: `# keyword` or `# keyword: value`
+/// Directives with args: `# keyword arg1 arg2 key=value`
+const KNOWN_DIRECTIVES: &[&str] = &[
+    "file",
+    "mdtest",
+    "snapshot",
+    "assert",
+    "working-dir",
+    "tree",
+    "copy",
+];
+
+/// Check if a line is a content directive (`#! keyword` or `#! keyword: value`).
+///
+/// This is used by both the parser (to extract directives) and the snapshot
+/// updater (to preserve directives when updating content).
+pub fn is_directive_line(line: &str) -> bool {
+    let trimmed = line.trim();
+    if let Some(rest) = trimmed.strip_prefix("#! ") {
+        // Get the first word (the directive name)
+        let keyword = rest.split_whitespace().next().unwrap_or(rest);
+        // Also handle `#! key: value` form
+        let keyword = keyword.strip_suffix(':').unwrap_or(keyword);
+        KNOWN_DIRECTIVES.contains(&keyword)
+    } else {
+        false
     }
-    (None, content.to_string())
 }
 
-/// Check if content starts with `# mdtest` marker for config blocks.
+/// Directives extracted from `# key` and `# key: value` comment lines
+/// at the top of a code block's content.
 ///
-/// Returns the remaining content with the marker line and optional blank line removed.
-fn extract_mdtest_content(content: &str) -> Option<String> {
+/// All directives are stripped from the content before further processing.
+#[derive(Debug, Default)]
+struct ContentDirectives {
+    /// File path from `# file: path`.
+    file: Option<String>,
+    /// Whether this is an mdtest config block (`# mdtest`).
+    is_mdtest: bool,
+    /// Whether this is a snapshot block (`# snapshot`).
+    snapshot: bool,
+    /// Assertion kind from `# assert: contains`.
+    assert_kind: Option<AssertKind>,
+    /// Working directory from `# working-dir: path`.
+    working_dir: Option<String>,
+    /// Tree block settings from `# tree [create] [depth=N]`.
+    tree: Option<TreeDirective>,
+    /// Whether this is a copy block (`# copy`). Content is `source -> dest`.
+    copy: bool,
+}
+
+/// Arguments parsed from `# tree [snapshot=true] [depth=N]`.
+///
+/// Tree blocks default to creation mode. Use `snapshot=true` to verify
+/// directory structure instead (consistent with `# file:` + `# snapshot`).
+#[derive(Debug, Default)]
+struct TreeDirective {
+    snapshot: bool,
+    depth: Option<usize>,
+}
+
+/// Extract directives from comment lines at the top of code block content.
+///
+/// Directives are comment lines at the top of a code block that control its behavior.
+/// Parsing stops at the first non-directive, non-blank line.
+/// A single blank line after the directive block is also consumed.
+///
+/// Simple directives:
+/// - `#! file: <path>` — names the file (for creation or verification)
+/// - `#! mdtest` — marks block as test configuration
+/// - `#! snapshot` — marks block as file snapshot verification
+/// - `#! assert: contains` — marks block as content assertion
+/// - `#! working-dir: <path>` — sets working directory for commands
+/// - `#! copy` — marks block as a copy operation (content: `source -> dest`)
+///
+/// Directives with arguments:
+/// - `#! tree [snapshot=true] [depth=N]` — marks block as a tree snapshot or creation
+fn extract_directives(content: &str) -> (ContentDirectives, String) {
+    let mut directives = ContentDirectives::default();
     let lines: Vec<&str> = content.lines().collect();
-    if let Some(first_line) = lines.first() {
-        if first_line.trim() == "# mdtest" {
-            // Skip marker line and optional blank line after it
-            let start = if lines.get(1).is_some_and(|l| l.is_empty()) {
-                2
-            } else {
-                1
-            };
-            return Some(lines[start..].join("\n"));
+    let mut consumed = 0;
+
+    for line in &lines {
+        let trimmed = line.trim();
+
+        // Only consume lines that are known directives
+        if !is_directive_line(trimmed) {
+            break;
         }
+
+        let rest = trimmed.strip_prefix("#! ").unwrap();
+
+        // Parse directives with arguments (#! tree snapshot=true depth=2)
+        let mut words = rest.split_whitespace();
+        let keyword = words.next().unwrap_or(rest);
+        // Strip trailing `:` for `#! key: value` form
+        let keyword = keyword.strip_suffix(':').unwrap_or(keyword);
+
+        match keyword {
+            "file" => {
+                // #! file: <path> — value is everything after "file: "
+                if let Some(path) = rest.strip_prefix("file: ") {
+                    directives.file = Some(path.to_string());
+                }
+            }
+            "mdtest" => directives.is_mdtest = true,
+            "snapshot" => directives.snapshot = true,
+            "copy" => directives.copy = true,
+            "assert" => {
+                if let Some(value) = rest.strip_prefix("assert: ") {
+                    directives.assert_kind = match value {
+                        "contains" => Some(AssertKind::Contains),
+                        _ => None,
+                    };
+                }
+            }
+            "working-dir" => {
+                if let Some(value) = rest.strip_prefix("working-dir: ") {
+                    directives.working_dir = Some(value.to_string());
+                }
+            }
+            "tree" => {
+                let mut tree = TreeDirective::default();
+                for arg in words {
+                    if let Some(value) = arg.strip_prefix("snapshot=") {
+                        tree.snapshot = value == "true";
+                    } else if let Some(value) = arg.strip_prefix("depth=") {
+                        tree.depth = value.parse().ok();
+                    }
+                }
+                // depth implies snapshot
+                if tree.depth.is_some() {
+                    tree.snapshot = true;
+                }
+                directives.tree = Some(tree);
+            }
+            _ => break,
+        }
+        consumed += 1;
     }
-    None
+
+    // If we consumed any directives, also skip an optional blank line after them
+    if consumed > 0 && lines.get(consumed).is_some_and(|l| l.is_empty()) {
+        consumed += 1;
+    }
+
+    let remaining = lines[consumed..].join("\n");
+    (directives, remaining)
 }
 
 /// Parse tree content into a list of tree entries.
@@ -610,7 +727,9 @@ Tests for lock command.
 
 ## Basic locking
 
-```toml title="pyproject.toml"
+```toml
+#! file: pyproject.toml
+
 [project]
 name = "test"
 version = "0.1.0"
@@ -660,7 +779,9 @@ Resolved 1 package in [TIME]
     #[test]
     fn test_parse_with_file_level_config() {
         let source = r#"
-```toml title="mdtest.toml"
+```toml
+#! mdtest
+
 [environment]
 python-version = "3.12"
 exclude-newer = "2024-03-25T00:00:00Z"
@@ -670,7 +791,9 @@ exclude-newer = "2024-03-25T00:00:00Z"
 
 ## Test one
 
-```toml title="pyproject.toml"
+```toml
+#! file: pyproject.toml
+
 [project]
 name = "test"
 ```
@@ -687,7 +810,9 @@ Done
 
 ## Test two
 
-```toml title="pyproject.toml"
+```toml
+#! file: pyproject.toml
+
 [project]
 name = "test2"
 ```
@@ -706,21 +831,27 @@ Done
         let result = MarkdownTestFile::parse(PathBuf::from("test.md"), source).unwrap();
         assert_eq!(result.tests.len(), 2);
 
-        // Both tests should have the file-level config
+        // Both tests should have the file-level config (raw TOML key is "python-version")
         assert_eq!(
-            result.tests[0].config.environment.python_versions,
-            crate::types::PythonVersions::Only(vec!["3.12".to_string()])
+            result.tests[0].config.raw["environment"]["python-version"]
+                .as_str()
+                .unwrap(),
+            "3.12"
         );
         assert_eq!(
-            result.tests[1].config.environment.python_versions,
-            crate::types::PythonVersions::Only(vec!["3.12".to_string()])
+            result.tests[1].config.raw["environment"]["python-version"]
+                .as_str()
+                .unwrap(),
+            "3.12"
         );
     }
 
     #[test]
     fn test_parse_with_file_level_create_venv() {
         let source = r#"
-```toml title="mdtest.toml"
+```toml
+#! mdtest
+
 [environment]
 python-version = "3.12"
 create-venv = false
@@ -746,10 +877,15 @@ Done
 
         // Test should have the file-level config including create_venv
         assert_eq!(
-            result.tests[0].config.environment.python_versions,
-            crate::types::PythonVersions::Only(vec!["3.12".to_string()])
+            result.tests[0].config.raw["environment"]["python-version"]
+                .as_str()
+                .unwrap(),
+            "3.12"
         );
-        assert_eq!(result.tests[0].config.environment.create_venv, Some(false));
+        assert_eq!(
+            result.tests[0].config.raw["environment"]["create-venv"].as_bool(),
+            Some(false)
+        );
     }
 
     #[test]
@@ -759,7 +895,9 @@ Done
 
 ## Test A
 
-```toml title="a.toml"
+```toml
+#! file: a.toml
+
 content = "a"
 ```
 
@@ -775,7 +913,9 @@ Done
 
 ## Test B
 
-```toml title="b.toml"
+```toml
+#! file: b.toml
+
 content = "b"
 ```
 
@@ -827,7 +967,9 @@ Done
 
 ## With snapshot
 
-```toml title="pyproject.toml"
+```toml
+#! file: pyproject.toml
+
 [project]
 name = "test"
 ```
@@ -842,7 +984,10 @@ exit_code: 0
 Done
 ```
 
-```toml title="uv.lock" snapshot=true
+```toml
+#! file: uv.lock
+#! snapshot
+
 version = 1
 requires-python = ">=3.12"
 ```
@@ -866,59 +1011,128 @@ requires-python = ">=3.12"
 
     #[test]
     fn test_parse_code_block_attributes() {
-        let attrs = CodeBlockAttributes::parse("toml title=\"pyproject.toml\"");
+        let attrs = CodeBlockAttributes::parse("toml");
         assert_eq!(attrs.language.as_deref(), Some("toml"));
-        assert_eq!(attrs.title.as_deref(), Some("pyproject.toml"));
-        assert!(!attrs.snapshot);
+        assert!(attrs.extra.is_empty());
 
+        // Fence attributes are now rejected — collected as extra
         let attrs = CodeBlockAttributes::parse("toml title=\"uv.lock\" snapshot=true");
-        assert!(attrs.snapshot);
+        assert_eq!(attrs.language.as_deref(), Some("toml"));
+        assert_eq!(attrs.extra.len(), 2);
     }
 
     #[test]
-    fn test_extract_title_from_content() {
-        // No title
-        let (title, content) = extract_title_from_content("[project]\nname = \"test\"");
-        assert!(title.is_none());
+    fn test_extract_directives_none() {
+        let (dirs, content) = extract_directives("[project]\nname = \"test\"");
+        assert!(dirs.file.is_none());
+        assert!(!dirs.is_mdtest);
+        assert!(!dirs.snapshot);
+        assert_eq!(content, "[project]\nname = \"test\"");
+    }
+
+    #[test]
+    fn test_extract_directives_file() {
+        // With blank line after directive
+        let (dirs, content) =
+            extract_directives("#! file: pyproject.toml\n\n[project]\nname = \"test\"");
+        assert_eq!(dirs.file.as_deref(), Some("pyproject.toml"));
         assert_eq!(content, "[project]\nname = \"test\"");
 
-        // With title and blank line
-        let (title, content) =
-            extract_title_from_content("# file: pyproject.toml\n\n[project]\nname = \"test\"");
-        assert_eq!(title.as_deref(), Some("pyproject.toml"));
+        // Without blank line
+        let (dirs, content) =
+            extract_directives("#! file: pyproject.toml\n[project]\nname = \"test\"");
+        assert_eq!(dirs.file.as_deref(), Some("pyproject.toml"));
         assert_eq!(content, "[project]\nname = \"test\"");
 
-        // With title, no blank line
-        let (title, content) =
-            extract_title_from_content("# file: pyproject.toml\n[project]\nname = \"test\"");
-        assert_eq!(title.as_deref(), Some("pyproject.toml"));
-        assert_eq!(content, "[project]\nname = \"test\"");
-
-        // Just the marker, no content
-        let (title, content) = extract_title_from_content("# file: foo.txt");
-        assert_eq!(title.as_deref(), Some("foo.txt"));
+        // Just the directive, no content
+        let (dirs, content) = extract_directives("#! file: foo.txt");
+        assert_eq!(dirs.file.as_deref(), Some("foo.txt"));
         assert_eq!(content, "");
     }
 
     #[test]
-    fn test_extract_mdtest_content() {
-        // No marker
-        let result = extract_mdtest_content("[environment]\npython-version = \"3.12\"");
-        assert!(result.is_none());
+    fn test_extract_directives_mdtest() {
+        // With blank line
+        let (dirs, content) =
+            extract_directives("#! mdtest\n\n[environment]\npython-version = \"3.12\"");
+        assert!(dirs.is_mdtest);
+        assert_eq!(content, "[environment]\npython-version = \"3.12\"");
 
-        // With marker and blank line
-        let result = extract_mdtest_content("# mdtest\n\n[environment]\npython-version = \"3.12\"");
-        assert_eq!(
-            result.as_deref(),
-            Some("[environment]\npython-version = \"3.12\"")
-        );
+        // Without blank line
+        let (dirs, content) =
+            extract_directives("#! mdtest\n[environment]\npython-version = \"3.12\"");
+        assert!(dirs.is_mdtest);
+        assert_eq!(content, "[environment]\npython-version = \"3.12\"");
+    }
 
-        // With marker, no blank line
-        let result = extract_mdtest_content("# mdtest\n[environment]\npython-version = \"3.12\"");
-        assert_eq!(
-            result.as_deref(),
-            Some("[environment]\npython-version = \"3.12\"")
+    #[test]
+    fn test_extract_directives_snapshot() {
+        let (dirs, content) = extract_directives(
+            "#! file: pyproject.toml\n#! snapshot\n\n[project]\nname = \"test\"",
         );
+        assert_eq!(dirs.file.as_deref(), Some("pyproject.toml"));
+        assert!(dirs.snapshot);
+        assert_eq!(content, "[project]\nname = \"test\"");
+    }
+
+    #[test]
+    fn test_extract_directives_assert() {
+        let (dirs, content) =
+            extract_directives("#! file: .venv/pyvenv.cfg\n#! assert: contains\nuv =");
+        assert_eq!(dirs.file.as_deref(), Some(".venv/pyvenv.cfg"));
+        assert_eq!(dirs.assert_kind, Some(AssertKind::Contains));
+        assert_eq!(content, "uv =");
+    }
+
+    #[test]
+    fn test_extract_directives_working_dir() {
+        let (dirs, content) =
+            extract_directives("#! working-dir: packages/foo\n$ uv lock\nsuccess: true");
+        assert_eq!(dirs.working_dir.as_deref(), Some("packages/foo"));
+        assert_eq!(content, "$ uv lock\nsuccess: true");
+    }
+
+    #[test]
+    fn test_extract_directives_tree_create() {
+        let (dirs, content) = extract_directives("#! tree\n\n.\n├── foo/");
+        assert!(dirs.tree.is_some());
+        let tree = dirs.tree.unwrap();
+        assert!(!tree.snapshot);
+        assert_eq!(content, ".\n├── foo/");
+    }
+
+    #[test]
+    fn test_extract_directives_tree_snapshot() {
+        let (dirs, content) = extract_directives("#! tree snapshot=true depth=2\n\n.\n├── foo/");
+        let tree = dirs.tree.unwrap();
+        assert!(tree.snapshot);
+        assert_eq!(tree.depth, Some(2));
+        assert_eq!(content, ".\n├── foo/");
+    }
+
+    #[test]
+    fn test_extract_directives_tree_depth_implies_snapshot() {
+        let (dirs, _) = extract_directives("#! tree depth=1\n.\n├── foo/");
+        let tree = dirs.tree.unwrap();
+        assert!(tree.snapshot);
+        assert_eq!(tree.depth, Some(1));
+    }
+
+    #[test]
+    fn test_extract_directives_stops_at_unknown() {
+        // Regular comment that looks like a directive but isn't known
+        let (dirs, content) = extract_directives("# This is a comment\nreal content");
+        assert!(dirs.file.is_none());
+        assert!(!dirs.is_mdtest);
+        assert_eq!(content, "# This is a comment\nreal content");
+    }
+
+    #[test]
+    fn test_extract_directives_multiple() {
+        let (dirs, content) = extract_directives("#! file: uv.lock\n#! snapshot\n\nversion = 1");
+        assert_eq!(dirs.file.as_deref(), Some("uv.lock"));
+        assert!(dirs.snapshot);
+        assert_eq!(content, "version = 1");
     }
 
     #[test]
@@ -929,7 +1143,7 @@ requires-python = ">=3.12"
 ## Basic locking
 
 ```toml
-# file: pyproject.toml
+#! file: pyproject.toml
 
 [project]
 name = "test"
@@ -963,7 +1177,7 @@ Resolved 1 package in [TIME]
         assert_eq!(files.len(), 1);
         assert_eq!(files[0].path, PathBuf::from("pyproject.toml"));
         // Content should not include the title line
-        assert!(!files[0].content.contains("# file:"));
+        assert!(!files[0].content.contains("#! file:"));
         assert!(files[0].content.contains("[project]"));
     }
 
@@ -971,7 +1185,7 @@ Resolved 1 package in [TIME]
     fn test_parse_with_mdtest_marker() {
         let source = r#"
 ```toml
-# mdtest
+#! mdtest
 
 [environment]
 python-version = "3.12"
@@ -982,7 +1196,7 @@ python-version = "3.12"
 ## Test one
 
 ```toml
-# file: pyproject.toml
+#! file: pyproject.toml
 
 [project]
 name = "test"
@@ -1002,10 +1216,255 @@ Done
         let result = MarkdownTestFile::parse(PathBuf::from("test.md"), source).unwrap();
         assert_eq!(result.tests.len(), 1);
 
-        // Test should have the config from # mdtest block
+        // Test should have the config from #! mdtest block
         assert_eq!(
-            result.tests[0].config.environment.python_versions,
-            crate::types::PythonVersions::Only(vec!["3.12".to_string()])
+            result.tests[0].config.raw["environment"]["python-version"]
+                .as_str()
+                .unwrap(),
+            "3.12"
         );
+    }
+
+    #[test]
+    fn test_parse_snapshot_with_directives() {
+        let source = r#"
+# Lock
+
+## Snapshot test
+
+```toml
+#! file: pyproject.toml
+
+[project]
+name = "test"
+```
+
+```console
+$ uv lock
+success: true
+exit_code: 0
+----- stdout -----
+
+----- stderr -----
+Done
+```
+
+```toml
+#! file: uv.lock
+#! snapshot
+
+version = 1
+requires-python = ">=3.12"
+```
+"#;
+
+        let result = MarkdownTestFile::parse(PathBuf::from("test.md"), source).unwrap();
+        assert_eq!(result.tests.len(), 1);
+
+        let test = &result.tests[0];
+        let snapshots: Vec<_> = test
+            .steps
+            .iter()
+            .filter_map(|s| match s {
+                TestStep::CheckFileSnapshot(f) => Some(f),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(snapshots.len(), 1);
+        assert_eq!(snapshots[0].path, PathBuf::from("uv.lock"));
+        assert!(snapshots[0].expected_content.contains("version = 1"));
+        // Directives should be stripped from content
+        assert!(!snapshots[0].expected_content.contains("#! file:"));
+        assert!(!snapshots[0].expected_content.contains("#! snapshot"));
+    }
+
+    #[test]
+    fn test_parse_assert_with_directives() {
+        let source = r#"
+# Tests
+
+## Assert test
+
+```console
+$ uv venv
+success: true
+exit_code: 0
+----- stdout -----
+
+----- stderr -----
+Done
+```
+
+```text
+#! file: .venv/pyvenv.cfg
+#! assert: contains
+
+uv =
+```
+"#;
+
+        let result = MarkdownTestFile::parse(PathBuf::from("test.md"), source).unwrap();
+        assert_eq!(result.tests.len(), 1);
+
+        let test = &result.tests[0];
+        let assertions: Vec<_> = test
+            .steps
+            .iter()
+            .filter_map(|s| match s {
+                TestStep::CheckContentAssertion(a) => Some(a),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(assertions.len(), 1);
+        assert_eq!(assertions[0].path, PathBuf::from(".venv/pyvenv.cfg"));
+        assert_eq!(assertions[0].kind, AssertKind::Contains);
+        assert_eq!(assertions[0].expected, "uv =");
+    }
+
+    #[test]
+    fn test_parse_working_dir_with_directives() {
+        let source = r#"
+# Tests
+
+## Working dir test
+
+```toml
+#! file: packages/foo/pyproject.toml
+
+[project]
+name = "foo"
+```
+
+```console
+#! working-dir: packages/foo
+$ uv lock
+success: true
+exit_code: 0
+----- stdout -----
+
+----- stderr -----
+Done
+```
+"#;
+
+        let result = MarkdownTestFile::parse(PathBuf::from("test.md"), source).unwrap();
+        assert_eq!(result.tests.len(), 1);
+
+        let test = &result.tests[0];
+        let commands: Vec<_> = test
+            .steps
+            .iter()
+            .filter_map(|s| match s {
+                TestStep::RunCommand(c) => Some(c),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(commands.len(), 1);
+        assert_eq!(commands[0].command, "uv lock");
+        assert_eq!(commands[0].working_dir, Some(PathBuf::from("packages/foo")));
+    }
+
+    #[test]
+    fn test_parse_tree_with_directives() {
+        let source = r#"
+# Tests
+
+## Tree test
+
+```text
+#! tree
+
+packages/
+└── foo/
+```
+
+```console
+$ uv version
+success: true
+exit_code: 0
+----- stdout -----
+
+----- stderr -----
+Done
+```
+
+```text
+#! tree snapshot=true depth=1
+
+.
+├── packages/
+```
+"#;
+
+        let result = MarkdownTestFile::parse(PathBuf::from("test.md"), source).unwrap();
+        assert_eq!(result.tests.len(), 1);
+
+        let test = &result.tests[0];
+
+        // First step should be a tree creation (default for # tree)
+        let creates: Vec<_> = test
+            .steps
+            .iter()
+            .filter_map(|s| match s {
+                TestStep::CreateTree(t) => Some(t),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(creates.len(), 1);
+
+        // Last step should be a tree snapshot with depth
+        let tree_snapshots: Vec<_> = test
+            .steps
+            .iter()
+            .filter_map(|s| match s {
+                TestStep::CheckTreeSnapshot(t) => Some(t),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(tree_snapshots.len(), 1);
+        assert_eq!(tree_snapshots[0].depth, Some(1));
+        // Directives should be stripped from content
+        assert!(!tree_snapshots[0].expected_content.contains("#! tree"));
+        assert!(tree_snapshots[0].expected_content.contains("packages/"));
+    }
+
+    #[test]
+    fn test_parse_skips_blocks_with_fence_attributes() {
+        // Blocks with fence attributes (like file=) are skipped with a warning.
+        // If ALL blocks are skipped, the file has no tests and returns NoTests error.
+        let source = r#"
+# Tests
+
+## Bad test
+
+```toml file="pyproject.toml"
+[project]
+name = "test"
+```
+
+```console
+$ uv lock
+success: true
+exit_code: 0
+----- stdout -----
+
+----- stderr -----
+Done
+```
+"#;
+
+        let result = MarkdownTestFile::parse(PathBuf::from("test.md"), source);
+        // The file= block is skipped, but the console block still produces a test
+        // (since $ uv lock is a valid command block)
+        assert!(result.is_ok());
+        let test_file = result.unwrap();
+        assert_eq!(test_file.tests.len(), 1);
+        // The file creation was skipped, only the command remains
+        let steps = &test_file.tests[0].steps;
+        let file_count = steps
+            .iter()
+            .filter(|s| matches!(s, TestStep::WriteFile(_)))
+            .count();
+        assert_eq!(file_count, 0, "file= block should be skipped");
     }
 }

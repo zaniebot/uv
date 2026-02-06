@@ -268,6 +268,8 @@ impl Mismatch {
     }
 }
 
+use crate::parser::is_directive_line;
+
 /// Update the content of a code block at a specific line.
 fn update_code_block_content(
     source: &str,
@@ -288,16 +290,16 @@ fn update_code_block_content(
             let start_line = i;
             i += 1;
 
-            // Check for directive comment (# file: ...) and preserve it
+            // Preserve all directive lines at the top of the block
             let mut directive_lines: Vec<&str> = Vec::new();
-            if i < lines.len() && lines[i].starts_with("# file: ") {
+            while i < lines.len() && is_directive_line(lines[i]) {
                 directive_lines.push(lines[i]);
                 i += 1;
-                // Preserve optional blank line after directive
-                if i < lines.len() && lines[i].is_empty() {
-                    directive_lines.push(lines[i]);
-                    i += 1;
-                }
+            }
+            // Preserve optional blank line after directives
+            if !directive_lines.is_empty() && i < lines.len() && lines[i].is_empty() {
+                directive_lines.push(lines[i]);
+                i += 1;
             }
 
             // Skip to the closing ```
@@ -371,7 +373,7 @@ More text.
         let source = r#"# Test
 
 ```toml
-# file: pyproject.toml
+#! file: pyproject.toml
 
 [project]
 name = "old"
@@ -384,7 +386,7 @@ More text.
 
         // Directive should be preserved
         assert!(
-            result.contains("# file: pyproject.toml"),
+            result.contains("#! file: pyproject.toml"),
             "Directive should be preserved"
         );
         // New content should be present
@@ -399,7 +401,7 @@ More text.
         );
         // Blank line after directive should be preserved
         assert!(
-            result.contains("# file: pyproject.toml\n\n[project]"),
+            result.contains("#! file: pyproject.toml\n\n[project]"),
             "Blank line after directive should be preserved"
         );
     }
@@ -409,7 +411,7 @@ More text.
         let source = r#"# Test
 
 ```toml
-# file: pyproject.toml
+#! file: pyproject.toml
 [project]
 name = "old"
 ```
@@ -419,16 +421,101 @@ name = "old"
 
         // Directive should be preserved
         assert!(
-            result.contains("# file: pyproject.toml"),
+            result.contains("#! file: pyproject.toml"),
             "Directive should be preserved"
         );
         // New content should be present
         assert!(result.contains("name = \"new\""));
         // Should NOT have blank line after directive since original didn't
         assert!(
-            result.contains("# file: pyproject.toml\n[project]"),
+            result.contains("#! file: pyproject.toml\n[project]"),
             "No blank line should be added if original didn't have one"
         );
+    }
+
+    #[test]
+    fn test_update_code_block_preserves_multiple_directives() {
+        let source = r#"# Test
+
+```toml
+#! file: pyproject.toml
+#! snapshot
+
+[project]
+name = "old"
+```
+"#;
+
+        let result = update_code_block_content(source, 3, "[project]\nname = \"new\"").unwrap();
+
+        assert!(
+            result.contains("#! file: pyproject.toml"),
+            "File directive should be preserved"
+        );
+        assert!(
+            result.contains("#! snapshot"),
+            "Snapshot directive should be preserved"
+        );
+        assert!(
+            result.contains("name = \"new\""),
+            "New content should be present"
+        );
+        assert!(
+            !result.contains("name = \"old\""),
+            "Old content should be replaced"
+        );
+        // Verify order: directives, blank line, content
+        assert!(
+            result.contains("#! file: pyproject.toml\n#! snapshot\n\n[project]"),
+            "Directive order and blank line should be preserved"
+        );
+    }
+
+    #[test]
+    fn test_update_code_block_preserves_assert_directive() {
+        let source = r#"# Test
+
+```text
+#! file: .venv/pyvenv.cfg
+#! assert: contains
+
+uv = old
+```
+"#;
+
+        let result = update_code_block_content(source, 3, "uv = new").unwrap();
+
+        assert!(
+            result.contains("#! file: .venv/pyvenv.cfg"),
+            "File directive should be preserved"
+        );
+        assert!(
+            result.contains("#! assert: contains"),
+            "Assert directive should be preserved"
+        );
+        assert!(result.contains("uv = new"));
+        assert!(!result.contains("uv = old"));
+    }
+
+    #[test]
+    fn test_update_code_block_preserves_working_dir_directive() {
+        let source = r"# Test
+
+```console
+#! working-dir: packages/foo
+$ uv lock
+old output
+```
+";
+
+        let result = update_code_block_content(source, 3, "$ uv lock\nnew output").unwrap();
+
+        assert!(
+            result.contains("#! working-dir: packages/foo"),
+            "Working-dir directive should be preserved"
+        );
+        assert!(result.contains("new output"));
+        assert!(!result.contains("old output"));
     }
 
     #[test]

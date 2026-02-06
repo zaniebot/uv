@@ -18,8 +18,115 @@ use libtest_mimic::{Arguments, Failed, Trial};
 use regex::Regex;
 use walkdir::WalkDir;
 
-use uv_mdtest::{MarkdownTestFile, PythonVersions, SnapshotMode, SnapshotUpdater};
+use serde::Deserialize;
+use uv_mdtest::{MarkdownTestFile, SnapshotMode, SnapshotUpdater};
 use uv_test::{READ_ONLY_GITHUB_TOKEN, TestContext, decode_token, get_bin};
+
+/// Uv-specific test configuration, deserialized from the `#! mdtest` TOML blocks.
+/// The framework merges the raw TOML; we deserialize the merged result here.
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "kebab-case", default)]
+struct UvTestConfig {
+    environment: UvEnvironmentConfig,
+    filters: UvFilterConfig,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "kebab-case", default)]
+struct UvEnvironmentConfig {
+    #[serde(alias = "python-version")]
+    python_versions: PythonVersions,
+    managed_python_versions: PythonVersions,
+    exclude_newer: Option<String>,
+    http_timeout: Option<String>,
+    concurrent_installs: Option<String>,
+    env: HashMap<String, String>,
+    env_remove: Vec<String>,
+    create_venv: Option<bool>,
+    required_features: Vec<String>,
+    // These are handled by the framework but still present in the raw TOML,
+    // so we need to accept them during deserialization.
+    #[serde(default)]
+    target_os: Option<toml::Value>,
+    #[serde(default)]
+    target_family: Option<toml::Value>,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "kebab-case", default)]
+struct UvFilterConfig {
+    counts: bool,
+    exe_suffix: bool,
+    python_names: bool,
+    virtualenv_bin: bool,
+    python_install_bin: bool,
+    python_sources: bool,
+    pyvenv_cfg: bool,
+    link_mode_warning: bool,
+    not_executable: bool,
+    python_keys: bool,
+    latest_python_versions: bool,
+    compiled_file_count: bool,
+    cyclonedx: bool,
+    collapse_whitespace: bool,
+    cache_size: bool,
+    cache_entry: bool,
+    missing_file_error: bool,
+}
+
+/// Python versions specification.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+enum PythonVersions {
+    #[default]
+    Default,
+    None,
+    Only(Vec<String>),
+}
+
+impl<'de> Deserialize<'de> for PythonVersions {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        use serde::de::{self, Visitor};
+        struct V;
+        impl<'de> Visitor<'de> for V {
+            type Value = PythonVersions;
+            fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                f.write_str("string or array of strings")
+            }
+            fn visit_str<E: de::Error>(self, v: &str) -> Result<Self::Value, E> {
+                Ok(PythonVersions::Only(vec![v.to_string()]))
+            }
+            fn visit_seq<A: de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
+                let mut versions = Vec::new();
+                while let Some(s) = seq.next_element::<String>()? {
+                    versions.push(s);
+                }
+                if versions.is_empty() {
+                    Ok(PythonVersions::None)
+                } else {
+                    Ok(PythonVersions::Only(versions))
+                }
+            }
+        }
+        deserializer.deserialize_any(V)
+    }
+}
+
+/// Deserialize a test's raw TOML config into our uv-specific struct.
+fn parse_uv_config(test: &uv_mdtest::MarkdownTest) -> UvTestConfig {
+    match test.config.raw.clone().try_into() {
+        Ok(config) => config,
+        Err(e) => {
+            eprintln!(
+                "Warning: failed to deserialize uv config for '{}': {e}",
+                test.name
+            );
+            UvTestConfig::default()
+        }
+    }
+}
 
 /// Convert a test name to a URL-friendly slug (like markdown anchors).
 fn slugify(name: &str) -> String {
@@ -55,8 +162,11 @@ fn main() {
         let source = fs::read_to_string(&path)
             .unwrap_or_else(|e| panic!("Failed to read {}: {e}", path.display()));
 
-        let test_file = MarkdownTestFile::parse(path.clone(), &source)
-            .unwrap_or_else(|e| panic!("Failed to parse {}: {e}", path.display()));
+        let test_file = match MarkdownTestFile::parse(path.clone(), &source) {
+            Ok(f) => f,
+            Err(uv_mdtest::ParseError::NoTests) => continue,
+            Err(e) => panic!("Failed to parse {}: {e}", path.display()),
+        };
 
         // Get relative path for display
         let relative_path = path
@@ -152,12 +262,14 @@ fn run_single_test(
     updater: &SnapshotUpdater,
     workspace_root: &Path,
 ) -> Result<(), Failed> {
+    let uv_config = parse_uv_config(test);
+
     // Get the Python versions from test config, combining managed and regular versions
-    let managed_versions: Vec<String> = match &test.config.environment.managed_python_versions {
+    let managed_versions: Vec<String> = match &uv_config.environment.managed_python_versions {
         PythonVersions::Default | PythonVersions::None => vec![],
         PythonVersions::Only(versions) => versions.clone(),
     };
-    let base_versions: Vec<String> = match &test.config.environment.python_versions {
+    let base_versions: Vec<String> = match &uv_config.environment.python_versions {
         PythonVersions::Default => vec!["3.12".to_string()],
         PythonVersions::None => vec![],
         PythonVersions::Only(versions) => versions.clone(),
@@ -178,34 +290,32 @@ fn run_single_test(
     // Create a TestContext for this test - this handles all the proper setup
     // Use new_with_versions_and_bin to avoid automatic venv creation, then conditionally create it
     let mut context = TestContext::new_with_versions_and_bin(&version_strs, get_bin!());
-    if test.config.environment.create_venv.unwrap_or(true) {
+    if uv_config.environment.create_venv.unwrap_or(true) {
         context.reset_venv();
     }
 
     // Apply environment options from test config
-    if let Some(exclude_newer) = &test.config.environment.exclude_newer {
+    if let Some(exclude_newer) = &uv_config.environment.exclude_newer {
         context = context.with_exclude_newer(exclude_newer);
     }
-    if let Some(http_timeout) = &test.config.environment.http_timeout {
+    if let Some(http_timeout) = &uv_config.environment.http_timeout {
         context = context.with_http_timeout(http_timeout);
     }
-    if let Some(concurrent_installs) = &test.config.environment.concurrent_installs {
+    if let Some(concurrent_installs) = &uv_config.environment.concurrent_installs {
         context = context.with_concurrent_installs(concurrent_installs);
     }
 
     // Set up git-lfs config if the test requires it
-    if test
-        .config
+    if uv_config
         .environment
         .required_features
-        .as_slice()
         .contains(&"git-lfs".to_string())
     {
         context = context.with_git_lfs_config();
     }
 
     // Apply custom environment variables from test config
-    for (key, value) in &test.config.environment.env {
+    for (key, value) in &uv_config.environment.env {
         context = context.with_env(key, value);
     }
 
@@ -221,12 +331,12 @@ fn run_single_test(
     }
 
     // Remove environment variables from test config
-    for key in &test.config.environment.env_remove {
+    for key in &uv_config.environment.env_remove {
         context = context.with_env_remove(key);
     }
 
     // Apply filter options from test config
-    let filters_config = &test.config.filters;
+    let filters_config = &uv_config.filters;
     if filters_config.counts {
         context = context.with_filtered_counts();
     }
@@ -292,6 +402,27 @@ fn run_single_test(
     // Note: File creation is now handled by the runner in document order
     let temp_dir_path = context.temp_dir.path().to_path_buf();
     let command_builder = |cmd_str: &str| -> Command {
+        // Check if this command needs to be run through a shell
+        // Shell operators: &&, ||, ;, |, >, <, etc.
+        // Environment variable assignments at start: VAR=value command
+        let needs_shell = cmd_str.contains("&&")
+            || cmd_str.contains("||")
+            || cmd_str.contains(';')
+            || cmd_str.contains('|')
+            || cmd_str.contains('>')
+            || cmd_str.contains('<')
+            || cmd_str
+                .split_whitespace()
+                .next()
+                .is_some_and(|first| first.contains('='));
+
+        if needs_shell {
+            let mut command = Command::new("sh");
+            command.arg("-c").arg(cmd_str);
+            context.add_shared_env(&mut command, true);
+            return command;
+        }
+
         // Parse the command using shlex to properly handle quoted strings
         let Some(parts) = shlex::split(cmd_str) else {
             return Command::new("false");
@@ -377,8 +508,15 @@ fn run_single_test(
     let mut substitutions = HashMap::new();
 
     // Add built-in platform-specific variables
-    let platform_vars = uv_mdtest::get_platform_variables();
-    substitutions.extend(platform_vars);
+    if cfg!(unix) {
+        substitutions.insert("VENV_BIN".to_string(), "bin".to_string());
+        substitutions.insert("PATH_SEP".to_string(), ":".to_string());
+        substitutions.insert("EXE_SUFFIX".to_string(), String::new());
+    } else if cfg!(windows) {
+        substitutions.insert("VENV_BIN".to_string(), "Scripts".to_string());
+        substitutions.insert("PATH_SEP".to_string(), ";".to_string());
+        substitutions.insert("EXE_SUFFIX".to_string(), ".exe".to_string());
+    }
 
     // Always provide workspace root for referencing test fixtures
     substitutions.insert(
@@ -387,11 +525,9 @@ fn run_single_test(
     );
 
     // Provide GitHub token if the test requires github access
-    if test
-        .config
+    if uv_config
         .environment
         .required_features
-        .as_slice()
         .contains(&"github".to_string())
     {
         let token = decode_token(READ_ONLY_GITHUB_TOKEN);

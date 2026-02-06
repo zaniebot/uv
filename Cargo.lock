@@ -6584,6 +6584,7 @@ name = "uv-mdtest"
 version = "0.0.15"
 dependencies = [
  "fs-err",
+ "libc",
  "pulldown-cmark",
  "regex",
  "serde",
@@ -6591,7 +6592,6 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.17",
  "toml",
- "uv-platform",
  "uv-static",
 ]
 
