@@ -129,7 +129,7 @@ pub(crate) async fn install(
     let requirement = match &request {
         // Ex) `ruff`
         ToolRequest::Package {
-            target: Target::Unspecified(.., name, extras),
+            target: Target::Name(name, extras),
             ..
         } => {
             if editable {
@@ -209,7 +209,7 @@ pub(crate) async fn install(
         }
         // Ex) `ruff@0.6.0`
         ToolRequest::Package {
-            target: Target::Version(.., name, extras, version),
+            target: Target::Version(name, extras, version),
             ..
         } => {
             if editable {
@@ -233,7 +233,7 @@ pub(crate) async fn install(
         }
         // Ex) `ruff@latest`
         ToolRequest::Package {
-            target: Target::Latest(.., name, extras),
+            target: Target::Latest(name, extras),
             ..
         } => {
             if editable {
@@ -265,7 +265,7 @@ pub(crate) async fn install(
 
     // For `@latest`, fetch the latest version and create a constraint.
     let latest = if let ToolRequest::Package {
-        target: Target::Latest(_, name, _),
+        target: Target::Latest(name, _),
         ..
     } = &request
     {

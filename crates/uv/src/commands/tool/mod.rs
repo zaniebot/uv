@@ -2,8 +2,9 @@ use std::str::FromStr;
 
 use tracing::debug;
 
-use uv_normalize::{ExtraName, PackageName};
+use uv_normalize::PackageName;
 use uv_pep440::Version;
+use uv_pep508::VerbatimUrl;
 use uv_python::PythonRequest;
 
 mod common;
@@ -73,7 +74,7 @@ impl<'a> ToolRequest<'a> {
         )
     }
 
-    /// Convert an [`Unspecified`](Target::Unspecified) target to [`Latest`](Target::Latest).
+    /// Convert a [`Name`](Target::Name) target to [`Latest`](Target::Latest).
     pub(crate) fn into_latest(self) -> Self {
         match self {
             Self::Package { executable, target } => Self::Package {
@@ -88,69 +89,46 @@ impl<'a> ToolRequest<'a> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum Target<'a> {
     /// A bare package name, e.g., `ruff` or `flask[dotenv]`.
-    Unspecified(&'a str, PackageName, Box<[ExtraName]>),
+    Name(PackageName, Box<[uv_normalize::ExtraName]>),
     /// A raw requirement string that needs PEP 508 / URL / path parsing,
     /// e.g., `ruff>=0.6.0`, `git+https://...`, or `./local-path`.
     Requirement(&'a str),
     /// e.g., `ruff[extra]@0.6.0`
-    Version(&'a str, PackageName, Box<[ExtraName]>, Version),
+    Version(PackageName, Box<[uv_normalize::ExtraName]>, Version),
     /// e.g., `ruff[extra]@latest`
-    Latest(&'a str, PackageName, Box<[ExtraName]>),
+    Latest(PackageName, Box<[uv_normalize::ExtraName]>),
 }
 
 impl<'a> Target<'a> {
-    /// Parse a target into a command name and a requirement.
+    /// Parse a target into a package name and version/requirement.
     pub(crate) fn parse(target: &'a str) -> Self {
-        // If there's no `@`, try to parse as a bare package name (with optional extras).
+        // If there's no `@`, check if it's a bare package name or a more complex requirement.
         let Some((name, version)) = target.split_once('@') else {
             return Self::parse_bare(target);
         };
 
-        // e.g. `ruff@`, warn and treat the whole thing as the command
+        // e.g. `ruff@`, warn and treat as bare
         if version.is_empty() {
             debug!("Ignoring empty version request in command");
             return Self::parse_bare(target);
         }
 
-        // Split into name and extras (e.g., `flask[dotenv]`).
-        let (executable, extras) = match name.split_once('[') {
-            Some((executable, extras)) => {
-                let Some(extras) = extras.strip_suffix(']') else {
-                    // e.g., ignore `flask[dotenv`.
-                    return Self::parse_bare(target);
-                };
-                (executable, extras)
-            }
-            None => (name, ""),
-        };
-
-        // e.g., ignore `git+https://github.com/astral-sh/ruff.git@main`
-        let Ok(name) = PackageName::from_str(executable) else {
+        // Parse the name portion (before `@`) as a package name with optional extras.
+        let Some((package_name, extras)) = Self::parse_name_and_extras(name) else {
+            // e.g., `git+https://github.com/astral-sh/ruff.git@main`
             debug!("Ignoring non-package name `{name}` in command");
-            return Self::parse_bare(target);
-        };
-
-        // e.g., ignore `ruff[1.0.0]` or any other invalid extra.
-        let Ok(extras) = extras
-            .split(',')
-            .map(str::trim)
-            .filter(|extra| !extra.is_empty())
-            .map(ExtraName::from_str)
-            .collect::<Result<Box<_>, _>>()
-        else {
-            debug!("Ignoring invalid extras `{extras}` in command");
             return Self::parse_bare(target);
         };
 
         match version {
             // e.g., `ruff@latest`
-            "latest" => Self::Latest(executable, name, extras),
+            "latest" => Self::Latest(package_name, extras),
             // e.g., `ruff@0.6.0`
             version => {
                 if let Ok(version) = Version::from_str(version) {
-                    Self::Version(executable, name, extras, version)
+                    Self::Version(package_name, extras, version)
                 } else {
-                    // e.g. `ruff@invalid`, warn and treat the whole thing as the command
+                    // e.g. `ruff@invalid`, warn and treat as bare
                     debug!("Ignoring invalid version request `{version}` in command");
                     Self::parse_bare(target)
                 }
@@ -158,44 +136,33 @@ impl<'a> Target<'a> {
         }
     }
 
-    /// Try to parse `target` as a bare package name with optional extras (e.g., `ruff` or
-    /// `flask[dotenv]`). Falls back to [`Requirement`](Target::Requirement) for anything
-    /// that doesn't parse as a valid package name.
+    /// Try to parse `target` as a bare package name with optional extras.
+    /// Falls back to [`Requirement`](Target::Requirement) for anything else.
     fn parse_bare(target: &'a str) -> Self {
-        // Split into name and extras (e.g., `flask[dotenv]`).
-        let (name, extras_str) = match target.split_once('[') {
-            Some((name, rest)) => {
-                let Some(extras) = rest.strip_suffix(']') else {
-                    return Self::Requirement(target);
-                };
-                (name, extras)
+        // Try PEP 508 parsing - if it succeeds with no version specifier, it's a bare name.
+        if let Ok(req) = uv_pep508::Requirement::<VerbatimUrl>::from_str(target) {
+            if req.version_or_url.is_none() && req.marker.is_true() {
+                return Self::Name(req.name, req.extras);
             }
-            None => (target, ""),
-        };
-
-        let Ok(package_name) = PackageName::from_str(name) else {
-            return Self::Requirement(target);
-        };
-
-        let Ok(extras) = extras_str
-            .split(',')
-            .map(str::trim)
-            .filter(|extra| !extra.is_empty())
-            .map(ExtraName::from_str)
-            .collect::<Result<Box<_>, _>>()
-        else {
-            return Self::Requirement(target);
-        };
-
-        Self::Unspecified(name, package_name, extras)
+        }
+        Self::Requirement(target)
     }
 
-    /// Convert an [`Unspecified`](Target::Unspecified) target to [`Latest`](Target::Latest).
+    /// Parse a name with optional extras, e.g., `flask` or `flask[dotenv]`.
+    fn parse_name_and_extras(input: &str) -> Option<(PackageName, Box<[uv_normalize::ExtraName]>)> {
+        // Try PEP 508 parsing
+        let req = uv_pep508::Requirement::<VerbatimUrl>::from_str(input).ok()?;
+        // Only accept if it's just a name (with optional extras), no version/url/markers
+        if req.version_or_url.is_some() || !req.marker.is_true() {
+            return None;
+        }
+        Some((req.name, req.extras))
+    }
+
+    /// Convert a [`Name`](Target::Name) target to [`Latest`](Target::Latest).
     pub(crate) fn into_latest(self) -> Self {
         match self {
-            Self::Unspecified(name, package_name, extras) => {
-                Self::Latest(name, package_name, extras)
-            }
+            Self::Name(package_name, extras) => Self::Latest(package_name, extras),
             other => other,
         }
     }
@@ -204,22 +171,18 @@ impl<'a> Target<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use uv_normalize::ExtraName;
 
     #[test]
     fn parse_target() {
         // Bare package name.
         let target = Target::parse("flask");
-        let expected = Target::Unspecified(
-            "flask",
-            PackageName::from_str("flask").unwrap(),
-            Box::new([]),
-        );
+        let expected = Target::Name(PackageName::from_str("flask").unwrap(), Box::new([]));
         assert_eq!(target, expected);
 
         // Bare package name with extras.
         let target = Target::parse("flask[dotenv]");
-        let expected = Target::Unspecified(
-            "flask",
+        let expected = Target::Name(
             PackageName::from_str("flask").unwrap(),
             Box::new([ExtraName::from_str("dotenv").unwrap()]),
         );
@@ -236,7 +199,6 @@ mod tests {
         // Version pinned via `@`.
         let target = Target::parse("flask@3.0.0");
         let expected = Target::Version(
-            "flask",
             PackageName::from_str("flask").unwrap(),
             Box::new([]),
             Version::new([3, 0, 0]),
@@ -245,17 +207,12 @@ mod tests {
 
         // Latest via `@latest`.
         let target = Target::parse("flask@latest");
-        let expected = Target::Latest(
-            "flask",
-            PackageName::from_str("flask").unwrap(),
-            Box::new([]),
-        );
+        let expected = Target::Latest(PackageName::from_str("flask").unwrap(), Box::new([]));
         assert_eq!(target, expected);
 
         // Version with extras.
         let target = Target::parse("flask[dotenv]@3.0.0");
         let expected = Target::Version(
-            "flask",
             PackageName::from_str("flask").unwrap(),
             Box::new([ExtraName::from_str("dotenv").unwrap()]),
             Version::new([3, 0, 0]),
@@ -265,7 +222,6 @@ mod tests {
         // Latest with extras.
         let target = Target::parse("flask[dotenv]@latest");
         let expected = Target::Latest(
-            "flask",
             PackageName::from_str("flask").unwrap(),
             Box::new([ExtraName::from_str("dotenv").unwrap()]),
         );
@@ -286,16 +242,16 @@ mod tests {
         let target = Target::parse("ruff").into_latest();
         assert_eq!(
             target,
-            Target::Latest("ruff", PackageName::from_str("ruff").unwrap(), Box::new([]))
+            Target::Latest(PackageName::from_str("ruff").unwrap(), Box::new([]))
         );
 
         // Package with extras is converted.
         let target = Target::parse("flask[dotenv]").into_latest();
-        assert!(matches!(target, Target::Latest("flask", _, _)));
+        assert!(matches!(target, Target::Latest(..)));
 
         // Already-latest is unchanged.
         let target = Target::parse("ruff@latest").into_latest();
-        assert!(matches!(target, Target::Latest("ruff", _, _)));
+        assert!(matches!(target, Target::Latest(..)));
 
         // Version-pinned is unchanged.
         let target = Target::parse("ruff@0.6.0").into_latest();

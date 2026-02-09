@@ -813,10 +813,10 @@ async fn get_or_create_environment(
         } => {
             let (executable, requirement) = match target {
                 // Ex) `ruff`
-                Target::Unspecified(executable, name, extras) => {
+                Target::Name(name, extras) => {
                     let executable = request_executable
                         .map(ToString::to_string)
-                        .unwrap_or_else(|| (*executable).to_string());
+                        .unwrap_or_else(|| name.to_string());
                     let requirement = Requirement {
                         name: name.clone(),
                         extras: extras.clone(),
@@ -880,10 +880,10 @@ async fn get_or_create_environment(
                     (executable, requirement)
                 }
                 // Ex) `ruff@0.6.0`
-                Target::Version(executable, name, extras, version) => {
+                Target::Version(name, extras, version) => {
                     let executable = request_executable
                         .map(ToString::to_string)
-                        .unwrap_or_else(|| (*executable).to_string());
+                        .unwrap_or_else(|| name.to_string());
                     let requirement = Requirement {
                         name: name.clone(),
                         extras: extras.clone(),
@@ -902,10 +902,10 @@ async fn get_or_create_environment(
                     (executable, requirement)
                 }
                 // Ex) `ruff@latest`
-                Target::Latest(executable, name, extras) => {
+                Target::Latest(name, extras) => {
                     let executable = request_executable
                         .map(ToString::to_string)
-                        .unwrap_or_else(|| (*executable).to_string());
+                        .unwrap_or_else(|| name.to_string());
                     let requirement = Requirement {
                         name: name.clone(),
                         extras: extras.clone(),
@@ -932,7 +932,7 @@ async fn get_or_create_environment(
 
     // For `@latest`, fetch the latest version and create a constraint.
     let latest = if let ToolRequest::Package {
-        target: Target::Latest(_, name, _),
+        target: Target::Latest(name, _),
         ..
     } = &request
     {
