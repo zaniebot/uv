@@ -25,7 +25,7 @@ use uv_fs::{CWD, LockedFile, LockedFileError, LockedFileMode, Simplified};
 use uv_git::ResolvedRepositoryReference;
 use uv_installer::{InstallationStrategy, SatisfiesResult, SitePackages};
 use uv_normalize::{DEV_DEPENDENCIES, DefaultGroups, ExtraName, GroupName, PackageName};
-use uv_pep440::{TildeVersionSpecifier, Version, VersionSpecifiers};
+use uv_pep440::{TildeVersionSpecifier, Version, VersionSpecifiers, release_specifiers_to_ranges};
 use uv_pep508::MarkerTreeContents;
 use uv_preview::{Preview, PreviewFeature};
 use uv_pypi_types::{ConflictItem, ConflictKind, ConflictSet, Conflicts};
@@ -614,6 +614,42 @@ fn validate_script_requires_python(
             ))
         }
     }
+}
+
+/// Returns `true` when the Python request from a `.python-version` file is compatible with
+/// `requires-python`.
+fn python_request_compatible_with_requires_python(
+    request: &PythonRequest,
+    requires_python: &RequiresPython,
+) -> bool {
+    if let Some(version) = request.as_pep440_version() {
+        return requires_python.contains(&version);
+    }
+
+    let request_specifiers = match request {
+        PythonRequest::Version(VersionRequest::Range(specifiers, _))
+        | PythonRequest::ImplementationVersion(_, VersionRequest::Range(specifiers, _)) => {
+            Some(specifiers)
+        }
+        PythonRequest::Key(download_request) => {
+            if let Some(VersionRequest::Range(specifiers, _)) = download_request.version() {
+                Some(specifiers)
+            } else {
+                None
+            }
+        }
+        _ => None,
+    };
+
+    let Some(request_specifiers) = request_specifiers else {
+        return true;
+    };
+
+    let request_range = release_specifiers_to_ranges(request_specifiers.clone());
+    let requires_python_range = release_specifiers_to_ranges(requires_python.specifiers().clone());
+    !request_range
+        .intersection(&requires_python_range)
+        .is_empty()
 }
 
 /// An interpreter suitable for a PEP 723 script.
@@ -1257,48 +1293,96 @@ pub(crate) struct ScriptPython {
 }
 
 impl ScriptPython {
-    /// Determine the [`ScriptPython`] for the current [`Workspace`].
+    /// Determine the [`ScriptPython`] for the current [`Pep723Script`].
     pub(crate) async fn from_request(
         python_request: Option<PythonRequest>,
         workspace: Option<&Workspace>,
         script: Pep723ItemRef<'_>,
         no_config: bool,
     ) -> Result<Self, ProjectError> {
-        // First, discover a requirement from the workspace
-        let WorkspacePython {
-            mut source,
-            mut python_request,
-            requires_python,
-        } = WorkspacePython::from_request(
-            python_request,
-            workspace,
-            // Scripts have no groups to hang requires-python settings off of
-            &DependencyGroupsWithDefaults::none(),
-            script.path().and_then(Path::parent).unwrap_or(&**CWD),
-            no_config,
-        )
-        .await?;
+        let script_requires_python = script
+            .metadata()
+            .requires_python
+            .as_ref()
+            .map(RequiresPython::from_specifiers);
 
-        // If the script has a `requires-python` specifier, prefer that over one from the workspace.
-        let requires_python =
-            if let Some(requires_python_specifiers) = script.metadata().requires_python.as_ref() {
-                if python_request.is_none() {
-                    python_request = Some(PythonRequest::Version(VersionRequest::Range(
-                        requires_python_specifiers.clone(),
-                        PythonVariant::Default,
-                    )));
-                    source = PythonRequestSource::RequiresPython;
+        let workspace_requires_python = workspace
+            .map(|workspace| find_requires_python(workspace, &DependencyGroupsWithDefaults::none()))
+            .transpose()?
+            .flatten();
+
+        let workspace_root = workspace.map(Workspace::install_path);
+        let project_dir = script.path().and_then(Path::parent).unwrap_or(&**CWD);
+
+        let (source, python_request) = if let Some(request) = python_request {
+            // (1) Explicit request from user
+            (PythonRequestSource::UserRequest, Some(request))
+        } else if let Some(file) = PythonVersionFile::discover(
+            project_dir,
+            &VersionFileDiscoveryOptions::default()
+                .with_stop_discovery_at(workspace_root.map(PathBuf::as_ref))
+                .with_no_config(no_config),
+        )
+        .await?
+        .filter(|file| {
+            // Ignore version files that are incompatible with the script's `requires-python`
+            match (file.version(), script_requires_python.as_ref()) {
+                (Some(request), Some(requires_python)) => {
+                    python_request_compatible_with_requires_python(request, requires_python)
                 }
-                Some((
-                    RequiresPython::from_specifiers(requires_python_specifiers),
-                    RequiresPythonSource::Script,
-                ))
-            } else {
-                requires_python.map(|requirement| (requirement, RequiresPythonSource::Project))
-            };
+                _ => true,
+            }
+        })
+        .filter(|file| {
+            // Ignore global version files that are incompatible with the workspace `requires-python`
+            if !file.is_global() {
+                return true;
+            }
+            match (file.version(), workspace_requires_python.as_ref()) {
+                (Some(request), Some(requires_python)) => {
+                    python_request_compatible_with_requires_python(request, requires_python)
+                }
+                _ => true,
+            }
+        }) {
+            // (2) Request from `.python-version`
+            (
+                PythonRequestSource::DotPythonVersion(file.clone()),
+                file.version().cloned(),
+            )
+        } else if let Some(specifiers) = script.metadata().requires_python.as_ref() {
+            // (3) `requires-python` from script metadata
+            let request = PythonRequest::Version(VersionRequest::Range(
+                specifiers.clone(),
+                PythonVariant::Default,
+            ));
+            (PythonRequestSource::RequiresPython, Some(request))
+        } else {
+            // (4) `requires-python` from workspace `pyproject.toml`
+            let request = workspace_requires_python
+                .as_ref()
+                .map(RequiresPython::specifiers)
+                .map(|specifiers| {
+                    PythonRequest::Version(VersionRequest::Range(
+                        specifiers.clone(),
+                        PythonVariant::Default,
+                    ))
+                });
+            (PythonRequestSource::RequiresPython, request)
+        };
+
+        let requires_python = if let Some(requires_python) = script_requires_python {
+            Some((requires_python, RequiresPythonSource::Script))
+        } else {
+            workspace_requires_python
+                .map(|requires_python| (requires_python, RequiresPythonSource::Project))
+        };
 
         if let Some(python_request) = python_request.as_ref() {
-            debug!("Using Python request {python_request} from {source}");
+            debug!(
+                "Using Python request `{}` from {source}",
+                python_request.to_canonical_string()
+            );
         }
 
         Ok(Self {
@@ -2983,6 +3067,8 @@ fn format_optional_requires_python_sources(
 
 #[cfg(test)]
 mod tests {
+    use std::str::FromStr;
+
     use super::*;
 
     #[test]
@@ -2994,5 +3080,53 @@ mod tests {
         assert_eq!(cache_name("foo-bar_baz_"), Some("foo-bar-baz".into()));
         assert_eq!(cache_name("foo-_bar_baz"), Some("foo-bar-baz".into()));
         assert_eq!(cache_name("_+-_"), None);
+    }
+
+    #[test]
+    fn python_request_compatible_with_requires_python_exact() {
+        let requires_python =
+            RequiresPython::from_specifiers(&VersionSpecifiers::from_str(">=3.12").unwrap());
+
+        assert!(python_request_compatible_with_requires_python(
+            &PythonRequest::parse("3.12"),
+            &requires_python,
+        ));
+
+        assert!(!python_request_compatible_with_requires_python(
+            &PythonRequest::parse("3.11"),
+            &requires_python,
+        ));
+    }
+
+    #[test]
+    fn python_request_compatible_with_requires_python_range() {
+        let requires_python =
+            RequiresPython::from_specifiers(&VersionSpecifiers::from_str(">=3.12").unwrap());
+
+        assert!(python_request_compatible_with_requires_python(
+            &PythonRequest::parse(">=3.12,<3.13"),
+            &requires_python,
+        ));
+
+        assert!(!python_request_compatible_with_requires_python(
+            &PythonRequest::parse(">=3.10,<3.12"),
+            &requires_python,
+        ));
+    }
+
+    #[test]
+    fn python_request_compatible_with_requires_python_implementation_range() {
+        let requires_python =
+            RequiresPython::from_specifiers(&VersionSpecifiers::from_str(">=3.12").unwrap());
+
+        assert!(python_request_compatible_with_requires_python(
+            &PythonRequest::parse("cpython@>=3.12,<3.13"),
+            &requires_python,
+        ));
+
+        assert!(!python_request_compatible_with_requires_python(
+            &PythonRequest::parse("cpython@>=3.10,<3.12"),
+            &requires_python,
+        ));
     }
 }
