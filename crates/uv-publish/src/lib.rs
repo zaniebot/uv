@@ -130,6 +130,8 @@ pub enum PublishSendError {
     StatusNoBody(StatusCode, #[source] reqwest::Error),
     #[error("Server returned status code {0}. Server says: {1}")]
     Status(StatusCode, String),
+    #[error("Server returned status code {0}. {1}")]
+    StatusProblemDetails(StatusCode, String),
     #[error(
         "POST requests are not supported by the endpoint, are you using the simple index URL instead of the upload URL?"
     )]
@@ -1403,7 +1405,10 @@ fn build_metadata_request<'a>(
 }
 
 /// Log response information and map response to an error variant if not successful.
-async fn handle_response(registry: &Url, response: Response) -> Result<(), PublishSendError> {
+async fn handle_response(
+    registry: &DisplaySafeUrl,
+    response: Response,
+) -> Result<(), PublishSendError> {
     let status_code = response.status();
     debug!("Response code for {registry}: {status_code}");
     trace!("Response headers for {registry}: {response:?}");
@@ -1447,6 +1452,18 @@ async fn handle_response(registry: &Url, response: Response) -> Result<(), Publi
                 upload_error.to_string(),
                 content_type.as_deref(),
             ),
+        ));
+    }
+
+    // Try to parse as RFC 9457 Problem Details (e.g., from pyx).
+    if content_type.as_deref() == Some(uv_client::ProblemDetails::CONTENT_TYPE)
+        && let Some(problem) =
+            uv_client::ProblemDetails::try_from_response_body(upload_error.as_bytes())
+        && let Some(description) = problem.description()
+    {
+        return Err(PublishSendError::StatusProblemDetails(
+            status_code,
+            description,
         ));
     }
 
@@ -2169,6 +2186,75 @@ mod tests {
             @"
         error: Failed to publish `../../test/links/tqdm-4.66.1-py3-none-manylinux_2_12_x86_64.manylinux2010_x86_64.musllinux_1_1_x86_64.whl` to https://different.auth.tld/final/
           Caused by: Redirected URL is not in the same realm. Redirected to: https://different.auth.tld/final/
+        "
+        );
+    }
+
+    /// PyPI returns `application/json` with a `code` field.
+    #[tokio::test]
+    async fn upload_error_pypi_json() {
+        let mock_server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/final"))
+            .respond_with(
+                ResponseTemplate::new(400)
+                    .insert_header("content-type", "application/json")
+                    .set_body_raw(
+                        r#"{"message": "The server could not comply with the request since it is either malformed or otherwise incorrect.\n\n\nError: Use 'source' as Python version for an sdist.\n\n", "code": "400 Error: Use 'source' as Python version for an sdist.", "title": "Bad Request"}"#,
+                        "application/json",
+                    ),
+            )
+            .mount(&mock_server)
+            .await;
+
+        let err = mock_server_upload(&mock_server).await.unwrap_err();
+
+        let mut capture = String::new();
+        write_error_chain(&err, &mut capture, "error", AnsiColors::Red).unwrap();
+
+        let capture = capture.replace(&mock_server.uri(), "[SERVER]");
+        let capture = anstream::adapter::strip_str(&capture);
+        assert_snapshot!(
+            &capture,
+            @"
+        error: Failed to publish `../../test/links/tqdm-4.66.1-py3-none-manylinux_2_12_x86_64.manylinux2010_x86_64.musllinux_1_1_x86_64.whl` to [SERVER]/final
+          Caused by: Server returned status code 400 Bad Request. Server says: 400 Error: Use 'source' as Python version for an sdist.
+        "
+        );
+    }
+
+    /// pyx returns `application/problem+json` with RFC 9457 Problem Details.
+    #[tokio::test]
+    async fn upload_error_problem_details() {
+        let mock_server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/final"))
+            .respond_with(
+                ResponseTemplate::new(400)
+                    .insert_header(
+                        "content-type",
+                        uv_client::ProblemDetails::CONTENT_TYPE,
+                    )
+                    .set_body_raw(
+                        r#"{"type": "about:blank", "status": 400, "title": "Bad Request", "detail": "Missing required field `name`"}"#,
+                        uv_client::ProblemDetails::CONTENT_TYPE,
+                    ),
+            )
+            .mount(&mock_server)
+            .await;
+
+        let err = mock_server_upload(&mock_server).await.unwrap_err();
+
+        let mut capture = String::new();
+        write_error_chain(&err, &mut capture, "error", AnsiColors::Red).unwrap();
+
+        let capture = capture.replace(&mock_server.uri(), "[SERVER]");
+        let capture = anstream::adapter::strip_str(&capture);
+        assert_snapshot!(
+            &capture,
+            @"
+        error: Failed to publish `../../test/links/tqdm-4.66.1-py3-none-manylinux_2_12_x86_64.manylinux2010_x86_64.musllinux_1_1_x86_64.whl` to [SERVER]/final
+          Caused by: Server returned status code 400 Bad Request. Server message: Bad Request, Missing required field `name`
         "
         );
     }

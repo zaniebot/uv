@@ -1432,7 +1432,7 @@ pub struct PipCompileArgs {
     /// Include optional dependencies from the specified extra name; may be provided more than once.
     ///
     /// Only applies to `pyproject.toml`, `setup.py`, and `setup.cfg` sources.
-    #[arg(long, conflicts_with = "all_extras", value_parser = extra_name_with_clap_error)]
+    #[arg(long, value_delimiter = ',', conflicts_with = "all_extras", value_parser = extra_name_with_clap_error)]
     pub extra: Option<Vec<ExtraName>>,
 
     /// Include all optional dependencies.
@@ -1789,7 +1789,7 @@ pub struct PipSyncArgs {
     /// Include optional dependencies from the specified extra name; may be provided more than once.
     ///
     /// Only applies to `pylock.toml`, `pyproject.toml`, `setup.py`, and `setup.cfg` sources.
-    #[arg(long, conflicts_with = "all_extras", value_parser = extra_name_with_clap_error)]
+    #[arg(long, value_delimiter = ',', conflicts_with = "all_extras", value_parser = extra_name_with_clap_error)]
     pub extra: Option<Vec<ExtraName>>,
 
     /// Include all optional dependencies.
@@ -2158,7 +2158,7 @@ pub struct PipInstallArgs {
     /// Include optional dependencies from the specified extra name; may be provided more than once.
     ///
     /// Only applies to `pylock.toml`, `pyproject.toml`, `setup.py`, and `setup.cfg` sources.
-    #[arg(long, conflicts_with = "all_extras", value_parser = extra_name_with_clap_error)]
+    #[arg(long, value_delimiter = ',', conflicts_with = "all_extras", value_parser = extra_name_with_clap_error)]
     pub extra: Option<Vec<ExtraName>>,
 
     /// Include all optional dependencies.
@@ -3171,8 +3171,15 @@ pub struct VenvArgs {
     /// absolute paths), the entrypoints and scripts themselves will _not_ be relocatable. In other
     /// words, copying those entrypoints and scripts to a location outside the environment will not
     /// work, as they reference paths relative to the environment itself.
-    #[arg(long)]
+    #[arg(long, overrides_with("no_relocatable"))]
     pub relocatable: bool,
+
+    /// Don't make the virtual environment relocatable.
+    ///
+    /// Disables the default relocatable behavior when the `relocatable-envs-default` preview
+    /// feature is enabled.
+    #[arg(long, overrides_with("relocatable"), hide = true)]
+    pub no_relocatable: bool,
 
     #[command(flatten)]
     pub index_args: IndexArgs,
@@ -3463,6 +3470,7 @@ pub struct RunArgs {
         long,
         conflicts_with = "all_extras",
         conflicts_with = "only_group",
+        value_delimiter = ',',
         value_parser = extra_name_with_clap_error,
         value_hint = ValueHint::Other,
     )]
@@ -3790,6 +3798,7 @@ pub struct SyncArgs {
         long,
         conflicts_with = "all_extras",
         conflicts_with = "only_group",
+        value_delimiter = ',',
         value_parser = extra_name_with_clap_error,
         value_hint = ValueHint::Other,
     )]
@@ -4797,7 +4806,7 @@ pub struct ExportArgs {
     /// Include optional dependencies from the specified extra name.
     ///
     /// May be provided more than once.
-    #[arg(long, conflicts_with = "all_extras", conflicts_with = "only_group", value_parser = extra_name_with_clap_error)]
+    #[arg(long, value_delimiter = ',', conflicts_with = "all_extras", conflicts_with = "only_group", value_parser = extra_name_with_clap_error)]
     pub extra: Option<Vec<ExtraName>>,
 
     /// Include all optional dependencies.
@@ -5068,9 +5077,20 @@ pub struct FormatArgs {
 
     /// The version of Ruff to use for formatting.
     ///
-    /// By default, a version of Ruff pinned by uv will be used.
+    /// Accepts either a version (e.g., `0.8.2`) which will be treated as an exact pin,
+    /// a version specifier (e.g., `>=0.8.0`), or `latest` to use the latest available version.
+    ///
+    /// By default, a pinned version of Ruff will be used.
     #[arg(long, value_hint = ValueHint::Other)]
     pub version: Option<String>,
+
+    /// Limit candidate Ruff versions to those released prior to the given date.
+    ///
+    /// Accepts a superset of [RFC 3339](https://www.rfc-editor.org/rfc/rfc3339.html) (e.g.,
+    /// `2006-12-02T02:07:43Z`) or local date in the same format (e.g. `2006-12-02`), as well as
+    /// durations relative to "now" (e.g., `-1 week`).
+    #[arg(long, env = EnvVars::UV_EXCLUDE_NEWER)]
+    pub exclude_newer: Option<ExcludeNewerValue>,
 
     /// Additional arguments to pass to Ruff.
     ///
@@ -5086,6 +5106,13 @@ pub struct FormatArgs {
     /// project.
     #[arg(long)]
     pub no_project: bool,
+
+    /// Display the version of Ruff that will be used for formatting.
+    ///
+    /// This is useful for verifying which version was resolved when using version constraints
+    /// (e.g., `--version ">=0.8.0"`) or `--version latest`.
+    #[arg(long, hide = true)]
+    pub show_version: bool,
 }
 
 #[derive(Args)]
@@ -6417,6 +6444,12 @@ pub struct PythonFindArgs {
     /// Show the Python version that would be used instead of the path to the interpreter.
     #[arg(long)]
     pub show_version: bool,
+
+    /// Resolve symlinks in the output path.
+    ///
+    /// When enabled, the output path will be canonicalized, resolving any symlinks.
+    #[arg(long)]
+    pub resolve_links: bool,
 
     /// URL pointing to JSON of custom Python installations.
     #[arg(long, value_hint = ValueHint::Other)]

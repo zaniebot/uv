@@ -498,7 +498,6 @@ hint: If you are running a script with `{}` in the shebang, you may need to incl
                     false,
                     false,
                     false,
-                    preview,
                 )?;
 
                 Some(environment.into_interpreter())
@@ -717,7 +716,6 @@ hint: If you are running a script with `{}` in the shebang, you may need to incl
                     false,
                     false,
                     false,
-                    preview,
                 )?
             } else {
                 // If we're not isolating the environment, reuse the base environment for the
@@ -954,7 +952,6 @@ hint: If you are running a script with `{}` in the shebang, you may need to incl
                     false,
                     false,
                     false,
-                    preview,
                 )?;
                 venv.into_interpreter()
             } else {
@@ -1082,7 +1079,6 @@ hint: If you are running a script with `{}` in the shebang, you may need to incl
                 false,
                 false,
                 false,
-                preview,
             )
         })
         .transpose()?
@@ -1609,7 +1605,7 @@ impl RunCommand {
 
     /// Return the directory containing the script, if any.
     fn script_dir(&self) -> Option<&Path> {
-        match self {
+        let parent = match self {
             Self::PythonScript(target, _)
             | Self::PythonGuiScript(target, _)
             | Self::PythonZipapp(target, _) => target.parent(),
@@ -1621,7 +1617,9 @@ impl RunCommand {
             | Self::PythonRemote(..)
             | Self::External(..)
             | Self::Empty => None,
-        }
+        };
+        // The parent is `Some("")` for bare filenames.
+        parent.filter(|parent| !parent.as_os_str().is_empty())
     }
 }
 

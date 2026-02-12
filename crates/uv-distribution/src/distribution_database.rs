@@ -90,11 +90,12 @@ impl<'a, Context: BuildContext> DistributionDatabase<'a, Context> {
     /// Handle a specific `reqwest` error, and convert it to [`io::Error`].
     fn handle_response_errors(&self, err: reqwest::Error) -> io::Error {
         if err.is_timeout() {
+            // Assumption: The connect timeout with the 10s default is not the culprit.
             io::Error::new(
                 io::ErrorKind::TimedOut,
                 format!(
                     "Failed to download distribution due to network timeout. Try increasing UV_HTTP_TIMEOUT (current value: {}s).",
-                    self.client.unmanaged.timeout().as_secs()
+                    self.client.unmanaged.read_timeout().as_secs()
                 ),
             )
         } else {
@@ -605,6 +606,8 @@ impl<'a, Context: BuildContext> DistributionDatabase<'a, Context> {
         // Create an entry for the HTTP cache.
         let http_entry = wheel_entry.with_file(format!("{}.http", filename.cache_key()));
 
+        let query_url = &url.clone();
+
         let download = |response: reqwest::Response| {
             async {
                 let size = size.or_else(|| content_length(&response));
@@ -633,7 +636,7 @@ impl<'a, Context: BuildContext> DistributionDatabase<'a, Context> {
                         let mut reader = ProgressReader::new(&mut hasher, progress, &**reporter);
                         match extension {
                             WheelExtension::Whl => {
-                                uv_extract::stream::unzip(&mut reader, temp_dir.path())
+                                uv_extract::stream::unzip(query_url, &mut reader, temp_dir.path())
                                     .await
                                     .map_err(|err| Error::Extract(filename.to_string(), err))?;
                             }
@@ -646,7 +649,7 @@ impl<'a, Context: BuildContext> DistributionDatabase<'a, Context> {
                     }
                     None => match extension {
                         WheelExtension::Whl => {
-                            uv_extract::stream::unzip(&mut hasher, temp_dir.path())
+                            uv_extract::stream::unzip(query_url, &mut hasher, temp_dir.path())
                                 .await
                                 .map_err(|err| Error::Extract(filename.to_string(), err))?;
                         }
@@ -776,6 +779,8 @@ impl<'a, Context: BuildContext> DistributionDatabase<'a, Context> {
         // Create an entry for the HTTP cache.
         let http_entry = wheel_entry.with_file(format!("{}.http", filename.cache_key()));
 
+        let query_url = &url.clone();
+
         let download = |response: reqwest::Response| {
             async {
                 let size = size.or_else(|| content_length(&response));
@@ -855,7 +860,7 @@ impl<'a, Context: BuildContext> DistributionDatabase<'a, Context> {
 
                     match extension {
                         WheelExtension::Whl => {
-                            uv_extract::stream::unzip(&mut hasher, temp_dir.path())
+                            uv_extract::stream::unzip(query_url, &mut hasher, temp_dir.path())
                                 .await
                                 .map_err(|err| Error::Extract(filename.to_string(), err))?;
                         }
@@ -1045,7 +1050,7 @@ impl<'a, Context: BuildContext> DistributionDatabase<'a, Context> {
             // Unzip the wheel to a temporary directory.
             match extension {
                 WheelExtension::Whl => {
-                    uv_extract::stream::unzip(&mut hasher, temp_dir.path())
+                    uv_extract::stream::unzip(path.display(), &mut hasher, temp_dir.path())
                         .await
                         .map_err(|err| Error::Extract(filename.to_string(), err))?;
                 }

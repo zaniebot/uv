@@ -255,7 +255,8 @@ pub(crate) struct NetworkSettings {
     pub(crate) https_proxy: Option<ProxyUrl>,
     pub(crate) no_proxy: Option<Vec<String>>,
     pub(crate) allow_insecure_host: Vec<TrustedHost>,
-    pub(crate) timeout: Duration,
+    pub(crate) read_timeout: Duration,
+    pub(crate) connect_timeout: Duration,
     pub(crate) retries: u32,
 }
 
@@ -333,7 +334,8 @@ impl NetworkSettings {
             https_proxy,
             no_proxy,
             allow_insecure_host,
-            timeout: environment.http_timeout,
+            read_timeout: environment.http_read_timeout,
+            connect_timeout: environment.http_connect_timeout,
             retries: environment.http_retries,
         }
     }
@@ -1465,6 +1467,7 @@ impl PythonUninstallSettings {
 pub(crate) struct PythonFindSettings {
     pub(crate) request: Option<String>,
     pub(crate) show_version: bool,
+    pub(crate) resolve_links: bool,
     pub(crate) no_project: bool,
     pub(crate) system: bool,
     pub(crate) python_downloads_json_url: Option<String>,
@@ -1480,6 +1483,7 @@ impl PythonFindSettings {
         let PythonFindArgs {
             request,
             show_version,
+            resolve_links,
             no_project,
             system,
             no_system,
@@ -1507,6 +1511,7 @@ impl PythonFindSettings {
         Self {
             request,
             show_version,
+            resolve_links,
             no_project,
             system: flag(system, no_system, "system").unwrap_or_default(),
             python_downloads_json_url,
@@ -2435,7 +2440,9 @@ pub(crate) struct FormatSettings {
     pub(crate) diff: bool,
     pub(crate) extra_args: Vec<String>,
     pub(crate) version: Option<String>,
+    pub(crate) exclude_newer: Option<jiff::Timestamp>,
     pub(crate) no_project: bool,
+    pub(crate) show_version: bool,
 }
 
 impl FormatSettings {
@@ -2446,7 +2453,9 @@ impl FormatSettings {
             diff,
             extra_args,
             version,
+            exclude_newer,
             no_project,
+            show_version,
         } = args;
 
         Self {
@@ -2454,7 +2463,9 @@ impl FormatSettings {
             diff,
             extra_args,
             version,
+            exclude_newer: exclude_newer.map(|v| v.timestamp()),
             no_project,
+            show_version,
         }
     }
 }
@@ -3357,6 +3368,7 @@ pub(crate) struct VenvSettings {
     pub(crate) prompt: Option<String>,
     pub(crate) system_site_packages: bool,
     pub(crate) relocatable: bool,
+    pub(crate) no_relocatable: bool,
     pub(crate) no_project: bool,
     pub(crate) refresh: Refresh,
     pub(crate) settings: PipSettings,
@@ -3381,6 +3393,7 @@ impl VenvSettings {
             prompt,
             system_site_packages,
             relocatable,
+            no_relocatable,
             index_args,
             index_strategy,
             keyring_provider,
@@ -3406,6 +3419,7 @@ impl VenvSettings {
             system_site_packages,
             no_project,
             relocatable,
+            no_relocatable,
             refresh: Refresh::from(refresh),
             settings: PipSettings::combine(
                 PipOptions {

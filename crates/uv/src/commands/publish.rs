@@ -8,12 +8,14 @@ use futures::StreamExt;
 use owo_colors::{AnsiColors, OwoColorize};
 use tokio::sync::Semaphore;
 use tracing::{debug, info, trace};
-use uv_auth::{Credentials, DEFAULT_TOLERANCE_SECS, PyxTokenStore};
+use uv_auth::{Credentials, PyxTokenStore};
 use uv_cache::Cache;
 use uv_client::{
     AuthIntegration, BaseClient, BaseClientBuilder, RedirectPolicy, RegistryClientBuilder,
 };
-use uv_configuration::{Concurrency, KeyringProviderType, PublishFailureStrategy, TrustedPublishing};
+use uv_configuration::{
+    Concurrency, KeyringProviderType, PublishFailureStrategy, TrustedPublishing,
+};
 use uv_distribution_types::{IndexCapabilities, IndexLocations, IndexUrl};
 use uv_preview::{Preview, PreviewFeature};
 use uv_publish::{
@@ -143,20 +145,25 @@ pub(crate) async fn publish(
         // Disable automatic redirect, as the streaming publish request is not cloneable.
         // Rely on custom redirect logic instead.
         .redirect(RedirectPolicy::NoRedirect)
-        .timeout(environment.upload_http_timeout)
+        .read_timeout(environment.http_read_timeout_upload)
+        .connect_timeout(environment.http_connect_timeout)
+        .client_name("upload")
         .build();
     // For OIDC (trusted publishing), we need retries (GitHub's networking is unreliable)
     // and default timeouts.
     let oidc_client = client_builder
         .clone()
         .auth_integration(AuthIntegration::NoAuthMiddleware)
+        .client_name("oidc")
         .build();
     // For S3 uploads, we roll our own retry loop, use upload timeouts, and no auth middleware.
     let s3_client = client_builder
         .clone()
         .retries(0)
         .auth_integration(AuthIntegration::NoAuthMiddleware)
-        .timeout(environment.upload_http_timeout)
+        .read_timeout(environment.http_read_timeout_upload)
+        .connect_timeout(environment.http_connect_timeout)
+        .client_name("s3")
         .build();
 
     let retry_policy = client_builder.retry_policy();
@@ -179,7 +186,6 @@ pub(crate) async fn publish(
         keyring_provider,
         &token_store,
         &oidc_client,
-        &upload_client,
         check_url.as_ref(),
         Prompt::Enabled,
         printer,
@@ -297,12 +303,8 @@ pub(crate) async fn publish(
                             PublishError::PublishPrepare(group.file.clone(), Box::new(err)).into();
                         if dry_run {
                             let mut buf = String::new();
-                            let _ = write_error_chain(
-                                err.as_ref(),
-                                &mut buf,
-                                "error",
-                                AnsiColors::Red,
-                            );
+                            let _ =
+                                write_error_chain(err.as_ref(), &mut buf, "error", AnsiColors::Red);
                             reporter.println(buf.trim_end())?;
                             error_count.fetch_add(1, Ordering::Relaxed);
                             return Ok(None);
@@ -460,12 +462,7 @@ pub(crate) async fn publish(
 
                 let anyhow_err = err;
                 let mut buf = String::new();
-                let _ = write_error_chain(
-                    anyhow_err.as_ref(),
-                    &mut buf,
-                    "error",
-                    AnsiColors::Red,
-                );
+                let _ = write_error_chain(anyhow_err.as_ref(), &mut buf, "error", AnsiColors::Red);
                 reporter.println(buf.trim_end())?;
                 errors.push((filename, anyhow_err));
             }
@@ -492,6 +489,12 @@ pub(crate) async fn publish(
             .bold()
             .red()
         )?;
+        return Ok(ExitStatus::Failure);
+    }
+
+    if error_count > 0 {
+        let failed = if error_count == 1 { "file" } else { "files" };
+        writeln!(printer.stderr(), "Found issues with {error_count} {failed}")?;
         return Ok(ExitStatus::Failure);
     }
 
@@ -545,7 +548,6 @@ async fn gather_credentials(
     keyring_provider: KeyringProviderType,
     token_store: &PyxTokenStore,
     oidc_client: &BaseClient,
-    base_client: &BaseClient,
     check_url: Option<&IndexUrl>,
     prompt: Prompt,
     printer: Printer,
@@ -571,22 +573,6 @@ async fn gather_credentials(
             .expect("Failed to clear publish URL username");
     }
 
-    // If the user is publishing to pyx, load the credentials from the store.
-    if username.is_none() && password.is_none() {
-        if token_store.is_known_url(&publish_url) {
-            if let Some(token) = token_store
-                .access_token(
-                    base_client.for_host(token_store.api()).raw_client(),
-                    DEFAULT_TOLERANCE_SECS,
-                )
-                .await?
-            {
-                debug!("Using authentication token from the store");
-                return Ok((publish_url, Credentials::from(token)));
-            }
-        }
-    }
-
     // If applicable, attempt obtaining a token for trusted publishing.
     let trusted_publishing_token = check_trusted_publishing(
         username.as_deref(),
@@ -604,9 +590,14 @@ async fn gather_credentials(
             (Some("__token__".to_string()), Some(password.to_string()))
         } else {
             if username.is_none() && password.is_none() {
-                match prompt {
-                    Prompt::Enabled => prompt_username_and_password()?,
-                    Prompt::Disabled => (None, None),
+                // Skip prompting for pyx URLs; the auth middleware will handle authentication.
+                if token_store.is_known_url(&publish_url) {
+                    (None, None)
+                } else {
+                    match prompt {
+                        Prompt::Enabled => prompt_username_and_password()?,
+                        Prompt::Disabled => (None, None),
+                    }
                 }
             } else {
                 (username, password)
@@ -621,7 +612,10 @@ async fn gather_credentials(
         );
     }
 
-    if username.is_none() && password.is_none() && keyring_provider == KeyringProviderType::Disabled
+    if username.is_none()
+        && password.is_none()
+        && keyring_provider == KeyringProviderType::Disabled
+        && !token_store.is_known_url(&publish_url)
     {
         if let TrustedPublishResult::Ignored(err) = trusted_publishing_token {
             // The user has configured something incorrectly:
@@ -717,7 +711,6 @@ mod tests {
             TrustedPublishing::Never,
             KeyringProviderType::Disabled,
             &token_store,
-            &client,
             &client,
             None,
             Prompt::Disabled,
