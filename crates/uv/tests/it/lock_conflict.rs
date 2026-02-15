@@ -15347,3 +15347,164 @@ fn conflict_item_unknown_field() -> Result<()> {
 
     Ok(())
 }
+
+/// Test that many pairwise conflicts sharing a common extra don't cause
+/// exponential fork growth. This mimics the pattern seen in projects like
+/// sktime, where CI pin extras (e.g., `dependencies_lowest`) conflict with
+/// many independent task extras (e.g., `forecasting`, `classification`).
+///
+/// Without optimization, N pairwise conflicts involving the same extra would
+/// create O(2^N) forks. With the optimization, this stays small.
+#[test]
+fn many_pairwise_conflicts_shared_extra() -> Result<()> {
+    let context = uv_test::test_context!("3.12");
+
+    // A project with:
+    // - `pinned`: pins sortedcontainers==2.3.0 (old version for CI testing)
+    // - `a` through `e`: each uses sortedcontainers>=2.4
+    // - Each task extra conflicts with `pinned` pairwise
+    // - The task extras do NOT conflict with each other
+    let pyproject_toml = context.temp_dir.child("pyproject.toml");
+    pyproject_toml.write_str(
+        r#"
+        [project]
+        name = "project"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        dependencies = []
+
+        [project.optional-dependencies]
+        pinned = ["sortedcontainers==2.3.0"]
+        a = ["sortedcontainers>=2.4"]
+        b = ["sortedcontainers>=2.4"]
+        c = ["sortedcontainers>=2.4"]
+        d = ["sortedcontainers>=2.4"]
+        e = ["sortedcontainers>=2.4"]
+
+        [tool.uv]
+        conflicts = [
+            [
+              { extra = "pinned" },
+              { extra = "a" },
+            ],
+            [
+              { extra = "pinned" },
+              { extra = "b" },
+            ],
+            [
+              { extra = "pinned" },
+              { extra = "c" },
+            ],
+            [
+              { extra = "pinned" },
+              { extra = "d" },
+            ],
+            [
+              { extra = "pinned" },
+              { extra = "e" },
+            ],
+        ]
+        "#,
+    )?;
+
+    // This should resolve quickly — not hang due to exponential forking.
+    uv_snapshot!(context.filters(), context.lock(), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Resolved 3 packages in [TIME]
+    ");
+
+    let lock = context.read("uv.lock");
+
+    // The lock file should have exactly 2 versions of sortedcontainers:
+    // 2.3.0 for pinned and 2.4.0 for the task extras.
+    insta::with_settings!({
+        filters => context.filters(),
+    }, {
+        assert_snapshot!(
+            lock, @r#"
+        version = 1
+        revision = 3
+        requires-python = ">=3.12"
+        conflicts = [[
+            { package = "project", extra = "a" },
+            { package = "project", extra = "pinned" },
+        ], [
+            { package = "project", extra = "b" },
+            { package = "project", extra = "pinned" },
+        ], [
+            { package = "project", extra = "c" },
+            { package = "project", extra = "pinned" },
+        ], [
+            { package = "project", extra = "d" },
+            { package = "project", extra = "pinned" },
+        ], [
+            { package = "project", extra = "e" },
+            { package = "project", extra = "pinned" },
+        ]]
+
+        [options]
+        exclude-newer = "2024-03-25T00:00:00Z"
+
+        [[package]]
+        name = "project"
+        version = "0.1.0"
+        source = { virtual = "." }
+
+        [package.optional-dependencies]
+        a = [
+            { name = "sortedcontainers", version = "2.4.0", source = { registry = "https://pypi.org/simple" } },
+        ]
+        b = [
+            { name = "sortedcontainers", version = "2.4.0", source = { registry = "https://pypi.org/simple" } },
+        ]
+        c = [
+            { name = "sortedcontainers", version = "2.4.0", source = { registry = "https://pypi.org/simple" } },
+        ]
+        d = [
+            { name = "sortedcontainers", version = "2.4.0", source = { registry = "https://pypi.org/simple" } },
+        ]
+        e = [
+            { name = "sortedcontainers", version = "2.4.0", source = { registry = "https://pypi.org/simple" } },
+        ]
+        pinned = [
+            { name = "sortedcontainers", version = "2.3.0", source = { registry = "https://pypi.org/simple" } },
+        ]
+
+        [package.metadata]
+        requires-dist = [
+            { name = "sortedcontainers", marker = "extra == 'a'", specifier = ">=2.4" },
+            { name = "sortedcontainers", marker = "extra == 'b'", specifier = ">=2.4" },
+            { name = "sortedcontainers", marker = "extra == 'c'", specifier = ">=2.4" },
+            { name = "sortedcontainers", marker = "extra == 'd'", specifier = ">=2.4" },
+            { name = "sortedcontainers", marker = "extra == 'e'", specifier = ">=2.4" },
+            { name = "sortedcontainers", marker = "extra == 'pinned'", specifier = "==2.3.0" },
+        ]
+        provides-extras = ["pinned", "a", "b", "c", "d", "e"]
+
+        [[package]]
+        name = "sortedcontainers"
+        version = "2.3.0"
+        source = { registry = "https://pypi.org/simple" }
+        sdist = { url = "https://files.pythonhosted.org/packages/14/10/6a9481890bae97da9edd6e737c9c3dec6aea3fc2fa53b0934037b35c89ea/sortedcontainers-2.3.0.tar.gz", hash = "sha256:59cc937650cf60d677c16775597c89a960658a09cf7c1a668f86e1e4464b10a1", size = 30509, upload-time = "2020-11-09T00:03:52.258Z" }
+        wheels = [
+            { url = "https://files.pythonhosted.org/packages/20/4d/a7046ae1a1a4cc4e9bbed194c387086f06b25038be596543d026946330c9/sortedcontainers-2.3.0-py2.py3-none-any.whl", hash = "sha256:37257a32add0a3ee490bb170b599e93095eed89a55da91fa9f48753ea12fd73f", size = 29479, upload-time = "2020-11-09T00:03:50.723Z" },
+        ]
+
+        [[package]]
+        name = "sortedcontainers"
+        version = "2.4.0"
+        source = { registry = "https://pypi.org/simple" }
+        sdist = { url = "https://files.pythonhosted.org/packages/e8/c4/ba2f8066cceb6f23394729afe52f3bf7adec04bf9ed2c820b39e19299111/sortedcontainers-2.4.0.tar.gz", hash = "sha256:25caa5a06cc30b6b83d11423433f65d1f9d76c4c6a0c90e3379eaa43b9bfdb88", size = 30594, upload-time = "2021-05-16T22:03:42.897Z" }
+        wheels = [
+            { url = "https://files.pythonhosted.org/packages/32/46/9cb0e58b2deb7f82b84065f37f3bffeb12413f947f9388e4cac22c4621ce/sortedcontainers-2.4.0-py2.py3-none-any.whl", hash = "sha256:a163dcaede0f1c021485e957a39245190e74249897e2ae4b2aa38595db237ee0", size = 29575, upload-time = "2021-05-16T22:03:41.177Z" },
+        ]
+        "#
+        );
+    });
+
+    Ok(())
+}
