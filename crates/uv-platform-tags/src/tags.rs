@@ -165,6 +165,14 @@ impl Tags {
             if matches!(platform.os(), Os::Manylinux { .. }) && !manylinux_compatible {
                 platform_tags.retain(|tag| !tag.is_manylinux());
             }
+            // When cross-compiling for a manylinux platform (e.g., via `--python-platform
+            // x86_64-manylinux2014`), exclude native `linux_*` tags. Unlike manylinux tags,
+            // native `linux_*` wheels carry no glibc compatibility guarantees — they may have
+            // been built against any glibc version. Including them would undermine the purpose
+            // of specifying a manylinux target platform.
+            if matches!(platform.os(), Os::Manylinux { .. }) && manylinux_compatible && is_cross {
+                platform_tags.retain(|tag| !matches!(tag, PlatformTag::Linux { .. }));
+            }
             platform_tags
         };
 
@@ -2204,6 +2212,75 @@ mod tests {
         py31-none-any
         py30-none-any
         "
+        );
+    }
+
+    /// When cross-compiling for a manylinux platform (e.g., via `--python-platform
+    /// x86_64-manylinux2014`), native `linux_*` tags should be excluded. Unlike manylinux tags,
+    /// native `linux_*` wheels carry no glibc compatibility guarantees.
+    #[test]
+    fn test_cross_manylinux_excludes_native_linux() {
+        let tags = Tags::from_env(
+            &Platform::new(
+                Os::Manylinux {
+                    major: 2,
+                    minor: 17,
+                },
+                Arch::X86_64,
+            ),
+            (3, 12),
+            "cpython",
+            (3, 12),
+            true,
+            false,
+            true, // is_cross
+        )
+        .unwrap();
+
+        // Verify no `linux_x86_64` tags are present.
+        let tag_string = tags.to_string();
+        assert!(
+            !tag_string.contains("linux_x86_64"),
+            "cross-compiled manylinux tags should not contain native linux_x86_64, but found:\n{tag_string}"
+        );
+
+        // Verify manylinux tags are still present.
+        assert!(
+            tag_string.contains("manylinux_2_17_x86_64"),
+            "cross-compiled manylinux tags should contain manylinux_2_17_x86_64"
+        );
+        assert!(
+            tag_string.contains("manylinux_2_5_x86_64"),
+            "cross-compiled manylinux tags should contain manylinux_2_5_x86_64"
+        );
+    }
+
+    /// When NOT cross-compiling (local interpreter), native `linux_*` tags should still be
+    /// included for backward compatibility.
+    #[test]
+    fn test_local_manylinux_includes_native_linux() {
+        let tags = Tags::from_env(
+            &Platform::new(
+                Os::Manylinux {
+                    major: 2,
+                    minor: 17,
+                },
+                Arch::X86_64,
+            ),
+            (3, 12),
+            "cpython",
+            (3, 12),
+            true,
+            false,
+            false, // is_cross
+        )
+        .unwrap();
+
+        // Verify `linux_x86_64` tags are present for local installs.
+        let tag_string = tags.to_string();
+        assert!(
+            tag_string.contains("linux_x86_64"),
+            "local manylinux tags should contain native linux_x86_64"
         );
     }
 
