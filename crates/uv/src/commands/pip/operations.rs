@@ -8,6 +8,7 @@ use std::sync::Arc;
 use anyhow::{Context, anyhow};
 use itertools::Itertools;
 use owo_colors::OwoColorize;
+use petgraph::visit::EdgeRef;
 use tracing::debug;
 
 use uv_cache::Cache;
@@ -23,7 +24,7 @@ use uv_distribution_types::{
     NameRequirementSpecification, Requirement, ResolutionDiagnostic, UnresolvedRequirement,
     UnresolvedRequirementSpecification, VersionOrUrlRef,
 };
-use uv_distribution_types::{DistributionMetadata, InstalledMetadata, Name, Resolution};
+use uv_distribution_types::{DistributionMetadata, InstalledMetadata, Name, Node, Resolution};
 use uv_fs::Simplified;
 use uv_install_wheel::LinkMode;
 use uv_installer::{InstallationStrategy, Plan, Planner, Preparer, SitePackages};
@@ -694,6 +695,9 @@ pub(crate) async fn install(
     // Notify the user of any environment modifications.
     logger.on_complete(&changelog, printer, dry_run)?;
 
+    // Emit hints for any downgraded packages.
+    diagnose_downgrades(&changelog, resolution, printer)?;
+
     Ok(changelog)
 }
 
@@ -1016,6 +1020,9 @@ fn report_dry_run(
 
     logger.on_complete(&changelog, printer, dry_run)?;
 
+    // Emit hints for any downgraded packages.
+    diagnose_downgrades(&changelog, resolution, printer)?;
+
     if matches!(dry_run, DryRun::Check) {
         return Err(Error::OutdatedEnvironment);
     }
@@ -1038,6 +1045,98 @@ pub(crate) fn diagnose_resolution(
             diagnostic.message().bold()
         )?;
     }
+    Ok(())
+}
+
+/// Report hints for any packages that were downgraded during installation.
+#[expect(clippy::result_large_err)]
+pub(crate) fn diagnose_downgrades(
+    changelog: &Changelog,
+    resolution: &Resolution,
+    printer: Printer,
+) -> Result<(), Error> {
+    // Build a map of uninstalled packages: name -> version.
+    let mut uninstalled_versions: BTreeMap<&PackageName, &Version> = BTreeMap::new();
+    for dist in &changelog.uninstalled {
+        if let Some(version) = dist.version() {
+            uninstalled_versions.insert(dist.name(), version);
+        }
+    }
+
+    // For each installed package, check if it replaced a higher version (i.e., a downgrade).
+    let mut downgrades: Vec<(&PackageName, &Version, &Version)> = Vec::new();
+    for dist in &changelog.installed {
+        let Some(new_version) = dist.version() else {
+            continue;
+        };
+        let Some(old_version) = uninstalled_versions.get(dist.name()) else {
+            continue;
+        };
+        if new_version < *old_version {
+            downgrades.push((dist.name(), old_version, new_version));
+        }
+    }
+
+    if downgrades.is_empty() {
+        return Ok(());
+    }
+
+    // Sort by package name for deterministic output.
+    downgrades.sort_by(|a, b| a.0.cmp(b.0));
+
+    // Build a map from package name to node index in the resolution graph.
+    let graph = resolution.graph();
+    let mut name_to_index: BTreeMap<&PackageName, petgraph::graph::NodeIndex> = BTreeMap::new();
+    for index in graph.node_indices() {
+        if let Node::Dist {
+            dist,
+            install: true,
+            ..
+        } = &graph[index]
+        {
+            name_to_index.insert(dist.name(), index);
+        }
+    }
+
+    for (name, old_version, new_version) in &downgrades {
+        // Find dependents by walking incoming edges in the resolution graph.
+        let dependents: Vec<String> = name_to_index
+            .get(name)
+            .map(|&node_index| {
+                graph
+                    .edges_directed(node_index, petgraph::Direction::Incoming)
+                    .filter_map(|edge| match &graph[edge.source()] {
+                        Node::Dist {
+                            dist,
+                            install: true,
+                            ..
+                        } => Some(format!("`{}=={}`", dist.name(), dist.version()?)),
+                        _ => None,
+                    })
+                    .sorted_unstable()
+                    .dedup()
+                    .collect()
+            })
+            .unwrap_or_default();
+
+        if dependents.is_empty() {
+            writeln!(
+                printer.stderr(),
+                "  {}{} `{name}` was downgraded from `{old_version}` to `{new_version}`",
+                "hint".bold().cyan(),
+                ":".bold(),
+            )?;
+        } else {
+            writeln!(
+                printer.stderr(),
+                "  {}{} `{name}` was downgraded from `{old_version}` to `{new_version}` to satisfy {}",
+                "hint".bold().cyan(),
+                ":".bold(),
+                dependents.join(", "),
+            )?;
+        }
+    }
+
     Ok(())
 }
 

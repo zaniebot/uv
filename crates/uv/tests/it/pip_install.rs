@@ -1359,6 +1359,7 @@ fn allow_incompatibilities() -> Result<()> {
     Installed 1 package in [TIME]
      - jinja2==3.1.3
      + jinja2==2.11.3
+      hint: `jinja2` was downgraded from `3.1.3` to `2.11.3`
     warning: The package `flask` requires `jinja2>=3.1.2`, but `2.11.3` is installed
     "
     );
@@ -1550,6 +1551,7 @@ fn install_editable_and_registry() {
     Installed 1 package in [TIME]
      - black==24.3.0
      + black==0.1.0 (from file://[WORKSPACE]/test/packages/black_editable)
+      hint: `black` was downgraded from `24.3.0` to `0.1.0`
     "
     );
 
@@ -3219,6 +3221,7 @@ fn cache_priority() {
     Installed 1 package in [TIME]
      - idna==3.6
      + idna==3.0
+      hint: `idna` was downgraded from `3.6` to `3.0`
     "
     );
 
@@ -3487,6 +3490,73 @@ fn install_no_downgrade() -> Result<()> {
      - idna==1000 (from file://[TEMP_DIR]/idna)
      + idna==3.6
      ~ sniffio==1.3.1
+      hint: `idna` was downgraded from `1000` to `3.6` to satisfy `anyio==4.3.0`
+    "
+    );
+
+    Ok(())
+}
+
+/// Show a hint when a package is downgraded during installation.
+#[test]
+fn install_downgrade_hint() -> Result<()> {
+    let context = uv_test::test_context!("3.12");
+
+    // Install an old version of `anyio` and its dependencies.
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("anyio==3.6.2"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Resolved 3 packages in [TIME]
+    Prepared 3 packages in [TIME]
+    Installed 3 packages in [TIME]
+     + anyio==3.6.2
+     + idna==3.6
+     + sniffio==1.3.1
+    "
+    );
+
+    // Create a local package that requires `idna<3.5`, forcing a downgrade.
+    let requires_old_idna = context.temp_dir.child("requires_old_idna");
+    requires_old_idna
+        .child("pyproject.toml")
+        .write_str(indoc! {r#"
+        [project]
+        name = "requires-old-idna"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        dependencies = ["idna<3.5"]
+
+        [build-system]
+        requires = ["setuptools>=42"]
+        build-backend = "setuptools.build_meta"
+    "#})?;
+    requires_old_idna
+        .child("requires_old_idna")
+        .create_dir_all()?;
+    requires_old_idna
+        .child("requires_old_idna/__init__.py")
+        .write_str("")?;
+
+    // Install the local package, which should downgrade `idna`.
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("./requires_old_idna"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Resolved 2 packages in [TIME]
+    Prepared 2 packages in [TIME]
+    Uninstalled 1 package in [TIME]
+    Installed 2 packages in [TIME]
+     - idna==3.6
+     + idna==3.4
+     + requires-old-idna==0.1.0 (from file://[TEMP_DIR]/requires_old_idna)
+      hint: `idna` was downgraded from `3.6` to `3.4` to satisfy `requires-old-idna==0.1.0`
     "
     );
 
@@ -4479,6 +4549,7 @@ requires-python = ">=3.8"
      - anyio==4.0.0
      + anyio==3.7.1
      ~ example==0.0.0 (from file://[TEMP_DIR]/editable)
+      hint: `anyio` was downgraded from `4.0.0` to `3.7.1` to satisfy `example==0.0.0`
     "
     );
 
@@ -4627,6 +4698,7 @@ requires-python = ">=3.8"
      - anyio==4.0.0
      + anyio==3.7.1
      ~ example==0.0.0 (from file://[TEMP_DIR]/editable)
+      hint: `anyio` was downgraded from `4.0.0` to `3.7.1` to satisfy `example==0.0.0`
     "
     );
 
@@ -5053,6 +5125,7 @@ fn path_name_version_change() {
     Installed 1 package in [TIME]
      - ok==2.0.0 (from file://[WORKSPACE]/test/links/ok-2.0.0-py3-none-any.whl)
      + ok==1.0.0 (from file://[WORKSPACE]/test/links/ok-1.0.0-py3-none-any.whl)
+      hint: `ok` was downgraded from `2.0.0` to `1.0.0`
     "
     );
 }
@@ -6580,6 +6653,7 @@ fn already_installed_local_version_of_remote_package() {
      + anyio==4.3.0
      + idna==3.6
      + sniffio==1.3.1
+      hint: `anyio` was downgraded from `4.3.0+foo` to `4.3.0`
     "
     );
 
@@ -10881,6 +10955,7 @@ fn no_sources_workspace_discovery() -> Result<()> {
      - anyio==4.3.0
      + anyio==2.0.0 (from file://[TEMP_DIR]/anyio)
      ~ foo==1.0.0 (from file://[TEMP_DIR]/)
+      hint: `anyio` was downgraded from `4.3.0` to `2.0.0` to satisfy `foo==1.0.0`
     "
     );
 
@@ -10921,6 +10996,7 @@ fn no_sources_workspace_discovery() -> Result<()> {
      - anyio==4.3.0
      + anyio==2.0.0 (from file://[TEMP_DIR]/anyio)
      ~ foo==1.0.0 (from file://[TEMP_DIR]/)
+      hint: `anyio` was downgraded from `4.3.0` to `2.0.0` to satisfy `foo==1.0.0`
     "
     );
 
@@ -13068,6 +13144,7 @@ fn pip_install_build_dependencies_respect_locked_versions() -> Result<()> {
      + anyio==3.7.1
      ~ child==0.1.0 (from file://[TEMP_DIR]/child)
      ~ parent==0.1.0 (from file://[TEMP_DIR]/)
+      hint: `anyio` was downgraded from `4.0.0` to `3.7.1` to satisfy `parent==0.1.0`
     ");
 
     Ok(())

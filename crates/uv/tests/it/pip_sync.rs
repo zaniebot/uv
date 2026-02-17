@@ -2479,6 +2479,7 @@ fn sync_editable_and_registry() -> Result<()> {
     Installed 1 package in [TIME]
      - black==24.1.0
      + black==0.1.0 (from file://[TEMP_DIR]/black_editable)
+      hint: `black` was downgraded from `24.1.0` to `0.1.0`
     "
     );
 
@@ -5250,6 +5251,7 @@ fn target_built_distribution() -> Result<()> {
     Installed 1 package in [TIME]
      - iniconfig==2.0.0
      + iniconfig==1.1.1
+      hint: `iniconfig` was downgraded from `2.0.0` to `1.1.1`
     ");
 
     // Remove it, and replace with `flask`, which includes a binary.
@@ -5506,6 +5508,7 @@ fn prefix() -> Result<()> {
     Installed 1 package in [TIME]
      - iniconfig==2.0.0
      + iniconfig==1.1.1
+      hint: `iniconfig` was downgraded from `2.0.0` to `1.1.1`
     ");
 
     Ok(())

@@ -1740,6 +1740,7 @@ fn sync_build_isolation_package_order() -> Result<()> {
      - source-distribution==0.0.3 (from https://files.pythonhosted.org/packages/1f/e5/5b016c945d745f8b108e759d428341488a6aee8f51f07c6c4e33498bb91f/source_distribution-0.0.3.tar.gz)
      + source-distribution==0.0.1 (from https://files.pythonhosted.org/packages/10/1f/57aa4cce1b1abf6b433106676e15f9fa2c92ed2bd4cf77c3b50a9e9ac773/source_distribution-0.0.1.tar.gz)
      + trove-classifiers==2024.3.3
+      hint: `source-distribution` was downgraded from `0.0.3` to `0.0.1`
     ");
 
     assert!(context.temp_dir.child("uv.lock").exists());
@@ -11573,6 +11574,7 @@ fn multiple_group_conflicts() -> Result<()> {
     Installed 1 package in [TIME]
      - iniconfig==2.0.0
      + iniconfig==1.1.1
+      hint: `iniconfig` was downgraded from `2.0.0` to `1.1.1`
     ");
 
     uv_snapshot!(context.filters(), context.sync().arg("--group").arg("foo").arg("--group").arg("bar"), @"
@@ -11860,6 +11862,7 @@ fn transitive_group_conflicts_siblings() -> Result<()> {
     Installed 1 package in [TIME]
      - anyio==4.3.0
      + anyio==3.7.1
+      hint: `anyio` was downgraded from `4.3.0` to `3.7.1`
     ");
 
     uv_snapshot!(context.filters(), context.sync().arg("--group").arg("dev2"), @"
@@ -13787,6 +13790,7 @@ fn sync_build_dependencies_respect_locked_versions() -> Result<()> {
      - anyio==4.0.0
      + anyio==3.7.1
      ~ child==0.1.0 (from file://[TEMP_DIR]/child)
+      hint: `anyio` was downgraded from `4.0.0` to `3.7.1`
     ");
 
     // Now, we'll set a constraint in the parent project
