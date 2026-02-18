@@ -9,18 +9,19 @@
 //! |-------------------------------------|----------------|--------------------------------------------------------|
 //! | `/simple/{pkg}/`                    | No             | Simple API JSON, file URLs → `/files/…`                |
 //! | `/relative/simple/{pkg}/`           | No             | Simple API JSON, file URLs are relative (`../../../files/…`) |
-//! | `/files/…`                          | No             | 302 redirect → `files.pythonhosted.org`                |
+//! | `/files/…`                          | No             | Serves vendored file from `test/vendor/`               |
 //! | `/basic-auth/simple/{pkg}/`         | `public:heron` | Simple API JSON, file URLs → `/basic-auth/files/…`     |
 //! | `/basic-auth/relative/simple/{pkg}/`| `public:heron` | Simple API JSON, file URLs are relative                |
-//! | `/basic-auth/files/…`              | `public:heron` | 302 redirect → `files.pythonhosted.org`                |
+//! | `/basic-auth/files/…`              | `public:heron` | Serves vendored file from `test/vendor/`               |
 //! | `/basic-auth-heron/simple/{pkg}/`   | `public:heron` | Same as basic-auth but separate location               |
-//! | `/basic-auth-heron/files/…`        | `public:heron` | 302 redirect → `files.pythonhosted.org`                |
+//! | `/basic-auth-heron/files/…`        | `public:heron` | Serves vendored file from `test/vendor/`               |
 //! | `/basic-auth-eagle/simple/{pkg}/`   | `public:eagle` | Same, different password                               |
-//! | `/basic-auth-eagle/files/…`        | `public:eagle` | 302 redirect → `files.pythonhosted.org`                |
+//! | `/basic-auth-eagle/files/…`        | `public:eagle` | Serves vendored file from `test/vendor/`               |
 
 use std::collections::HashMap;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
+use std::path::Path;
 
 use serde_json::json;
 
@@ -304,15 +305,16 @@ impl PypiProxy {
 /// - `/basic-auth-eagle/simple/{pkg}/` — authenticated Simple API (public:eagle)
 /// - `/relative/simple/{pkg}/` — unauthenticated Simple API with relative file links
 /// - `/basic-auth/relative/simple/{pkg}/` — authenticated Simple API with relative file links
-/// - `/files/…` — unauthenticated file redirect to `files.pythonhosted.org`
-/// - `/basic-auth/files/…` — authenticated file redirect (public:heron)
-/// - `/basic-auth-heron/files/…` — authenticated file redirect (public:heron)
-/// - `/basic-auth-eagle/files/…` — authenticated file redirect (public:eagle)
+/// - `/files/…` — unauthenticated, serves vendored file
+/// - `/basic-auth/files/…` — authenticated (public:heron), serves vendored file
+/// - `/basic-auth-heron/files/…` — authenticated (public:heron), serves vendored file
+/// - `/basic-auth-eagle/files/…` — authenticated (public:eagle), serves vendored file
 pub(crate) async fn start() -> PypiProxy {
     use wiremock::{Mock, MockServer, Request, ResponseTemplate};
 
     let server = MockServer::start().await;
     let db = package_database();
+    let files = vendor_files();
     let server_uri = server.uri();
 
     // We use a single `respond_with` closure that inspects the request path and auth header
@@ -328,12 +330,14 @@ pub(crate) async fn start() -> PypiProxy {
                 .and_then(parse_basic_auth);
 
             // Route: /basic-auth/files/...
+            // Redirect to /files/ (unauthenticated) after verifying credentials,
+            // matching the original behavior of redirecting to files.pythonhosted.org.
             if let Some(rest) = path.strip_prefix("/basic-auth/files/") {
                 if auth
                     .as_ref()
                     .is_some_and(|(u, p)| u == "public" && p == "heron")
                 {
-                    let target = format!("https://files.pythonhosted.org/{rest}");
+                    let target = format!("{server_uri}/files/{rest}");
                     return ResponseTemplate::new(302).insert_header("Location", target);
                 }
                 return unauthorized_response();
@@ -345,7 +349,7 @@ pub(crate) async fn start() -> PypiProxy {
                     .as_ref()
                     .is_some_and(|(u, p)| u == "public" && p == "heron")
                 {
-                    let target = format!("https://files.pythonhosted.org/{rest}");
+                    let target = format!("{server_uri}/files/{rest}");
                     return ResponseTemplate::new(302).insert_header("Location", target);
                 }
                 return unauthorized_response();
@@ -357,16 +361,15 @@ pub(crate) async fn start() -> PypiProxy {
                     .as_ref()
                     .is_some_and(|(u, p)| u == "public" && p == "eagle")
                 {
-                    let target = format!("https://files.pythonhosted.org/{rest}");
+                    let target = format!("{server_uri}/files/{rest}");
                     return ResponseTemplate::new(302).insert_header("Location", target);
                 }
                 return unauthorized_response();
             }
 
-            // Route: /files/...  (unauthenticated)
+            // Route: /files/...  (unauthenticated, serves vendored files)
             if let Some(rest) = path.strip_prefix("/files/") {
-                let target = format!("https://files.pythonhosted.org/{rest}");
-                return ResponseTemplate::new(302).insert_header("Location", target);
+                return serve_vendor_file(rest, &files);
             }
 
             // Route: /basic-auth/relative/simple/{pkg}/
@@ -442,12 +445,10 @@ pub(crate) async fn start() -> PypiProxy {
             }
 
             // Route: /simple/{pkg}/  (unauthenticated)
-            // Unlike authenticated routes, file URLs point directly to files.pythonhosted.org
-            // (matching the behavior of the original fly.dev proxy).
             if let Some(pkg) = extract_package_name(path, "/simple/") {
                 if let Some(entries) = db.get(pkg) {
-                    let file_prefix = "https://files.pythonhosted.org";
-                    let body = build_simple_api_response(pkg, entries, file_prefix);
+                    let file_prefix = format!("{server_uri}/files");
+                    let body = build_simple_api_response(pkg, entries, &file_prefix);
                     return simple_api_response(&body);
                 }
                 return ResponseTemplate::new(404);
@@ -459,6 +460,44 @@ pub(crate) async fn start() -> PypiProxy {
         .await;
 
     PypiProxy { server }
+}
+
+/// Load vendored package files into a map from filename to bytes.
+///
+/// These files live in `test/vendor/` at the workspace root and correspond to
+/// the packages in [`package_database`].
+fn vendor_files() -> HashMap<String, Vec<u8>> {
+    let vendor_dir = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(Path::parent)
+        .expect("CARGO_MANIFEST_DIR should be nested under workspace root")
+        .join("test/vendor");
+
+    let mut files = HashMap::new();
+    for entry in package_database().values().flatten() {
+        let path = vendor_dir.join(entry.filename);
+        let bytes = std::fs::read(&path)
+            .unwrap_or_else(|e| panic!("failed to read vendor file {}: {e}", path.display()));
+        files.insert(entry.filename.to_string(), bytes);
+    }
+    files
+}
+
+/// Serve a vendored file by extracting the filename from a PyPI-style path.
+///
+/// The path looks like `packages/ef/a6/.../iniconfig-2.0.0-py3-none-any.whl`.
+/// We extract the last segment and look it up in the vendor file map.
+fn serve_vendor_file(rest: &str, files: &HashMap<String, Vec<u8>>) -> wiremock::ResponseTemplate {
+    let filename = rest.rsplit('/').next().unwrap_or(rest);
+    if let Some(bytes) = files.get(filename) {
+        wiremock::ResponseTemplate::new(200)
+            .insert_header("Cache-Control", "max-age=31536000, immutable")
+            .insert_header("Accept-Ranges", "bytes")
+            .insert_header("Content-Length", bytes.len().to_string())
+            .set_body_raw(bytes.clone(), "application/octet-stream")
+    } else {
+        wiremock::ResponseTemplate::new(404)
+    }
 }
 
 /// Extract the package name from a path like `/prefix/{package}/`.
