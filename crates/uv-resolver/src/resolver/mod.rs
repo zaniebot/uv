@@ -3868,13 +3868,24 @@ impl Forks {
                     .filter(|item| fork.env.included_by_group(item.as_ref()))
                     .collect();
                 if non_excluded.len() < 2 {
-                    // Check if any non-excluded item appears in another
-                    // conflict set. If so, we still need to fork to
+                    // Check if any non-excluded item still has a live
+                    // conflict in another set — i.e., another set where
+                    // this item AND at least one other non-excluded item
+                    // both appear. If so, we still need to fork to
                     // create the "excluded" variant for that item.
                     let dominated = non_excluded.iter().all(|item| {
                         !conflicts.iter().any(|other_set| {
                             !std::ptr::eq(set, other_set)
                                 && other_set.contains(item.package(), item.kind().as_ref())
+                                && other_set
+                                    .iter()
+                                    .filter(|other_item| {
+                                        other_item.package() != item.package()
+                                            || other_item.kind() != item.kind()
+                                    })
+                                    .any(|other_item| {
+                                        fork.env.included_by_group(other_item.as_ref())
+                                    })
                         })
                     });
                     if dominated {

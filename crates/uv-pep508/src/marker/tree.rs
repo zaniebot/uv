@@ -2113,6 +2113,89 @@ mod test {
         );
     }
 
+    /// Test that simplify_python_versions preserves correlations between
+    /// extras and platform markers (i.e., memoization doesn't lose info).
+    #[test]
+    fn simplify_python_versions_preserves_extra_platform_correlation() {
+        // The marker "(sys_platform != 'linux' and extra == 'x1') or (extra == 'x1' and extra == 'x2')"
+        // should NOT simplify to just "extra == 'x1'" — the sys_platform condition matters.
+        let marker =
+            m("(sys_platform != 'linux' and extra == 'x1') or (extra == 'x1' and extra == 'x2')");
+        let simplified = marker.simplify_python_versions(
+            Bound::Included(Version::new([3, 8])).as_ref(),
+            Bound::Unbounded.as_ref(),
+        );
+        // The simplified marker should still contain sys_platform — it shouldn't be lost.
+        assert_eq!(
+            simplified.try_to_string().unwrap(),
+            "(sys_platform != 'linux' and extra == 'x1') or (extra == 'x1' and extra == 'x2')"
+        );
+    }
+
+    /// Test that simplify_python_versions handles deeply shared BDD structures
+    /// efficiently (the memoization case). Many extras sharing the same
+    /// python_version subtree should not cause exponential traversal.
+    #[test]
+    fn simplify_python_versions_many_extras_shared_subtree() {
+        // Build a marker: (extra == 'a' or extra == 'b' or ... or extra == 'j') and python_version >= '3.9'
+        // This creates a BDD where many extra nodes share the same python_version subtree.
+        let marker = m(
+            "(extra == 'a' or extra == 'b' or extra == 'c' or extra == 'd' or extra == 'e' \
+             or extra == 'f' or extra == 'g' or extra == 'h' or extra == 'i' or extra == 'j') \
+             and python_full_version >= '3.9'",
+        );
+        let simplified = marker.simplify_python_versions(
+            Bound::Included(Version::new([3, 8])).as_ref(),
+            Bound::Unbounded.as_ref(),
+        );
+        // After simplification with requires-python >= 3.8, the python >= 3.9
+        // constraint should be preserved, along with all extras.
+        assert_eq!(
+            simplified.try_to_string().unwrap(),
+            "(python_full_version >= '3.9' and extra == 'a') \
+             or (python_full_version >= '3.9' and extra == 'b') \
+             or (python_full_version >= '3.9' and extra == 'c') \
+             or (python_full_version >= '3.9' and extra == 'd') \
+             or (python_full_version >= '3.9' and extra == 'e') \
+             or (python_full_version >= '3.9' and extra == 'f') \
+             or (python_full_version >= '3.9' and extra == 'g') \
+             or (python_full_version >= '3.9' and extra == 'h') \
+             or (python_full_version >= '3.9' and extra == 'i') \
+             or (python_full_version >= '3.9' and extra == 'j')"
+        );
+    }
+
+    /// Test that simplify_python_versions correctly simplifies when
+    /// requires-python subsumes the marker constraint, even with extras present.
+    #[test]
+    fn simplify_python_versions_subsumed_with_extras() {
+        // python_full_version >= '3.8' is always true given requires-python >= 3.8
+        let marker = m("extra == 'foo' and python_full_version >= '3.8'");
+        let simplified = marker.simplify_python_versions(
+            Bound::Included(Version::new([3, 8])).as_ref(),
+            Bound::Unbounded.as_ref(),
+        );
+        // The python constraint should be removed, leaving just the extra.
+        assert_eq!(simplified.try_to_string().unwrap(), "extra == 'foo'");
+    }
+
+    /// Test that complexify_python_versions works correctly with extras,
+    /// including the memoization path.
+    #[test]
+    fn complexify_python_versions_with_extras() {
+        // Start with a simplified marker that has extras and a python constraint.
+        let marker = m("extra == 'foo' and python_full_version < '3.12'");
+        let complexified = marker.complexify_python_versions(
+            Bound::Included(Version::new([3, 8])).as_ref(),
+            Bound::Unbounded.as_ref(),
+        );
+        // Should add the lower bound: python >= 3.8 AND python < 3.12 AND extra == 'foo'
+        assert_eq!(
+            complexified.try_to_string().unwrap(),
+            "python_full_version >= '3.8' and python_full_version < '3.12' and extra == 'foo'"
+        );
+    }
+
     #[test]
     fn release_only() {
         assert!(m("python_full_version > '3.10' or python_full_version <= '3.10'").is_true());
