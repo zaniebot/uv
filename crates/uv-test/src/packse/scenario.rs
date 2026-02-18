@@ -178,6 +178,29 @@ fn default_python() -> String {
     "3.12".to_string()
 }
 
+/// A standalone package index — just a set of packages without scenario metadata.
+///
+/// Used for general-purpose test packages (the "birds") that aren't tied to a
+/// specific resolver scenario.
+#[derive(Debug, Deserialize)]
+pub struct PackageIndex {
+    /// Human-readable description.
+    #[serde(default)]
+    pub description: Option<String>,
+
+    /// The packages in this index.
+    #[serde(default)]
+    pub packages: BTreeMap<String, Package>,
+}
+
+impl PackageIndex {
+    /// Parse a package index from a TOML file path.
+    pub fn from_path(path: &Path) -> Self {
+        let contents = fs_err::read_to_string(path).expect("failed to read package index file");
+        toml::from_str(&contents).expect("failed to parse package index file")
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

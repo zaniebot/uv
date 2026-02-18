@@ -1,0 +1,211 @@
+description = """
+A general-purpose package index with birds of varying complexity.
+Tests pick the packages they need from this single index.
+
+    tiny-sparrow                    — no deps (replaces iniconfig)
+    swift-finch                     — small tree (replaces anyio)
+    ├── loud-warbler                  (replaces idna)
+    └── silly-wren                    (replaces sniffio)
+    golden-crane                    — medium tree (replaces flask)
+    ├── proud-heron → calm-ibis       (replaces werkzeug → markupsafe)
+    ├── gentle-egret → calm-ibis      (replaces jinja2 → markupsafe)
+    ├── clever-robin                  (replaces click)
+    ├── quick-jay                     (replaces itsdangerous)
+    └── quiet-dove                    (replaces blinker)
+    bold-eagle                      — platform-specific wheels (replaces black)
+    ├── sharp-talon                   (replaces platformdirs)
+    └── bright-feather                (replaces pathspec)
+    spotted-owl                     — many versions (replaces tqdm)
+
+Version numbers mirror the real packages so test code changes are minimal.
+"""
+
+###############################################################################
+# tiny-sparrow — zero-dep package (replaces iniconfig)
+#
+#   iniconfig versions used in tests: 0.1, 1.0.0, 1.1.1, 2.0.0
+###############################################################################
+
+[packages.tiny-sparrow.versions."0.1"]
+[packages.tiny-sparrow.versions."1.0.0"]
+[packages.tiny-sparrow.versions."1.1.1"]
+[packages.tiny-sparrow.versions."2.0.0"]
+
+###############################################################################
+# swift-finch — small dep tree (replaces anyio → idna, sniffio)
+#
+#   anyio versions used: 1.0.0, 3.0.0, 3.5.0, 3.7.0, 3.7.1, 4.0.0, 4.3.0
+#   All versions depend on loud-warbler + silly-wren.
+###############################################################################
+
+[packages.swift-finch.versions."1.0.0"]
+requires = ["loud-warbler>=1.0.0", "silly-wren>=1.0.0"]
+
+[packages.swift-finch.versions."3.0.0"]
+requires = ["loud-warbler>=1.0.0", "silly-wren>=1.0.0"]
+
+[packages.swift-finch.versions."3.5.0"]
+requires = ["loud-warbler>=1.0.0", "silly-wren>=1.0.0"]
+
+[packages.swift-finch.versions."3.7.0"]
+requires = ["loud-warbler>=1.0.0", "silly-wren>=1.0.0"]
+
+[packages.swift-finch.versions."3.7.1"]
+requires = ["loud-warbler>=1.0.0", "silly-wren>=1.0.0"]
+
+[packages.swift-finch.versions."4.0.0"]
+requires = ["loud-warbler>=1.0.0", "silly-wren>=1.0.0"]
+
+[packages.swift-finch.versions."4.3.0"]
+requires = ["loud-warbler>=1.0.0", "silly-wren>=1.0.0"]
+
+# loud-warbler (replaces idna — various versions needed)
+[packages.loud-warbler.versions."1.0.0"]
+[packages.loud-warbler.versions."2.0.0"]
+[packages.loud-warbler.versions."3.6"]
+
+# silly-wren (replaces sniffio — resolved versions: 1.3.1)
+[packages.silly-wren.versions."1.3.1"]
+
+###############################################################################
+# golden-crane — medium dep tree (replaces flask → werkzeug, jinja2, etc.)
+#
+#   flask versions used: 1.1.4, 2.0.0, 2.2.5, 3.0.0, 3.0.2
+###############################################################################
+
+[packages.golden-crane.versions."1.1.4"]
+requires = ["proud-heron", "gentle-egret", "clever-robin", "quick-jay"]
+
+[packages.golden-crane.versions."2.0.0"]
+requires = ["proud-heron>=2.0.0", "gentle-egret>=3.0.0", "clever-robin>=8.0.0", "quick-jay>=2.0.0"]
+
+[packages.golden-crane.versions."2.2.5"]
+requires = ["proud-heron>=2.0.0", "gentle-egret>=3.0.0", "clever-robin>=8.0.0", "quick-jay>=2.0.0", "quiet-dove>=1.6.0"]
+
+[packages.golden-crane.versions."2.3.2"]
+requires = ["proud-heron>=2.0.0", "gentle-egret>=3.0.0", "clever-robin>=8.0.0", "quick-jay>=2.0.0", "quiet-dove>=1.6.0"]
+
+[packages.golden-crane.versions."2.3.3"]
+requires = ["proud-heron>=2.0.0", "gentle-egret>=3.0.0", "clever-robin>=8.0.0", "quick-jay>=2.0.0", "quiet-dove>=1.6.0"]
+
+[packages.golden-crane.versions."3.0.0"]
+requires = ["proud-heron>=3.0.0", "gentle-egret>=3.1.0", "clever-robin>=8.1.0", "quick-jay>=2.1.0", "quiet-dove>=1.7.0"]
+
+[packages.golden-crane.versions."3.0.2"]
+requires = ["proud-heron>=3.0.0", "gentle-egret>=3.1.0", "clever-robin>=8.1.0", "quick-jay>=2.1.0", "quiet-dove>=1.7.0"]
+
+[packages.golden-crane.versions."3.0.2".extras]
+nest = ["wild-goose"]
+egg = ["happy-toucan"]
+feather = []
+
+# proud-heron (replaces werkzeug → markupsafe)
+[packages.proud-heron.versions."2.0.0"]
+requires = ["calm-ibis>=2.1.0"]
+
+[packages.proud-heron.versions."2.3.0"]
+requires = ["calm-ibis>=2.1.0"]
+
+[packages.proud-heron.versions."2.3.8"]
+requires = ["calm-ibis>=2.1.0"]
+
+[packages.proud-heron.versions."3.0.0"]
+requires = ["calm-ibis>=2.1.0"]
+
+[packages.proud-heron.versions."3.0.1"]
+requires = ["calm-ibis>=2.1.0"]
+
+# gentle-egret (replaces jinja2 → markupsafe)
+[packages.gentle-egret.versions."2.11.3"]
+requires = ["calm-ibis>=2.0.0"]
+
+[packages.gentle-egret.versions."3.0.0"]
+requires = ["calm-ibis>=2.0.0"]
+
+[packages.gentle-egret.versions."3.1.0"]
+requires = ["calm-ibis>=2.0.0"]
+
+[packages.gentle-egret.versions."3.1.2"]
+requires = ["calm-ibis>=2.0.0"]
+
+[packages.gentle-egret.versions."3.1.3"]
+requires = ["calm-ibis>=2.0.0"]
+
+[packages.gentle-egret.versions."3.1.4"]
+requires = ["calm-ibis>=2.0.0"]
+
+[packages.gentle-egret.versions."3.1.5"]
+requires = ["calm-ibis>=2.0.0"]
+
+# calm-ibis (replaces markupsafe — leaf dep)
+[packages.calm-ibis.versions."2.1.0"]
+[packages.calm-ibis.versions."2.1.2"]
+[packages.calm-ibis.versions."2.1.3"]
+[packages.calm-ibis.versions."2.1.5"]
+[packages.calm-ibis.versions."3.0.2"]
+
+# clever-robin (replaces click — leaf dep)
+[packages.clever-robin.versions."7.0.0"]
+[packages.clever-robin.versions."8.0.0"]
+[packages.clever-robin.versions."8.1.0"]
+[packages.clever-robin.versions."8.1.3"]
+[packages.clever-robin.versions."8.1.7"]
+
+# quick-jay (replaces itsdangerous — leaf dep)
+[packages.quick-jay.versions."2.0.0"]
+[packages.quick-jay.versions."2.1.0"]
+[packages.quick-jay.versions."2.1.2"]
+
+# wild-goose (extra dep for golden-crane[nest], replaces asgiref)
+[packages.wild-goose.versions."3.8.1"]
+
+# happy-toucan (extra dep for golden-crane[egg], replaces python-dotenv)
+[packages.happy-toucan.versions."1.0.1"]
+
+# quiet-dove (replaces blinker — leaf dep)
+[packages.quiet-dove.versions."1.6.0"]
+[packages.quiet-dove.versions."1.7.0"]
+[packages.quiet-dove.versions."1.7.0.post1"]
+[packages.quiet-dove.versions."1.9.0"]
+
+###############################################################################
+# bold-eagle — platform-specific wheels (replaces black)
+#
+#   black versions used: 23.10.1, 24.3.0
+###############################################################################
+
+[packages.bold-eagle.versions."23.10.1"]
+requires = ["sharp-talon>=3.0.0", "bright-feather>=0.6.0"]
+wheel_tags = [
+  "cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64",
+  "cp312-cp312-macosx_11_0_arm64",
+  "cp312-cp312-win_amd64",
+]
+
+[packages.bold-eagle.versions."24.3.0"]
+requires = ["sharp-talon>=4.0.0", "bright-feather>=0.6.0"]
+wheel_tags = [
+  "cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64",
+  "cp312-cp312-macosx_11_0_arm64",
+  "cp312-cp312-win_amd64",
+]
+
+# sharp-talon (replaces platformdirs)
+[packages.sharp-talon.versions."3.0.0"]
+[packages.sharp-talon.versions."4.0.0"]
+[packages.sharp-talon.versions."4.2.0"]
+
+# bright-feather (replaces pathspec)
+[packages.bright-feather.versions."0.6.0"]
+[packages.bright-feather.versions."0.12.0"]
+[packages.bright-feather.versions."0.12.1"]
+
+###############################################################################
+# spotted-owl — many versions (replaces tqdm)
+#
+#   tqdm versions used: 4.64.0, 4.64.1, 4.66.2
+###############################################################################
+
+[packages.spotted-owl.versions."4.64.0"]
+[packages.spotted-owl.versions."4.64.1"]
+[packages.spotted-owl.versions."4.66.2"]

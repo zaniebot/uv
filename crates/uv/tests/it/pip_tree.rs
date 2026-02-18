@@ -11,7 +11,7 @@ use uv_test::uv_snapshot;
 
 #[test]
 fn no_package() {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
     uv_snapshot!(context.filters(), context.pip_tree(), @"
     success: true
@@ -117,10 +117,10 @@ fn single_package() {
 #[test]
 #[cfg(feature = "test-pypi")]
 fn nested_dependencies() {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
     let requirements_txt = context.temp_dir.child("requirements.txt");
-    requirements_txt.write_str("flask").unwrap();
+    requirements_txt.write_str("golden-crane").unwrap();
 
     uv_snapshot!(context
         .pip_install()
@@ -135,13 +135,13 @@ fn nested_dependencies() {
     Resolved 7 packages in [TIME]
     Prepared 7 packages in [TIME]
     Installed 7 packages in [TIME]
-     + blinker==1.7.0
-     + click==8.1.7
-     + flask==3.0.2
-     + itsdangerous==2.1.2
-     + jinja2==3.1.3
-     + markupsafe==2.1.5
-     + werkzeug==3.0.1
+     + calm-ibis==3.0.2
+     + clever-robin==8.1.7
+     + gentle-egret==3.1.5
+     + golden-crane==3.0.2
+     + proud-heron==3.0.1
+     + quick-jay==2.1.2
+     + quiet-dove==1.9.0
     "
     );
 
@@ -149,14 +149,14 @@ fn nested_dependencies() {
     success: true
     exit_code: 0
     ----- stdout -----
-    flask v3.0.2
-    ├── blinker v1.7.0
-    ├── click v8.1.7
-    ├── itsdangerous v2.1.2
-    ├── jinja2 v3.1.3
-    │   └── markupsafe v2.1.5
-    └── werkzeug v3.0.1
-        └── markupsafe v2.1.5
+    golden-crane v3.0.2
+    ├── clever-robin v8.1.7
+    ├── gentle-egret v3.1.5
+    │   └── calm-ibis v3.0.2
+    ├── proud-heron v3.0.1
+    │   └── calm-ibis v3.0.2
+    ├── quick-jay v2.1.2
+    └── quiet-dove v1.9.0
 
     ----- stderr -----
     "
@@ -167,10 +167,10 @@ fn nested_dependencies() {
 #[test]
 #[cfg(feature = "test-pypi")]
 fn reverse() {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
     let requirements_txt = context.temp_dir.child("requirements.txt");
-    requirements_txt.write_str("flask").unwrap();
+    requirements_txt.write_str("golden-crane").unwrap();
 
     uv_snapshot!(context
         .pip_install()
@@ -185,13 +185,13 @@ fn reverse() {
     Resolved 7 packages in [TIME]
     Prepared 7 packages in [TIME]
     Installed 7 packages in [TIME]
-     + blinker==1.7.0
-     + click==8.1.7
-     + flask==3.0.2
-     + itsdangerous==2.1.2
-     + jinja2==3.1.3
-     + markupsafe==2.1.5
-     + werkzeug==3.0.1
+     + calm-ibis==3.0.2
+     + clever-robin==8.1.7
+     + gentle-egret==3.1.5
+     + golden-crane==3.0.2
+     + proud-heron==3.0.1
+     + quick-jay==2.1.2
+     + quiet-dove==1.9.0
     "
     );
 
@@ -199,17 +199,17 @@ fn reverse() {
     success: true
     exit_code: 0
     ----- stdout -----
-    blinker v1.7.0
-    └── flask v3.0.2
-    click v8.1.7
-    └── flask v3.0.2
-    itsdangerous v2.1.2
-    └── flask v3.0.2
-    markupsafe v2.1.5
-    ├── jinja2 v3.1.3
-    │   └── flask v3.0.2
-    └── werkzeug v3.0.1
-        └── flask v3.0.2
+    calm-ibis v3.0.2
+    ├── gentle-egret v3.1.5
+    │   └── golden-crane v3.0.2
+    └── proud-heron v3.0.1
+        └── golden-crane v3.0.2
+    clever-robin v8.1.7
+    └── golden-crane v3.0.2
+    quick-jay v2.1.2
+    └── golden-crane v3.0.2
+    quiet-dove v1.9.0
+    └── golden-crane v3.0.2
 
     ----- stderr -----
     "
@@ -219,10 +219,10 @@ fn reverse() {
 #[test]
 #[cfg(feature = "test-pypi")]
 fn invert() {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
     let requirements_txt = context.temp_dir.child("requirements.txt");
-    requirements_txt.write_str("flask").unwrap();
+    requirements_txt.write_str("golden-crane").unwrap();
 
     uv_snapshot!(context
         .pip_install()
@@ -237,13 +237,13 @@ fn invert() {
     Resolved 7 packages in [TIME]
     Prepared 7 packages in [TIME]
     Installed 7 packages in [TIME]
-     + blinker==1.7.0
-     + click==8.1.7
-     + flask==3.0.2
-     + itsdangerous==2.1.2
-     + jinja2==3.1.3
-     + markupsafe==2.1.5
-     + werkzeug==3.0.1
+     + calm-ibis==3.0.2
+     + clever-robin==8.1.7
+     + gentle-egret==3.1.5
+     + golden-crane==3.0.2
+     + proud-heron==3.0.1
+     + quick-jay==2.1.2
+     + quiet-dove==1.9.0
     "
     );
 
@@ -251,17 +251,17 @@ fn invert() {
     success: true
     exit_code: 0
     ----- stdout -----
-    blinker v1.7.0
-    └── flask v3.0.2
-    click v8.1.7
-    └── flask v3.0.2
-    itsdangerous v2.1.2
-    └── flask v3.0.2
-    markupsafe v2.1.5
-    ├── jinja2 v3.1.3
-    │   └── flask v3.0.2
-    └── werkzeug v3.0.1
-        └── flask v3.0.2
+    calm-ibis v3.0.2
+    ├── gentle-egret v3.1.5
+    │   └── golden-crane v3.0.2
+    └── proud-heron v3.0.1
+        └── golden-crane v3.0.2
+    clever-robin v8.1.7
+    └── golden-crane v3.0.2
+    quick-jay v2.1.2
+    └── golden-crane v3.0.2
+    quiet-dove v1.9.0
+    └── golden-crane v3.0.2
 
     ----- stderr -----
     "
@@ -271,10 +271,10 @@ fn invert() {
 #[test]
 #[cfg(feature = "test-pypi")]
 fn depth() {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
     let requirements_txt = context.temp_dir.child("requirements.txt");
-    requirements_txt.write_str("flask").unwrap();
+    requirements_txt.write_str("golden-crane").unwrap();
 
     uv_snapshot!(context.pip_install()
         .arg("-r")
@@ -288,13 +288,13 @@ fn depth() {
     Resolved 7 packages in [TIME]
     Prepared 7 packages in [TIME]
     Installed 7 packages in [TIME]
-     + blinker==1.7.0
-     + click==8.1.7
-     + flask==3.0.2
-     + itsdangerous==2.1.2
-     + jinja2==3.1.3
-     + markupsafe==2.1.5
-     + werkzeug==3.0.1
+     + calm-ibis==3.0.2
+     + clever-robin==8.1.7
+     + gentle-egret==3.1.5
+     + golden-crane==3.0.2
+     + proud-heron==3.0.1
+     + quick-jay==2.1.2
+     + quiet-dove==1.9.0
     "
     );
 
@@ -304,7 +304,7 @@ fn depth() {
     success: true
     exit_code: 0
     ----- stdout -----
-    flask v3.0.2
+    golden-crane v3.0.2
 
     ----- stderr -----
     "
@@ -316,12 +316,12 @@ fn depth() {
     success: true
     exit_code: 0
     ----- stdout -----
-    flask v3.0.2
-    ├── blinker v1.7.0
-    ├── click v8.1.7
-    ├── itsdangerous v2.1.2
-    ├── jinja2 v3.1.3
-    └── werkzeug v3.0.1
+    golden-crane v3.0.2
+    ├── clever-robin v8.1.7
+    ├── gentle-egret v3.1.5
+    ├── proud-heron v3.0.1
+    ├── quick-jay v2.1.2
+    └── quiet-dove v1.9.0
 
     ----- stderr -----
     "
@@ -333,14 +333,14 @@ fn depth() {
     success: true
     exit_code: 0
     ----- stdout -----
-    flask v3.0.2
-    ├── blinker v1.7.0
-    ├── click v8.1.7
-    ├── itsdangerous v2.1.2
-    ├── jinja2 v3.1.3
-    │   └── markupsafe v2.1.5
-    └── werkzeug v3.0.1
-        └── markupsafe v2.1.5
+    golden-crane v3.0.2
+    ├── clever-robin v8.1.7
+    ├── gentle-egret v3.1.5
+    │   └── calm-ibis v3.0.2
+    ├── proud-heron v3.0.1
+    │   └── calm-ibis v3.0.2
+    ├── quick-jay v2.1.2
+    └── quiet-dove v1.9.0
 
     ----- stderr -----
     "
@@ -350,10 +350,10 @@ fn depth() {
 #[test]
 #[cfg(feature = "test-pypi")]
 fn prune() {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
     let requirements_txt = context.temp_dir.child("requirements.txt");
-    requirements_txt.write_str("flask").unwrap();
+    requirements_txt.write_str("golden-crane").unwrap();
 
     uv_snapshot!(context.pip_install()
         .arg("-r")
@@ -367,28 +367,28 @@ fn prune() {
     Resolved 7 packages in [TIME]
     Prepared 7 packages in [TIME]
     Installed 7 packages in [TIME]
-     + blinker==1.7.0
-     + click==8.1.7
-     + flask==3.0.2
-     + itsdangerous==2.1.2
-     + jinja2==3.1.3
-     + markupsafe==2.1.5
-     + werkzeug==3.0.1
+     + calm-ibis==3.0.2
+     + clever-robin==8.1.7
+     + gentle-egret==3.1.5
+     + golden-crane==3.0.2
+     + proud-heron==3.0.1
+     + quick-jay==2.1.2
+     + quiet-dove==1.9.0
     "
     );
 
     uv_snapshot!(context.filters(), context.pip_tree()
         .arg("--prune")
-        .arg("werkzeug"), @"
+        .arg("proud-heron"), @"
     success: true
     exit_code: 0
     ----- stdout -----
-    flask v3.0.2
-    ├── blinker v1.7.0
-    ├── click v8.1.7
-    ├── itsdangerous v2.1.2
-    └── jinja2 v3.1.3
-        └── markupsafe v2.1.5
+    golden-crane v3.0.2
+    ├── clever-robin v8.1.7
+    ├── gentle-egret v3.1.5
+    │   └── calm-ibis v3.0.2
+    ├── quick-jay v2.1.2
+    └── quiet-dove v1.9.0
 
     ----- stderr -----
     "
@@ -396,17 +396,17 @@ fn prune() {
 
     uv_snapshot!(context.filters(), context.pip_tree()
         .arg("--prune")
-        .arg("werkzeug")
+        .arg("proud-heron")
         .arg("--prune")
-        .arg("jinja2"), @"
+        .arg("gentle-egret"), @"
     success: true
     exit_code: 0
     ----- stdout -----
-    flask v3.0.2
-    ├── blinker v1.7.0
-    ├── click v8.1.7
-    └── itsdangerous v2.1.2
-    markupsafe v2.1.5
+    calm-ibis v3.0.2
+    golden-crane v3.0.2
+    ├── clever-robin v8.1.7
+    ├── quick-jay v2.1.2
+    └── quiet-dove v1.9.0
 
     ----- stderr -----
     "
@@ -414,16 +414,16 @@ fn prune() {
 
     uv_snapshot!(context.filters(), context.pip_tree()
         .arg("--prune")
-        .arg("werkzeug"), @"
+        .arg("proud-heron"), @"
     success: true
     exit_code: 0
     ----- stdout -----
-    flask v3.0.2
-    ├── blinker v1.7.0
-    ├── click v8.1.7
-    ├── itsdangerous v2.1.2
-    └── jinja2 v3.1.3
-        └── markupsafe v2.1.5
+    golden-crane v3.0.2
+    ├── clever-robin v8.1.7
+    ├── gentle-egret v3.1.5
+    │   └── calm-ibis v3.0.2
+    ├── quick-jay v2.1.2
+    └── quiet-dove v1.9.0
 
     ----- stderr -----
     "
@@ -815,10 +815,10 @@ fn with_editable() {
 #[test]
 #[cfg(feature = "test-pypi")]
 fn package_flag() {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
     let requirements_txt = context.temp_dir.child("requirements.txt");
-    requirements_txt.write_str("flask").unwrap();
+    requirements_txt.write_str("golden-crane").unwrap();
 
     uv_snapshot!(context
         .pip_install()
@@ -833,13 +833,13 @@ fn package_flag() {
     Resolved 7 packages in [TIME]
     Prepared 7 packages in [TIME]
     Installed 7 packages in [TIME]
-     + blinker==1.7.0
-     + click==8.1.7
-     + flask==3.0.2
-     + itsdangerous==2.1.2
-     + jinja2==3.1.3
-     + markupsafe==2.1.5
-     + werkzeug==3.0.1
+     + calm-ibis==3.0.2
+     + clever-robin==8.1.7
+     + gentle-egret==3.1.5
+     + golden-crane==3.0.2
+     + proud-heron==3.0.1
+     + quick-jay==2.1.2
+     + quiet-dove==1.9.0
     "
     );
 
@@ -847,13 +847,13 @@ fn package_flag() {
         context.filters(),
         context.pip_tree()
         .arg("--package")
-        .arg("werkzeug"),
+        .arg("proud-heron"),
         @"
     success: true
     exit_code: 0
     ----- stdout -----
-    werkzeug v3.0.1
-    └── markupsafe v2.1.5
+    proud-heron v3.0.1
+    └── calm-ibis v3.0.2
 
     ----- stderr -----
     "
@@ -863,17 +863,17 @@ fn package_flag() {
         context.filters(),
         context.pip_tree()
         .arg("--package")
-        .arg("werkzeug")
+        .arg("proud-heron")
         .arg("--package")
-        .arg("jinja2"),
+        .arg("gentle-egret"),
         @"
     success: true
     exit_code: 0
     ----- stdout -----
-    jinja2 v3.1.3
-    └── markupsafe v2.1.5
-    werkzeug v3.0.1
-    └── markupsafe v2.1.5
+    gentle-egret v3.1.5
+    └── calm-ibis v3.0.2
+    proud-heron v3.0.1
+    └── calm-ibis v3.0.2
 
     ----- stderr -----
     "
@@ -927,10 +927,10 @@ fn show_version_specifiers_simple() {
 #[test]
 #[cfg(feature = "test-pypi")]
 fn show_version_specifiers_with_invert() {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
     let requirements_txt = context.temp_dir.child("requirements.txt");
-    requirements_txt.write_str("flask").unwrap();
+    requirements_txt.write_str("golden-crane").unwrap();
 
     uv_snapshot!(context
         .pip_install()
@@ -945,13 +945,13 @@ fn show_version_specifiers_with_invert() {
     Resolved 7 packages in [TIME]
     Prepared 7 packages in [TIME]
     Installed 7 packages in [TIME]
-     + blinker==1.7.0
-     + click==8.1.7
-     + flask==3.0.2
-     + itsdangerous==2.1.2
-     + jinja2==3.1.3
-     + markupsafe==2.1.5
-     + werkzeug==3.0.1
+     + calm-ibis==3.0.2
+     + clever-robin==8.1.7
+     + gentle-egret==3.1.5
+     + golden-crane==3.0.2
+     + proud-heron==3.0.1
+     + quick-jay==2.1.2
+     + quiet-dove==1.9.0
     "
     );
 
@@ -963,17 +963,17 @@ fn show_version_specifiers_with_invert() {
     success: true
     exit_code: 0
     ----- stdout -----
-    blinker v1.7.0
-    └── flask v3.0.2 [requires: blinker >=1.6.2]
-    click v8.1.7
-    └── flask v3.0.2 [requires: click >=8.1.3]
-    itsdangerous v2.1.2
-    └── flask v3.0.2 [requires: itsdangerous >=2.1.2]
-    markupsafe v2.1.5
-    ├── jinja2 v3.1.3 [requires: markupsafe >=2.0]
-    │   └── flask v3.0.2 [requires: jinja2 >=3.1.2]
-    └── werkzeug v3.0.1 [requires: markupsafe >=2.1.1]
-        └── flask v3.0.2 [requires: werkzeug >=3.0.0]
+    calm-ibis v3.0.2
+    ├── gentle-egret v3.1.5 [requires: calm-ibis >=2.0.0]
+    │   └── golden-crane v3.0.2 [requires: gentle-egret >=3.1.0]
+    └── proud-heron v3.0.1 [requires: calm-ibis >=2.1.0]
+        └── golden-crane v3.0.2 [requires: proud-heron >=3.0.0]
+    clever-robin v8.1.7
+    └── golden-crane v3.0.2 [requires: clever-robin >=8.1.0]
+    quick-jay v2.1.2
+    └── golden-crane v3.0.2 [requires: quick-jay >=2.1.0]
+    quiet-dove v1.9.0
+    └── golden-crane v3.0.2 [requires: quiet-dove >=1.7.0]
 
     ----- stderr -----
     "
@@ -983,10 +983,10 @@ fn show_version_specifiers_with_invert() {
 #[test]
 #[cfg(feature = "test-pypi")]
 fn show_version_specifiers_with_package() {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
     let requirements_txt = context.temp_dir.child("requirements.txt");
-    requirements_txt.write_str("flask").unwrap();
+    requirements_txt.write_str("golden-crane").unwrap();
 
     uv_snapshot!(context
         .pip_install()
@@ -1001,13 +1001,13 @@ fn show_version_specifiers_with_package() {
     Resolved 7 packages in [TIME]
     Prepared 7 packages in [TIME]
     Installed 7 packages in [TIME]
-     + blinker==1.7.0
-     + click==8.1.7
-     + flask==3.0.2
-     + itsdangerous==2.1.2
-     + jinja2==3.1.3
-     + markupsafe==2.1.5
-     + werkzeug==3.0.1
+     + calm-ibis==3.0.2
+     + clever-robin==8.1.7
+     + gentle-egret==3.1.5
+     + golden-crane==3.0.2
+     + proud-heron==3.0.1
+     + quick-jay==2.1.2
+     + quiet-dove==1.9.0
     "
     );
 
@@ -1016,12 +1016,12 @@ fn show_version_specifiers_with_package() {
         context.pip_tree()
         .arg("--show-version-specifiers")
         .arg("--package")
-        .arg("werkzeug"), @"
+        .arg("proud-heron"), @"
     success: true
     exit_code: 0
     ----- stdout -----
-    werkzeug v3.0.1
-    └── markupsafe v2.1.5 [required: >=2.1.1]
+    proud-heron v3.0.1
+    └── calm-ibis v3.0.2 [required: >=2.1.0]
 
     ----- stderr -----
     "
@@ -1071,10 +1071,10 @@ fn print_output_even_with_quite_flag() {
 #[test]
 #[cfg(feature = "test-pypi")]
 fn outdated() {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
     let requirements_txt = context.temp_dir.child("requirements.txt");
-    requirements_txt.write_str("flask==2.0.0").unwrap();
+    requirements_txt.write_str("golden-crane==2.0.0").unwrap();
 
     uv_snapshot!(context
         .pip_install()
@@ -1089,12 +1089,12 @@ fn outdated() {
     Resolved 6 packages in [TIME]
     Prepared 6 packages in [TIME]
     Installed 6 packages in [TIME]
-     + click==8.1.7
-     + flask==2.0.0
-     + itsdangerous==2.1.2
-     + jinja2==3.1.3
-     + markupsafe==2.1.5
-     + werkzeug==3.0.1
+     + calm-ibis==3.0.2
+     + clever-robin==8.1.7
+     + gentle-egret==3.1.5
+     + golden-crane==2.0.0
+     + proud-heron==3.0.1
+     + quick-jay==2.1.2
     "
     );
 
@@ -1104,13 +1104,13 @@ fn outdated() {
     success: true
     exit_code: 0
     ----- stdout -----
-    flask v2.0.0 (latest: v3.0.2)
-    ├── click v8.1.7
-    ├── itsdangerous v2.1.2
-    ├── jinja2 v3.1.3
-    │   └── markupsafe v2.1.5
-    └── werkzeug v3.0.1
-        └── markupsafe v2.1.5
+    golden-crane v2.0.0 (latest: v3.0.2)
+    ├── clever-robin v8.1.7
+    ├── gentle-egret v3.1.5
+    │   └── calm-ibis v3.0.2
+    ├── proud-heron v3.0.1
+    │   └── calm-ibis v3.0.2
+    └── quick-jay v2.1.2
 
     ----- stderr -----
     "

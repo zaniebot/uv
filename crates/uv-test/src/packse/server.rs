@@ -20,9 +20,9 @@ use wiremock::{Mock, MockServer, Request, ResponseTemplate};
 use uv_distribution_filename::WheelFilename;
 use uv_normalize::PackageName;
 
-use super::scenario::Scenario;
+use super::scenario::{PackageIndex, Scenario};
 use super::wheel::{generate_sdist, generate_wheel, sha256_hex};
-use super::{scenarios_dir, vendor_dir};
+use super::{packages_dir, scenarios_dir, vendor_dir};
 
 /// Information about a single distribution file (metadata for the Simple API).
 struct DistInfo {
@@ -89,13 +89,36 @@ impl PackseServer {
         Self::from_scenario(&scenario)
     }
 
+    /// Load a general-purpose package index from a TOML path (relative to
+    /// `test/packages/`) and start a mock server for it.
+    ///
+    /// Unlike [`PackseServer::new`], which loads a packse scenario with root
+    /// requirements and expected outcomes, this loads a standalone set of
+    /// packages intended for use across many tests.
+    pub fn for_packages(index_path: &str) -> Self {
+        let full_path = packages_dir().join(index_path);
+        let index = PackageIndex::from_path(&full_path);
+        Self::from_packages(&index.packages)
+    }
+
+    /// Start a mock server from a raw packages map.
+    pub fn from_packages(
+        packages: &std::collections::BTreeMap<String, super::scenario::Package>,
+    ) -> Self {
+        let vendor_path = vendor_dir();
+        let index = Arc::new(build_server_index_from_packages(packages, &vendor_path));
+        Self::start_server(index)
+    }
+
     /// Start a mock server for the given scenario.
     pub fn from_scenario(scenario: &Scenario) -> Self {
         let vendor_path = vendor_dir();
-
-        // Build the full index eagerly (on the calling thread).
         let index = Arc::new(build_server_index(scenario, &vendor_path));
+        Self::start_server(index)
+    }
 
+    /// Spin up a wiremock server on a background thread serving the given index.
+    fn start_server(index: Arc<ServerIndex>) -> Self {
         // Channel: background thread sends us the URL once the server is ready.
         let (url_tx, url_rx) = std::sync::mpsc::channel::<String>();
         // Channel: we send shutdown signal to the background thread.
@@ -157,13 +180,29 @@ impl Drop for PackseServer {
     }
 }
 
+/// Build the complete [`ServerIndex`] from a standalone packages map and vendored wheels.
+fn build_server_index_from_packages(
+    pkgs: &std::collections::BTreeMap<String, super::scenario::Package>,
+    vendor_path: &Path,
+) -> ServerIndex {
+    build_server_index_inner(pkgs, vendor_path)
+}
+
 /// Build the complete [`ServerIndex`] from a scenario and vendored wheels.
 fn build_server_index(scenario: &Scenario, vendor_path: &Path) -> ServerIndex {
+    build_server_index_inner(&scenario.packages, vendor_path)
+}
+
+/// Shared implementation for building a [`ServerIndex`] from a packages map.
+fn build_server_index_inner(
+    scenario_packages: &std::collections::BTreeMap<String, super::scenario::Package>,
+    vendor_path: &Path,
+) -> ServerIndex {
     let mut packages = HashMap::new();
     let mut files: HashMap<String, Arc<[u8]>> = HashMap::new();
 
     // Index scenario packages.
-    for (pkg_name, package) in &scenario.packages {
+    for (pkg_name, package) in scenario_packages {
         let package_name =
             PackageName::from_str(pkg_name).expect("invalid package name in scenario");
         let mut dists = Vec::new();

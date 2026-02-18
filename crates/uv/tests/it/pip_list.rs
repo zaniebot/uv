@@ -9,7 +9,7 @@ use uv_test::uv_snapshot;
 
 #[test]
 fn list_empty_columns() {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
     uv_snapshot!(context.pip_list()
         .arg("--format")
@@ -25,7 +25,7 @@ fn list_empty_columns() {
 
 #[test]
 fn list_empty_freeze() {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
     uv_snapshot!(context.pip_list()
         .arg("--format")
@@ -41,7 +41,7 @@ fn list_empty_freeze() {
 
 #[test]
 fn list_empty_json() {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
     uv_snapshot!(context.pip_list()
         .arg("--format")
@@ -59,10 +59,10 @@ fn list_empty_json() {
 #[test]
 #[cfg(feature = "test-pypi")]
 fn list_single_no_editable() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
     let requirements_txt = context.temp_dir.child("requirements.txt");
-    requirements_txt.write_str("MarkupSafe==2.1.3")?;
+    requirements_txt.write_str("calm-ibis==2.1.3")?;
 
     uv_snapshot!(context.pip_install()
         .arg("-r")
@@ -76,19 +76,19 @@ fn list_single_no_editable() -> Result<()> {
     Resolved 1 package in [TIME]
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
-     + markupsafe==2.1.3
+     + calm-ibis==2.1.3
     "
     );
 
-    context.assert_command("import markupsafe").success();
+    context.assert_command("import calm_ibis").success();
 
     uv_snapshot!(context.pip_list(), @"
     success: true
     exit_code: 0
     ----- stdout -----
-    Package    Version
-    ---------- -------
-    markupsafe 2.1.3
+    Package   Version
+    --------- -------
+    calm-ibis 2.1.3
 
     ----- stderr -----
     "
@@ -100,10 +100,10 @@ fn list_single_no_editable() -> Result<()> {
 #[test]
 #[cfg(feature = "test-pypi")]
 fn list_outdated_columns() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
     let requirements_txt = context.temp_dir.child("requirements.txt");
-    requirements_txt.write_str("anyio==3.0.0")?;
+    requirements_txt.write_str("swift-finch==3.0.0")?;
 
     uv_snapshot!(context.pip_install()
         .arg("-r")
@@ -117,9 +117,9 @@ fn list_outdated_columns() -> Result<()> {
     Resolved 3 packages in [TIME]
     Prepared 3 packages in [TIME]
     Installed 3 packages in [TIME]
-     + anyio==3.0.0
-     + idna==3.6
-     + sniffio==1.3.1
+     + loud-warbler==3.6
+     + silly-wren==1.3.1
+     + swift-finch==3.0.0
     "
     );
 
@@ -127,9 +127,9 @@ fn list_outdated_columns() -> Result<()> {
     success: true
     exit_code: 0
     ----- stdout -----
-    Package Version Latest Type
-    ------- ------- ------ -----
-    anyio   3.0.0   4.3.0  wheel
+    Package     Version Latest Type
+    ----------- ------- ------ -----
+    swift-finch 3.0.0   4.3.0  wheel
 
     ----- stderr -----
     "
@@ -141,10 +141,10 @@ fn list_outdated_columns() -> Result<()> {
 #[test]
 #[cfg(feature = "test-pypi")]
 fn list_outdated_json() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
     let requirements_txt = context.temp_dir.child("requirements.txt");
-    requirements_txt.write_str("anyio==3.0.0")?;
+    requirements_txt.write_str("swift-finch==3.0.0")?;
 
     uv_snapshot!(context.pip_install()
         .arg("-r")
@@ -158,9 +158,9 @@ fn list_outdated_json() -> Result<()> {
     Resolved 3 packages in [TIME]
     Prepared 3 packages in [TIME]
     Installed 3 packages in [TIME]
-     + anyio==3.0.0
-     + idna==3.6
-     + sniffio==1.3.1
+     + loud-warbler==3.6
+     + silly-wren==1.3.1
+     + swift-finch==3.0.0
     "
     );
 
@@ -168,7 +168,7 @@ fn list_outdated_json() -> Result<()> {
     success: true
     exit_code: 0
     ----- stdout -----
-    [{"name":"anyio","version":"3.0.0","latest_version":"4.3.0","latest_filetype":"wheel"}]
+    [{"name":"swift-finch","version":"3.0.0","latest_version":"4.3.0","latest_filetype":"wheel"}]
 
     ----- stderr -----
     "#
@@ -179,7 +179,7 @@ fn list_outdated_json() -> Result<()> {
 
 #[test]
 fn list_outdated_freeze() {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
     uv_snapshot!(context.pip_list().arg("--outdated").arg("--format").arg("freeze"), @"
     success: false

@@ -179,7 +179,7 @@ fn invert() -> Result<()> {
 
 #[test]
 fn frozen() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
     let pyproject_toml = context.temp_dir.child("pyproject.toml");
     pyproject_toml.write_str(
@@ -188,7 +188,7 @@ fn frozen() -> Result<()> {
         name = "project"
         version = "0.1.0"
         requires-python = ">=3.12"
-        dependencies = ["anyio"]
+        dependencies = ["swift-finch"]
     "#,
     )?;
 
@@ -197,9 +197,9 @@ fn frozen() -> Result<()> {
     exit_code: 0
     ----- stdout -----
     project v0.1.0
-    └── anyio v4.3.0
-        ├── idna v3.6
-        └── sniffio v1.3.1
+    └── swift-finch v4.3.0
+        ├── loud-warbler v3.6
+        └── silly-wren v1.3.1
 
     ----- stderr -----
     Resolved 4 packages in [TIME]
@@ -218,7 +218,7 @@ fn frozen() -> Result<()> {
         name = "project"
         version = "0.1.0"
         requires-python = ">=3.12"
-        dependencies = ["iniconfig"]
+        dependencies = ["tiny-sparrow"]
     "#,
     )?;
 
@@ -228,9 +228,9 @@ fn frozen() -> Result<()> {
     exit_code: 0
     ----- stdout -----
     project v0.1.0
-    └── anyio v4.3.0
-        ├── idna v3.6
-        └── sniffio v1.3.1
+    └── swift-finch v4.3.0
+        ├── loud-warbler v3.6
+        └── silly-wren v1.3.1
 
     ----- stderr -----
     "
@@ -241,7 +241,7 @@ fn frozen() -> Result<()> {
 
 #[test]
 fn outdated() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
     let pyproject_toml = context.temp_dir.child("pyproject.toml");
     pyproject_toml.write_str(
@@ -250,7 +250,7 @@ fn outdated() -> Result<()> {
         name = "project"
         version = "0.1.0"
         requires-python = ">=3.12"
-        dependencies = ["anyio==3.0.0"]
+        dependencies = ["swift-finch==3.0.0"]
     "#,
     )?;
 
@@ -259,9 +259,9 @@ fn outdated() -> Result<()> {
     exit_code: 0
     ----- stdout -----
     project v0.1.0
-    └── anyio v3.0.0 (latest: v4.3.0)
-        ├── idna v3.6
-        └── sniffio v1.3.1
+    └── swift-finch v3.0.0 (latest: v4.3.0)
+        ├── loud-warbler v3.6
+        └── silly-wren v1.3.1
 
     ----- stderr -----
     Resolved 4 packages in [TIME]
@@ -353,7 +353,7 @@ fn platform_dependencies() -> Result<()> {
 
 #[test]
 fn platform_dependencies_inverted() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
     let pyproject_toml = context.temp_dir.child("pyproject.toml");
     pyproject_toml.write_str(
@@ -363,7 +363,7 @@ fn platform_dependencies_inverted() -> Result<()> {
         version = "0.1.0"
         requires-python = ">=3.12"
         dependencies = [
-            "click"
+            "clever-robin"
         ]
     "#,
     )?;
@@ -373,11 +373,11 @@ fn platform_dependencies_inverted() -> Result<()> {
     success: true
     exit_code: 0
     ----- stdout -----
-    click v8.1.7
+    clever-robin v8.1.7
     └── project v0.1.0
 
     ----- stderr -----
-    Resolved 3 packages in [TIME]
+    Resolved 2 packages in [TIME]
     ");
 
     // Unless `--python-platform` is set to `windows`, in which case it should be included.
@@ -385,12 +385,11 @@ fn platform_dependencies_inverted() -> Result<()> {
     success: true
     exit_code: 0
     ----- stdout -----
-    colorama v0.4.6
-    └── click v8.1.7
-        └── project v0.1.0
+    clever-robin v8.1.7
+    └── project v0.1.0
 
     ----- stderr -----
-    Resolved 3 packages in [TIME]
+    Resolved 2 packages in [TIME]
     ");
 
     Ok(())
@@ -398,7 +397,7 @@ fn platform_dependencies_inverted() -> Result<()> {
 
 #[test]
 fn repeated_dependencies() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
     let pyproject_toml = context.temp_dir.child("pyproject.toml");
     pyproject_toml.write_str(
@@ -408,28 +407,27 @@ fn repeated_dependencies() -> Result<()> {
         version = "0.1.0"
         requires-python = ">=3.12"
         dependencies = [
-            "anyio < 2 ; sys_platform == 'win32'",
-            "anyio > 2 ; sys_platform == 'linux'",
+            "swift-finch < 2 ; sys_platform == 'win32'",
+            "swift-finch > 2 ; sys_platform == 'linux'",
         ]
     "#,
     )?;
 
-    // Should include both versions of `anyio`, which have different dependencies.
+    // Should include both versions of `swift-finch`, which have different dependencies.
     uv_snapshot!(context.filters(), context.tree().arg("--universal"), @"
     success: true
     exit_code: 0
     ----- stdout -----
     project v0.1.0
-    ├── anyio v1.4.0
-    │   ├── async-generator v1.10
-    │   ├── idna v3.6
-    │   └── sniffio v1.3.1
-    └── anyio v4.3.0
-        ├── idna v3.6
-        └── sniffio v1.3.1
+    ├── swift-finch v1.0.0
+    │   ├── loud-warbler v3.6
+    │   └── silly-wren v1.3.1
+    └── swift-finch v4.3.0
+        ├── loud-warbler v3.6
+        └── silly-wren v1.3.1
 
     ----- stderr -----
-    Resolved 6 packages in [TIME]
+    Resolved 5 packages in [TIME]
     "
     );
 
@@ -444,7 +442,7 @@ fn repeated_dependencies() -> Result<()> {
 /// URLs.
 #[test]
 fn repeated_version() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
     let v1 = context.temp_dir.child("v1");
     fs_err::create_dir_all(&v1)?;
@@ -455,7 +453,7 @@ fn repeated_version() -> Result<()> {
         name = "dependency"
         version = "0.0.1"
         requires-python = ">=3.12"
-        dependencies = ["anyio==3.7.0"]
+        dependencies = ["swift-finch==3.7.0"]
         "#,
     )?;
 
@@ -468,7 +466,7 @@ fn repeated_version() -> Result<()> {
         name = "dependency"
         version = "0.0.1"
         requires-python = ">=3.12"
-        dependencies = ["anyio==3.0.0"]
+        dependencies = ["swift-finch==3.0.0"]
         "#,
     )?;
 
@@ -494,13 +492,13 @@ fn repeated_version() -> Result<()> {
     ----- stdout -----
     project v0.1.0
     ├── dependency v0.0.1
-    │   └── anyio v3.7.0
-    │       ├── idna v3.6
-    │       └── sniffio v1.3.1
+    │   └── swift-finch v3.7.0
+    │       ├── loud-warbler v3.6
+    │       └── silly-wren v1.3.1
     └── dependency v0.0.1
-        └── anyio v3.0.0
-            ├── idna v3.6
-            └── sniffio v1.3.1
+        └── swift-finch v3.0.0
+            ├── loud-warbler v3.6
+            └── silly-wren v1.3.1
 
     ----- stderr -----
     Resolved 7 packages in [TIME]
@@ -516,7 +514,7 @@ fn repeated_version() -> Result<()> {
 
 #[test]
 fn dev_dependencies() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
     let pyproject_toml = context.temp_dir.child("pyproject.toml");
     pyproject_toml.write_str(
@@ -525,10 +523,10 @@ fn dev_dependencies() -> Result<()> {
         name = "project"
         version = "0.1.0"
         requires-python = ">=3.12"
-        dependencies = ["iniconfig"]
+        dependencies = ["tiny-sparrow"]
 
         [tool.uv]
-        dev-dependencies = ["anyio"]
+        dev-dependencies = ["swift-finch"]
     "#,
     )?;
 
@@ -537,10 +535,10 @@ fn dev_dependencies() -> Result<()> {
     exit_code: 0
     ----- stdout -----
     project v0.1.0
-    ├── iniconfig v2.0.0
-    └── anyio v4.3.0 (group: dev)
-        ├── idna v3.6
-        └── sniffio v1.3.1
+    ├── tiny-sparrow v2.0.0
+    └── swift-finch v4.3.0 (group: dev)
+        ├── loud-warbler v3.6
+        └── silly-wren v1.3.1
 
     ----- stderr -----
     warning: The `tool.uv.dev-dependencies` field (used in `pyproject.toml`) is deprecated and will be removed in a future release; use `dependency-groups.dev` instead
@@ -553,7 +551,7 @@ fn dev_dependencies() -> Result<()> {
     exit_code: 0
     ----- stdout -----
     project v0.1.0
-    └── iniconfig v2.0.0
+    └── tiny-sparrow v2.0.0
 
     ----- stderr -----
     warning: The `tool.uv.dev-dependencies` field (used in `pyproject.toml`) is deprecated and will be removed in a future release; use `dependency-groups.dev` instead
@@ -570,7 +568,7 @@ fn dev_dependencies() -> Result<()> {
 
 #[test]
 fn dev_dependencies_inverted() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
     let pyproject_toml = context.temp_dir.child("pyproject.toml");
     pyproject_toml.write_str(
@@ -579,10 +577,10 @@ fn dev_dependencies_inverted() -> Result<()> {
         name = "project"
         version = "0.1.0"
         requires-python = ">=3.12"
-        dependencies = ["iniconfig"]
+        dependencies = ["tiny-sparrow"]
 
         [tool.uv]
-        dev-dependencies = ["anyio"]
+        dev-dependencies = ["swift-finch"]
     "#,
     )?;
 
@@ -590,13 +588,13 @@ fn dev_dependencies_inverted() -> Result<()> {
     success: true
     exit_code: 0
     ----- stdout -----
-    idna v3.6
-    └── anyio v4.3.0
+    loud-warbler v3.6
+    └── swift-finch v4.3.0
         └── project v0.1.0 (group: dev)
-    iniconfig v2.0.0
+    silly-wren v1.3.1
+    └── swift-finch v4.3.0 (*)
+    tiny-sparrow v2.0.0
     └── project v0.1.0
-    sniffio v1.3.1
-    └── anyio v4.3.0 (*)
     (*) Package tree already displayed
 
     ----- stderr -----
@@ -609,7 +607,7 @@ fn dev_dependencies_inverted() -> Result<()> {
     success: true
     exit_code: 0
     ----- stdout -----
-    iniconfig v2.0.0
+    tiny-sparrow v2.0.0
     └── project v0.1.0
 
     ----- stderr -----
@@ -1676,7 +1674,7 @@ fn only_group() -> Result<()> {
 
 #[test]
 fn show_sizes() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
     let pyproject_toml = context.temp_dir.child("pyproject.toml");
     pyproject_toml.write_str(
@@ -1685,7 +1683,7 @@ fn show_sizes() -> Result<()> {
         name = "project"
         version = "0.1.0"
         requires-python = ">=3.12"
-        dependencies = ["iniconfig"]
+        dependencies = ["tiny-sparrow"]
     "#,
     )?;
 
@@ -1694,7 +1692,7 @@ fn show_sizes() -> Result<()> {
     exit_code: 0
     ----- stdout -----
     project v0.1.0
-    └── iniconfig v2.0.0 ([SIZE])
+    └── tiny-sparrow v2.0.0
 
     ----- stderr -----
     Resolved 2 packages in [TIME]

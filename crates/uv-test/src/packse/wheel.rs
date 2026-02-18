@@ -30,8 +30,19 @@ pub fn generate_wheel(
     let mut zip = ZipWriter::new(Cursor::new(Vec::new()));
     let opts = SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
 
-    // __init__.py
-    let init_py = format!("__version__ = \"{version}\"\n");
+    // __init__.py — import all dependencies so `import pkg` fails if deps are missing
+    let mut init_py = format!("__version__ = \"{version}\"\n");
+    for req in requires {
+        // Extract bare package name from requirement string (before any version specifier)
+        let dep_name = req
+            .split(|c: char| !c.is_alphanumeric() && c != '-' && c != '_')
+            .next()
+            .unwrap_or("");
+        if !dep_name.is_empty() {
+            let dep_module = dep_name.replace('-', "_");
+            init_py.push_str(&format!("import {dep_module}\n"));
+        }
+    }
     zip.start_file(format!("{normalized}/__init__.py"), opts)
         .unwrap();
     zip.write_all(init_py.as_bytes()).unwrap();
@@ -52,9 +63,21 @@ pub fn generate_wheel(
     zip.start_file(format!("{dist_info}/WHEEL"), opts).unwrap();
     zip.write_all(wheel_info.as_bytes()).unwrap();
 
-    // RECORD (empty – not validated for our test purposes)
+    // RECORD — list all files so uv can properly uninstall
+    let init_hash = sha256_hex(init_py.as_bytes());
+    let metadata_hash = sha256_hex(metadata.as_bytes());
+    let wheel_hash = sha256_hex(wheel_info.as_bytes());
+    let record = format!(
+        "{normalized}/__init__.py,sha256={init_hash},{init_len}\n\
+         {dist_info}/METADATA,sha256={metadata_hash},{metadata_len}\n\
+         {dist_info}/WHEEL,sha256={wheel_hash},{wheel_len}\n\
+         {dist_info}/RECORD,,\n",
+        init_len = init_py.len(),
+        metadata_len = metadata.len(),
+        wheel_len = wheel_info.len(),
+    );
     zip.start_file(format!("{dist_info}/RECORD"), opts).unwrap();
-    zip.write_all(b"").unwrap();
+    zip.write_all(record.as_bytes()).unwrap();
 
     let bytes = zip.finish().unwrap().into_inner();
     let filename = format!("{normalized}-{version}-{tag}.whl");
@@ -93,8 +116,18 @@ pub fn generate_sdist(
     let pkg_info = build_metadata(name, version, requires, extras, requires_python);
     append_tar_file(&mut tar, &format!("{prefix}/PKG-INFO"), pkg_info.as_bytes());
 
-    // src/{module}/__init__.py
-    let init_py = format!("__version__ = \"{version}\"\n");
+    // src/{module}/__init__.py — import all dependencies so `import pkg` fails if deps are missing
+    let mut init_py = format!("__version__ = \"{version}\"\n");
+    for req in requires {
+        let dep_name = req
+            .split(|c: char| !c.is_alphanumeric() && c != '-' && c != '_')
+            .next()
+            .unwrap_or("");
+        if !dep_name.is_empty() {
+            let dep_module = dep_name.replace('-', "_");
+            init_py.push_str(&format!("import {dep_module}\n"));
+        }
+    }
     append_tar_file(
         &mut tar,
         &format!("{prefix}/src/{normalized}/__init__.py"),

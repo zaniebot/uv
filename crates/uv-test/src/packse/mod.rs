@@ -25,6 +25,11 @@ fn scenarios_dir() -> PathBuf {
     workspace_root().join("test").join("scenarios")
 }
 
+/// Base directory containing general-purpose package index TOML files.
+fn packages_dir() -> PathBuf {
+    workspace_root().join("test").join("packages")
+}
+
 /// Base directory containing vendored build-dependency wheels (hatchling, etc.).
 fn vendor_dir() -> PathBuf {
     workspace_root().join("test").join("vendor")

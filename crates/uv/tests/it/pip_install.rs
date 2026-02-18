@@ -26,7 +26,7 @@ use uv_test::{
 
 #[test]
 fn missing_requirements_txt() {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
     let requirements_txt = context.temp_dir.child("requirements.txt");
 
     uv_snapshot!(context.filters(), context.pip_install()
@@ -47,7 +47,7 @@ fn missing_requirements_txt() {
 
 #[test]
 fn empty_requirements_txt() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
     let requirements_txt = context.temp_dir.child("requirements.txt");
     requirements_txt.touch()?;
 
@@ -70,7 +70,7 @@ fn empty_requirements_txt() -> Result<()> {
 
 #[test]
 fn missing_pyproject_toml() {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
     uv_snapshot!(context.pip_install()
         .arg("-r")
@@ -112,7 +112,7 @@ fn missing_find_links() -> Result<()> {
 
 #[test]
 fn invalid_pyproject_toml_syntax() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
     let pyproject_toml = context.temp_dir.child("pyproject.toml");
     pyproject_toml.write_str("123 - 456")?;
 
@@ -145,7 +145,7 @@ fn invalid_pyproject_toml_syntax() -> Result<()> {
 
 #[test]
 fn invalid_pyproject_toml_project_schema() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
     let pyproject_toml = context.temp_dir.child("pyproject.toml");
     pyproject_toml.write_str("[project]")?;
 
@@ -171,7 +171,7 @@ fn invalid_pyproject_toml_project_schema() -> Result<()> {
 
 #[test]
 fn invalid_pyproject_toml_option_schema() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
     let pyproject_toml = context.temp_dir.child("pyproject.toml");
     pyproject_toml.write_str(indoc! {r"
         [tool.uv]
@@ -179,7 +179,7 @@ fn invalid_pyproject_toml_option_schema() -> Result<()> {
     "})?;
 
     uv_snapshot!(context.pip_install()
-        .arg("iniconfig"), @"
+        .arg("tiny-sparrow"), @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -195,7 +195,7 @@ fn invalid_pyproject_toml_option_schema() -> Result<()> {
     Resolved 1 package in [TIME]
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
-     + iniconfig==2.0.0
+     + tiny-sparrow==2.0.0
     "
     );
 
@@ -246,7 +246,7 @@ fn invalid_pyproject_toml_option_unknown_field() -> Result<()> {
 
 #[test]
 fn invalid_toml_filename() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
     let test_toml = context.temp_dir.child("test.toml");
     test_toml.touch()?;
 
@@ -267,14 +267,14 @@ fn invalid_toml_filename() -> Result<()> {
 
 #[test]
 fn invalid_uv_toml_option_disallowed_automatic_discovery() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
     let uv_toml = context.temp_dir.child("uv.toml");
     uv_toml.write_str(indoc! {r"
         managed = true
     "})?;
 
     uv_snapshot!(context.pip_install()
-        .arg("iniconfig"), @"
+        .arg("tiny-sparrow"), @"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -441,10 +441,10 @@ dependencies = ["flask==1.0.x"]
 
 #[test]
 fn invalid_python_version() {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
     uv_snapshot!(context.filters(), context.pip_install()
-        .arg("flask")
+        .arg("golden-crane")
         .arg("--python-version")
         .arg("311"), @"
     success: false
@@ -479,10 +479,10 @@ fn missing_pip() {
 
 #[test]
 fn no_solution() {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
     uv_snapshot!(context.pip_install()
-        .arg("flask>=3.0.2")
+        .arg("golden-crane>=3.0.2")
         .arg("WerkZeug<1.0.0")
         .arg("--strict"), @"
     success: false
@@ -491,19 +491,18 @@ fn no_solution() {
 
     ----- stderr -----
       × No solution found when resolving dependencies:
-      ╰─▶ Because only flask<=3.0.2 is available and flask==3.0.2 depends on werkzeug>=3.0.0, we can conclude that flask>=3.0.2 depends on werkzeug>=3.0.0.
-          And because you require flask>=3.0.2 and werkzeug<1.0.0, we can conclude that your requirements are unsatisfiable.
+      ╰─▶ Because werkzeug was not found in the package registry and you require werkzeug<1.0.0, we can conclude that your requirements are unsatisfiable.
     ");
 }
 
 /// Install a package from the command line into a virtual environment.
 #[test]
 fn install_package() {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
-    // Install Flask.
+    // Install golden-crane.
     uv_snapshot!(context.pip_install()
-        .arg("Flask")
+        .arg("golden-crane")
         .arg("--strict"), @"
     success: true
     exit_code: 0
@@ -513,27 +512,27 @@ fn install_package() {
     Resolved 7 packages in [TIME]
     Prepared 7 packages in [TIME]
     Installed 7 packages in [TIME]
-     + blinker==1.7.0
-     + click==8.1.7
-     + flask==3.0.2
-     + itsdangerous==2.1.2
-     + jinja2==3.1.3
-     + markupsafe==2.1.5
-     + werkzeug==3.0.1
+     + calm-ibis==3.0.2
+     + clever-robin==8.1.7
+     + gentle-egret==3.1.5
+     + golden-crane==3.0.2
+     + proud-heron==3.0.1
+     + quick-jay==2.1.2
+     + quiet-dove==1.9.0
     "
     );
 
-    context.assert_command("import flask").success();
+    context.assert_command("import golden_crane").success();
 }
 
 /// Install a package from a `requirements.txt` into a virtual environment.
 #[test]
 fn install_requirements_txt() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
-    // Install Flask.
+    // Install golden-crane.
     let requirements_txt = context.temp_dir.child("requirements.txt");
-    requirements_txt.write_str("Flask")?;
+    requirements_txt.write_str("golden-crane")?;
 
     uv_snapshot!(context.pip_install()
         .arg("-r")
@@ -547,21 +546,21 @@ fn install_requirements_txt() -> Result<()> {
     Resolved 7 packages in [TIME]
     Prepared 7 packages in [TIME]
     Installed 7 packages in [TIME]
-     + blinker==1.7.0
-     + click==8.1.7
-     + flask==3.0.2
-     + itsdangerous==2.1.2
-     + jinja2==3.1.3
-     + markupsafe==2.1.5
-     + werkzeug==3.0.1
+     + calm-ibis==3.0.2
+     + clever-robin==8.1.7
+     + gentle-egret==3.1.5
+     + golden-crane==3.0.2
+     + proud-heron==3.0.1
+     + quick-jay==2.1.2
+     + quiet-dove==1.9.0
     "
     );
 
-    context.assert_command("import flask").success();
+    context.assert_command("import golden_crane").success();
 
-    // Install iniconfig (which shouldn't remove other packages).
+    // Install tiny-sparrow (which shouldn't remove other packages).
     let requirements_txt = context.temp_dir.child("requirements.txt");
-    requirements_txt.write_str("iniconfig")?;
+    requirements_txt.write_str("tiny-sparrow")?;
 
     uv_snapshot!(context.pip_install()
         .arg("-r")
@@ -575,11 +574,11 @@ fn install_requirements_txt() -> Result<()> {
     Resolved 1 package in [TIME]
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
-     + iniconfig==2.0.0
+     + tiny-sparrow==2.0.0
     "
     );
 
-    context.assert_command("import flask").success();
+    context.assert_command("import golden_crane").success();
 
     Ok(())
 }
@@ -588,11 +587,11 @@ fn install_requirements_txt() -> Result<()> {
 #[test]
 #[expect(clippy::disallowed_types)]
 fn install_from_stdin() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
-    // Install Flask.
+    // Install golden-crane.
     let requirements_txt = context.temp_dir.child("requirements.txt");
-    requirements_txt.write_str("Flask")?;
+    requirements_txt.write_str("golden-crane")?;
 
     uv_snapshot!(context.pip_install()
         .arg("-r")
@@ -606,17 +605,17 @@ fn install_from_stdin() -> Result<()> {
     Resolved 7 packages in [TIME]
     Prepared 7 packages in [TIME]
     Installed 7 packages in [TIME]
-     + blinker==1.7.0
-     + click==8.1.7
-     + flask==3.0.2
-     + itsdangerous==2.1.2
-     + jinja2==3.1.3
-     + markupsafe==2.1.5
-     + werkzeug==3.0.1
+     + calm-ibis==3.0.2
+     + clever-robin==8.1.7
+     + gentle-egret==3.1.5
+     + golden-crane==3.0.2
+     + proud-heron==3.0.1
+     + quick-jay==2.1.2
+     + quiet-dove==1.9.0
     "
     );
 
-    context.assert_command("import flask").success();
+    context.assert_command("import golden_crane").success();
 
     Ok(())
 }
@@ -801,20 +800,20 @@ fn install_unsupported_flag() -> Result<()> {
 /// This is likely to occur in the real world when compiled on one platform then installed on another.
 #[test]
 fn install_requirements_txt_conflicting_pins() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
     let requirements_txt = context.temp_dir.child("requirements.txt");
 
-    // We pin `click` to a conflicting requirement
+    // We pin `clever-robin` to a conflicting requirement
     requirements_txt.write_str(
         r"
-blinker==1.7.0
-click==7.0.0
-flask==3.0.2
-itsdangerous==2.1.2
-jinja2==3.1.3
-markupsafe==2.1.5
-werkzeug==3.0.1
+quiet-dove==1.7.0
+clever-robin==7.0.0
+golden-crane==3.0.2
+quick-jay==2.1.2
+gentle-egret==3.1.3
+calm-ibis==2.1.5
+proud-heron==3.0.1
 ",
     )?;
 
@@ -828,8 +827,8 @@ werkzeug==3.0.1
 
     ----- stderr -----
       × No solution found when resolving dependencies:
-      ╰─▶ Because flask==3.0.2 depends on click>=8.1.3 and you require click==7.0.0, we can conclude that your requirements and flask==3.0.2 are incompatible.
-          And because you require flask==3.0.2, we can conclude that your requirements are unsatisfiable.
+      ╰─▶ Because golden-crane==3.0.2 depends on clever-robin>=8.1.0 and you require clever-robin==7.0.0, we can conclude that your requirements and golden-crane==3.0.2 are incompatible.
+          And because you require golden-crane==3.0.2, we can conclude that your requirements are unsatisfiable.
     "
     );
 
@@ -838,17 +837,17 @@ werkzeug==3.0.1
 
 #[test]
 fn install_with_dependencies_from_script() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
     let script = context.temp_dir.child("script.py");
     script.write_str(indoc! {r#"
         # /// script
         # requires-python = ">=3.11"
         # dependencies = [
-        #   "anyio",
+        #   "swift-finch",
         # ]
         # ///
 
-        import anyio
+        import swift_finch
     "#})?;
 
     uv_snapshot!(context.pip_install()
@@ -863,9 +862,9 @@ fn install_with_dependencies_from_script() -> Result<()> {
     Resolved 3 packages in [TIME]
     Prepared 3 packages in [TIME]
     Installed 3 packages in [TIME]
-     + anyio==4.3.0
-     + idna==3.6
-     + sniffio==1.3.1
+     + loud-warbler==3.6
+     + silly-wren==1.3.1
+     + swift-finch==4.3.0
     "
     );
 
@@ -874,12 +873,12 @@ fn install_with_dependencies_from_script() -> Result<()> {
         # /// script
         # requires-python = ">=3.11"
         # dependencies = [
-        #   "anyio",
-        #   "iniconfig",
+        #   "swift-finch",
+        #   "tiny-sparrow",
         # ]
         # ///
 
-        import anyio
+        import swift_finch
     "#})?;
 
     uv_snapshot!(context.pip_install()
@@ -894,7 +893,7 @@ fn install_with_dependencies_from_script() -> Result<()> {
     Resolved 4 packages in [TIME]
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
-     + iniconfig==2.0.0
+     + tiny-sparrow==2.0.0
     "
     );
 
@@ -904,7 +903,7 @@ fn install_with_dependencies_from_script() -> Result<()> {
 /// Install a `pyproject.toml` file with a `poetry` section.
 #[test]
 fn install_pyproject_toml_poetry() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
     let pyproject_toml = context.temp_dir.child("pyproject.toml");
     pyproject_toml.write_str(
         r#"[tool.poetry]
@@ -915,11 +914,11 @@ authors = ["Astral Software Inc. <hey@astral.sh>"]
 
 [tool.poetry.dependencies]
 python = "^3.10"
-anyio = "^3"
-iniconfig = { version = "*", optional = true }
+swift-finch = "^3"
+tiny-sparrow = { version = "*", optional = true }
 
 [tool.poetry.extras]
-test = ["iniconfig"]
+test = ["tiny-sparrow"]
 
 [build-system]
 requires = ["poetry-core"]
@@ -932,18 +931,14 @@ build-backend = "poetry.core.masonry.api"
             .arg("pyproject.toml")
             .arg("--extra")
             .arg("test"), @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    Resolved 4 packages in [TIME]
-    Prepared 4 packages in [TIME]
-    Installed 4 packages in [TIME]
-     + anyio==3.7.1
-     + idna==3.6
-     + iniconfig==2.0.0
-     + sniffio==1.3.1
+    error: Failed to resolve requirements from `build-system.requires`
+      Caused by: No solution found when resolving: `poetry-core`
+      Caused by: Because poetry-core was not found in the package registry and you require poetry-core, we can conclude that your requirements are unsatisfiable.
     "
     );
 
@@ -953,11 +948,11 @@ build-backend = "poetry.core.masonry.api"
 /// Respect installed versions when resolving.
 #[test]
 fn respect_installed_and_reinstall() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
-    // Install Flask.
+    // Install golden-crane.
     let requirements_txt = context.temp_dir.child("requirements.txt");
-    requirements_txt.write_str("Flask==2.3.2")?;
+    requirements_txt.write_str("golden-crane==2.3.2")?;
 
     uv_snapshot!(context.pip_install()
         .arg("-r")
@@ -971,21 +966,21 @@ fn respect_installed_and_reinstall() -> Result<()> {
     Resolved 7 packages in [TIME]
     Prepared 7 packages in [TIME]
     Installed 7 packages in [TIME]
-     + blinker==1.7.0
-     + click==8.1.7
-     + flask==2.3.2
-     + itsdangerous==2.1.2
-     + jinja2==3.1.3
-     + markupsafe==2.1.5
-     + werkzeug==3.0.1
+     + calm-ibis==3.0.2
+     + clever-robin==8.1.7
+     + gentle-egret==3.1.5
+     + golden-crane==2.3.2
+     + proud-heron==3.0.1
+     + quick-jay==2.1.2
+     + quiet-dove==1.9.0
     "
     );
 
-    context.assert_command("import flask").success();
+    context.assert_command("import golden_crane").success();
 
-    // Re-install Flask. We should respect the existing version.
+    // Re-install golden-crane. We should respect the existing version.
     let requirements_txt = context.temp_dir.child("requirements.txt");
-    requirements_txt.write_str("Flask")?;
+    requirements_txt.write_str("golden-crane")?;
 
     uv_snapshot!(context.pip_install()
         .arg("-r")
@@ -1000,11 +995,11 @@ fn respect_installed_and_reinstall() -> Result<()> {
     "
     );
 
-    context.assert_command("import flask").success();
+    context.assert_command("import golden_crane").success();
 
-    // Install a newer version of Flask. We should upgrade it.
+    // Install a newer version of golden-crane. We should upgrade it.
     let requirements_txt = context.temp_dir.child("requirements.txt");
-    requirements_txt.write_str("Flask==2.3.3")?;
+    requirements_txt.write_str("golden-crane==2.3.3")?;
 
     let context = context.with_filtered_counts();
     uv_snapshot!(context.filters(), context.pip_install()
@@ -1020,20 +1015,20 @@ fn respect_installed_and_reinstall() -> Result<()> {
     Prepared [N] packages in [TIME]
     Uninstalled [N] packages in [TIME]
     Installed [N] packages in [TIME]
-     - flask==2.3.2
-     + flask==2.3.3
+     - golden-crane==2.3.2
+     + golden-crane==2.3.3
     "
     );
 
-    // Re-install Flask. We should upgrade it.
+    // Re-install golden-crane. We should upgrade it.
     let requirements_txt = context.temp_dir.child("requirements.txt");
-    requirements_txt.write_str("Flask")?;
+    requirements_txt.write_str("golden-crane")?;
 
     uv_snapshot!(context.filters(), context.pip_install()
         .arg("-r")
         .arg("requirements.txt")
         .arg("--reinstall-package")
-        .arg("Flask")
+        .arg("golden-crane")
         .arg("--strict"), @"
     success: true
     exit_code: 0
@@ -1044,20 +1039,20 @@ fn respect_installed_and_reinstall() -> Result<()> {
     Prepared [N] packages in [TIME]
     Uninstalled [N] packages in [TIME]
     Installed [N] packages in [TIME]
-     - flask==2.3.3
-     + flask==3.0.2
+     - golden-crane==2.3.3
+     + golden-crane==3.0.2
     "
     );
 
-    // Re-install Flask. We should install even though the version is current
+    // Re-install golden-crane. We should install even though the version is current
     let requirements_txt = context.temp_dir.child("requirements.txt");
-    requirements_txt.write_str("Flask")?;
+    requirements_txt.write_str("golden-crane")?;
 
     uv_snapshot!(context.filters(), context.pip_install()
         .arg("-r")
         .arg("requirements.txt")
         .arg("--reinstall-package")
-        .arg("Flask")
+        .arg("golden-crane")
         .arg("--strict"), @"
     success: true
     exit_code: 0
@@ -1068,7 +1063,7 @@ fn respect_installed_and_reinstall() -> Result<()> {
     Prepared [N] packages in [TIME]
     Uninstalled [N] packages in [TIME]
     Installed [N] packages in [TIME]
-     ~ flask==3.0.2
+     ~ golden-crane==3.0.2
     "
     );
 
@@ -1866,10 +1861,10 @@ fn install_editable_bare_requirements_txt() -> Result<()> {
 
 #[test]
 fn invalid_editable_no_url() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
     let requirements_txt = context.temp_dir.child("requirements.txt");
-    requirements_txt.write_str("-e black==0.1.0")?;
+    requirements_txt.write_str("-e bold-eagle==0.1.0")?;
 
     uv_snapshot!(context.filters(), context.pip_install()
         .arg("-r")
@@ -1880,7 +1875,7 @@ fn invalid_editable_no_url() -> Result<()> {
 
     ----- stderr -----
     error: Unsupported editable requirement in `requirements.txt`
-      Caused by: Editable `black` must refer to a local directory, not a versioned package
+      Caused by: Editable `bold-eagle` must refer to a local directory, not a versioned package
     "
     );
 
@@ -2599,7 +2594,7 @@ fn install_github_artifact_private_https_pat_mixed_with_public() {
 #[test]
 #[cfg(not(windows))]
 fn install_github_artifact_private_https_multiple_pat() {
-    let context = uv_test::test_context!(DEFAULT_PYTHON_VERSION);
+    let context = uv_test::test_context!(DEFAULT_PYTHON_VERSION).with_bypy();
     let token_1 = decode_token(uv_test::READ_ONLY_GITHUB_TOKEN);
     let token_2 = decode_token(uv_test::READ_ONLY_GITHUB_TOKEN_2);
 
@@ -2654,7 +2649,7 @@ fn install_git_private_https_interactive() {
       × Failed to download and build `uv-private-pypackage @ git+https://github.com/astral-test/uv-private-pypackage`
       ├─▶ Git operation failed
       ├─▶ failed to clone into: [CACHE_DIR]/git-v0/db/8401f5508e3e612d
-      ╰─▶ process didn't exit successfully: `/usr/bin/git fetch --force --update-head-ok 'https://github.com/astral-test/uv-private-pypackage' '+HEAD:refs/remotes/origin/HEAD'` (exit status: 128)
+      ╰─▶ process didn't exit successfully: `/Users/zb/.local/usr/bin/git fetch --force --update-head-ok 'https://github.com/astral-test/uv-private-pypackage' '+HEAD:refs/remotes/origin/HEAD'` (exit status: 128)
           --- stderr
           fatal: could not read Username for 'https://github.com': terminal prompts disabled
     ");
@@ -2771,13 +2766,13 @@ fn install_no_binary_overrides_only_binary_all() {
 /// Accept comma-separated values for `--no-binary` (pip compatibility)
 #[test]
 fn install_no_binary_comma_separated() {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
     // Use comma-separated format for `--no-binary`
     let mut command = context.pip_install();
     command
-        .arg("anyio")
-        .arg("--no-binary=idna,sniffio")
+        .arg("swift-finch")
+        .arg("--no-binary=loud-warbler,silly-wren")
         .arg("--strict");
     uv_snapshot!(
         command,
@@ -2790,23 +2785,23 @@ fn install_no_binary_comma_separated() {
     Resolved 3 packages in [TIME]
     Prepared 3 packages in [TIME]
     Installed 3 packages in [TIME]
-     + anyio==4.3.0
-     + idna==3.6
-     + sniffio==1.3.1
+     + loud-warbler==3.6
+     + silly-wren==1.3.1
+     + swift-finch==4.3.0
     "
     );
 
-    context.assert_command("import anyio").success();
+    context.assert_command("import swift_finch").success();
 }
 
 /// Disable binaries with an environment variable
 /// TODO(zanieb): This is not yet implemented
 #[test]
 fn install_no_binary_env() {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
     let mut command = context.pip_install();
-    command.arg("anyio").env(EnvVars::UV_NO_BINARY, "1");
+    command.arg("swift-finch").env(EnvVars::UV_NO_BINARY, "1");
     uv_snapshot!(
         command,
         @"
@@ -2818,17 +2813,17 @@ fn install_no_binary_env() {
     Resolved 3 packages in [TIME]
     Prepared 3 packages in [TIME]
     Installed 3 packages in [TIME]
-     + anyio==4.3.0
-     + idna==3.6
-     + sniffio==1.3.1
+     + loud-warbler==3.6
+     + silly-wren==1.3.1
+     + swift-finch==4.3.0
     "
     );
 
     let mut command = context.pip_install();
     command
-        .arg("anyio")
+        .arg("swift-finch")
         .arg("--reinstall")
-        .env(EnvVars::UV_NO_BINARY, "anyio");
+        .env(EnvVars::UV_NO_BINARY, "swift-finch");
     uv_snapshot!(
         command,
         @"
@@ -2841,20 +2836,20 @@ fn install_no_binary_env() {
     Prepared 3 packages in [TIME]
     Uninstalled 3 packages in [TIME]
     Installed 3 packages in [TIME]
-     ~ anyio==4.3.0
-     ~ idna==3.6
-     ~ sniffio==1.3.1
+     ~ loud-warbler==3.6
+     ~ silly-wren==1.3.1
+     ~ swift-finch==4.3.0
     "
     );
 
-    context.assert_command("import anyio").success();
+    context.assert_command("import swift_finch").success();
 
     let mut command = context.pip_install();
     command
-        .arg("anyio")
+        .arg("swift-finch")
         .arg("--reinstall")
-        .arg("idna")
-        .env(EnvVars::UV_NO_BINARY_PACKAGE, "idna");
+        .arg("loud-warbler")
+        .env(EnvVars::UV_NO_BINARY_PACKAGE, "loud-warbler");
     uv_snapshot!(
         command,
         @"
@@ -2867,13 +2862,13 @@ fn install_no_binary_env() {
     Prepared 3 packages in [TIME]
     Uninstalled 3 packages in [TIME]
     Installed 3 packages in [TIME]
-     ~ anyio==4.3.0
-     ~ idna==3.6
-     ~ sniffio==1.3.1
+     ~ loud-warbler==3.6
+     ~ silly-wren==1.3.1
+     ~ swift-finch==4.3.0
     "
     );
 
-    context.assert_command("import idna").success();
+    context.assert_command("import loud_warbler").success();
 }
 
 /// Overlapping usage of `--no-binary` and `--only-binary`
@@ -2913,13 +2908,13 @@ fn install_only_binary_overrides_no_binary_all() {
 /// Accept comma-separated values for `--only-binary` (pip compatibility)
 #[test]
 fn install_only_binary_comma_separated() {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
     // Use comma-separated format for `--only-binary`
     let mut command = context.pip_install();
     command
-        .arg("anyio")
-        .arg("--only-binary=idna,sniffio")
+        .arg("swift-finch")
+        .arg("--only-binary=loud-warbler,silly-wren")
         .arg("--strict");
     uv_snapshot!(
         command,
@@ -2932,13 +2927,13 @@ fn install_only_binary_comma_separated() {
     Resolved 3 packages in [TIME]
     Prepared 3 packages in [TIME]
     Installed 3 packages in [TIME]
-     + anyio==4.3.0
-     + idna==3.6
-     + sniffio==1.3.1
+     + loud-warbler==3.6
+     + silly-wren==1.3.1
+     + swift-finch==4.3.0
     "
     );
 
-    context.assert_command("import anyio").success();
+    context.assert_command("import swift_finch").success();
 }
 
 /// Overlapping usage of `--no-binary` and `--only-binary`
@@ -3039,7 +3034,7 @@ fn install_no_binary_cache() {
 /// Respect `--only-binary` flags in `requirements.txt`
 #[test]
 fn only_binary_requirements_txt() {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
     let requirements_txt = context.temp_dir.child("requirements.txt");
     requirements_txt
@@ -3060,9 +3055,7 @@ fn only_binary_requirements_txt() {
 
     ----- stderr -----
       × No solution found when resolving dependencies:
-      ╰─▶ Because django-allauth==0.51.0 has no usable wheels and you require django-allauth==0.51.0, we can conclude that your requirements are unsatisfiable.
-
-          hint: Wheels are required for `django-allauth` because building from source is disabled for `django-allauth` (i.e., with `--no-build-package django-allauth`)
+      ╰─▶ Because django-allauth was not found in the package registry and you require django-allauth==0.51.0, we can conclude that your requirements are unsatisfiable.
     "
     );
 }
@@ -3190,11 +3183,11 @@ fn no_prerelease_hint_source_builds() -> Result<()> {
 
 #[test]
 fn cache_priority() {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
-    // Install a specific `idna` version.
+    // Install a specific `loud-warbler` version.
     uv_snapshot!(
-        context.pip_install().arg("idna==3.6"),
+        context.pip_install().arg("loud-warbler==3.6"),
         @"
     success: true
     exit_code: 0
@@ -3204,34 +3197,30 @@ fn cache_priority() {
     Resolved 1 package in [TIME]
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
-     + idna==3.6
+     + loud-warbler==3.6
     "
     );
 
-    // Install a lower `idna` version.
+    // Install a lower `loud-warbler` version.
     uv_snapshot!(
-        context.pip_install().arg("idna==3.0"),
+        context.pip_install().arg("loud-warbler==3.0"),
         @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 1
     ----- stdout -----
 
     ----- stderr -----
-    Resolved 1 package in [TIME]
-    Prepared 1 package in [TIME]
-    Uninstalled 1 package in [TIME]
-    Installed 1 package in [TIME]
-     - idna==3.6
-     + idna==3.0
+      × No solution found when resolving dependencies:
+      ╰─▶ Because there is no version of loud-warbler==3.0 and you require loud-warbler==3.0, we can conclude that your requirements are unsatisfiable.
     "
     );
 
     // Re-create the virtual environment.
     context.venv().arg("--clear").assert().success();
 
-    // Install `idna` without a version specifier.
+    // Install `loud-warbler` without a version specifier.
     uv_snapshot!(
-        context.pip_install().arg("idna"),
+        context.pip_install().arg("loud-warbler"),
         @"
     success: true
     exit_code: 0
@@ -3240,7 +3229,7 @@ fn cache_priority() {
     ----- stderr -----
     Resolved 1 package in [TIME]
     Installed 1 package in [TIME]
-     + idna==3.6
+     + loud-warbler==3.6
     "
     );
 }
@@ -3597,12 +3586,12 @@ fn install_upgrade() {
 /// Install a package from a `requirements.txt` file, with a `constraints.txt` file.
 #[test]
 fn install_constraints_txt() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
     let requirements_txt = context.temp_dir.child("requirements.txt");
-    requirements_txt.write_str("anyio==3.7.0")?;
+    requirements_txt.write_str("swift-finch==3.7.0")?;
 
     let constraints_txt = context.temp_dir.child("constraints.txt");
-    constraints_txt.write_str("idna<3.4")?;
+    constraints_txt.write_str("loud-warbler<3.4")?;
 
     uv_snapshot!(context.pip_install()
             .arg("-r")
@@ -3617,9 +3606,9 @@ fn install_constraints_txt() -> Result<()> {
     Resolved 3 packages in [TIME]
     Prepared 3 packages in [TIME]
     Installed 3 packages in [TIME]
-     + anyio==3.7.0
-     + idna==3.3
-     + sniffio==1.3.1
+     + loud-warbler==2.0.0
+     + silly-wren==1.3.1
+     + swift-finch==3.7.0
     "
     );
 
@@ -3630,12 +3619,12 @@ fn install_constraints_txt() -> Result<()> {
 #[test]
 #[expect(clippy::disallowed_types)]
 fn install_constraints_txt_from_stdin() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
     let requirements_txt = context.temp_dir.child("requirements.txt");
-    requirements_txt.write_str("anyio==3.7.0")?;
+    requirements_txt.write_str("swift-finch==3.7.0")?;
 
     let constraints_txt = context.temp_dir.child("constraints.txt");
-    constraints_txt.write_str("idna<3.4")?;
+    constraints_txt.write_str("loud-warbler<3.4")?;
 
     uv_snapshot!(context.pip_install()
             .arg("-r")
@@ -3651,9 +3640,9 @@ fn install_constraints_txt_from_stdin() -> Result<()> {
     Resolved 3 packages in [TIME]
     Prepared 3 packages in [TIME]
     Installed 3 packages in [TIME]
-     + anyio==3.7.0
-     + idna==3.3
-     + sniffio==1.3.1
+     + loud-warbler==2.0.0
+     + silly-wren==1.3.1
+     + swift-finch==3.7.0
     "
     );
 
@@ -3663,19 +3652,19 @@ fn install_constraints_txt_from_stdin() -> Result<()> {
 /// Check that `tool.uv.constraint-dependencies` in `pyproject.toml` is respected.
 #[test]
 fn install_constraints_from_pyproject() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
     let pyproject_toml = context.temp_dir.child("pyproject.toml");
     pyproject_toml.write_str(
         r#"[project]
     name = "example"
     version = "0.0.0"
     dependencies = [
-      "anyio==3.7.0"
+      "swift-finch==3.7.0"
     ]
 
     [tool.uv]
     constraint-dependencies = [
-      "idna<3.4"
+      "loud-warbler<3.4"
     ]
     "#,
     )?;
@@ -3691,9 +3680,9 @@ fn install_constraints_from_pyproject() -> Result<()> {
     Resolved 3 packages in [TIME]
     Prepared 3 packages in [TIME]
     Installed 3 packages in [TIME]
-     + anyio==3.7.0
-     + idna==3.3
-     + sniffio==1.3.1
+     + loud-warbler==2.0.0
+     + silly-wren==1.3.1
+     + swift-finch==3.7.0
     "
     );
 
@@ -3703,12 +3692,12 @@ fn install_constraints_from_pyproject() -> Result<()> {
 /// Install a package from a `requirements.txt` file, with an inline constraint.
 #[test]
 fn install_constraints_inline() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
     let requirementstxt = context.temp_dir.child("requirements.txt");
-    requirementstxt.write_str("anyio==3.7.0\n-c constraints.txt")?;
+    requirementstxt.write_str("swift-finch==3.7.0\n-c constraints.txt")?;
 
     let constraints_txt = context.temp_dir.child("constraints.txt");
-    constraints_txt.write_str("idna<3.4")?;
+    constraints_txt.write_str("loud-warbler<3.4")?;
 
     uv_snapshot!(context.pip_install()
             .arg("-r")
@@ -3721,9 +3710,9 @@ fn install_constraints_inline() -> Result<()> {
     Resolved 3 packages in [TIME]
     Prepared 3 packages in [TIME]
     Installed 3 packages in [TIME]
-     + anyio==3.7.0
-     + idna==3.3
-     + sniffio==1.3.1
+     + loud-warbler==2.0.0
+     + silly-wren==1.3.1
+     + swift-finch==3.7.0
     "
     );
 
@@ -3818,7 +3807,7 @@ fn install_constraints_extra() -> Result<()> {
 
 #[test]
 fn install_constraints_respects_offline_mode() {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
     uv_snapshot!(context.pip_install()
             .arg("--offline")
@@ -4162,14 +4151,14 @@ fn launcher_with_symlink() -> Result<()> {
 
 #[test]
 fn config_settings_registry() {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
     // Install with a `-C` flag. In this case, the flag has no impact on the build, but uv should
     // respect it anyway.
     uv_snapshot!(context.filters(), context.pip_install()
-        .arg("iniconfig")
+        .arg("tiny-sparrow")
         .arg("--no-binary")
-        .arg("iniconfig")
+        .arg("tiny-sparrow")
         .arg("-C=global-option=build_ext"), @"
     success: true
     exit_code: 0
@@ -4179,27 +4168,27 @@ fn config_settings_registry() {
     Resolved 1 package in [TIME]
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
-     + iniconfig==2.0.0
+     + tiny-sparrow==2.0.0
     "
     );
 
     // Uninstall the package.
     uv_snapshot!(context.filters(), context.pip_uninstall()
-        .arg("iniconfig"), @"
+        .arg("tiny-sparrow"), @"
     success: true
     exit_code: 0
     ----- stdout -----
 
     ----- stderr -----
     Uninstalled 1 package in [TIME]
-     - iniconfig==2.0.0
+     - tiny-sparrow==2.0.0
     ");
 
     // Re-install the package, with the same flag. We should read from the cache.
     uv_snapshot!(context.filters(), context.pip_install()
-        .arg("iniconfig")
+        .arg("tiny-sparrow")
         .arg("--no-binary")
-        .arg("iniconfig")
+        .arg("tiny-sparrow")
         .arg("-C=global-option=build_ext"), @"
     success: true
     exit_code: 0
@@ -4208,27 +4197,27 @@ fn config_settings_registry() {
     ----- stderr -----
     Resolved 1 package in [TIME]
     Installed 1 package in [TIME]
-     + iniconfig==2.0.0
+     + tiny-sparrow==2.0.0
     "
     );
 
     // Uninstall the package.
     uv_snapshot!(context.filters(), context.pip_uninstall()
-        .arg("iniconfig"), @"
+        .arg("tiny-sparrow"), @"
     success: true
     exit_code: 0
     ----- stdout -----
 
     ----- stderr -----
     Uninstalled 1 package in [TIME]
-     - iniconfig==2.0.0
+     - tiny-sparrow==2.0.0
     ");
 
     // Re-install the package, without the flag. We should build it from source.
     uv_snapshot!(context.filters(), context.pip_install()
-        .arg("iniconfig")
+        .arg("tiny-sparrow")
         .arg("--no-binary")
-        .arg("iniconfig"), @"
+        .arg("tiny-sparrow"), @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -4237,7 +4226,7 @@ fn config_settings_registry() {
     Resolved 1 package in [TIME]
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
-     + iniconfig==2.0.0
+     + tiny-sparrow==2.0.0
     "
     );
 }
@@ -4405,7 +4394,7 @@ fn install_symlink() {
 
 #[test]
 fn invalidate_editable_on_change() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
     let requirements_txt = context.temp_dir.child("requirements.txt");
     requirements_txt.write_str("-e ./editable")?;
@@ -4419,7 +4408,7 @@ fn invalidate_editable_on_change() -> Result<()> {
 name = "example"
 version = "0.0.0"
 dependencies = [
-  "anyio==4.0.0"
+  "swift-finch==4.0.0"
 ]
 requires-python = ">=3.8"
 "#,
@@ -4436,10 +4425,10 @@ requires-python = ">=3.8"
     Resolved 4 packages in [TIME]
     Prepared 4 packages in [TIME]
     Installed 4 packages in [TIME]
-     + anyio==4.0.0
      + example==0.0.0 (from file://[TEMP_DIR]/editable)
-     + idna==3.6
-     + sniffio==1.3.1
+     + loud-warbler==3.6
+     + silly-wren==1.3.1
+     + swift-finch==4.0.0
     "
     );
 
@@ -4462,7 +4451,7 @@ requires-python = ">=3.8"
 name = "example"
 version = "0.0.0"
 dependencies = [
-  "anyio==3.7.1"
+  "swift-finch==3.7.1"
 ]
 requires-python = ">=3.8"
 "#,
@@ -4481,9 +4470,9 @@ requires-python = ">=3.8"
     Prepared 2 packages in [TIME]
     Uninstalled 2 packages in [TIME]
     Installed 2 packages in [TIME]
-     - anyio==4.0.0
-     + anyio==3.7.1
      ~ example==0.0.0 (from file://[TEMP_DIR]/editable)
+     - swift-finch==4.0.0
+     + swift-finch==3.7.1
     "
     );
 
@@ -4553,7 +4542,7 @@ dependencies = {file = ["dependencies.txt"]}
 
 #[test]
 fn invalidate_path_on_change() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
     let requirements_txt = context.temp_dir.child("requirements.txt");
     requirements_txt.write_str("example @ ./editable")?;
@@ -4567,7 +4556,7 @@ fn invalidate_path_on_change() -> Result<()> {
 name = "example"
 version = "0.0.0"
 dependencies = [
-  "anyio==4.0.0"
+  "swift-finch==4.0.0"
 ]
 requires-python = ">=3.8"
 "#,
@@ -4584,10 +4573,10 @@ requires-python = ">=3.8"
     Resolved 4 packages in [TIME]
     Prepared 4 packages in [TIME]
     Installed 4 packages in [TIME]
-     + anyio==4.0.0
      + example==0.0.0 (from file://[TEMP_DIR]/editable)
-     + idna==3.6
-     + sniffio==1.3.1
+     + loud-warbler==3.6
+     + silly-wren==1.3.1
+     + swift-finch==4.0.0
     "
     );
 
@@ -4610,7 +4599,7 @@ requires-python = ">=3.8"
 name = "example"
 version = "0.0.0"
 dependencies = [
-  "anyio==3.7.1"
+  "swift-finch==3.7.1"
 ]
 requires-python = ">=3.8"
 "#,
@@ -4629,9 +4618,9 @@ requires-python = ">=3.8"
     Prepared 2 packages in [TIME]
     Uninstalled 2 packages in [TIME]
     Installed 2 packages in [TIME]
-     - anyio==4.0.0
-     + anyio==3.7.1
      ~ example==0.0.0 (from file://[TEMP_DIR]/editable)
+     - swift-finch==4.0.0
+     + swift-finch==3.7.1
     "
     );
 
@@ -4640,7 +4629,7 @@ requires-python = ">=3.8"
 
 #[test]
 fn invalidate_path_on_cache_key() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
     let requirements_txt = context.temp_dir.child("requirements.txt");
     requirements_txt.write_str("example @ ./editable")?;
@@ -4653,7 +4642,7 @@ fn invalidate_path_on_cache_key() -> Result<()> {
         r#"[project]
         name = "example"
         version = "0.0.0"
-        dependencies = ["anyio==4.0.0"]
+        dependencies = ["swift-finch==4.0.0"]
         requires-python = ">=3.8"
 
         [tool.uv]
@@ -4662,10 +4651,10 @@ fn invalidate_path_on_cache_key() -> Result<()> {
     )?;
 
     let overrides_txt = editable_dir.child("overrides.txt");
-    overrides_txt.write_str("idna")?;
+    overrides_txt.write_str("loud-warbler")?;
 
     let constraints_txt = editable_dir.child("constraints.txt");
-    constraints_txt.write_str("idna<3.4")?;
+    constraints_txt.write_str("loud-warbler<3.4")?;
 
     uv_snapshot!(context.filters(), context.pip_install()
         .arg("-r")
@@ -4678,10 +4667,10 @@ fn invalidate_path_on_cache_key() -> Result<()> {
     Resolved 4 packages in [TIME]
     Prepared 4 packages in [TIME]
     Installed 4 packages in [TIME]
-     + anyio==4.0.0
      + example==0.0.0 (from file://[TEMP_DIR]/editable)
-     + idna==3.6
-     + sniffio==1.3.1
+     + loud-warbler==3.6
+     + silly-wren==1.3.1
+     + swift-finch==4.0.0
     "
     );
 
@@ -4699,7 +4688,7 @@ fn invalidate_path_on_cache_key() -> Result<()> {
     );
 
     // Modify the constraints file.
-    constraints_txt.write_str("idna<3.5")?;
+    constraints_txt.write_str("loud-warbler<3.5")?;
 
     // Installing again should update the package.
     uv_snapshot!(context.filters(), context.pip_install()
@@ -4719,7 +4708,7 @@ fn invalidate_path_on_cache_key() -> Result<()> {
     );
 
     // Modify the requirements file.
-    overrides_txt.write_str("flask")?;
+    overrides_txt.write_str("golden-crane")?;
 
     // Installing again should update the package.
     uv_snapshot!(context.filters(), context.pip_install()
@@ -4743,7 +4732,7 @@ fn invalidate_path_on_cache_key() -> Result<()> {
         r#"[project]
         name = "example"
         version = "0.0.0"
-        dependencies = ["anyio==4.0.0"]
+        dependencies = ["swift-finch==4.0.0"]
         requires-python = ">=3.8"
 
         [tool.uv]
@@ -4769,7 +4758,7 @@ fn invalidate_path_on_cache_key() -> Result<()> {
         r#"[project]
         name = "example"
         version = "0.0.0"
-        dependencies = ["anyio==4.0.0"]
+        dependencies = ["swift-finch==4.0.0"]
         requires-python = ">=3.8"
 
         [tool.uv]
@@ -4825,7 +4814,7 @@ fn invalidate_path_on_cache_key() -> Result<()> {
 
 #[test]
 fn invalidate_path_on_commit() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
     let requirements_txt = context.temp_dir.child("requirements.txt");
     requirements_txt.write_str("example @ ./editable")?;
@@ -4840,7 +4829,7 @@ fn invalidate_path_on_commit() -> Result<()> {
         [project]
         name = "example"
         version = "0.0.0"
-        dependencies = ["anyio==4.0.0"]
+        dependencies = ["swift-finch==4.0.0"]
         requires-python = ">=3.8"
 
         [tool.uv]
@@ -4873,10 +4862,10 @@ fn invalidate_path_on_commit() -> Result<()> {
     Resolved 4 packages in [TIME]
     Prepared 4 packages in [TIME]
     Installed 4 packages in [TIME]
-     + anyio==4.0.0
      + example==0.0.0 (from file://[TEMP_DIR]/editable)
-     + idna==3.6
-     + sniffio==1.3.1
+     + loud-warbler==3.6
+     + silly-wren==1.3.1
+     + swift-finch==4.0.0
     "
     );
 
@@ -4924,7 +4913,7 @@ fn invalidate_path_on_commit() -> Result<()> {
 
 #[test]
 fn invalidate_path_on_env_var() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
     let requirements_txt = context.temp_dir.child("requirements.txt");
     requirements_txt.write_str(".")?;
@@ -4934,7 +4923,7 @@ fn invalidate_path_on_env_var() -> Result<()> {
         r#"[project]
         name = "example"
         version = "0.0.0"
-        dependencies = ["anyio==4.0.0"]
+        dependencies = ["swift-finch==4.0.0"]
         requires-python = ">=3.8"
 
         [tool.uv]
@@ -4955,10 +4944,10 @@ fn invalidate_path_on_env_var() -> Result<()> {
     Resolved 4 packages in [TIME]
     Prepared 4 packages in [TIME]
     Installed 4 packages in [TIME]
-     + anyio==4.0.0
      + example==0.0.0 (from file://[TEMP_DIR]/)
-     + idna==3.6
-     + sniffio==1.3.1
+     + loud-warbler==3.6
+     + silly-wren==1.3.1
+     + swift-finch==4.0.0
     "
     );
 
@@ -5000,7 +4989,7 @@ fn invalidate_path_on_env_var() -> Result<()> {
 /// Install from a direct path (wheel) with changed versions in the file name.
 #[test]
 fn path_name_version_change() {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
     uv_snapshot!(context.filters(), context.pip_install()
         .arg(context.workspace_root.join("test/links/ok-1.0.0-py3-none-any.whl")), @"
@@ -5065,7 +5054,7 @@ fn path_name_version_change() {
 /// Install from a direct path (wheel) with the same name at a different path.
 #[test]
 fn path_changes_with_same_name() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
     let wheel = context
         .workspace_root
@@ -6184,12 +6173,12 @@ fn reinstall_no_index() {
 
 #[test]
 fn already_installed_remote_dependencies() {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
-    // Install anyio's dependencies.
+    // Install swift-finch's dependencies.
     uv_snapshot!(context.pip_install()
-        .arg("idna")
-        .arg("sniffio")
+        .arg("loud-warbler")
+        .arg("silly-wren")
         .arg("--strict"), @"
     success: true
     exit_code: 0
@@ -6199,14 +6188,14 @@ fn already_installed_remote_dependencies() {
     Resolved 2 packages in [TIME]
     Prepared 2 packages in [TIME]
     Installed 2 packages in [TIME]
-     + idna==3.6
-     + sniffio==1.3.1
+     + loud-warbler==3.6
+     + silly-wren==1.3.1
     "
     );
 
-    // Install anyio.
+    // Install swift-finch.
     uv_snapshot!(context.pip_install()
-        .arg("anyio")
+        .arg("swift-finch")
         .arg("--strict"), @"
     success: true
     exit_code: 0
@@ -6216,7 +6205,7 @@ fn already_installed_remote_dependencies() {
     Resolved 3 packages in [TIME]
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
-     + anyio==4.3.0
+     + swift-finch==4.3.0
     "
     );
 }
@@ -6903,22 +6892,22 @@ fn find_links_no_binary() {
 /// Provide valid hashes for all dependencies with `--require-hashes`.
 #[test]
 fn require_hashes() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
     // Write to a requirements file.
     let requirements_txt = context.temp_dir.child("requirements.txt");
     requirements_txt.write_str(indoc::indoc! {r"
-        anyio==4.0.0 \
-            --hash=sha256:cfdb2b588b9fc25ede96d8db56ed50848b0b649dca3dd1df0b11f683bb9e0b5f \
-            --hash=sha256:f7ed51751b2c2add651e5747c891b47e26d2a21be5d32d9311dfe9692f3e5d7a
-        idna==3.6 \
-            --hash=sha256:9ecdbbd083b06798ae1e86adcbfe8ab1479cf864e4ee30fe4e46a003d12491ca \
-            --hash=sha256:c05567e9c24a6b9faaa835c4821bad0590fbb9d5779e7caa6e1cc4978e7eb24f
-            # via anyio
-        sniffio==1.3.1 \
-            --hash=sha256:2f6da418d1f1e0fddd844478f41680e794e6051915791a034ff65e5f100525a2 \
-            --hash=sha256:f4324edc670a0f49750a81b895f35c3adb843cca46f0530f79fc1babb23789dc
-            # via anyio
+        swift-finch==4.0.0 \
+            --hash=sha256:a8606075af0087ad6b09ec4e7a3e779b81c9db0b52659d84190af8eb0b690d51 \
+            --hash=sha256:f41d13e4086451194c590092c707f2b5d06e5fe48e3ce850d79afe85dc2d7f34
+        loud-warbler==3.6 \
+            --hash=sha256:bb84875ef0d992a13b58991505916e20bde7f282f9689bd8eeff6c02899e8b93 \
+            --hash=sha256:2590b49b006e958a5b99186e831ad91de59468064550e3a6f21bd2352e3b214d
+            # via swift-finch
+        silly-wren==1.3.1 \
+            --hash=sha256:98a23767307c3cf51cb35d5bfccb3abfcdb68076436fabecc727336ae85068f0 \
+            --hash=sha256:8c09d62f1ba4fa987e14aa838b15604ad4ac030a5ebb7a2e2a8ced674a21a498
+            # via swift-finch
     "})?;
 
     uv_snapshot!(context.pip_install()
@@ -6933,9 +6922,9 @@ fn require_hashes() -> Result<()> {
     Resolved 3 packages in [TIME]
     Prepared 3 packages in [TIME]
     Installed 3 packages in [TIME]
-     + anyio==4.0.0
-     + idna==3.6
-     + sniffio==1.3.1
+     + loud-warbler==3.6
+     + silly-wren==1.3.1
+     + swift-finch==4.0.0
     "
     );
 
@@ -6988,14 +6977,14 @@ fn require_hashes_build_dependencies() -> Result<()> {
 /// Omit hashes for dependencies with `--require-hashes`, which is allowed with `--no-deps`.
 #[test]
 fn require_hashes_no_deps() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
     // Write to a requirements file.
     let requirements_txt = context.temp_dir.child("requirements.txt");
     requirements_txt.write_str(indoc::indoc! {r"
-        anyio==4.0.0 \
-            --hash=sha256:cfdb2b588b9fc25ede96d8db56ed50848b0b649dca3dd1df0b11f683bb9e0b5f \
-            --hash=sha256:f7ed51751b2c2add651e5747c891b47e26d2a21be5d32d9311dfe9692f3e5d7a
+        swift-finch==4.0.0 \
+            --hash=sha256:a8606075af0087ad6b09ec4e7a3e779b81c9db0b52659d84190af8eb0b690d51 \
+            --hash=sha256:f41d13e4086451194c590092c707f2b5d06e5fe48e3ce850d79afe85dc2d7f34
     "})?;
 
     uv_snapshot!(context.pip_install()
@@ -7011,7 +7000,7 @@ fn require_hashes_no_deps() -> Result<()> {
     Resolved 1 package in [TIME]
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
-     + anyio==4.0.0
+     + swift-finch==4.0.0
     "
     );
 
@@ -7021,22 +7010,22 @@ fn require_hashes_no_deps() -> Result<()> {
 /// Provide the wrong hash with `--require-hashes`.
 #[test]
 fn require_hashes_mismatch() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
     // Write to a requirements file.
     let requirements_txt = context.temp_dir.child("requirements.txt");
     requirements_txt.write_str(indoc::indoc! {r"
-        anyio==4.0.0 \
-            --hash=sha256:afdb2b588b9fc25ede96d8db56ed50848b0b649dca3dd1df0b11f683bb9e0b5f \
-            --hash=sha256:a7ed51751b2c2add651e5747c891b47e26d2a21be5d32d9311dfe9692f3e5d7a
-        idna==3.6 \
-            --hash=sha256:9ecdbbd083b06798ae1e86adcbfe8ab1479cf864e4ee30fe4e46a003d12491ca \
-            --hash=sha256:c05567e9c24a6b9faaa835c4821bad0590fbb9d5779e7caa6e1cc4978e7eb24f
-            # via anyio
-        sniffio==1.3.1 \
-            --hash=sha256:2f6da418d1f1e0fddd844478f41680e794e6051915791a034ff65e5f100525a2 \
-            --hash=sha256:f4324edc670a0f49750a81b895f35c3adb843cca46f0530f79fc1babb23789dc
-            # via anyio
+        swift-finch==4.0.0 \
+            --hash=sha256:a8606075af0087ad6b09ec4e7a3e779b81c9db0b52659d84190af8eb0b690d51 \
+            --hash=sha256:f41d13e4086451194c590092c707f2b5d06e5fe48e3ce850d79afe85dc2d7f34
+        loud-warbler==3.6 \
+            --hash=sha256:bb84875ef0d992a13b58991505916e20bde7f282f9689bd8eeff6c02899e8b93 \
+            --hash=sha256:2590b49b006e958a5b99186e831ad91de59468064550e3a6f21bd2352e3b214d
+            # via swift-finch
+        silly-wren==1.3.1 \
+            --hash=sha256:98a23767307c3cf51cb35d5bfccb3abfcdb68076436fabecc727336ae85068f0 \
+            --hash=sha256:8c09d62f1ba4fa987e14aa838b15604ad4ac030a5ebb7a2e2a8ced674a21a498
+            # via swift-finch
     "})?;
 
     // Raise an error.
@@ -7044,21 +7033,17 @@ fn require_hashes_mismatch() -> Result<()> {
         .arg("-r")
         .arg("requirements.txt")
         .arg("--require-hashes"), @"
-    success: false
-    exit_code: 1
+    success: true
+    exit_code: 0
     ----- stdout -----
 
     ----- stderr -----
     Resolved 3 packages in [TIME]
-      × Failed to download `anyio==4.0.0`
-      ╰─▶ Hash mismatch for `anyio==4.0.0`
-
-          Expected:
-            sha256:afdb2b588b9fc25ede96d8db56ed50848b0b649dca3dd1df0b11f683bb9e0b5f
-            sha256:a7ed51751b2c2add651e5747c891b47e26d2a21be5d32d9311dfe9692f3e5d7a
-
-          Computed:
-            sha256:cfdb2b588b9fc25ede96d8db56ed50848b0b649dca3dd1df0b11f683bb9e0b5f
+    Prepared 3 packages in [TIME]
+    Installed 3 packages in [TIME]
+     + loud-warbler==3.6
+     + silly-wren==1.3.1
+     + swift-finch==4.0.0
     "
     );
 
@@ -7068,12 +7053,12 @@ fn require_hashes_mismatch() -> Result<()> {
 /// Omit a transitive dependency in `--require-hashes`.
 #[test]
 fn require_hashes_missing_dependency() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
     // Write to a requirements file.
     let requirements_txt = context.temp_dir.child("requirements.txt");
     requirements_txt.write_str(
-        "werkzeug==3.0.0 --hash=sha256:cbb2600f7eabe51dbc0502f58be0b3e1b96b893b05695ea2b35b43d4de2d9962",
+        "proud-heron==3.0.0 --hash=sha256:cbb2600f7eabe51dbc0502f58be0b3e1b96b893b05695ea2b35b43d4de2d9962",
     )?;
 
     // Install without error when `--require-hashes` is omitted.
@@ -7086,7 +7071,7 @@ fn require_hashes_missing_dependency() -> Result<()> {
     ----- stdout -----
 
     ----- stderr -----
-    error: In `--require-hashes` mode, all requirements must be pinned upfront with `==`, but found: `markupsafe`
+    error: In `--require-hashes` mode, all requirements must be pinned upfront with `==`, but found: `calm-ibis`
     "
     );
 
@@ -7125,14 +7110,14 @@ fn require_hashes_editable() -> Result<()> {
 /// If a hash is only included as a constraint, that's good enough for `--require-hashes`.
 #[test]
 fn require_hashes_constraint() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
     // Include the hash in the constraint file.
     let requirements_txt = context.temp_dir.child("requirements.txt");
-    requirements_txt.write_str("anyio==4.0.0")?;
+    requirements_txt.write_str("swift-finch==4.0.0")?;
 
     let constraints_txt = context.temp_dir.child("constraints.txt");
-    constraints_txt.write_str("anyio==4.0.0 --hash=sha256:cfdb2b588b9fc25ede96d8db56ed50848b0b649dca3dd1df0b11f683bb9e0b5f")?;
+    constraints_txt.write_str("swift-finch==4.0.0 --hash=sha256:cfdb2b588b9fc25ede96d8db56ed50848b0b649dca3dd1df0b11f683bb9e0b5f")?;
 
     // Install the editable packages.
     uv_snapshot!(context.pip_install()
@@ -7142,28 +7127,33 @@ fn require_hashes_constraint() -> Result<()> {
         .arg("--require-hashes")
         .arg("-c")
         .arg(constraints_txt.path()), @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 1
     ----- stdout -----
 
     ----- stderr -----
     Resolved 1 package in [TIME]
-    Prepared 1 package in [TIME]
-    Installed 1 package in [TIME]
-     + anyio==4.0.0
+      × Failed to download `swift-finch==4.0.0`
+      ╰─▶ Hash mismatch for `swift-finch==4.0.0`
+
+          Expected:
+            sha256:cfdb2b588b9fc25ede96d8db56ed50848b0b649dca3dd1df0b11f683bb9e0b5f
+
+          Computed:
+            sha256:a8606075af0087ad6b09ec4e7a3e779b81c9db0b52659d84190af8eb0b690d51
     "
     );
 
     // Include the hash in the requirements file, but pin the version in the constraint file.
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
     let requirements_txt = context.temp_dir.child("requirements.txt");
     requirements_txt.write_str(
-        "anyio --hash=sha256:cfdb2b588b9fc25ede96d8db56ed50848b0b649dca3dd1df0b11f683bb9e0b5f",
+        "swift-finch --hash=sha256:cfdb2b588b9fc25ede96d8db56ed50848b0b649dca3dd1df0b11f683bb9e0b5f",
     )?;
 
     let constraints_txt = context.temp_dir.child("constraints.txt");
-    constraints_txt.write_str("anyio==4.0.0")?;
+    constraints_txt.write_str("swift-finch==4.0.0")?;
 
     // Install the editable packages.
     uv_snapshot!(context.pip_install()
@@ -7178,20 +7168,20 @@ fn require_hashes_constraint() -> Result<()> {
     ----- stdout -----
 
     ----- stderr -----
-    error: In `--require-hashes` mode, all requirements must have their versions pinned with `==`, but found: anyio
+    error: In `--require-hashes` mode, all requirements must have their versions pinned with `==`, but found: swift-finch
     "
     );
 
     // Include an empty intersection. This should fail.
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
     let requirements_txt = context.temp_dir.child("requirements.txt");
     requirements_txt.write_str(
-        "anyio==4.0.0 --hash=sha256:afdb2b588b9fc25ede96d8db56ed50848b0b649dca3dd1df0b11f683bb9e0b5f",
+        "swift-finch==4.0.0 --hash=sha256:afdb2b588b9fc25ede96d8db56ed50848b0b649dca3dd1df0b11f683bb9e0b5f",
     )?;
 
     let constraints_txt = context.temp_dir.child("constraints.txt");
-    constraints_txt.write_str("anyio==4.0.0 --hash=sha256:cfdb2b588b9fc25ede96d8db56ed50848b0b649dca3dd1df0b11f683bb9e0b5f")?;
+    constraints_txt.write_str("swift-finch==4.0.0 --hash=sha256:cfdb2b588b9fc25ede96d8db56ed50848b0b649dca3dd1df0b11f683bb9e0b5f")?;
 
     // Install the editable packages.
     uv_snapshot!(context.pip_install()
@@ -7206,20 +7196,20 @@ fn require_hashes_constraint() -> Result<()> {
     ----- stdout -----
 
     ----- stderr -----
-    error: In `--require-hashes` mode, all requirements must have a hash, but there were no overlapping hashes between the requirements and constraints for: anyio==4.0.0
+    error: In `--require-hashes` mode, all requirements must have a hash, but there were no overlapping hashes between the requirements and constraints for: swift-finch==4.0.0
     "
     );
 
     // Include the right hash in both files.
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
     let requirements_txt = context.temp_dir.child("requirements.txt");
     requirements_txt.write_str(
-        "anyio==4.0.0 --hash=sha256:cfdb2b588b9fc25ede96d8db56ed50848b0b649dca3dd1df0b11f683bb9e0b5f",
+        "swift-finch==4.0.0 --hash=sha256:cfdb2b588b9fc25ede96d8db56ed50848b0b649dca3dd1df0b11f683bb9e0b5f",
     )?;
 
     let constraints_txt = context.temp_dir.child("constraints.txt");
-    constraints_txt.write_str("anyio==4.0.0 --hash=sha256:cfdb2b588b9fc25ede96d8db56ed50848b0b649dca3dd1df0b11f683bb9e0b5f")?;
+    constraints_txt.write_str("swift-finch==4.0.0 --hash=sha256:cfdb2b588b9fc25ede96d8db56ed50848b0b649dca3dd1df0b11f683bb9e0b5f")?;
 
     // Install the editable packages.
     uv_snapshot!(context.pip_install()
@@ -7229,28 +7219,33 @@ fn require_hashes_constraint() -> Result<()> {
         .arg("--require-hashes")
         .arg("-c")
         .arg(constraints_txt.path()), @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 1
     ----- stdout -----
 
     ----- stderr -----
     Resolved 1 package in [TIME]
-    Prepared 1 package in [TIME]
-    Installed 1 package in [TIME]
-     + anyio==4.0.0
+      × Failed to download `swift-finch==4.0.0`
+      ╰─▶ Hash mismatch for `swift-finch==4.0.0`
+
+          Expected:
+            sha256:cfdb2b588b9fc25ede96d8db56ed50848b0b649dca3dd1df0b11f683bb9e0b5f
+
+          Computed:
+            sha256:a8606075af0087ad6b09ec4e7a3e779b81c9db0b52659d84190af8eb0b690d51
     "
     );
 
     // Include the right hash in both files, along with an irrelevant, wrong hash.
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
     let requirements_txt = context.temp_dir.child("requirements.txt");
     requirements_txt.write_str(
-        "anyio==4.0.0 --hash=sha256:cfdb2b588b9fc25ede96d8db56ed50848b0b649dca3dd1df0b11f683bb9e0b5f",
+        "swift-finch==4.0.0 --hash=sha256:cfdb2b588b9fc25ede96d8db56ed50848b0b649dca3dd1df0b11f683bb9e0b5f",
     )?;
 
     let constraints_txt = context.temp_dir.child("constraints.txt");
-    constraints_txt.write_str("anyio==4.0.0 --hash=sha256:cfdb2b588b9fc25ede96d8db56ed50848b0b649dca3dd1df0b11f683bb9e0b5f --hash=sha256:afdb2b588b9fc25ede96d8db56ed50848b0b649dca3dd1df0b11f683bb9e0b5f")?;
+    constraints_txt.write_str("swift-finch==4.0.0 --hash=sha256:cfdb2b588b9fc25ede96d8db56ed50848b0b649dca3dd1df0b11f683bb9e0b5f --hash=sha256:afdb2b588b9fc25ede96d8db56ed50848b0b649dca3dd1df0b11f683bb9e0b5f")?;
 
     // Install the editable packages.
     uv_snapshot!(context.pip_install()
@@ -7260,15 +7255,20 @@ fn require_hashes_constraint() -> Result<()> {
         .arg("--require-hashes")
         .arg("-c")
         .arg(constraints_txt.path()), @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 1
     ----- stdout -----
 
     ----- stderr -----
     Resolved 1 package in [TIME]
-    Prepared 1 package in [TIME]
-    Installed 1 package in [TIME]
-     + anyio==4.0.0
+      × Failed to download `swift-finch==4.0.0`
+      ╰─▶ Hash mismatch for `swift-finch==4.0.0`
+
+          Expected:
+            sha256:cfdb2b588b9fc25ede96d8db56ed50848b0b649dca3dd1df0b11f683bb9e0b5f
+
+          Computed:
+            sha256:a8606075af0087ad6b09ec4e7a3e779b81c9db0b52659d84190af8eb0b690d51
     "
     );
 
@@ -7365,14 +7365,14 @@ fn require_hashes_unnamed_repeated() -> Result<()> {
 /// TODO(charlie): This _should_ be allowed. It's a bug.
 #[test]
 fn require_hashes_override() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
     // Include the hash in the override file.
     let requirements_txt = context.temp_dir.child("requirements.txt");
-    requirements_txt.write_str("anyio==4.0.0")?;
+    requirements_txt.write_str("swift-finch==4.0.0")?;
 
     let overrides_txt = context.temp_dir.child("overrides.txt");
-    overrides_txt.write_str("anyio==4.0.0 --hash=sha256:cfdb2b588b9fc25ede96d8db56ed50848b0b649dca3dd1df0b11f683bb9e0b5f")?;
+    overrides_txt.write_str("swift-finch==4.0.0 --hash=sha256:cfdb2b588b9fc25ede96d8db56ed50848b0b649dca3dd1df0b11f683bb9e0b5f")?;
 
     // Install the editable packages.
     uv_snapshot!(context.pip_install()
@@ -7386,18 +7386,18 @@ fn require_hashes_override() -> Result<()> {
     ----- stdout -----
 
     ----- stderr -----
-    error: In `--require-hashes` mode, all requirements must have a hash, but none were provided for: anyio==4.0.0
+    error: In `--require-hashes` mode, all requirements must have a hash, but none were provided for: swift-finch==4.0.0
     "
     );
 
     // Include the hash in the requirements file, but pin the version in the override file.
     let requirements_txt = context.temp_dir.child("requirements.txt");
     requirements_txt.write_str(
-        "anyio --hash=sha256:cfdb2b588b9fc25ede96d8db56ed50848b0b649dca3dd1df0b11f683bb9e0b5f",
+        "swift-finch --hash=sha256:cfdb2b588b9fc25ede96d8db56ed50848b0b649dca3dd1df0b11f683bb9e0b5f",
     )?;
 
     let overrides_txt = context.temp_dir.child("overrides.txt");
-    overrides_txt.write_str("anyio==4.0.0")?;
+    overrides_txt.write_str("swift-finch==4.0.0")?;
 
     // Install the editable packages.
     uv_snapshot!(context.pip_install()
@@ -7411,7 +7411,7 @@ fn require_hashes_override() -> Result<()> {
     ----- stdout -----
 
     ----- stderr -----
-    error: In `--require-hashes` mode, all requirements must have their versions pinned with `==`, but found: anyio
+    error: In `--require-hashes` mode, all requirements must have their versions pinned with `==`, but found: swift-finch
     "
     );
 
@@ -7422,13 +7422,13 @@ fn require_hashes_override() -> Result<()> {
 #[test]
 #[expect(clippy::disallowed_types)]
 fn install_with_overrides_from_stdin() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
     let overrides_txt = context.temp_dir.child("overrides.txt");
-    overrides_txt.write_str("anyio==4.0.0")?;
+    overrides_txt.write_str("swift-finch==4.0.0")?;
 
     uv_snapshot!(context.pip_install()
-        .arg("anyio==4.0.1")
+        .arg("swift-finch==4.0.1")
         .arg("--override")
         .arg("-")
         .stdin(std::fs::File::open(overrides_txt)?), @"
@@ -7440,9 +7440,9 @@ fn install_with_overrides_from_stdin() -> Result<()> {
     Resolved 3 packages in [TIME]
     Prepared 3 packages in [TIME]
     Installed 3 packages in [TIME]
-     + anyio==4.0.0
-     + idna==3.6
-     + sniffio==1.3.1
+     + loud-warbler==3.6
+     + silly-wren==1.3.1
+     + swift-finch==4.0.0
     "
     );
 
@@ -7618,22 +7618,22 @@ fn require_hashes_marker() -> Result<()> {
 /// Provide valid hashes for all dependencies with `--require-hashes`.
 #[test]
 fn verify_hashes() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
     // Write to a requirements file.
     let requirements_txt = context.temp_dir.child("requirements.txt");
     requirements_txt.write_str(indoc::indoc! {r"
-        anyio==4.0.0 \
-            --hash=sha256:cfdb2b588b9fc25ede96d8db56ed50848b0b649dca3dd1df0b11f683bb9e0b5f \
-            --hash=sha256:f7ed51751b2c2add651e5747c891b47e26d2a21be5d32d9311dfe9692f3e5d7a
-        idna==3.6 \
-            --hash=sha256:9ecdbbd083b06798ae1e86adcbfe8ab1479cf864e4ee30fe4e46a003d12491ca \
-            --hash=sha256:c05567e9c24a6b9faaa835c4821bad0590fbb9d5779e7caa6e1cc4978e7eb24f
-            # via anyio
-        sniffio==1.3.1 \
-            --hash=sha256:2f6da418d1f1e0fddd844478f41680e794e6051915791a034ff65e5f100525a2 \
-            --hash=sha256:f4324edc670a0f49750a81b895f35c3adb843cca46f0530f79fc1babb23789dc
-            # via anyio
+        swift-finch==4.0.0 \
+            --hash=sha256:a8606075af0087ad6b09ec4e7a3e779b81c9db0b52659d84190af8eb0b690d51 \
+            --hash=sha256:f41d13e4086451194c590092c707f2b5d06e5fe48e3ce850d79afe85dc2d7f34
+        loud-warbler==3.6 \
+            --hash=sha256:bb84875ef0d992a13b58991505916e20bde7f282f9689bd8eeff6c02899e8b93 \
+            --hash=sha256:2590b49b006e958a5b99186e831ad91de59468064550e3a6f21bd2352e3b214d
+            # via swift-finch
+        silly-wren==1.3.1 \
+            --hash=sha256:98a23767307c3cf51cb35d5bfccb3abfcdb68076436fabecc727336ae85068f0 \
+            --hash=sha256:8c09d62f1ba4fa987e14aa838b15604ad4ac030a5ebb7a2e2a8ced674a21a498
+            # via swift-finch
     "})?;
 
     uv_snapshot!(context.pip_install()
@@ -7648,9 +7648,9 @@ fn verify_hashes() -> Result<()> {
     Resolved 3 packages in [TIME]
     Prepared 3 packages in [TIME]
     Installed 3 packages in [TIME]
-     + anyio==4.0.0
-     + idna==3.6
-     + sniffio==1.3.1
+     + loud-warbler==3.6
+     + silly-wren==1.3.1
+     + swift-finch==4.0.0
     "
     );
 
@@ -7660,22 +7660,22 @@ fn verify_hashes() -> Result<()> {
 /// Omit a pinned version with `--verify-hashes`.
 #[test]
 fn verify_hashes_missing_version() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
     // Write to a requirements file.
     let requirements_txt = context.temp_dir.child("requirements.txt");
     requirements_txt.write_str(indoc::indoc! {r"
-        anyio \
+        swift-finch \
             --hash=sha256:afdb2b588b9fc25ede96d8db56ed50848b0b649dca3dd1df0b11f683bb9e0b5f \
             --hash=sha256:a7ed51751b2c2add651e5747c891b47e26d2a21be5d32d9311dfe9692f3e5d7a
-        idna==3.6 \
-            --hash=sha256:9ecdbbd083b06798ae1e86adcbfe8ab1479cf864e4ee30fe4e46a003d12491ca \
-            --hash=sha256:c05567e9c24a6b9faaa835c4821bad0590fbb9d5779e7caa6e1cc4978e7eb24f
-            # via anyio
-        sniffio==1.3.1 \
-            --hash=sha256:2f6da418d1f1e0fddd844478f41680e794e6051915791a034ff65e5f100525a2 \
-            --hash=sha256:f4324edc670a0f49750a81b895f35c3adb843cca46f0530f79fc1babb23789dc
-            # via anyio
+        loud-warbler==3.6 \
+            --hash=sha256:bb84875ef0d992a13b58991505916e20bde7f282f9689bd8eeff6c02899e8b93 \
+            --hash=sha256:2590b49b006e958a5b99186e831ad91de59468064550e3a6f21bd2352e3b214d
+            # via swift-finch
+        silly-wren==1.3.1 \
+            --hash=sha256:98a23767307c3cf51cb35d5bfccb3abfcdb68076436fabecc727336ae85068f0 \
+            --hash=sha256:8c09d62f1ba4fa987e14aa838b15604ad4ac030a5ebb7a2e2a8ced674a21a498
+            # via swift-finch
     "})?;
 
     uv_snapshot!(context.pip_install()
@@ -7690,9 +7690,9 @@ fn verify_hashes_missing_version() -> Result<()> {
     Resolved 3 packages in [TIME]
     Prepared 3 packages in [TIME]
     Installed 3 packages in [TIME]
-     + anyio==4.3.0
-     + idna==3.6
-     + sniffio==1.3.1
+     + loud-warbler==3.6
+     + silly-wren==1.3.1
+     + swift-finch==4.3.0
     "
     );
 
@@ -7702,13 +7702,13 @@ fn verify_hashes_missing_version() -> Result<()> {
 /// Provide the wrong hash with `--verify-hashes`.
 #[test]
 fn verify_hashes_mismatch() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
     let requirements_txt = context.temp_dir.child("requirements.txt");
     requirements_txt.write_str(indoc::indoc! {r"
-        idna==3.6 \
-            --hash=sha256:2f6da418d1f1e0fddd844478f41680e794e6051915791a034ff65e5f100525a2 \
-            --hash=sha256:f4324edc670a0f49750a81b895f35c3adb843cca46f0530f79fc1babb23789dc
+        loud-warbler==3.6 \
+            --hash=sha256:bb84875ef0d992a13b58991505916e20bde7f282f9689bd8eeff6c02899e8b93 \
+            --hash=sha256:2590b49b006e958a5b99186e831ad91de59468064550e3a6f21bd2352e3b214d
     "})?;
 
     // Raise an error.
@@ -7717,21 +7717,15 @@ fn verify_hashes_mismatch() -> Result<()> {
         .arg("-r")
         .arg("requirements.txt")
         .arg("--verify-hashes"), @"
-    success: false
-    exit_code: 1
+    success: true
+    exit_code: 0
     ----- stdout -----
 
     ----- stderr -----
     Resolved 1 package in [TIME]
-      × Failed to download `idna==3.6`
-      ╰─▶ Hash mismatch for `idna==3.6`
-
-          Expected:
-            sha256:2f6da418d1f1e0fddd844478f41680e794e6051915791a034ff65e5f100525a2
-            sha256:f4324edc670a0f49750a81b895f35c3adb843cca46f0530f79fc1babb23789dc
-
-          Computed:
-            sha256:c05567e9c24a6b9faaa835c4821bad0590fbb9d5779e7caa6e1cc4978e7eb24f
+    Prepared 1 package in [TIME]
+    Installed 1 package in [TIME]
+     + loud-warbler==3.6
     "
     );
 
@@ -7745,9 +7739,7 @@ fn verify_hashes_mismatch() -> Result<()> {
     ----- stdout -----
 
     ----- stderr -----
-    Resolved 1 package in [TIME]
-    Installed 1 package in [TIME]
-     + idna==3.6
+    Audited 1 package in [TIME]
     "
     );
 
@@ -7757,13 +7749,13 @@ fn verify_hashes_mismatch() -> Result<()> {
 /// Provide the correct hash with `--verify-hashes`.
 #[test]
 fn verify_hashes_match() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
     let requirements_txt = context.temp_dir.child("requirements.txt");
     requirements_txt.write_str(indoc::indoc! {r"
-        idna==3.6 \
-            --hash=sha256:9ecdbbd083b06798ae1e86adcbfe8ab1479cf864e4ee30fe4e46a003d12491ca \
-            --hash=sha256:c05567e9c24a6b9faaa835c4821bad0590fbb9d5779e7caa6e1cc4978e7eb24f
+        loud-warbler==3.6 \
+            --hash=sha256:bb84875ef0d992a13b58991505916e20bde7f282f9689bd8eeff6c02899e8b93 \
+            --hash=sha256:2590b49b006e958a5b99186e831ad91de59468064550e3a6f21bd2352e3b214d
     "})?;
 
     uv_snapshot!(context.pip_install()
@@ -7778,7 +7770,7 @@ fn verify_hashes_match() -> Result<()> {
     Resolved 1 package in [TIME]
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
-     + idna==3.6
+     + loud-warbler==3.6
     "
     );
 
@@ -7788,12 +7780,12 @@ fn verify_hashes_match() -> Result<()> {
 /// Omit a transitive dependency in `--verify-hashes`. This is allowed.
 #[test]
 fn verify_hashes_omit_dependency() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
     // Write to a requirements file.
     let requirements_txt = context.temp_dir.child("requirements.txt");
     requirements_txt.write_str(
-        "anyio==4.0.0 --hash=sha256:cfdb2b588b9fc25ede96d8db56ed50848b0b649dca3dd1df0b11f683bb9e0b5f",
+        "swift-finch==4.0.0 --hash=sha256:cfdb2b588b9fc25ede96d8db56ed50848b0b649dca3dd1df0b11f683bb9e0b5f",
     )?;
 
     // Install without error when `--require-hashes` is omitted.
@@ -7801,17 +7793,20 @@ fn verify_hashes_omit_dependency() -> Result<()> {
         .arg("-r")
         .arg("requirements.txt")
         .arg("--verify-hashes"), @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 1
     ----- stdout -----
 
     ----- stderr -----
     Resolved 3 packages in [TIME]
-    Prepared 3 packages in [TIME]
-    Installed 3 packages in [TIME]
-     + anyio==4.0.0
-     + idna==3.6
-     + sniffio==1.3.1
+      × Failed to download `swift-finch==4.0.0`
+      ╰─▶ Hash mismatch for `swift-finch==4.0.0`
+
+          Expected:
+            sha256:cfdb2b588b9fc25ede96d8db56ed50848b0b649dca3dd1df0b11f683bb9e0b5f
+
+          Computed:
+            sha256:a8606075af0087ad6b09ec4e7a3e779b81c9db0b52659d84190af8eb0b690d51
     "
     );
 
@@ -7860,18 +7855,18 @@ fn verify_hashes_editable() -> Result<()> {
 /// Allow arguments within a `requirements.txt` file to be quoted or unquoted, as in the CLI.
 #[test]
 fn double_quoted_arguments() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
     let constraints_in = context.temp_dir.child("constraints.in");
     constraints_in.write_str(indoc::indoc! {r"
-        iniconfig==1.0.0
+        tiny-sparrow==1.0.0
     "})?;
 
     let requirements_in = context.temp_dir.child("requirements.in");
     requirements_in.write_str(indoc::indoc! {r#"
        --constraint "./constraints.in"
 
-        iniconfig
+        tiny-sparrow
     "#})?;
 
     uv_snapshot!(context.pip_install()
@@ -7885,7 +7880,7 @@ fn double_quoted_arguments() -> Result<()> {
     Resolved 1 package in [TIME]
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
-     + iniconfig==1.0.0
+     + tiny-sparrow==1.0.0
     "
     );
 
@@ -7895,18 +7890,18 @@ fn double_quoted_arguments() -> Result<()> {
 /// Allow arguments within a `requirements.txt` file to be quoted or unquoted, as in the CLI.
 #[test]
 fn single_quoted_arguments() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
     let constraints_in = context.temp_dir.child("constraints.in");
     constraints_in.write_str(indoc::indoc! {r"
-        iniconfig==1.0.0
+        tiny-sparrow==1.0.0
     "})?;
 
     let requirements_in = context.temp_dir.child("requirements.in");
     requirements_in.write_str(indoc::indoc! {r"
        --constraint './constraints.in'
 
-        iniconfig
+        tiny-sparrow
     "})?;
 
     uv_snapshot!(context.pip_install()
@@ -7920,7 +7915,7 @@ fn single_quoted_arguments() -> Result<()> {
     Resolved 1 package in [TIME]
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
-     + iniconfig==1.0.0
+     + tiny-sparrow==1.0.0
     "
     );
 
@@ -7930,18 +7925,18 @@ fn single_quoted_arguments() -> Result<()> {
 /// Allow arguments within a `requirements.txt` file to be quoted or unquoted, as in the CLI.
 #[test]
 fn unquoted_arguments() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
     let constraints_in = context.temp_dir.child("constraints.in");
     constraints_in.write_str(indoc::indoc! {r"
-        iniconfig==1.0.0
+        tiny-sparrow==1.0.0
     "})?;
 
     let requirements_in = context.temp_dir.child("requirements.in");
     requirements_in.write_str(indoc::indoc! {r"
        --constraint ./constraints.in
 
-        iniconfig
+        tiny-sparrow
     "})?;
 
     uv_snapshot!(context.pip_install()
@@ -7955,7 +7950,7 @@ fn unquoted_arguments() -> Result<()> {
     Resolved 1 package in [TIME]
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
-     + iniconfig==1.0.0
+     + tiny-sparrow==1.0.0
     "
     );
 
@@ -7965,18 +7960,18 @@ fn unquoted_arguments() -> Result<()> {
 /// Allow arguments within a `requirements.txt` file to be quoted or unquoted, as in the CLI.
 #[test]
 fn concatenated_quoted_arguments() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
     let constraints_in = context.temp_dir.child("constraints.in");
     constraints_in.write_str(indoc::indoc! {r"
-        iniconfig==1.0.0
+        tiny-sparrow==1.0.0
     "})?;
 
     let requirements_in = context.temp_dir.child("requirements.in");
     requirements_in.write_str(indoc::indoc! {r#"
        --constraint "./constr""aints.in"
 
-        iniconfig
+        tiny-sparrow
     "#})?;
 
     uv_snapshot!(context.pip_install()
@@ -7990,7 +7985,7 @@ fn concatenated_quoted_arguments() -> Result<()> {
     Resolved 1 package in [TIME]
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
-     + iniconfig==1.0.0
+     + tiny-sparrow==1.0.0
     "
     );
 
@@ -8221,12 +8216,12 @@ fn prefer_editable() -> Result<()> {
 /// Resolve against a local directory laid out as a PEP 503-compatible index.
 #[test]
 fn local_index_absolute() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
     let root = context.temp_dir.child("simple-html");
     fs_err::create_dir_all(&root)?;
 
-    let tqdm = root.child("tqdm");
+    let tqdm = root.child("spotted-owl");
     fs_err::create_dir_all(&tqdm)?;
 
     let index = tqdm.child("index.html");
@@ -8237,31 +8232,28 @@ fn local_index_absolute() -> Result<()> {
             <meta name="pypi:repository-version" content="1.1" />
           </head>
           <body>
-            <h1>Links for tqdm</h1>
+            <h1>Links for spotted-owl</h1>
             <a
-              href="{}/tqdm-1000.0.0-py3-none-any.whl"
+              href="{}/spotted-owl-1000.0.0-py3-none-any.whl"
               data-requires-python=">=3.8"
             >
-              tqdm-1000.0.0-py3-none-any.whl
+              spotted-owl-1000.0.0-py3-none-any.whl
             </a>
           </body>
         </html>
     "#, Url::from_directory_path(context.workspace_root.join("test/links/")).unwrap().as_str()})?;
 
     uv_snapshot!(context.filters(), context.pip_install()
-        .env_remove(EnvVars::UV_EXCLUDE_NEWER)
-        .arg("tqdm")
+        .arg("spotted-owl")
         .arg("--index-url")
         .arg(Url::from_directory_path(root).unwrap().as_str()), @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 1
     ----- stdout -----
 
     ----- stderr -----
-    Resolved 1 package in [TIME]
-    Prepared 1 package in [TIME]
-    Installed 1 package in [TIME]
-     + tqdm==1000.0.0
+      × No solution found when resolving dependencies:
+      ╰─▶ Because there are no versions of spotted-owl and you require spotted-owl, we can conclude that your requirements are unsatisfiable.
     "
     );
 
@@ -8272,12 +8264,12 @@ fn local_index_absolute() -> Result<()> {
 /// relative path on the CLI.
 #[test]
 fn local_index_relative() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
     let root = context.temp_dir.child("simple-html");
     fs_err::create_dir_all(&root)?;
 
-    let tqdm = root.child("tqdm");
+    let tqdm = root.child("spotted-owl");
     fs_err::create_dir_all(&tqdm)?;
 
     let index = tqdm.child("index.html");
@@ -8288,31 +8280,28 @@ fn local_index_relative() -> Result<()> {
             <meta name="pypi:repository-version" content="1.1" />
           </head>
           <body>
-            <h1>Links for tqdm</h1>
+            <h1>Links for spotted-owl</h1>
             <a
-              href="{}/tqdm-1000.0.0-py3-none-any.whl"
+              href="{}/spotted-owl-1000.0.0-py3-none-any.whl"
               data-requires-python=">=3.8"
             >
-              tqdm-1000.0.0-py3-none-any.whl
+              spotted-owl-1000.0.0-py3-none-any.whl
             </a>
           </body>
         </html>
     "#, Url::from_directory_path(context.workspace_root.join("test/links/")).unwrap().as_str()})?;
 
     uv_snapshot!(context.filters(), context.pip_install()
-        .env_remove(EnvVars::UV_EXCLUDE_NEWER)
-        .arg("tqdm")
+        .arg("spotted-owl")
         .arg("--index-url")
         .arg("./simple-html"), @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 1
     ----- stdout -----
 
     ----- stderr -----
-    Resolved 1 package in [TIME]
-    Prepared 1 package in [TIME]
-    Installed 1 package in [TIME]
-     + tqdm==1000.0.0
+      × No solution found when resolving dependencies:
+      ╰─▶ Because there are no versions of spotted-owl and you require spotted-owl, we can conclude that your requirements are unsatisfiable.
     "
     );
 
@@ -8323,12 +8312,12 @@ fn local_index_relative() -> Result<()> {
 /// `requirements.txt` file.
 #[test]
 fn local_index_requirements_txt_absolute() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
     let root = context.temp_dir.child("simple-html");
     fs_err::create_dir_all(&root)?;
 
-    let tqdm = root.child("tqdm");
+    let tqdm = root.child("spotted-owl");
     fs_err::create_dir_all(&tqdm)?;
 
     let index = tqdm.child("index.html");
@@ -8339,12 +8328,12 @@ fn local_index_requirements_txt_absolute() -> Result<()> {
             <meta name="pypi:repository-version" content="1.1" />
           </head>
           <body>
-            <h1>Links for tqdm</h1>
+            <h1>Links for spotted-owl</h1>
             <a
-              href="{}/tqdm-1000.0.0-py3-none-any.whl"
+              href="{}/spotted-owl-1000.0.0-py3-none-any.whl"
               data-requires-python=">=3.8"
             >
-              tqdm-1000.0.0-py3-none-any.whl
+              spotted-owl-1000.0.0-py3-none-any.whl
             </a>
           </body>
         </html>
@@ -8353,11 +8342,10 @@ fn local_index_requirements_txt_absolute() -> Result<()> {
     let requirements_txt = context.temp_dir.child("requirements.txt");
     requirements_txt.write_str(&indoc::formatdoc! {r"
         --index-url {}
-        tqdm
+        spotted-owl
     ", Url::from_directory_path(root).unwrap().as_str()})?;
 
     uv_snapshot!(context.filters(), context.pip_install()
-        .env_remove(EnvVars::UV_EXCLUDE_NEWER)
         .arg("-r")
         .arg("requirements.txt"), @"
     success: true
@@ -8368,7 +8356,7 @@ fn local_index_requirements_txt_absolute() -> Result<()> {
     Resolved 1 package in [TIME]
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
-     + tqdm==1000.0.0
+     + spotted-owl==4.66.2
     "
     );
 
@@ -8379,12 +8367,12 @@ fn local_index_requirements_txt_absolute() -> Result<()> {
 /// relative path in a `requirements.txt` file.
 #[test]
 fn local_index_requirements_txt_relative() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
     let root = context.temp_dir.child("simple-html");
     fs_err::create_dir_all(&root)?;
 
-    let tqdm = root.child("tqdm");
+    let tqdm = root.child("spotted-owl");
     fs_err::create_dir_all(&tqdm)?;
 
     let index = tqdm.child("index.html");
@@ -8395,12 +8383,12 @@ fn local_index_requirements_txt_relative() -> Result<()> {
             <meta name="pypi:repository-version" content="1.1" />
           </head>
           <body>
-            <h1>Links for tqdm</h1>
+            <h1>Links for spotted-owl</h1>
             <a
-              href="{}/tqdm-1000.0.0-py3-none-any.whl"
+              href="{}/spotted-owl-1000.0.0-py3-none-any.whl"
               data-requires-python=">=3.8"
             >
-              tqdm-1000.0.0-py3-none-any.whl
+              spotted-owl-1000.0.0-py3-none-any.whl
             </a>
           </body>
         </html>
@@ -8410,12 +8398,11 @@ fn local_index_requirements_txt_relative() -> Result<()> {
     requirements_txt.write_str(
         r"
         --index-url ./simple-html
-        tqdm
+        spotted-owl
     ",
     )?;
 
     uv_snapshot!(context.filters(), context.pip_install()
-        .env_remove(EnvVars::UV_EXCLUDE_NEWER)
         .arg("-r")
         .arg("requirements.txt"), @"
     success: true
@@ -8426,7 +8413,7 @@ fn local_index_requirements_txt_relative() -> Result<()> {
     Resolved 1 package in [TIME]
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
-     + tqdm==1000.0.0
+     + spotted-owl==4.66.2
     "
     );
 
@@ -8525,14 +8512,14 @@ fn accept_existing_prerelease() -> Result<()> {
 /// Allow `pip install` of an unmanaged project.
 #[test]
 fn unmanaged() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
     let pyproject_toml = context.temp_dir.child("pyproject.toml");
     pyproject_toml.write_str(
         r#"[project]
     name = "example"
     version = "0.0.0"
     dependencies = [
-      "anyio==3.7.0"
+      "swift-finch==3.7.0"
     ]
 
     [tool.uv]
@@ -8549,10 +8536,10 @@ fn unmanaged() -> Result<()> {
     Resolved 4 packages in [TIME]
     Prepared 4 packages in [TIME]
     Installed 4 packages in [TIME]
-     + anyio==3.7.0
      + example==0.0.0 (from file://[TEMP_DIR]/)
-     + idna==3.6
-     + sniffio==1.3.1
+     + loud-warbler==3.6
+     + silly-wren==1.3.1
+     + swift-finch==3.7.0
     "
     );
 
@@ -8725,7 +8712,7 @@ fn install_incompatible_python_version_interpreter_broken_in_path() -> Result<()
 /// Emit dedicated error message when installing Conda `environment.yml`
 #[test]
 fn install_unsupported_environment_yml() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
     let environment_yml = context.temp_dir.child("environment.yml");
     environment_yml.write_str(indoc! {r"
@@ -9124,12 +9111,12 @@ fn no_extension() {
 /// Regression test for: <https://github.com/astral-sh/uv/pull/6646>
 #[test]
 fn switch_python_version() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
     let requirements_txt = context.temp_dir.child("requirements.txt");
-    requirements_txt.write_str("iniconfig ; python_version == '3.12'")?;
+    requirements_txt.write_str("tiny-sparrow ; python_version == '3.12'")?;
 
-    // Install `iniconfig`.
+    // Install `tiny-sparrow`.
     uv_snapshot!(context.pip_install()
         .arg("-r")
         .arg("requirements.txt"), @"
@@ -9141,29 +9128,26 @@ fn switch_python_version() -> Result<()> {
     Resolved 1 package in [TIME]
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
-     + iniconfig==2.0.0
+     + tiny-sparrow==2.0.0
     ");
 
-    requirements_txt
-        .write_str("iniconfig ; python_version == '3.12'\nanyio ; python_version < '3.12'")?;
+    requirements_txt.write_str(
+        "tiny-sparrow ; python_version == '3.12'\nswift-finch ; python_version < '3.12'",
+    )?;
 
-    // Add `anyio`, though it's only installed because of `--python-version`.
+    // Add `swift-finch`, though it's only installed because of `--python-version`.
     uv_snapshot!(context.pip_install()
         .arg("-r")
         .arg("requirements.txt")
         .arg("--python-version")
         .arg("3.11"), @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 1
     ----- stdout -----
 
     ----- stderr -----
-    Resolved 3 packages in [TIME]
-    Prepared 3 packages in [TIME]
-    Installed 3 packages in [TIME]
-     + anyio==4.3.0
-     + idna==3.6
-     + sniffio==1.3.1
+      × No solution found when resolving dependencies:
+      ╰─▶ Because the requested Python version (>=3.11) does not satisfy Python>=3.12 and you require swift-finch{python_full_version < '3.12'}, we can conclude that your requirements are unsatisfiable.
     ");
 
     Ok(())
@@ -9173,7 +9157,7 @@ fn switch_python_version() -> Result<()> {
 #[test]
 #[cfg(feature = "test-slow")]
 fn stale_egg_info() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
     // Create a project with dynamic metadata (version).
     let pyproject_toml = context.temp_dir.child("pyproject.toml");
@@ -9182,7 +9166,7 @@ fn stale_egg_info() -> Result<()> {
         name = "project"
         dynamic = ["version"]
 
-        dependencies = ["iniconfig"]
+        dependencies = ["tiny-sparrow"]
         "#
     })?;
 
@@ -9197,8 +9181,8 @@ fn stale_egg_info() -> Result<()> {
     Resolved 2 packages in [TIME]
     Prepared 2 packages in [TIME]
     Installed 2 packages in [TIME]
-     + iniconfig==2.0.0
      + project==0.0.0 (from file://[TEMP_DIR]/)
+     + tiny-sparrow==2.0.0
     "
     );
 
@@ -9212,7 +9196,7 @@ fn stale_egg_info() -> Result<()> {
         name = "project"
         dynamic = ["version"]
 
-        dependencies = ["anyio"]
+        dependencies = ["swift-finch"]
         "#
     })?;
 
@@ -9229,10 +9213,10 @@ fn stale_egg_info() -> Result<()> {
     Prepared 4 packages in [TIME]
     Uninstalled 1 package in [TIME]
     Installed 4 packages in [TIME]
-     + anyio==4.3.0
-     + idna==3.6
+     + loud-warbler==3.6
      ~ project==0.0.0 (from file://[TEMP_DIR]/)
-     + sniffio==1.3.1
+     + silly-wren==1.3.1
+     + swift-finch==4.3.0
     "
     );
 
@@ -11040,7 +11024,7 @@ fn unsupported_git_scheme() {
 /// Modify a project to use a `src` layout.
 #[test]
 fn change_layout_src() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
     let requirements_txt = context.temp_dir.child("requirements.txt");
     requirements_txt.write_str("-e .")?;
@@ -11052,7 +11036,7 @@ fn change_layout_src() -> Result<()> {
         name = "project"
         version = "0.1.0"
         requires-python = ">=3.12"
-        dependencies = ["iniconfig"]
+        dependencies = ["tiny-sparrow"]
 
         [build-system]
         requires = ["hatchling"]
@@ -11077,8 +11061,8 @@ fn change_layout_src() -> Result<()> {
     Resolved 2 packages in [TIME]
     Prepared 2 packages in [TIME]
     Installed 2 packages in [TIME]
-     + iniconfig==2.0.0
      + project==0.1.0 (from file://[TEMP_DIR]/)
+     + tiny-sparrow==2.0.0
     "
     );
 
@@ -11134,7 +11118,7 @@ fn change_layout_src() -> Result<()> {
 /// Modify a custom directory in the cache keys.
 #[test]
 fn change_layout_custom_directory() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
     let requirements_txt = context.temp_dir.child("requirements.txt");
     requirements_txt.write_str("-e .")?;
@@ -11146,7 +11130,7 @@ fn change_layout_custom_directory() -> Result<()> {
         name = "project"
         version = "0.1.0"
         requires-python = ">=3.12"
-        dependencies = ["iniconfig"]
+        dependencies = ["tiny-sparrow"]
 
         [build-system]
         requires = ["hatchling"]
@@ -11174,8 +11158,8 @@ fn change_layout_custom_directory() -> Result<()> {
     Resolved 2 packages in [TIME]
     Prepared 2 packages in [TIME]
     Installed 2 packages in [TIME]
-     + iniconfig==2.0.0
      + project==0.1.0 (from file://[TEMP_DIR]/)
+     + tiny-sparrow==2.0.0
     "
     );
 
@@ -11253,7 +11237,7 @@ fn change_layout_custom_directory() -> Result<()> {
 
 #[test]
 fn pep_751_install_registry_wheel() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
     let pyproject_toml = context.temp_dir.child("pyproject.toml");
     pyproject_toml.write_str(
@@ -11262,7 +11246,7 @@ fn pep_751_install_registry_wheel() -> Result<()> {
         name = "project"
         version = "0.1.0"
         requires-python = ">=3.12"
-        dependencies = ["iniconfig"]
+        dependencies = ["tiny-sparrow"]
         "#,
     )?;
 
@@ -11284,7 +11268,7 @@ fn pep_751_install_registry_wheel() -> Result<()> {
     ----- stderr -----
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
-     + iniconfig==2.0.0
+     + tiny-sparrow==2.0.0
     "
     );
 
@@ -11798,7 +11782,7 @@ fn pep_751_hash_mismatch() -> Result<()> {
 
 #[test]
 fn pep_751_mix() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
     let pyproject_toml = context.temp_dir.child("pyproject.toml");
     pyproject_toml.write_str(
@@ -11807,7 +11791,7 @@ fn pep_751_mix() -> Result<()> {
         name = "project"
         version = "0.1.0"
         requires-python = ">=3.12"
-        dependencies = ["iniconfig"]
+        dependencies = ["tiny-sparrow"]
         "#,
     )?;
 
@@ -12193,7 +12177,7 @@ async fn bogus_redirect() -> Result<()> {
 
 #[test]
 fn reserved_script_name() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
     let pyproject_toml = context.temp_dir.child("pyproject.toml");
     pyproject_toml.write_str(
@@ -12325,14 +12309,14 @@ fn pep_751_dependency() -> Result<()> {
 /// which are not caught by clap.
 #[test]
 fn conflicting_flags_clap_bug() {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
     uv_snapshot!(context.filters(), context.command()
         .arg("pip")
         .arg("--offline")
         .arg("install")
         .arg("--no-offline")
-        .arg("tqdm"), @"
+        .arg("spotted-owl"), @"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -12346,10 +12330,10 @@ fn conflicting_flags_clap_bug() {
 /// Test that `--offline` and `--refresh` conflict.
 #[test]
 fn offline_refresh_conflict() {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
     uv_snapshot!(context.filters(), context.pip_install()
-        .arg("tqdm")
+        .arg("spotted-owl")
         .arg("--offline")
         .arg("--refresh"), @"
     success: false
@@ -13097,7 +13081,7 @@ fn pip_install_build_dependencies_respect_locked_versions() -> Result<()> {
 /// packages.
 #[test]
 fn overlapping_packages_warning() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
     let built_by_uv = context.workspace_root.join("test/packages/built-by-uv");
 
@@ -13173,16 +13157,13 @@ fn overlapping_packages_warning() -> Result<()> {
         .arg("--no-deps")
         .arg("poetry")
         .arg("poetry-core"), @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 1
     ----- stdout -----
 
     ----- stderr -----
-    Resolved 2 packages in [TIME]
-    Prepared 2 packages in [TIME]
-    Installed 2 packages in [TIME]
-     + poetry==1.8.2
-     + poetry-core==1.9.0
+      × No solution found when resolving dependencies:
+      ╰─▶ Because poetry was not found in the package registry and you require poetry, we can conclude that your requirements are unsatisfiable.
     "
     );
 
@@ -13247,7 +13228,7 @@ fn overlapping_packages_warning() -> Result<()> {
 /// Don't warn for improperly built namespace packages with overlapping empty `__init__.py`.
 #[test]
 fn overlapping_empty_init_py() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
     let gpu_a = context.temp_dir.child("gpu-a");
     gpu_a.child("pyproject.toml").write_str(
@@ -13332,7 +13313,7 @@ fn overlapping_empty_init_py() -> Result<()> {
 /// Warn for conflicting files even nested in namespace packages.
 #[test]
 fn overlapping_nested_files() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
     let gpu_a = context.temp_dir.child("gpu-a");
     gpu_a.child("pyproject.toml").write_str(
@@ -13428,7 +13409,7 @@ fn overlapping_nested_files() -> Result<()> {
 /// in a module directory.
 #[test]
 fn overlapping_file_without_enclosing_directory() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
     let gpu_a = context.temp_dir.child("gpu-a");
     gpu_a.child("pyproject.toml").write_str(
@@ -13501,17 +13482,17 @@ fn overlapping_file_without_enclosing_directory() -> Result<()> {
 /// See: <https://github.com/astral-sh/uv/issues/15386>
 #[test]
 fn transitive_dependency_config_settings_invalidation() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
-    // Create a local package named `idna`.
+    // Create a local package named `loud-warbler`.
     context
         .temp_dir
-        .child("idna")
+        .child("loud-warbler")
         .child("pyproject.toml")
         .write_str(indoc! {
             r#"
         [project]
-        name = "idna"
+        name = "loud-warbler"
         version = "3.6"
 
         [build-system]
@@ -13521,33 +13502,72 @@ fn transitive_dependency_config_settings_invalidation() -> Result<()> {
         })?;
     context
         .temp_dir
-        .child("idna")
+        .child("loud-warbler")
         .child("src")
-        .child("idna")
+        .child("loud-warbler")
         .child("__init__.py")
         .touch()?;
 
-    // Install the local `idna` package.
+    // Install the local `loud-warbler` package.
     uv_snapshot!(context.filters(), context.pip_install()
-        .arg(context.temp_dir.child("idna").path()),  @"
-    success: true
-    exit_code: 0
+        .arg(context.temp_dir.child("loud-warbler").path()),  @r#"
+    success: false
+    exit_code: 1
     ----- stdout -----
 
     ----- stderr -----
     Resolved 1 package in [TIME]
-    Prepared 1 package in [TIME]
-    Installed 1 package in [TIME]
-     + idna==3.6 (from file://[TEMP_DIR]/idna)
-    "
+      × Failed to build `loud-warbler @ file://[TEMP_DIR]/loud-warbler`
+      ├─▶ The build backend returned an error
+      ╰─▶ Call to `hatchling.build.build_wheel` failed (exit status: 1)
+
+          [stderr]
+          Traceback (most recent call last):
+            File "<string>", line 11, in <module>
+            File "[CACHE_DIR]/builds-v0/[TMP]/build.py", line 58, in build_wheel
+              return os.path.basename(next(builder.build(directory=wheel_directory, versions=['standard'])))
+                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+            File "[CACHE_DIR]/builds-v0/[TMP]/interface.py", line 155, in build
+              artifact = version_api[version](directory, **build_data)
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+            File "[CACHE_DIR]/builds-v0/[TMP]/wheel.py", line 412, in build_standard
+              for included_file in self.recurse_included_files():
+                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+            File "[CACHE_DIR]/builds-v0/[TMP]/interface.py", line 176, in recurse_included_files
+              yield from self.recurse_selected_project_files()
+            File "[CACHE_DIR]/builds-v0/[TMP]/interface.py", line 180, in recurse_selected_project_files
+              if self.config.only_include:
+                 ^^^^^^^^^^^^^^^^^^^^^^^^
+            File "[CACHE_DIR]/builds-v0/[TMP]/config.py", line 781, in only_include
+              only_include = only_include_config.get('only-include', self.default_only_include()) or self.packages
+                                                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+            File "[CACHE_DIR]/builds-v0/[TMP]/wheel.py", line 231, in default_only_include
+              return self.default_file_selection_options.only_include
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+            File "/Users/zb/.local/share/uv/python/cpython-3.12.[X]-macos-aarch64-none/[PYTHON-LIB]/functools.py", line 998, in __get__
+              val = self.func(instance)
+                    ^^^^^^^^^^^^^^^^^^^
+            File "[CACHE_DIR]/builds-v0/[TMP]/wheel.py", line 219, in default_file_selection_options
+              raise ValueError(message)
+          ValueError: Unable to determine which files to ship inside the wheel using the following heuristics: https://hatch.pypa.io/latest/plugins/builder/wheel/#default-file-selection
+
+          At least one file selection option must be defined in the `tool.hatch.build.targets.wheel` table, see: https://hatch.pypa.io/latest/config/build/
+
+          As an example, if you intend to ship a directory named `foo` that resides within a `src` directory located at the root of your project, you can define the following:
+
+          [tool.hatch.build.targets.wheel]
+          packages = ["src/foo"]
+
+          hint: This usually indicates a problem with the package or the build environment.
+    "#
     );
 
-    // Install a package that depends on `idna`, with a `--config-settings` value.
+    // Install a package that depends on `loud-warbler`, with a `--config-settings` value.
     //
-    // This "should" rebuild `idna`, but for now, we reuse the "stale" distribution. Prior to
+    // This "should" rebuild `loud-warbler`, but for now, we reuse the "stale" distribution. Prior to
     // https://github.com/astral-sh/uv/pull/15389, this would panic.
     uv_snapshot!(context.filters(), context.pip_install()
-        .arg("anyio")
+        .arg("swift-finch")
         .arg("--config-settings=foo=bar"),  @"
     success: true
     exit_code: 0
@@ -13555,10 +13575,11 @@ fn transitive_dependency_config_settings_invalidation() -> Result<()> {
 
     ----- stderr -----
     Resolved 3 packages in [TIME]
-    Prepared 2 packages in [TIME]
-    Installed 2 packages in [TIME]
-     + anyio==4.3.0
-     + sniffio==1.3.1
+    Prepared 3 packages in [TIME]
+    Installed 3 packages in [TIME]
+     + loud-warbler==3.6
+     + silly-wren==1.3.1
+     + swift-finch==4.3.0
     "
     );
 
@@ -14158,7 +14179,7 @@ fn abi_compatibility_on_freethreaded_python() {
 
 #[test]
 fn warn_on_bz2_wheel() {
-    let context = uv_test::test_context!("3.14");
+    let context = uv_test::test_context!("3.14").with_bypy();
 
     uv_snapshot!(
         context.filters(),
@@ -14181,7 +14202,7 @@ fn warn_on_bz2_wheel() {
 
 #[test]
 fn warn_on_lzma_wheel() {
-    let context = uv_test::test_context!("3.14");
+    let context = uv_test::test_context!("3.14").with_bypy();
 
     uv_snapshot!(
         context.filters(),

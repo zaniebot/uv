@@ -12,7 +12,7 @@ use uv_test::uv_snapshot;
 
 #[test]
 fn show_empty() {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
     uv_snapshot!(context.pip_show(), @"
     success: false
@@ -78,10 +78,10 @@ fn show_requires_multiple() -> Result<()> {
 #[test]
 #[cfg(feature = "test-pypi")]
 fn show_python_version_marker() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
     let requirements_txt = context.temp_dir.child("requirements.txt");
-    requirements_txt.write_str("click==8.1.7")?;
+    requirements_txt.write_str("clever-robin==8.1.7")?;
 
     uv_snapshot!(context
         .pip_install()
@@ -96,11 +96,11 @@ fn show_python_version_marker() -> Result<()> {
     Resolved 1 package in [TIME]
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
-     + click==8.1.7
+     + clever-robin==8.1.7
     "
     );
 
-    context.assert_command("import click").success();
+    context.assert_command("import clever_robin").success();
 
     let mut filters = context.filters();
     if cfg!(windows) {
@@ -108,11 +108,11 @@ fn show_python_version_marker() -> Result<()> {
     }
 
     uv_snapshot!(filters, context.pip_show()
-        .arg("click"), @"
+        .arg("clever-robin"), @"
     success: true
     exit_code: 0
     ----- stdout -----
-    Name: click
+    Name: clever-robin
     Version: 8.1.7
     Location: [SITE_PACKAGES]/
     Requires:
@@ -128,10 +128,10 @@ fn show_python_version_marker() -> Result<()> {
 #[test]
 #[cfg(feature = "test-pypi")]
 fn show_found_single_package() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
     let requirements_txt = context.temp_dir.child("requirements.txt");
-    requirements_txt.write_str("MarkupSafe==2.1.3")?;
+    requirements_txt.write_str("calm-ibis==2.1.3")?;
 
     uv_snapshot!(context
         .pip_install()
@@ -146,18 +146,18 @@ fn show_found_single_package() -> Result<()> {
     Resolved 1 package in [TIME]
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
-     + markupsafe==2.1.3
+     + calm-ibis==2.1.3
     "
     );
 
-    context.assert_command("import markupsafe").success();
+    context.assert_command("import calm_ibis").success();
 
     uv_snapshot!(context.filters(), context.pip_show()
-        .arg("markupsafe"), @"
+        .arg("calm-ibis"), @"
     success: true
     exit_code: 0
     ----- stdout -----
-    Name: markupsafe
+    Name: calm-ibis
     Version: 2.1.3
     Location: [SITE_PACKAGES]/
     Requires:
@@ -538,10 +538,10 @@ fn show_files() {
 #[test]
 #[cfg(feature = "test-pypi")]
 fn show_target() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
     let requirements_txt = context.temp_dir.child("requirements.txt");
-    requirements_txt.write_str("MarkupSafe==2.1.3")?;
+    requirements_txt.write_str("calm-ibis==2.1.3")?;
 
     let target = context.temp_dir.child("target");
 
@@ -557,13 +557,13 @@ fn show_target() -> Result<()> {
 
     // Show package in the target directory.
     uv_snapshot!(context.filters(), context.pip_show()
-        .arg("markupsafe")
+        .arg("calm-ibis")
         .arg("--target")
         .arg(target.path()), @"
     success: true
     exit_code: 0
     ----- stdout -----
-    Name: markupsafe
+    Name: calm-ibis
     Version: 2.1.3
     Location: [TEMP_DIR]/target
     Requires:
@@ -574,13 +574,13 @@ fn show_target() -> Result<()> {
     );
 
     // Without --target, the package should not be found.
-    uv_snapshot!(context.pip_show().arg("markupsafe"), @"
+    uv_snapshot!(context.pip_show().arg("calm-ibis"), @"
     success: false
     exit_code: 1
     ----- stdout -----
 
     ----- stderr -----
-    warning: Package(s) not found for: markupsafe
+    warning: Package(s) not found for: calm-ibis
     "
     );
 
@@ -590,10 +590,10 @@ fn show_target() -> Result<()> {
 #[test]
 #[cfg(feature = "test-pypi")]
 fn show_prefix() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_bypy();
 
     let requirements_txt = context.temp_dir.child("requirements.txt");
-    requirements_txt.write_str("MarkupSafe==2.1.3")?;
+    requirements_txt.write_str("calm-ibis==2.1.3")?;
 
     let prefix = context.temp_dir.child("prefix");
 
@@ -609,13 +609,13 @@ fn show_prefix() -> Result<()> {
 
     // Show package in the prefix directory.
     uv_snapshot!(context.filters(), context.pip_show()
-        .arg("markupsafe")
+        .arg("calm-ibis")
         .arg("--prefix")
         .arg(prefix.path()), @"
     success: true
     exit_code: 0
     ----- stdout -----
-    Name: markupsafe
+    Name: calm-ibis
     Version: 2.1.3
     Location: [TEMP_DIR]/prefix/[PYTHON-LIB]/site-packages
     Requires:
@@ -626,13 +626,13 @@ fn show_prefix() -> Result<()> {
     );
 
     // Without --prefix, the package should not be found.
-    uv_snapshot!(context.pip_show().arg("markupsafe"), @"
+    uv_snapshot!(context.pip_show().arg("calm-ibis"), @"
     success: false
     exit_code: 1
     ----- stdout -----
 
     ----- stderr -----
-    warning: Package(s) not found for: markupsafe
+    warning: Package(s) not found for: calm-ibis
     "
     );
 

@@ -146,6 +146,10 @@ pub struct TestContext {
     /// Extra environment variables to apply to all commands.
     extra_env: Vec<(OsString, OsString)>,
 
+    /// When set, commands use this local package index instead of PyPI, and
+    /// `UV_EXCLUDE_NEWER` is removed (synthetic packages have no upload dates).
+    bypy: Option<packse::PackseServer>,
+
     #[allow(dead_code)]
     _root: tempfile::TempDir,
 }
@@ -948,6 +952,7 @@ impl TestContext {
             uv_bin,
             filters,
             extra_env: vec![],
+            bypy: None,
             _root: root,
         }
     }
@@ -1060,10 +1065,17 @@ impl TestContext {
             .env(EnvVars::UV_PYTHON_INSTALL_DIR, "")
             // Installations are not allowed by default; see `Self::with_managed_python_dirs`
             .env(EnvVars::UV_PYTHON_DOWNLOADS, "never")
-            .env(EnvVars::UV_TEST_PYTHON_PATH, self.python_path())
-            // Lock to a point in time view of the world
-            .env(EnvVars::UV_EXCLUDE_NEWER, EXCLUDE_NEWER)
-            .env(EnvVars::UV_TEST_CURRENT_TIMESTAMP, EXCLUDE_NEWER)
+            .env(EnvVars::UV_TEST_PYTHON_PATH, self.python_path());
+        // Lock to a point in time view of the world.
+        // Disabled when using bypy (synthetic packages have no upload dates).
+        if let Some(server) = &self.bypy {
+            command.env(EnvVars::UV_INDEX_URL, server.index_url());
+        } else {
+            command
+                .env(EnvVars::UV_EXCLUDE_NEWER, EXCLUDE_NEWER)
+                .env(EnvVars::UV_TEST_CURRENT_TIMESTAMP, EXCLUDE_NEWER);
+        }
+        command
             // When installations are allowed, we don't want to write to global state, like the
             // Windows registry
             .env(EnvVars::UV_PYTHON_INSTALL_REGISTRY, "0")
@@ -1098,6 +1110,17 @@ impl TestContext {
             // Avoid locale issues in tests
             command.env(EnvVars::LC_ALL, "C");
         }
+    }
+
+    /// Use the bird-themed local package index (`test/packages/general.toml`)
+    /// instead of PyPI.  Commands created from this context will automatically
+    /// set `--index-url` to the local server and remove `UV_EXCLUDE_NEWER`
+    /// (synthetic packages have no upload dates).
+    #[must_use]
+    pub fn with_bypy(mut self) -> Self {
+        let server = packse::PackseServer::for_packages("general.toml");
+        self.bypy = Some(server);
+        self
     }
 
     /// Create a `pip compile` command for testing.

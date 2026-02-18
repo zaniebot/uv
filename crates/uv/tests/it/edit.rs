@@ -4909,7 +4909,7 @@ fn add_lower_bound_local() -> Result<()> {
         source = { registry = "http://[LOCALHOST]/simple/" }
         sdist = { url = "http://[LOCALHOST]/files/a-1.2.3+foo.tar.gz", hash = "sha256:67395cb5cf75b15d713843c4e47eebb86cf42ae19fd3f516dd959daa14719248" }
         wheels = [
-            { url = "http://[LOCALHOST]/files/a-1.2.3+foo-py3-none-any.whl", hash = "sha256:788fb0f2dc4838efe5753396fcb2978166f60179ec2fa2fd5b53952bb6d83adc" },
+            { url = "http://[LOCALHOST]/files/a-1.2.3+foo-py3-none-any.whl", hash = "sha256:4468ecb3e9a4bb07764092d61b224d3794d5c0efd8c71d3af7fee49b7dbaf872" },
         ]
 
         [[package]]
