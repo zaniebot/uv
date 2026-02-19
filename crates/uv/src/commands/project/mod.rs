@@ -762,7 +762,7 @@ impl ScriptInterpreter {
                     }
                 }
             }
-            Err(uv_python::Error::MissingEnvironment(_)) => {}
+            Err(uv_python::Error::MissingEnvironment(_, _)) => {}
             Err(err) => warn!("Ignoring existing script environment: {err}"),
         }
 
@@ -1003,7 +1003,7 @@ impl ProjectInterpreter {
                     }
                 }
             }
-            Err(uv_python::Error::MissingEnvironment(_)) => {}
+            Err(uv_python::Error::MissingEnvironment(_, _)) => {}
             Err(uv_python::Error::InvalidEnvironment(inner)) => {
                 // If there's an invalid environment with existing content, we error instead of
                 // deleting it later on

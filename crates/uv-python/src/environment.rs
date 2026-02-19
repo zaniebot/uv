@@ -160,7 +160,37 @@ impl PythonEnvironment {
             match find_python_installation(request, preference, python_preference, cache, preview)?
             {
                 Ok(installation) => installation,
-                Err(err) => return Err(EnvironmentNotFound::from(err).into()),
+                Err(err) => {
+                    let not_found = EnvironmentNotFound::from(err);
+
+                    // If a specific Python version was requested and a virtual environment
+                    // exists but with a different version, include the environment's version
+                    // in the error to help the user understand why it was skipped.
+                    let hint = if !matches!(request, PythonRequest::Default | PythonRequest::Any) {
+                        find_python_installation(
+                            &PythonRequest::Default,
+                            EnvironmentPreference::OnlyVirtual,
+                            python_preference,
+                            cache,
+                            preview,
+                        )
+                        .ok()
+                        .and_then(Result::ok)
+                        .map(|installation| {
+                            let version = installation.python_version();
+                            format!(
+                                "A virtual environment was found at `{}`, but it uses Python {}.{}",
+                                installation.interpreter().sys_prefix().user_display(),
+                                version.release()[0],
+                                version.release()[1],
+                            )
+                        })
+                    } else {
+                        None
+                    };
+
+                    return Err(Error::MissingEnvironment(not_found, hint));
+                }
             };
         Ok(Self::from_installation(installation))
     }
@@ -176,10 +206,13 @@ impl PythonEnvironment {
         match root.as_ref().try_exists() {
             Ok(true) => {}
             Ok(false) => {
-                return Err(Error::MissingEnvironment(EnvironmentNotFound {
-                    preference: EnvironmentPreference::Any,
-                    request: PythonRequest::Directory(root.as_ref().to_owned()),
-                }));
+                return Err(Error::MissingEnvironment(
+                    EnvironmentNotFound {
+                        preference: EnvironmentPreference::Any,
+                        request: PythonRequest::Directory(root.as_ref().to_owned()),
+                    },
+                    None,
+                ));
             }
             Err(err) => return Err(Error::Discovery(err.into())),
         }

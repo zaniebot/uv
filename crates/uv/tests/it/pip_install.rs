@@ -8619,8 +8619,41 @@ fn install_incompatible_python_version() {
 
     ----- stderr -----
     error: No virtual environment found for Python 3.12; run `uv venv` to create an environment, or pass `--system` to install into a non-virtual environment
+
+    hint: A virtual environment was found at `.venv`, but it uses Python 3.11
     "
     );
+}
+
+/// Install requesting Python 3.12 when the virtual environment uses 3.11 and is in a parent
+/// directory.
+#[test]
+fn install_incompatible_python_version_parent_venv() -> Result<()> {
+    let context = uv_test::test_context_with_versions!(&["3.11", "3.12"]);
+
+    // Initialize the virtual environment with 3.11 in the test root
+    context.reset_venv();
+
+    // Create a child directory and run from there
+    let child = context.temp_dir.child("project");
+    fs_err::create_dir_all(&child)?;
+
+    // Request Python 3.12; which should fail, but report the parent's .venv
+    uv_snapshot!(context.filters(), context.pip_install().arg("-p").arg("3.12")
+        .arg("anyio")
+        .current_dir(&child), @"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    error: No virtual environment found for Python 3.12; run `uv venv` to create an environment, or pass `--system` to install into a non-virtual environment
+
+    hint: A virtual environment was found at `[VENV]/`, but it uses Python 3.11
+    "
+    );
+
+    Ok(())
 }
 
 /// Install requesting Python 3.12 when the virtual environment uses 3.11, but there's also
@@ -8696,6 +8729,8 @@ fn install_incompatible_python_version_interpreter_broken_in_path() -> Result<()
 
     ----- stderr -----
     error: No virtual environment found for Python 3.12; run `uv venv` to create an environment, or pass `--system` to install into a non-virtual environment
+
+    hint: A virtual environment was found at `.venv`, but it uses Python 3.11
     "
     );
 
@@ -13722,6 +13757,8 @@ fn install_missing_python_no_target() {
 
     ----- stderr -----
     error: No virtual environment found for Python 3.12; run `uv venv` to create an environment, or pass `--system` to install into a non-virtual environment
+
+    hint: A virtual environment was found at `.venv`, but it uses Python 3.11
     "
     );
 }

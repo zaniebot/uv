@@ -94,8 +94,8 @@ pub enum Error {
     #[error("{}{}", .0, if let Some(hint) = .1 { format!("\n\n{}{} {hint}", "hint".bold().cyan(), ":".bold()) } else { String::new() })]
     MissingPython(PythonNotFound, Option<String>),
 
-    #[error(transparent)]
-    MissingEnvironment(#[from] environment::EnvironmentNotFound),
+    #[error("{}{}", .0, if let Some(hint) = .1 { format!("\n\n{}{} {hint}", "hint".bold().cyan(), ":".bold()) } else { String::new() })]
+    MissingEnvironment(environment::EnvironmentNotFound, Option<String>),
 
     #[error(transparent)]
     InvalidEnvironment(#[from] environment::InvalidEnvironment),
@@ -116,6 +116,12 @@ impl Error {
 impl From<PythonNotFound> for Error {
     fn from(err: PythonNotFound) -> Self {
         Self::MissingPython(err, None)
+    }
+}
+
+impl From<environment::EnvironmentNotFound> for Error {
+    fn from(err: environment::EnvironmentNotFound) -> Self {
+        Self::MissingEnvironment(err, None)
     }
 }
 

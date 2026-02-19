@@ -6178,6 +6178,8 @@ fn sync_missing_python_no_target() -> Result<()> {
 
     ----- stderr -----
     error: No virtual environment found for Python 3.12; run `uv venv` to create an environment, or pass `--system` to install into a non-virtual environment
+
+    hint: A virtual environment was found at `.venv`, but it uses Python 3.11
     "
     );
     Ok(())

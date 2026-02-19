@@ -276,7 +276,7 @@ impl InstalledTools {
                 );
                 Ok(Some(ToolEnvironment::new(venv, name.clone())))
             }
-            Err(uv_python::Error::MissingEnvironment(_)) => Ok(None),
+            Err(uv_python::Error::MissingEnvironment(_, _)) => Ok(None),
             Err(uv_python::Error::Query(uv_python::InterpreterError::NotFound(
                 interpreter_path,
             ))) => {
