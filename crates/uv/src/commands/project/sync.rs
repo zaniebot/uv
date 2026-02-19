@@ -14,7 +14,7 @@ use uv_client::{BaseClientBuilder, FlatIndexClient, RegistryClientBuilder};
 use uv_configuration::{
     Concurrency, Constraints, DependencyGroups, DependencyGroupsWithDefaults, DryRun, EditableMode,
     ExtrasSpecification, ExtrasSpecificationWithDefaults, HashCheckingMode, InstallOptions,
-    TargetTriple, Upgrade,
+    TargetTriple, Upgrade, UpgradeStrategy,
 };
 use uv_dispatch::BuildDispatch;
 use uv_distribution::LoweredExtraBuildDependencies;
@@ -674,6 +674,7 @@ pub(super) async fn do_sync(
                 sources: sources.clone(),
                 torch_backend: None,
                 upgrade: Upgrade::default(),
+                upgrade_strategy: UpgradeStrategy::default(),
             };
             script_extra_build_requires(
                 (*script).into(),

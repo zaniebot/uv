@@ -34,7 +34,7 @@ use uv_configuration::{
     ExportFormat, ExtrasSpecification, GitLfsSetting, HashCheckingMode, IndexStrategy,
     InstallOptions, KeyringProviderType, NoBinary, NoBuild, NoSources, PipCompileFormat,
     ProjectBuildBackend, ProxyUrl, Reinstall, RequiredVersion, TargetTriple, TrustedHost,
-    TrustedPublishing, Upgrade, VersionControlSystem,
+    TrustedPublishing, Upgrade, UpgradeStrategy, VersionControlSystem,
 };
 use uv_distribution_types::{
     ConfigSettings, DependencyMetadata, ExtraBuildVariables, Index, IndexLocations, IndexUrl,
@@ -1033,6 +1033,7 @@ impl ToolUpgradeSettings {
             upgrade: upgrade_package.is_empty(),
             no_upgrade: false,
             upgrade_package,
+            upgrade_strategy: None,
             reinstall,
             no_reinstall,
             reinstall_package,
@@ -3471,6 +3472,7 @@ pub(crate) struct ResolverSettings {
     pub(crate) sources: NoSources,
     pub(crate) torch_backend: Option<TorchMode>,
     pub(crate) upgrade: Upgrade,
+    pub(crate) upgrade_strategy: UpgradeStrategy,
 }
 
 impl ResolverSettings {
@@ -3530,6 +3532,7 @@ impl From<ResolverOptions> for ResolverSettings {
                 value.no_sources_package.unwrap_or_default(),
             ),
             upgrade: value.upgrade.unwrap_or_default(),
+            upgrade_strategy: value.upgrade_strategy.unwrap_or_default(),
             build_options: BuildOptions::new(
                 NoBinary::from_args(value.no_binary, value.no_binary_package.unwrap_or_default()),
                 NoBuild::from_args(value.no_build, value.no_build_package.unwrap_or_default()),
@@ -3624,6 +3627,7 @@ impl From<ResolverInstallerOptions> for ResolverInstallerSettings {
                 ),
                 torch_backend: value.torch_backend,
                 upgrade: value.upgrade.unwrap_or_default(),
+                upgrade_strategy: value.upgrade_strategy.unwrap_or_default(),
             },
             compile_bytecode: value.compile_bytecode.unwrap_or_default(),
             reinstall: value.reinstall.unwrap_or_default(),
@@ -3685,6 +3689,7 @@ pub(crate) struct PipSettings {
     pub(crate) sources: NoSources,
     pub(crate) hash_checking: Option<HashCheckingMode>,
     pub(crate) upgrade: Upgrade,
+    pub(crate) upgrade_strategy: UpgradeStrategy,
     pub(crate) reinstall: Reinstall,
 }
 
@@ -3764,6 +3769,7 @@ impl PipSettings {
             no_sources_package,
             upgrade,
             upgrade_package,
+            upgrade_strategy,
             reinstall,
             reinstall_package,
             exclude_newer_package,
@@ -3794,6 +3800,7 @@ impl PipSettings {
             no_sources_package: top_level_no_sources_package,
             upgrade: top_level_upgrade,
             upgrade_package: top_level_upgrade_package,
+            upgrade_strategy: top_level_upgrade_strategy,
             reinstall: top_level_reinstall,
             reinstall_package: top_level_reinstall_package,
             no_build: top_level_no_build,
@@ -3843,6 +3850,7 @@ impl PipSettings {
         let no_sources_package = no_sources_package.combine(top_level_no_sources_package);
         let upgrade = upgrade.combine(top_level_upgrade);
         let upgrade_package = upgrade_package.combine(top_level_upgrade_package);
+        let upgrade_strategy = upgrade_strategy.combine(top_level_upgrade_strategy);
         let reinstall = reinstall.combine(top_level_reinstall);
         let reinstall_package = reinstall_package.combine(top_level_reinstall_package);
         let torch_backend = torch_backend.combine(top_level_torch_backend);
@@ -4023,6 +4031,10 @@ impl PipSettings {
                     .collect(),
             ))
             .unwrap_or_default(),
+            upgrade_strategy: args
+                .upgrade_strategy
+                .combine(upgrade_strategy)
+                .unwrap_or_default(),
             reinstall: Reinstall::from_args(
                 args.reinstall,
                 args.reinstall_package.unwrap_or_default(),

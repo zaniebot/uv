@@ -15,7 +15,7 @@ use uv_cache::Cache;
 use uv_client::{BaseClientBuilder, FlatIndexClient, RegistryClientBuilder};
 use uv_configuration::{
     BuildIsolation, BuildOptions, Concurrency, Constraints, ExtrasSpecification, IndexStrategy,
-    NoBinary, NoBuild, NoSources, PipCompileFormat, Reinstall, Upgrade,
+    NoBinary, NoBuild, NoSources, PipCompileFormat, Reinstall, Upgrade, UpgradeStrategy,
 };
 use uv_configuration::{KeyringProviderType, TargetTriple};
 use uv_dispatch::{BuildDispatch, SharedState};
@@ -23,7 +23,7 @@ use uv_distribution::LoweredExtraBuildDependencies;
 use uv_distribution_types::{
     ConfigSettings, DependencyMetadata, ExtraBuildVariables, HashGeneration, Index, IndexLocations,
     NameRequirementSpecification, Origin, PackageConfigSettings, Requirement, RequiresPython,
-    UnresolvedRequirementSpecification, Verbatim,
+    UnresolvedRequirement, UnresolvedRequirementSpecification, Verbatim,
 };
 use uv_fs::{CWD, Simplified};
 use uv_git::ResolvedRepositoryReference;
@@ -81,6 +81,7 @@ pub(crate) async fn pip_compile(
     fork_strategy: ForkStrategy,
     dependency_mode: DependencyMode,
     upgrade: Upgrade,
+    upgrade_strategy: UpgradeStrategy,
     generate_hashes: bool,
     no_emit_packages: Vec<PackageName>,
     include_extras: bool,
@@ -227,6 +228,20 @@ pub(crate) async fn pip_compile(
             "`pylock.toml` is not a supported input format for `uv pip compile`"
         ));
     }
+
+    // Apply the upgrade strategy. When using `only-if-needed`, narrow `Upgrade::All` to only
+    // cover the direct dependencies, so transitive dependencies retain their lockfile versions.
+    let upgrade = if upgrade_strategy == UpgradeStrategy::OnlyIfNeeded {
+        let direct = requirements
+            .iter()
+            .filter_map(|spec| match &spec.requirement {
+                UnresolvedRequirement::Named(requirement) => Some(requirement.name.clone()),
+                UnresolvedRequirement::Unnamed(_) => None,
+            });
+        upgrade.narrow_to_direct(direct)
+    } else {
+        upgrade
+    };
 
     let constraints = constraints
         .iter()

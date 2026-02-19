@@ -215,6 +215,7 @@ async fn build_impl(
         exclude_newer,
         link_mode,
         upgrade: _,
+        upgrade_strategy: _,
         build_options,
         sources,
         torch_backend: _,

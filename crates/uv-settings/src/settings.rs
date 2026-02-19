@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use uv_cache_info::CacheKey;
 use uv_configuration::{
     BuildIsolation, IndexStrategy, KeyringProviderType, PackageNameSpecifier, ProxyUrl, Reinstall,
-    RequiredVersion, TargetTriple, TrustedHost, TrustedPublishing, Upgrade,
+    RequiredVersion, TargetTriple, TrustedHost, TrustedPublishing, Upgrade, UpgradeStrategy,
 };
 use uv_distribution_types::{
     ConfigSettings, ExtraBuildVariables, Index, IndexUrl, IndexUrlError, PackageConfigSettings,
@@ -405,6 +405,7 @@ pub struct ResolverOptions {
     pub link_mode: Option<LinkMode>,
     pub torch_backend: Option<TorchMode>,
     pub upgrade: Option<Upgrade>,
+    pub upgrade_strategy: Option<UpgradeStrategy>,
     pub build_isolation: Option<BuildIsolation>,
     pub no_build: Option<bool>,
     pub no_build_package: Option<Vec<PackageName>>,
@@ -444,6 +445,7 @@ pub struct ResolverInstallerOptions {
     pub no_sources: Option<bool>,
     pub no_sources_package: Option<Vec<PackageName>>,
     pub upgrade: Option<Upgrade>,
+    pub upgrade_strategy: Option<UpgradeStrategy>,
     pub reinstall: Option<Reinstall>,
     pub no_build: Option<bool>,
     pub no_build_package: Option<Vec<PackageName>>,
@@ -480,6 +482,7 @@ impl From<ResolverInstallerSchema> for ResolverInstallerOptions {
             no_sources_package,
             upgrade,
             upgrade_package,
+            upgrade_strategy,
             reinstall,
             reinstall_package,
             no_build,
@@ -522,6 +525,7 @@ impl From<ResolverInstallerSchema> for ResolverInstallerOptions {
                     .map(Into::into)
                     .collect(),
             ),
+            upgrade_strategy,
             reinstall: Reinstall::from_args(reinstall, reinstall_package.unwrap_or_default()),
             no_build,
             no_build_package,
@@ -955,6 +959,20 @@ pub struct ResolverInstallerSchema {
         "#
     )]
     pub upgrade_package: Option<Vec<Requirement<VerbatimParsedUrl>>>,
+    /// The strategy to use when considering upgrades of dependencies.
+    ///
+    /// By default, uv will upgrade both direct and transitive dependencies (`"eager"`). Use
+    /// `"only-if-needed"` to only upgrade direct dependencies (or packages specified via
+    /// `upgrade-package`), keeping transitive dependencies at their current versions unless a
+    /// newer version is required to satisfy updated constraints.
+    #[option(
+        default = r#""eager""#,
+        value_type = "str",
+        example = r#"
+            upgrade-strategy = "only-if-needed"
+        "#
+    )]
+    pub upgrade_strategy: Option<UpgradeStrategy>,
     /// Reinstall all packages, regardless of whether they're already installed. Implies `refresh`.
     #[option(
         default = "false",
@@ -1855,6 +1873,20 @@ pub struct PipOptions {
         "#
     )]
     pub upgrade_package: Option<Vec<Requirement<VerbatimParsedUrl>>>,
+    /// The strategy to use when considering upgrades of dependencies.
+    ///
+    /// By default, uv will upgrade both direct and transitive dependencies (`"eager"`). Use
+    /// `"only-if-needed"` to only upgrade direct dependencies (or packages specified via
+    /// `upgrade-package`), keeping transitive dependencies at their current versions unless a
+    /// newer version is required to satisfy updated constraints.
+    #[option(
+        default = r#""eager""#,
+        value_type = "str",
+        example = r#"
+            upgrade-strategy = "only-if-needed"
+        "#
+    )]
+    pub upgrade_strategy: Option<UpgradeStrategy>,
     /// Reinstall all packages, regardless of whether they're already installed. Implies `refresh`.
     #[option(
         default = "false",
@@ -1973,6 +2005,7 @@ impl From<ResolverInstallerSchema> for ResolverOptions {
                     .map(Into::into)
                     .collect(),
             ),
+            upgrade_strategy: value.upgrade_strategy,
             no_build: value.no_build,
             no_build_package: value.no_build_package,
             no_binary: value.no_binary,
@@ -2130,6 +2163,7 @@ impl From<ToolOptions> for ResolverInstallerOptions {
             no_sources: value.no_sources,
             no_sources_package: value.no_sources_package,
             upgrade: None,
+            upgrade_strategy: None,
             reinstall: None,
             no_build: value.no_build,
             no_build_package: value.no_build_package,
@@ -2190,6 +2224,7 @@ pub struct OptionsWire {
     no_sources_package: Option<Vec<PackageName>>,
     upgrade: Option<bool>,
     upgrade_package: Option<Vec<Requirement<VerbatimParsedUrl>>>,
+    upgrade_strategy: Option<UpgradeStrategy>,
     reinstall: Option<bool>,
     reinstall_package: Option<Vec<PackageName>>,
     no_build: Option<bool>,
@@ -2287,6 +2322,7 @@ impl From<OptionsWire> for Options {
             no_sources_package,
             upgrade,
             upgrade_package,
+            upgrade_strategy,
             reinstall,
             reinstall_package,
             no_build,
@@ -2365,6 +2401,7 @@ impl From<OptionsWire> for Options {
                 no_sources_package,
                 upgrade,
                 upgrade_package,
+                upgrade_strategy,
                 reinstall,
                 reinstall_package,
                 no_build,

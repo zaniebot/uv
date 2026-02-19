@@ -9,7 +9,7 @@ use uv_cache::Cache;
 use uv_client::{BaseClientBuilder, FlatIndexClient, RegistryClientBuilder};
 use uv_configuration::{
     BuildIsolation, BuildOptions, Concurrency, Constraints, DryRun, ExtrasSpecification,
-    HashCheckingMode, IndexStrategy, NoSources, Reinstall, Upgrade,
+    HashCheckingMode, IndexStrategy, NoSources, Reinstall, Upgrade, UpgradeStrategy,
 };
 use uv_configuration::{KeyringProviderType, TargetTriple};
 use uv_dispatch::{BuildDispatch, SharedState};
@@ -17,7 +17,7 @@ use uv_distribution::LoweredExtraBuildDependencies;
 use uv_distribution_types::{
     ConfigSettings, DependencyMetadata, ExtraBuildVariables, Index, IndexLocations,
     NameRequirementSpecification, Origin, PackageConfigSettings, Requirement, Resolution,
-    UnresolvedRequirementSpecification,
+    UnresolvedRequirement, UnresolvedRequirementSpecification,
 };
 use uv_fs::Simplified;
 use uv_install_wheel::LinkMode;
@@ -67,6 +67,7 @@ pub(crate) async fn pip_install(
     prerelease_mode: PrereleaseMode,
     dependency_mode: DependencyMode,
     upgrade: Upgrade,
+    upgrade_strategy: UpgradeStrategy,
     index_locations: IndexLocations,
     index_strategy: IndexStrategy,
     torch_backend: Option<TorchMode>,
@@ -144,6 +145,20 @@ pub(crate) async fn pip_install(
             );
         }
     }
+
+    // Apply the upgrade strategy. When using `only-if-needed`, narrow `Upgrade::All` to only
+    // cover the direct dependencies, so transitive dependencies retain their lockfile versions.
+    let upgrade = if upgrade_strategy == UpgradeStrategy::OnlyIfNeeded {
+        let direct = requirements
+            .iter()
+            .filter_map(|spec| match &spec.requirement {
+                UnresolvedRequirement::Named(requirement) => Some(requirement.name.clone()),
+                UnresolvedRequirement::Unnamed(_) => None,
+            });
+        upgrade.narrow_to_direct(direct)
+    } else {
+        upgrade
+    };
 
     let constraints: Vec<NameRequirementSpecification> = constraints
         .iter()

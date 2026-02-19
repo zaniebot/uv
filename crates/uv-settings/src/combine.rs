@@ -5,7 +5,7 @@ use url::Url;
 
 use uv_configuration::{
     BuildIsolation, ExportFormat, IndexStrategy, KeyringProviderType, NoSources, ProxyUrl,
-    Reinstall, RequiredVersion, TargetTriple, TrustedPublishing, Upgrade,
+    Reinstall, RequiredVersion, TargetTriple, TrustedPublishing, Upgrade, UpgradeStrategy,
 };
 use uv_distribution_types::{
     ConfigSettings, ExtraBuildVariables, Index, IndexUrl, PackageConfigSettings, PipExtraIndex,
@@ -112,6 +112,7 @@ impl_combine_or!(SupportedEnvironments);
 impl_combine_or!(TargetTriple);
 impl_combine_or!(TorchMode);
 impl_combine_or!(TrustedPublishing);
+impl_combine_or!(UpgradeStrategy);
 impl_combine_or!(Url);
 impl_combine_or!(bool);
 

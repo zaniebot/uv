@@ -13,7 +13,7 @@ use uv_cache::{Cache, Refresh};
 use uv_client::{BaseClientBuilder, FlatIndexClient, RegistryClientBuilder};
 use uv_configuration::{
     Concurrency, Constraints, DependencyGroupsWithDefaults, DryRun, ExtrasSpecification, Reinstall,
-    Upgrade,
+    Upgrade, UpgradeStrategy,
 };
 use uv_dispatch::BuildDispatch;
 use uv_distribution::{DistributionDatabase, LoweredExtraBuildDependencies};
@@ -467,6 +467,7 @@ async fn do_lock(
         exclude_newer,
         link_mode,
         upgrade,
+        upgrade_strategy,
         build_options,
         sources,
         torch_backend: _,
@@ -521,6 +522,22 @@ async fn do_lock(
             Ok((name, requirements))
         })
         .collect::<Result<BTreeMap<_, _>, ProjectError>>()?;
+
+    // Apply the upgrade strategy. When using `only-if-needed`, narrow `Upgrade::All` to only
+    // cover the direct dependencies (workspace members and their declared dependencies), so
+    // transitive dependencies retain their lockfile versions.
+    let upgrade = if *upgrade_strategy == UpgradeStrategy::OnlyIfNeeded {
+        let direct = members
+            .iter()
+            .cloned()
+            .chain(requirements.iter().map(|req| req.name.clone()))
+            .chain(target.members_requirements().map(|req| req.name.clone()))
+            .chain(target.group_requirements().map(|req| req.name.clone()));
+        upgrade.clone().narrow_to_direct(direct)
+    } else {
+        upgrade.clone()
+    };
+    let upgrade = &upgrade;
 
     // Collect the conflicts.
     let mut conflicts = target.conflicts();

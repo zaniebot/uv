@@ -211,6 +211,7 @@ pub(crate) async fn tree(
                 exclude_newer: _,
                 link_mode: _,
                 upgrade: _,
+                upgrade_strategy: _,
                 build_options: _,
                 sources: _,
                 torch_backend: _,

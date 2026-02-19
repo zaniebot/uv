@@ -132,6 +132,30 @@ impl From<Reinstall> for Refresh {
     }
 }
 
+/// The strategy to use when upgrading packages.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+#[serde(deny_unknown_fields, rename_all = "kebab-case")]
+#[cfg_attr(feature = "clap", derive(clap::ValueEnum))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub enum UpgradeStrategy {
+    /// Upgrade both direct and transitive dependencies.
+    #[default]
+    Eager,
+    /// Only upgrade direct dependencies (or packages specified via `--upgrade-package`), keeping
+    /// transitive dependencies at their current versions unless a newer version is required to
+    /// satisfy updated constraints.
+    OnlyIfNeeded,
+}
+
+impl std::fmt::Display for UpgradeStrategy {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Eager => write!(f, "eager"),
+            Self::OnlyIfNeeded => write!(f, "only-if-needed"),
+        }
+    }
+}
+
 /// Whether to allow package upgrades.
 #[derive(Debug, Default, Clone)]
 pub enum Upgrade {
@@ -207,6 +231,19 @@ impl Upgrade {
             )
         } else {
             Either::Left(std::iter::empty())
+        }
+    }
+
+    /// Narrow [`Upgrade::All`] to only cover the given set of direct dependency names.
+    ///
+    /// When using `--upgrade-strategy only-if-needed`, this converts an "upgrade everything"
+    /// request into an "upgrade only direct dependencies" request, so that transitive dependencies
+    /// retain their lockfile versions unless their constraints require an upgrade.
+    #[must_use]
+    pub fn narrow_to_direct(self, direct: impl IntoIterator<Item = PackageName>) -> Self {
+        match self {
+            Self::All => Self::Packages(direct.into_iter().map(|name| (name, vec![])).collect()),
+            other => other,
         }
     }
 

@@ -15,7 +15,8 @@ use uv_auth::Service;
 use uv_cache::CacheArgs;
 use uv_configuration::{
     ExportFormat, IndexStrategy, KeyringProviderType, PackageNameSpecifier, PipCompileFormat,
-    ProjectBuildBackend, TargetTriple, TrustedHost, TrustedPublishing, VersionControlSystem,
+    ProjectBuildBackend, TargetTriple, TrustedHost, TrustedPublishing, UpgradeStrategy,
+    VersionControlSystem,
 };
 use uv_distribution_types::{
     ConfigSettingEntry, ConfigSettingPackageEntry, Index, IndexUrl, Origin, PipExtraIndex,
@@ -7034,6 +7035,17 @@ pub struct ResolverArgs {
     #[arg(long, short = 'P', help_heading = "Resolver options")]
     pub upgrade_package: Vec<Requirement<VerbatimParsedUrl>>,
 
+    /// The strategy to use when considering upgrades of dependencies.
+    ///
+    /// By default, uv will upgrade both direct and transitive dependencies (`eager`). Use
+    /// `only-if-needed` to only upgrade direct dependencies (or packages specified via
+    /// `--upgrade-package`), keeping transitive dependencies at their current versions unless a
+    /// newer version is required to satisfy updated constraints.
+    ///
+    /// Requires `--upgrade` or `--upgrade-package` to have an effect.
+    #[arg(long, value_enum, help_heading = "Resolver options")]
+    pub upgrade_strategy: Option<UpgradeStrategy>,
+
     /// The strategy to use when resolving against multiple index URLs.
     ///
     /// By default, uv will stop at the first index on which a given package is available, and limit
@@ -7244,6 +7256,17 @@ pub struct ResolverInstallerArgs {
     /// Implies `--refresh-package`.
     #[arg(long, short = 'P', help_heading = "Resolver options", value_hint = ValueHint::Other)]
     pub upgrade_package: Vec<Requirement<VerbatimParsedUrl>>,
+
+    /// The strategy to use when considering upgrades of dependencies.
+    ///
+    /// By default, uv will upgrade both direct and transitive dependencies (`eager`). Use
+    /// `only-if-needed` to only upgrade direct dependencies (or packages specified via
+    /// `--upgrade-package`), keeping transitive dependencies at their current versions unless a
+    /// newer version is required to satisfy updated constraints.
+    ///
+    /// Requires `--upgrade` or `--upgrade-package` to have an effect.
+    #[arg(long, value_enum, help_heading = "Resolver options")]
+    pub upgrade_strategy: Option<UpgradeStrategy>,
 
     /// Reinstall all packages, regardless of whether they're already installed. Implies
     /// `--refresh`.
