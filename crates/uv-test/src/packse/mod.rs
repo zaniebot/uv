@@ -9,8 +9,21 @@ mod server;
 mod wheel;
 
 use std::path::{Path, PathBuf};
+use std::sync::LazyLock;
 
 pub use server::PackseServer;
+
+/// A shared [`PackseServer`] for the bird-themed general package index.
+///
+/// Lazily started on first access and kept alive for the entire test binary.
+/// This avoids spending ~142ms per test on server startup.
+static SHARED_BYPY: LazyLock<PackseServer> =
+    LazyLock::new(|| PackseServer::for_packages("general.toml"));
+
+/// Return the index URL of the shared bird-themed package server.
+pub fn shared_bypy_index_url() -> String {
+    SHARED_BYPY.index_url()
+}
 
 fn workspace_root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))

@@ -146,9 +146,10 @@ pub struct TestContext {
     /// Extra environment variables to apply to all commands.
     extra_env: Vec<(OsString, OsString)>,
 
-    /// When set, commands use this local package index instead of PyPI, and
-    /// `UV_EXCLUDE_NEWER` is removed (synthetic packages have no upload dates).
-    bypy: Option<packse::PackseServer>,
+    /// When `true`, commands use the shared bird-themed local package index
+    /// instead of PyPI, and `UV_EXCLUDE_NEWER` is removed (synthetic packages
+    /// have no upload dates).
+    bypy: bool,
 
     #[allow(dead_code)]
     _root: tempfile::TempDir,
@@ -952,7 +953,7 @@ impl TestContext {
             uv_bin,
             filters,
             extra_env: vec![],
-            bypy: None,
+            bypy: false,
             _root: root,
         }
     }
@@ -1068,8 +1069,8 @@ impl TestContext {
             .env(EnvVars::UV_TEST_PYTHON_PATH, self.python_path());
         // Lock to a point in time view of the world.
         // Disabled when using bypy (synthetic packages have no upload dates).
-        if let Some(server) = &self.bypy {
-            command.env(EnvVars::UV_INDEX_URL, server.index_url());
+        if self.bypy {
+            command.env(EnvVars::UV_INDEX_URL, packse::shared_bypy_index_url());
         } else {
             command
                 .env(EnvVars::UV_EXCLUDE_NEWER, EXCLUDE_NEWER)
@@ -1118,8 +1119,7 @@ impl TestContext {
     /// (synthetic packages have no upload dates).
     #[must_use]
     pub fn with_bypy(mut self) -> Self {
-        let server = packse::PackseServer::for_packages("general.toml");
-        self.bypy = Some(server);
+        self.bypy = true;
         self
     }
 
