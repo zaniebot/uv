@@ -775,23 +775,24 @@ async fn perform_install(
                 "There are no installed versions to upgrade"
             )?;
         } else if let [request] = requests.as_slice() {
+            // Convert to the inner request
+            let request = &request.request;
             if is_unspecified_upgrade {
                 writeln!(
                     printer.stderr(),
                     "All versions already on latest supported patch release"
                 )?;
             } else if let Some((_, installation)) = satisfied.first() {
+                let key = installation.minor_version_key();
                 if matches!(upgrade, PythonUpgrade::Enabled(_)) {
                     writeln!(
                         printer.stderr(),
-                        "`{}` is already on the latest supported patch release",
-                        installation.minor_version_key()
+                        "{request} is already on the latest supported patch release (`{key}`)"
                     )?;
                 } else {
                     writeln!(
                         printer.stderr(),
-                        "`{}` is already installed",
-                        installation.minor_version_key()
+                        "{request} is already installed (`{key}`)"
                     )?;
                 }
             } else if matches!(upgrade, PythonUpgrade::Enabled(_)) {

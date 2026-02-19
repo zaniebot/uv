@@ -98,7 +98,7 @@ fn python_install() {
     ----- stdout -----
 
     ----- stderr -----
-    `cpython-3.14-[PLATFORM]` is already installed
+    Python 3.14 is already installed (`cpython-3.14-[PLATFORM]`)
     ");
 
     // You can opt-in to a reinstall
@@ -143,6 +143,43 @@ fn python_install() {
 
     // The executable should be removed
     bin_python.assert(predicate::path::missing());
+}
+
+/// When a key-style request like `3.14-x86_64` is already satisfied, the
+/// message should show the installation that fulfilled it.
+#[test]
+fn python_install_key_already_installed() {
+    let context: TestContext = TestContext::new_with_versions(&[])
+        .with_filtered_python_keys()
+        .with_filtered_exe_suffix()
+        .with_filtered_latest_python_versions()
+        .with_managed_python_dirs()
+        .with_empty_python_install_mirror()
+        .with_python_download_cache();
+
+    // Install the latest version
+    context.python_install().arg("3.14").assert().success();
+
+    // Build a key-style request using the current architecture (e.g., `3.14-x86_64`)
+    let arch = std::env::consts::ARCH;
+    let key_arg = format!("3.14-{arch}");
+
+    let mut filters = context.filters();
+    // Also normalize the architecture in `any`-prefixed download request keys
+    filters.push((
+        r"any-(\d+\.\d+)-any-[a-z0-9_]+-any",
+        "any-$1-any-[ARCH]-any",
+    ));
+
+    // The message should include the matching installation key
+    uv_snapshot!(filters, context.python_install().arg(&key_arg), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    any-3.14-any-[ARCH]-any is already installed (`cpython-3.14-[PLATFORM]`)
+    ");
 }
 
 #[test]
@@ -724,7 +761,7 @@ fn python_install_preview() {
     ----- stdout -----
 
     ----- stderr -----
-    `cpython-3.14-[PLATFORM]` is already installed
+    Python 3.14 is already installed (`cpython-3.14-[PLATFORM]`)
     ");
     uv_snapshot!(context.filters(), context.python_install().arg("--preview").arg("3.14").env(EnvVars::UV_PYTHON_INSTALL_BIN, "0"), @"
     success: true
@@ -732,7 +769,7 @@ fn python_install_preview() {
     ----- stdout -----
 
     ----- stderr -----
-    `cpython-3.14-[PLATFORM]` is already installed
+    Python 3.14 is already installed (`cpython-3.14-[PLATFORM]`)
     ");
 
     uv_snapshot!(context.filters(), context.python_install().arg("--preview").arg("--force").arg("3.14"), @"
@@ -2689,7 +2726,7 @@ fn python_install_no_cache() {
     ----- stdout -----
 
     ----- stderr -----
-    `cpython-3.14-[PLATFORM]` is already installed
+    Python 3.14 is already installed (`cpython-3.14-[PLATFORM]`)
     ");
 
     // You can opt-in to a reinstall
@@ -3873,7 +3910,7 @@ fn python_install_upgrade() {
     ----- stdout -----
 
     ----- stderr -----
-    `cpython-3.11-[PLATFORM]` is already on the latest supported patch release
+    Python 3.11 is already on the latest supported patch release (`cpython-3.11-[PLATFORM]`)
     ");
 
     // Install an outdated version
@@ -3894,7 +3931,7 @@ fn python_install_upgrade() {
     ----- stdout -----
 
     ----- stderr -----
-    `cpython-3.11-[PLATFORM]` is already on the latest supported patch release
+    Python 3.11 is already on the latest supported patch release (`cpython-3.11-[PLATFORM]`)
     ");
 
     // Ask for multiple already satisfied versions
@@ -3949,7 +3986,7 @@ fn python_install_upgrade_version_file() {
     ----- stdout -----
 
     ----- stderr -----
-    `cpython-3.13-[PLATFORM]` is already on the latest supported patch release
+    Python 3.13 is already on the latest supported patch release (`cpython-3.13-[PLATFORM]`)
     ");
 
     // Pin to a patch version
@@ -4068,7 +4105,7 @@ fn python_install_compile_bytecode() -> anyhow::Result<()> {
     ----- stdout -----
 
     ----- stderr -----
-    `cpython-3.14-[PLATFORM]` is already installed
+    Python 3.14 is already installed (`cpython-3.14-[PLATFORM]`)
     Bytecode compiled [COUNT] files in [TIME]
     ");
 
@@ -4114,7 +4151,7 @@ fn python_install_compile_bytecode_existing() {
     ----- stdout -----
 
     ----- stderr -----
-    `cpython-3.14-[PLATFORM]` is already installed
+    Python 3.14 is already installed (`cpython-3.14-[PLATFORM]`)
     Bytecode compiled [COUNT] files in [TIME]
     ");
 }
@@ -4178,7 +4215,7 @@ fn python_install_upgrade_build_version() {
     ----- stdout -----
 
     ----- stderr -----
-    `cpython-3.12-[PLATFORM]` is already on the latest supported patch release
+    Python 3.12 is already on the latest supported patch release (`cpython-3.12-[PLATFORM]`)
     ");
 
     // Overwrite the BUILD file with an older build version
@@ -4207,7 +4244,7 @@ fn python_install_upgrade_build_version() {
     ----- stdout -----
 
     ----- stderr -----
-    `cpython-3.12-[PLATFORM]` is already on the latest supported patch release
+    Python 3.12 is already on the latest supported patch release (`cpython-3.12-[PLATFORM]`)
     ");
 }
 
