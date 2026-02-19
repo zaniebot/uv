@@ -1,5 +1,8 @@
+use rustc_hash::FxHashMap;
+
 use uv_distribution_filename::DistExtension;
 use uv_normalize::{ExtraName, GroupName, PackageName};
+use uv_pep440::VersionSpecifiers;
 use uv_pypi_types::{HashDigest, HashDigests};
 
 use crate::{
@@ -15,6 +18,10 @@ use crate::{
 pub struct Resolution {
     graph: petgraph::graph::DiGraph<Node, Edge>,
     diagnostics: Vec<ResolutionDiagnostic>,
+    /// Map from dependent package name to dependency package name to the version specifiers
+    /// that the dependent places on the dependency. Populated from package metadata during
+    /// resolution.
+    dependency_specifiers: FxHashMap<PackageName, FxHashMap<PackageName, VersionSpecifiers>>,
 }
 
 impl Resolution {
@@ -23,6 +30,7 @@ impl Resolution {
         Self {
             graph,
             diagnostics: Vec::new(),
+            dependency_specifiers: FxHashMap::default(),
         }
     }
 
@@ -36,6 +44,27 @@ impl Resolution {
     pub fn with_diagnostics(mut self, diagnostics: Vec<ResolutionDiagnostic>) -> Self {
         self.diagnostics.extend(diagnostics);
         self
+    }
+
+    /// Add dependency version specifiers to the resolution.
+    #[must_use]
+    pub fn with_dependency_specifiers(
+        mut self,
+        specifiers: FxHashMap<PackageName, FxHashMap<PackageName, VersionSpecifiers>>,
+    ) -> Self {
+        self.dependency_specifiers = specifiers;
+        self
+    }
+
+    /// Return the version specifiers that `dependent` places on `dependency`, if known.
+    pub fn dependency_specifier(
+        &self,
+        dependent: &PackageName,
+        dependency: &PackageName,
+    ) -> Option<&VersionSpecifiers> {
+        self.dependency_specifiers
+            .get(dependent)
+            .and_then(|deps| deps.get(dependency))
     }
 
     /// Return the hashes for the given package name, if they exist.

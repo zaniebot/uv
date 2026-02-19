@@ -1110,7 +1110,17 @@ pub(crate) fn diagnose_downgrades(
                             dist,
                             install: true,
                             ..
-                        } => Some(format!("`{}=={}`", dist.name(), dist.version()?)),
+                        } => {
+                            let dependent_name = dist.name();
+                            let version = dist.version()?;
+                            let specifier = resolution
+                                .dependency_specifier(dependent_name, name)
+                                .map(|s| format!(" (requires `{name}{s}`)"));
+                            Some(format!(
+                                "`{dependent_name}=={version}`{}",
+                                specifier.unwrap_or_default()
+                            ))
+                        }
                         _ => None,
                     })
                     .sorted_unstable()

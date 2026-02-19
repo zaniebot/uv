@@ -12,12 +12,12 @@ use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
 use uv_configuration::{Constraints, Overrides};
 use uv_distribution::Metadata;
 use uv_distribution_types::{
-    Dist, DistributionMetadata, Edge, IndexUrl, Name, Node, Requirement, RequiresPython,
-    ResolutionDiagnostic, ResolvedDist, VersionId, VersionOrUrlRef,
+    Dist, DistributionMetadata, Edge, IndexUrl, Name, Node, Requirement, RequirementSource,
+    RequiresPython, ResolutionDiagnostic, ResolvedDist, VersionId, VersionOrUrlRef,
 };
 use uv_git::GitResolver;
 use uv_normalize::{ExtraName, GroupName, PackageName};
-use uv_pep440::{Version, VersionSpecifier};
+use uv_pep440::{Version, VersionSpecifier, VersionSpecifiers};
 use uv_pep508::{MarkerEnvironment, MarkerTree, MarkerTreeKind};
 use uv_pypi_types::{Conflicts, HashDigests, ParsedUrlError, VerbatimParsedUrl, Yanked};
 
@@ -896,6 +896,32 @@ impl From<ResolverOutput> for uv_distribution_types::Resolution {
             }
         }
 
+        // Build a map of dependency version specifiers from package metadata.
+        let mut dependency_specifiers: FxHashMap<
+            PackageName,
+            FxHashMap<PackageName, VersionSpecifiers>,
+        > = FxHashMap::default();
+        for index in graph.node_indices() {
+            let ResolutionGraphNode::Dist(dist) = &graph[index] else {
+                continue;
+            };
+            if !dist.is_base() {
+                continue;
+            }
+            if let Some(metadata) = &dist.metadata {
+                for req in &*metadata.requires_dist {
+                    if let RequirementSource::Registry { specifier, .. } = &req.source {
+                        if !specifier.is_empty() {
+                            dependency_specifiers
+                                .entry(dist.name.clone())
+                                .or_default()
+                                .insert(req.name.clone(), specifier.clone());
+                        }
+                    }
+                }
+            }
+        }
+
         // Re-add the edges to the reduced graph.
         for edge in graph.edge_indices() {
             let (source, target) = graph.edge_endpoints(edge).unwrap();
@@ -928,7 +954,9 @@ impl From<ResolverOutput> for uv_distribution_types::Resolution {
             }
         }
 
-        Self::new(transformed).with_diagnostics(diagnostics)
+        Self::new(transformed)
+            .with_diagnostics(diagnostics)
+            .with_dependency_specifiers(dependency_specifiers)
     }
 }
 

@@ -3490,7 +3490,7 @@ fn install_no_downgrade() -> Result<()> {
      - idna==1000 (from file://[TEMP_DIR]/idna)
      + idna==3.6
      ~ sniffio==1.3.1
-      hint: `idna` was downgraded from `1000` to `3.6` to satisfy `anyio==4.3.0`
+      hint: `idna` was downgraded from `1000` to `3.6` to satisfy `anyio==4.3.0` (requires `idna>=2.8`)
     "
     );
 
@@ -3556,7 +3556,7 @@ fn install_downgrade_hint() -> Result<()> {
      - idna==3.6
      + idna==3.4
      + requires-old-idna==0.1.0 (from file://[TEMP_DIR]/requires_old_idna)
-      hint: `idna` was downgraded from `3.6` to `3.4` to satisfy `requires-old-idna==0.1.0`
+      hint: `idna` was downgraded from `3.6` to `3.4` to satisfy `requires-old-idna==0.1.0` (requires `idna<3.5`)
     "
     );
 
@@ -4549,7 +4549,7 @@ requires-python = ">=3.8"
      - anyio==4.0.0
      + anyio==3.7.1
      ~ example==0.0.0 (from file://[TEMP_DIR]/editable)
-      hint: `anyio` was downgraded from `4.0.0` to `3.7.1` to satisfy `example==0.0.0`
+      hint: `anyio` was downgraded from `4.0.0` to `3.7.1` to satisfy `example==0.0.0` (requires `anyio==3.7.1`)
     "
     );
 
@@ -4698,7 +4698,7 @@ requires-python = ">=3.8"
      - anyio==4.0.0
      + anyio==3.7.1
      ~ example==0.0.0 (from file://[TEMP_DIR]/editable)
-      hint: `anyio` was downgraded from `4.0.0` to `3.7.1` to satisfy `example==0.0.0`
+      hint: `anyio` was downgraded from `4.0.0` to `3.7.1` to satisfy `example==0.0.0` (requires `anyio==3.7.1`)
     "
     );
 
@@ -13144,7 +13144,7 @@ fn pip_install_build_dependencies_respect_locked_versions() -> Result<()> {
      + anyio==3.7.1
      ~ child==0.1.0 (from file://[TEMP_DIR]/child)
      ~ parent==0.1.0 (from file://[TEMP_DIR]/)
-      hint: `anyio` was downgraded from `4.0.0` to `3.7.1` to satisfy `parent==0.1.0`
+      hint: `anyio` was downgraded from `4.0.0` to `3.7.1` to satisfy `parent==0.1.0` (requires `anyio<3.8`)
     ");
 
     Ok(())
