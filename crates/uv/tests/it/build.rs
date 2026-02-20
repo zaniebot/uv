@@ -1960,6 +1960,7 @@ fn build_unconfigured_setuptools() -> Result<()> {
 #[test]
 fn build_workspace_virtual_root() -> Result<()> {
     let context = uv_test::test_context!("3.12");
+
     context
         .temp_dir
         .child("pyproject.toml")
@@ -1968,18 +1969,169 @@ fn build_workspace_virtual_root() -> Result<()> {
             members = ["packages/*"]
     "#})?;
 
+    let member_a = context.temp_dir.child("packages").child("member-a");
+    fs_err::create_dir_all(member_a.path())?;
+
+    member_a.child("pyproject.toml").write_str(indoc! {r#"
+        [project]
+        name = "member-a"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+
+        [build-system]
+        requires = ["hatchling"]
+        build-backend = "hatchling.build"
+    "#})?;
+
+    member_a
+        .child("src")
+        .child("member_a")
+        .child("__init__.py")
+        .touch()?;
+    member_a.child("README").touch()?;
+
+    let member_b = context.temp_dir.child("packages").child("member-b");
+    fs_err::create_dir_all(member_b.path())?;
+
+    member_b.child("pyproject.toml").write_str(indoc! {r#"
+        [project]
+        name = "member-b"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+
+        [build-system]
+        requires = ["hatchling"]
+        build-backend = "hatchling.build"
+    "#})?;
+
+    member_b
+        .child("src")
+        .child("member_b")
+        .child("__init__.py")
+        .touch()?;
+    member_b.child("README").touch()?;
+
+    // Building from a virtual workspace root should default to `--all-packages`.
     uv_snapshot!(context.filters(), context.build().arg("--no-build-logs"), @"
     success: true
     exit_code: 0
     ----- stdout -----
 
     ----- stderr -----
-    Building source distribution...
-    warning: `[TEMP_DIR]/` appears to be a workspace root without a Python project; consider using `uv sync` to install the workspace, or add a `[build-system]` table to `pyproject.toml`
-    Building wheel from source distribution...
-    Successfully built dist/cache-0.0.0.tar.gz
-    Successfully built dist/UNKNOWN-0.0.0-py3-none-any.whl
+    [member-a] Building source distribution...
+    [member-b] Building source distribution...
+    [member-a] Building wheel from source distribution...
+    [member-b] Building wheel from source distribution...
+    Successfully built dist/member_a-0.1.0.tar.gz
+    Successfully built dist/member_a-0.1.0-py3-none-any.whl
+    Successfully built dist/member_b-0.1.0.tar.gz
+    Successfully built dist/member_b-0.1.0-py3-none-any.whl
     ");
+
+    context
+        .temp_dir
+        .child("dist")
+        .child("member_a-0.1.0.tar.gz")
+        .assert(predicate::path::is_file());
+    context
+        .temp_dir
+        .child("dist")
+        .child("member_a-0.1.0-py3-none-any.whl")
+        .assert(predicate::path::is_file());
+    context
+        .temp_dir
+        .child("dist")
+        .child("member_b-0.1.0.tar.gz")
+        .assert(predicate::path::is_file());
+    context
+        .temp_dir
+        .child("dist")
+        .child("member_b-0.1.0-py3-none-any.whl")
+        .assert(predicate::path::is_file());
+
+    Ok(())
+}
+
+/// Building from a member directory within a virtual workspace should build only that member.
+#[test]
+fn build_workspace_virtual_root_member() -> Result<()> {
+    let context = uv_test::test_context!("3.12");
+
+    context
+        .temp_dir
+        .child("pyproject.toml")
+        .write_str(indoc! {r#"
+            [tool.uv.workspace]
+            members = ["packages/*"]
+    "#})?;
+
+    let member_a = context.temp_dir.child("packages").child("member-a");
+    fs_err::create_dir_all(member_a.path())?;
+
+    member_a.child("pyproject.toml").write_str(indoc! {r#"
+        [project]
+        name = "member-a"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+
+        [build-system]
+        requires = ["hatchling"]
+        build-backend = "hatchling.build"
+    "#})?;
+
+    member_a
+        .child("src")
+        .child("member_a")
+        .child("__init__.py")
+        .touch()?;
+    member_a.child("README").touch()?;
+
+    let member_b = context.temp_dir.child("packages").child("member-b");
+    fs_err::create_dir_all(member_b.path())?;
+
+    member_b.child("pyproject.toml").write_str(indoc! {r#"
+        [project]
+        name = "member-b"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+
+        [build-system]
+        requires = ["hatchling"]
+        build-backend = "hatchling.build"
+    "#})?;
+
+    member_b
+        .child("src")
+        .child("member_b")
+        .child("__init__.py")
+        .touch()?;
+    member_b.child("README").touch()?;
+
+    // Building from a member directory should build only that member, not all packages.
+    uv_snapshot!(context.filters(), context.build().arg("--no-build-logs").current_dir(&member_a), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Building source distribution...
+    Building wheel from source distribution...
+    Successfully built [TEMP_DIR]/dist/member_a-0.1.0.tar.gz
+    Successfully built [TEMP_DIR]/dist/member_a-0.1.0-py3-none-any.whl
+    ");
+
+    // Output goes to the workspace root's `dist/` directory.
+    context
+        .temp_dir
+        .child("dist")
+        .child("member_a-0.1.0.tar.gz")
+        .assert(predicate::path::is_file());
+    context
+        .temp_dir
+        .child("dist")
+        .child("member_a-0.1.0-py3-none-any.whl")
+        .assert(predicate::path::is_file());
+
     Ok(())
 }
 

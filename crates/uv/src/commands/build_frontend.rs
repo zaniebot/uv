@@ -1108,6 +1108,10 @@ impl fmt::Display for AnnotatedSource<'_> {
 }
 
 /// Identify the packages to build based on the source, workspace, and CLI flags.
+///
+/// When the workspace root is virtual (i.e., without a `[project]` table), defaults to building
+/// all packages, matching the behavior of [`identify_installation_target`] in the sync, run, and
+/// export commands.
 fn identify_build_target<'a>(
     src: Source<'a>,
     workspace: &'a Result<Workspace, WorkspaceError>,
@@ -1150,8 +1154,16 @@ fn identify_build_target<'a>(
             ))])
         }
 
-        // Build all packages in the workspace.
-        None if all_packages => {
+        // Build all packages in the workspace, either explicitly via `--all-packages` or
+        // implicitly when the workspace root is virtual (no `[project]` table).
+        None if all_packages
+            || workspace.as_ref().is_ok_and(|workspace| {
+                let Source::Directory(src_dir) = &src else {
+                    return false;
+                };
+                workspace.is_non_project() && workspace.install_path() == src_dir.as_ref()
+            }) =>
+        {
             if matches!(src, Source::File(_)) {
                 return Err(anyhow::anyhow!(
                     "Cannot specify `--all-packages` when building from a file"
