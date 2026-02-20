@@ -251,87 +251,8 @@ async fn build_impl(
     )
     .await;
 
-    // If a `--package` or `--all-packages` was provided, adjust the source directory.
-    let packages = if let Some(package) = package {
-        if matches!(src, Source::File(_)) {
-            return Err(anyhow::anyhow!(
-                "Cannot specify `--package` when building from a file"
-            ));
-        }
-
-        let workspace = match workspace {
-            Ok(ref workspace) => workspace,
-            Err(err) => {
-                return Err(err).context("`--package` was provided, but no workspace was found");
-            }
-        };
-
-        let package = workspace
-            .packages()
-            .get(package)
-            .ok_or_else(|| anyhow::anyhow!("Package `{package}` not found in workspace"))?;
-
-        if !package.pyproject_toml().is_package(true) {
-            let name = &package.project().name;
-            let pyproject_toml = package.root().join("pyproject.toml");
-            return Err(anyhow::anyhow!(
-                "Package `{}` is missing a `{}`. For example, to build with `{}`, add the following to `{}`:\n```toml\n[build-system]\nrequires = [\"setuptools\"]\nbuild-backend = \"setuptools.build_meta\"\n```",
-                name.cyan(),
-                "build-system".green(),
-                "setuptools".cyan(),
-                pyproject_toml.user_display().cyan()
-            ));
-        }
-
-        vec![AnnotatedSource::from(Source::Directory(Cow::Borrowed(
-            package.root(),
-        )))]
-    } else if all_packages {
-        if matches!(src, Source::File(_)) {
-            return Err(anyhow::anyhow!(
-                "Cannot specify `--all-packages` when building from a file"
-            ));
-        }
-
-        let workspace = match workspace {
-            Ok(ref workspace) => workspace,
-            Err(err) => {
-                return Err(err)
-                    .context("`--all-packages` was provided, but no workspace was found");
-            }
-        };
-
-        if workspace.packages().is_empty() {
-            return Err(anyhow::anyhow!("No packages found in workspace"));
-        }
-
-        let packages: Vec<_> = workspace
-            .packages()
-            .values()
-            .filter(|package| package.pyproject_toml().is_package(true))
-            .map(|package| AnnotatedSource {
-                source: Source::Directory(Cow::Borrowed(package.root())),
-                package: Some(package.project().name.clone()),
-            })
-            .collect();
-
-        if packages.is_empty() {
-            let member = workspace.packages().values().next().unwrap();
-            let name = &member.project().name;
-            let pyproject_toml = member.root().join("pyproject.toml");
-            return Err(anyhow::anyhow!(
-                "Workspace does not contain any buildable packages. For example, to build `{}` with `{}`, add a `{}` to `{}`:\n```toml\n[build-system]\nrequires = [\"setuptools\"]\nbuild-backend = \"setuptools.build_meta\"\n```",
-                name.cyan(),
-                "setuptools".cyan(),
-                "build-system".green(),
-                pyproject_toml.user_display().cyan()
-            ));
-        }
-
-        packages
-    } else {
-        vec![AnnotatedSource::from(src)]
-    };
+    // Identify the packages to build.
+    let packages = identify_build_target(src, &workspace, all_packages, package)?;
 
     let results: Vec<_> = futures::future::join_all(packages.into_iter().map(|source| {
         let future = build_package(
@@ -1183,6 +1104,97 @@ impl fmt::Display for AnnotatedSource<'_> {
         } else {
             write!(f, "{}", self.path().simplified_display())
         }
+    }
+}
+
+/// Identify the packages to build based on the source, workspace, and CLI flags.
+fn identify_build_target<'a>(
+    src: Source<'a>,
+    workspace: &'a Result<Workspace, WorkspaceError>,
+    all_packages: bool,
+    package: Option<&PackageName>,
+) -> Result<Vec<AnnotatedSource<'a>>> {
+    match package {
+        // Build a specific package in the workspace.
+        Some(package) => {
+            if matches!(src, Source::File(_)) {
+                return Err(anyhow::anyhow!(
+                    "Cannot specify `--package` when building from a file"
+                ));
+            }
+
+            let workspace = workspace
+                .as_ref()
+                .map_err(|err| anyhow::anyhow!("{err}"))
+                .context("`--package` was provided, but no workspace was found")?;
+
+            let member = workspace
+                .packages()
+                .get(package)
+                .ok_or_else(|| anyhow::anyhow!("Package `{package}` not found in workspace"))?;
+
+            if !member.pyproject_toml().is_package(true) {
+                let name = &member.project().name;
+                let pyproject_toml = member.root().join("pyproject.toml");
+                return Err(anyhow::anyhow!(
+                    "Package `{}` is missing a `{}`. For example, to build with `{}`, add the following to `{}`:\n```toml\n[build-system]\nrequires = [\"setuptools\"]\nbuild-backend = \"setuptools.build_meta\"\n```",
+                    name.cyan(),
+                    "build-system".green(),
+                    "setuptools".cyan(),
+                    pyproject_toml.user_display().cyan()
+                ));
+            }
+
+            Ok(vec![AnnotatedSource::from(Source::Directory(
+                Cow::Borrowed(member.root()),
+            ))])
+        }
+
+        // Build all packages in the workspace.
+        None if all_packages => {
+            if matches!(src, Source::File(_)) {
+                return Err(anyhow::anyhow!(
+                    "Cannot specify `--all-packages` when building from a file"
+                ));
+            }
+
+            let workspace = workspace
+                .as_ref()
+                .map_err(|err| anyhow::anyhow!("{err}"))
+                .context("`--all-packages` was provided, but no workspace was found")?;
+
+            if workspace.packages().is_empty() {
+                return Err(anyhow::anyhow!("No packages found in workspace"));
+            }
+
+            let packages: Vec<_> = workspace
+                .packages()
+                .values()
+                .filter(|member| member.pyproject_toml().is_package(true))
+                .map(|member| AnnotatedSource {
+                    source: Source::Directory(Cow::Borrowed(member.root())),
+                    package: Some(member.project().name.clone()),
+                })
+                .collect();
+
+            if packages.is_empty() {
+                let member = workspace.packages().values().next().unwrap();
+                let name = &member.project().name;
+                let pyproject_toml = member.root().join("pyproject.toml");
+                return Err(anyhow::anyhow!(
+                    "Workspace does not contain any buildable packages. For example, to build `{}` with `{}`, add a `{}` to `{}`:\n```toml\n[build-system]\nrequires = [\"setuptools\"]\nbuild-backend = \"setuptools.build_meta\"\n```",
+                    name.cyan(),
+                    "setuptools".cyan(),
+                    "build-system".green(),
+                    pyproject_toml.user_display().cyan()
+                ));
+            }
+
+            Ok(packages)
+        }
+
+        // Build the source directory or file directly.
+        None => Ok(vec![AnnotatedSource::from(src)]),
     }
 }
 
