@@ -961,15 +961,15 @@ pub struct ResolverInstallerSchema {
     pub upgrade_package: Option<Vec<Requirement<VerbatimParsedUrl>>>,
     /// The strategy to use when considering upgrades of dependencies.
     ///
-    /// By default, uv will upgrade both direct and transitive dependencies (`"eager"`). Use
-    /// `"only-if-needed"` to only upgrade direct dependencies (or packages specified via
+    /// By default, uv will upgrade both direct and transitive dependencies (`"transitive"`). Use
+    /// `"direct"` to only upgrade direct dependencies (or packages specified via
     /// `upgrade-package`), keeping transitive dependencies at their current versions unless a
     /// newer version is required to satisfy updated constraints.
     #[option(
-        default = r#""eager""#,
+        default = r#""transitive""#,
         value_type = "str",
         example = r#"
-            upgrade-strategy = "only-if-needed"
+            upgrade-strategy = "direct"
         "#
     )]
     pub upgrade_strategy: Option<UpgradeStrategy>,
@@ -1875,15 +1875,15 @@ pub struct PipOptions {
     pub upgrade_package: Option<Vec<Requirement<VerbatimParsedUrl>>>,
     /// The strategy to use when considering upgrades of dependencies.
     ///
-    /// By default, uv will upgrade both direct and transitive dependencies (`"eager"`). Use
-    /// `"only-if-needed"` to only upgrade direct dependencies (or packages specified via
+    /// By default, uv will upgrade both direct and transitive dependencies (`"transitive"`). Use
+    /// `"direct"` to only upgrade direct dependencies (or packages specified via
     /// `upgrade-package`), keeping transitive dependencies at their current versions unless a
     /// newer version is required to satisfy updated constraints.
     #[option(
-        default = r#""eager""#,
+        default = r#""transitive""#,
         value_type = "str",
         example = r#"
-            upgrade-strategy = "only-if-needed"
+            upgrade-strategy = "direct"
         "#
     )]
     pub upgrade_strategy: Option<UpgradeStrategy>,

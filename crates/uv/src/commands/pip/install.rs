@@ -146,9 +146,9 @@ pub(crate) async fn pip_install(
         }
     }
 
-    // Apply the upgrade strategy. When using `only-if-needed`, narrow `Upgrade::All` to only
+    // Apply the upgrade strategy. When using `direct`, narrow `Upgrade::All` to only
     // cover the direct dependencies, so transitive dependencies retain their lockfile versions.
-    let upgrade = if upgrade_strategy == UpgradeStrategy::OnlyIfNeeded {
+    let upgrade = if upgrade_strategy == UpgradeStrategy::Direct {
         let direct = requirements
             .iter()
             .filter_map(|spec| match &spec.requirement {

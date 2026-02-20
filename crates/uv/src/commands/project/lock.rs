@@ -523,10 +523,10 @@ async fn do_lock(
         })
         .collect::<Result<BTreeMap<_, _>, ProjectError>>()?;
 
-    // Apply the upgrade strategy. When using `only-if-needed`, narrow `Upgrade::All` to only
+    // Apply the upgrade strategy. When using `direct`, narrow `Upgrade::All` to only
     // cover the direct dependencies (workspace members and their declared dependencies), so
     // transitive dependencies retain their lockfile versions.
-    let upgrade = if *upgrade_strategy == UpgradeStrategy::OnlyIfNeeded {
+    let upgrade = if *upgrade_strategy == UpgradeStrategy::Direct {
         let direct = members
             .iter()
             .cloned()

@@ -7037,8 +7037,8 @@ pub struct ResolverArgs {
 
     /// The strategy to use when considering upgrades of dependencies.
     ///
-    /// By default, uv will upgrade both direct and transitive dependencies (`eager`). Use
-    /// `only-if-needed` to only upgrade direct dependencies (or packages specified via
+    /// By default, uv will upgrade both direct and transitive dependencies (`transitive`). Use
+    /// `direct` to only upgrade direct dependencies (or packages specified via
     /// `--upgrade-package`), keeping transitive dependencies at their current versions unless a
     /// newer version is required to satisfy updated constraints.
     ///
@@ -7259,8 +7259,8 @@ pub struct ResolverInstallerArgs {
 
     /// The strategy to use when considering upgrades of dependencies.
     ///
-    /// By default, uv will upgrade both direct and transitive dependencies (`eager`). Use
-    /// `only-if-needed` to only upgrade direct dependencies (or packages specified via
+    /// By default, uv will upgrade both direct and transitive dependencies (`transitive`). Use
+    /// `direct` to only upgrade direct dependencies (or packages specified via
     /// `--upgrade-package`), keeping transitive dependencies at their current versions unless a
     /// newer version is required to satisfy updated constraints.
     ///

@@ -140,18 +140,18 @@ impl From<Reinstall> for Refresh {
 pub enum UpgradeStrategy {
     /// Upgrade both direct and transitive dependencies.
     #[default]
-    Eager,
+    Transitive,
     /// Only upgrade direct dependencies (or packages specified via `--upgrade-package`), keeping
     /// transitive dependencies at their current versions unless a newer version is required to
     /// satisfy updated constraints.
-    OnlyIfNeeded,
+    Direct,
 }
 
 impl std::fmt::Display for UpgradeStrategy {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Eager => write!(f, "eager"),
-            Self::OnlyIfNeeded => write!(f, "only-if-needed"),
+            Self::Transitive => write!(f, "transitive"),
+            Self::Direct => write!(f, "direct"),
         }
     }
 }
@@ -236,7 +236,7 @@ impl Upgrade {
 
     /// Narrow [`Upgrade::All`] to only cover the given set of direct dependency names.
     ///
-    /// When using `--upgrade-strategy only-if-needed`, this converts an "upgrade everything"
+    /// When using `--upgrade-strategy direct`, this converts an "upgrade everything"
     /// request into an "upgrade only direct dependencies" request, so that transitive dependencies
     /// retain their lockfile versions unless their constraints require an upgrade.
     #[must_use]
