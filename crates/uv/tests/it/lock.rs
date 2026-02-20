@@ -4747,6 +4747,74 @@ fn lock_preference() -> Result<()> {
     Ok(())
 }
 
+/// When a pre-release is locked but the specifier is later widened to a
+/// non-prerelease range and a stable version is available, the resolver should
+/// upgrade to the stable version.
+///
+/// See: <https://github.com/astral-sh/uv/issues/18123>
+#[test]
+fn lock_preference_prerelease_to_stable() -> Result<()> {
+    let context = uv_test::test_context!("3.12").with_exclude_newer("2024-09-01T00:00:00Z");
+
+    let pyproject_toml = context.temp_dir.child("pyproject.toml");
+
+    // Step 1: Lock with an explicit pre-release specifier.
+    pyproject_toml.write_str(
+        r#"
+        [project]
+        name = "project"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        dependencies = ["cffi==1.17.0rc1"]
+        "#,
+    )?;
+
+    uv_snapshot!(context.filters(), context.lock(), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Resolved 3 packages in [TIME]
+    ");
+
+    let lock = context.read("uv.lock");
+    // Verify that the pre-release is locked.
+    assert!(
+        lock.contains("cffi\"\nversion = \"1.17.0rc1\"")
+            || lock.contains("version = \"1.17.0rc1\"")
+    );
+
+    // Step 2: Widen the specifier to a non-prerelease range.
+    // The stable 1.17.0 should now be preferred over the locked 1.17.0rc1.
+    pyproject_toml.write_str(
+        r#"
+        [project]
+        name = "project"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        dependencies = ["cffi>=1.17"]
+        "#,
+    )?;
+
+    uv_snapshot!(context.filters(), context.lock(), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Resolved 3 packages in [TIME]
+    Updated cffi v1.17.0rc1 -> v1.17.0
+    ");
+
+    let lock = context.read("uv.lock");
+    // Verify that the stable version is now in the lockfile.
+    assert!(lock.contains("version = \"1.17.0\""));
+    assert!(!lock.contains("version = \"1.17.0rc1\""));
+
+    Ok(())
+}
+
 /// If the user includes `git+` in a `tool.uv.sources` entry, we shouldn't fail.
 #[test]
 #[cfg(feature = "test-git")]

@@ -306,12 +306,26 @@ impl CandidateSelector {
                     AllowPrerelease::Yes => true,
                     AllowPrerelease::No => false,
                     // If the pre-release was provided via an existing file, rather than from the
-                    // current solve, accept it unless pre-releases are completely banned.
+                    // current solve, accept it unless there's a stable version available in the
+                    // range that is at least as new. For example, if `1.0.0rc1` is locked but
+                    // `1.0.0` stable is now available, prefer the stable version. But if
+                    // `1.17.0rc1` is locked and the latest stable is `1.16.0`, retain the
+                    // pre-release since it's newer than any available stable version in the range.
                     AllowPrerelease::IfNecessary => match source {
                         PreferenceSource::Resolver => false,
                         PreferenceSource::Lock
                         | PreferenceSource::Environment
-                        | PreferenceSource::RequirementsTxt => true,
+                        | PreferenceSource::RequirementsTxt => {
+                            !version_maps.iter().any(|version_map| {
+                                version_map.iter(range).any(|(v, handle)| {
+                                    !v.any_prerelease()
+                                        && v >= version
+                                        && handle
+                                            .prioritized_dist()
+                                            .is_some_and(|dist| dist.get().is_some())
+                                })
+                            })
+                        }
                     },
                 };
                 if !allow {
