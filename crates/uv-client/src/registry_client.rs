@@ -7,12 +7,12 @@ use std::time::Duration;
 
 use async_http_range_reader::AsyncHttpRangeReader;
 use futures::{FutureExt, StreamExt, TryStreamExt};
-use http::{HeaderMap, StatusCode};
+use http::HeaderMap;
 use itertools::Either;
 use reqwest::{Proxy, Response};
 use rustc_hash::FxHashMap;
 use tokio::sync::{Mutex, Semaphore};
-use tracing::{Instrument, debug, info_span, instrument, trace, warn};
+use tracing::{Instrument, info_span, instrument, trace, warn};
 use url::Url;
 
 use uv_auth::{CredentialsCache, Indexes, PyxTokenStore};
@@ -379,12 +379,9 @@ impl RegistryClient {
                                 // Package not found, so we will continue on to the next index (if there is one)
                                 SimpleMetadataSearchOutcome::NotFound => {}
                                 // The search failed because of an HTTP status code that we don't ignore for
-                                // this index. We end our search here.
-                                SimpleMetadataSearchOutcome::StatusCodeFailure(status_code) => {
-                                    debug!(
-                                        "Indexes search failed because of status code failure: {status_code}"
-                                    );
-                                    break;
+                                // this index. Propagate the error to the caller.
+                                SimpleMetadataSearchOutcome::StatusCodeFailure(err) => {
+                                    return Err(err);
                                 }
                             }
                         }
@@ -560,15 +557,14 @@ impl RegistryClient {
                     };
                     let decision =
                         status_code_strategy.handle_status_code(status_code, index, capabilities);
-                    if let IndexStatusCodeDecision::Fail(status_code) = decision {
-                        if !matches!(
-                            status_code,
-                            StatusCode::UNAUTHORIZED | StatusCode::FORBIDDEN
-                        ) {
-                            return Err(err);
+                    match decision {
+                        IndexStatusCodeDecision::Ignore => {
+                            Ok(SimpleMetadataSearchOutcome::NotFound)
+                        }
+                        IndexStatusCodeDecision::Fail(_) => {
+                            Ok(SimpleMetadataSearchOutcome::StatusCodeFailure(err))
                         }
                     }
-                    Ok(SimpleMetadataSearchOutcome::from(decision))
                 }
 
                 // The package is unavailable due to a lack of connectivity.
@@ -1259,17 +1255,9 @@ pub(crate) enum SimpleMetadataSearchOutcome {
     /// Simple metadata was not found
     NotFound,
     /// A status code failure was encountered when searching for
-    /// simple metadata and our strategy did not ignore it
-    StatusCodeFailure(StatusCode),
-}
-
-impl From<IndexStatusCodeDecision> for SimpleMetadataSearchOutcome {
-    fn from(item: IndexStatusCodeDecision) -> Self {
-        match item {
-            IndexStatusCodeDecision::Ignore => Self::NotFound,
-            IndexStatusCodeDecision::Fail(status_code) => Self::StatusCodeFailure(status_code),
-        }
-    }
+    /// simple metadata and our strategy did not ignore it.
+    /// Carries the original error so it can be propagated by the caller.
+    StatusCodeFailure(Error),
 }
 
 /// A map from [`IndexUrl`] to [`FlatIndexEntry`] entries found at the given URL, indexed by

@@ -941,6 +941,84 @@ fn tool_upgrade_python_with_all() {
     });
 }
 
+/// Upgrade a tool when the stored index requires authentication but no credentials are provided.
+///
+/// See: <https://github.com/astral-sh/uv/issues/18120>
+#[tokio::test]
+async fn tool_upgrade_invalid_auth() {
+    use wiremock::matchers::method;
+    use wiremock::{Mock, MockServer, ResponseTemplate};
+
+    let context = uv_test::test_context!("3.12")
+        .with_filtered_counts()
+        .with_filtered_exe_suffix();
+    let tool_dir = context.temp_dir.child("tools");
+    let bin_dir = context.temp_dir.child("bin");
+
+    // Install `babel` from PyPI.
+    uv_snapshot!(context.filters(), context.tool_install()
+        .arg("babel==2.14.0")
+        .env(EnvVars::UV_TOOL_DIR, tool_dir.as_os_str())
+        .env(EnvVars::XDG_BIN_HOME, bin_dir.as_os_str())
+        .env(EnvVars::PATH, bin_dir.as_os_str()), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Resolved [N] packages in [TIME]
+    Prepared [N] packages in [TIME]
+    Installed [N] packages in [TIME]
+     + babel==2.14.0
+    Installed 1 executable: pybabel
+    ");
+
+    // Start a mock server that returns 401 for all requests.
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .respond_with(ResponseTemplate::new(401))
+        .mount(&server)
+        .await;
+
+    let index_url = format!("{}/simple", server.uri());
+
+    // Overwrite the receipt to point at the mock server with `authenticate = "auto"`,
+    // simulating a tool that was originally installed from a private index with inline
+    // credentials (which are stripped from the receipt on save).
+    let receipt = indoc::formatdoc! {r#"
+        [tool]
+        requirements = [{{ name = "babel" }}]
+        entrypoints = [
+            {{ name = "pybabel", install-path = "{bin_dir}/pybabel", from = "babel" }},
+        ]
+
+        [tool.options]
+        index = [{{ url = "{index_url}", explicit = false, default = false, format = "simple", authenticate = "auto" }}]
+    "#, bin_dir = bin_dir.display()};
+    tool_dir
+        .child("babel")
+        .child("uv-receipt.toml")
+        .write_str(&receipt)
+        .unwrap();
+
+    // Attempt to upgrade without providing any credentials.
+    // This should fail with an authentication error, not silently report "Nothing to upgrade".
+    uv_snapshot!(context.filters(), context.tool_upgrade()
+        .arg("babel")
+        .env(EnvVars::UV_TOOL_DIR, tool_dir.as_os_str())
+        .env(EnvVars::XDG_BIN_HOME, bin_dir.as_os_str())
+        .env(EnvVars::PATH, bin_dir.as_os_str()), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+
+    ----- stderr -----
+    error: Failed to upgrade babel
+      Caused by: Failed to fetch: `http://[LOCALHOST]/simple/babel/`
+      Caused by: HTTP status client error (401 Unauthorized) for url (http://[LOCALHOST]/simple/babel/)
+    ");
+}
+
 /// Upgrade a tool together with any additional entrypoints from other
 /// packages.
 #[test]
