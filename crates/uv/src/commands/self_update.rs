@@ -9,6 +9,7 @@ use uv_client::{BaseClientBuilder, WrappedReqwestError};
 use uv_fs::Simplified;
 
 use crate::commands::ExitStatus;
+use crate::install_source::InstallSource;
 use crate::printer::Printer;
 
 /// Attempt to update the uv binary.
@@ -19,6 +20,11 @@ pub(crate) async fn self_update(
     printer: Printer,
     client_builder: BaseClientBuilder<'_>,
 ) -> Result<ExitStatus> {
+    // If uv was installed via a package manager, delegate to it instead of using axoupdater.
+    if let Some(source) = InstallSource::detect() {
+        return source.upgrade(dry_run, printer).await;
+    }
+
     if client_builder.is_offline() {
         writeln!(
             printer.stderr(),

@@ -61,7 +61,6 @@ use crate::settings::{
 
 pub(crate) mod child;
 pub(crate) mod commands;
-#[cfg(not(feature = "self-update"))]
 mod install_source;
 pub(crate) mod logging;
 pub(crate) mod printer;
@@ -1311,24 +1310,18 @@ async fn run(mut cli: Cli) -> Result<ExitStatus> {
             Ok(ExitStatus::Success)
         }
         #[cfg(not(feature = "self-update"))]
-        Commands::Self_(_) => {
-            const BASE_MESSAGE: &str =
-                "uv was installed through an external package manager and cannot update itself.";
-
-            let message = match InstallSource::detect() {
-                Some(source) => format!(
-                    "{base}\n\n{hint}{colon} You installed uv using {}. To update uv, run `{}`",
-                    source.description(),
-                    source.update_instructions().green(),
-                    hint = "hint".bold().cyan(),
-                    colon = ":".bold(),
-                    base = BASE_MESSAGE
-                ),
-                None => format!("{BASE_MESSAGE} Please use your package manager to update uv."),
-            };
-
-            anyhow::bail!(message);
-        }
+        Commands::Self_(SelfNamespace {
+            command: SelfCommand::Update(args),
+        }) => match InstallSource::detect() {
+            Some(source) => source.upgrade(args.dry_run, printer).await,
+            None => {
+                anyhow::bail!(
+                    "{base}\n\n{message}",
+                    base = "uv was installed through an external package manager and cannot update itself.",
+                    message = "Please use your package manager to update uv.",
+                );
+            }
+        },
         Commands::GenerateShellCompletion(args) => {
             args.shell.generate(&mut Cli::command(), &mut stdout());
             Ok(ExitStatus::Success)
