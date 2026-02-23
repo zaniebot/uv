@@ -200,7 +200,7 @@ There are no breaking changes to [`uv_build`](https://docs.astral.sh/uv/concepts
   This does not come with any behavior changes. You will no longer see an experimental warning when using these commands.
 - **`extra-build-dependencies`** ([#17767](https://github.com/astral-sh/uv/pull/17767))
   
-  This does not come with any behavior changes. You will no longer see an experimental warning when using `extra-build-dependencies` in configuration.
+3  This does not come with any behavior changes. You will no longer see an experimental warning when using `extra-build-dependencies` in configuration.
 
 ### Enhancements
 
