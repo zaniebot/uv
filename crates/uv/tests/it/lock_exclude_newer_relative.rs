@@ -140,7 +140,9 @@ fn lock_exclude_newer_relative() -> Result<()> {
     requires-dist = [{ name = "idna" }]
     "#);
 
-    // Similarly, using something like `--upgrade` should cause a new resolution
+    // Using `--upgrade` with a different timestamp but same span should NOT update the
+    // `exclude-newer` timestamp since the resolved packages are the same.
+    // See: https://github.com/astral-sh/uv/issues/18155
     let current_timestamp = "2024-06-01T00:00:00Z";
     uv_snapshot!(context.filters(), context
         .lock()
@@ -157,7 +159,7 @@ fn lock_exclude_newer_relative() -> Result<()> {
     Resolved 2 packages in [TIME]
     ");
 
-    // And the `exclude-newer` timestamp value in the lockfile should be changed
+    // The `exclude-newer` timestamp in the lockfile should be preserved
     let lock = context.read("uv.lock");
     assert_snapshot!(lock, @r#"
     version = 1
@@ -165,7 +167,7 @@ fn lock_exclude_newer_relative() -> Result<()> {
     requires-python = ">=3.12"
 
     [options]
-    exclude-newer = "2024-05-18T00:00:00Z"
+    exclude-newer = "2024-04-17T00:00:00Z"
     exclude-newer-span = "P2W"
 
     [[package]]
@@ -189,7 +191,7 @@ fn lock_exclude_newer_relative() -> Result<()> {
     requires-dist = [{ name = "idna" }]
     "#);
 
-    // Similarly, using something like `--refresh` should cause a new resolution
+    // Similarly, using something like `--refresh` should NOT update the timestamp
     let current_timestamp = "2024-07-01T00:00:00Z";
     uv_snapshot!(context.filters(), context
         .lock()
@@ -463,7 +465,9 @@ fn lock_exclude_newer_package_relative() -> Result<()> {
     requires-dist = [{ name = "idna" }]
     "#);
 
-    // Similarly, using something like `--upgrade` should cause a new resolution
+    // Using `--upgrade` with a different timestamp but same span should NOT update the
+    // `exclude-newer-package` timestamp since the resolved packages are the same.
+    // See: https://github.com/astral-sh/uv/issues/18155
     let current_timestamp = "2024-06-01T00:00:00Z";
     uv_snapshot!(context.filters(), context
         .lock()
@@ -480,7 +484,7 @@ fn lock_exclude_newer_package_relative() -> Result<()> {
     Resolved 2 packages in [TIME]
     ");
 
-    // And the `exclude-newer-package` timestamp value in the lockfile should be changed
+    // The `exclude-newer-package` timestamp in the lockfile should be preserved
     let lock = context.read("uv.lock");
     assert_snapshot!(lock, @r#"
     version = 1
@@ -490,7 +494,7 @@ fn lock_exclude_newer_package_relative() -> Result<()> {
     [options]
 
     [options.exclude-newer-package]
-    idna = { timestamp = "2024-05-18T00:00:00Z", span = "P2W" }
+    idna = { timestamp = "2024-04-17T00:00:00Z", span = "P2W" }
 
     [[package]]
     name = "idna"
@@ -1320,6 +1324,134 @@ fn lock_exclude_newer_relative_values_pyproject() -> Result<()> {
 
     Resolved 2 packages in [TIME]
     "#);
+
+    Ok(())
+}
+
+/// Verify that `--upgrade` does not update `exclude-newer` in the lock file when using a relative
+/// span and no packages changed.
+///
+/// See: <https://github.com/astral-sh/uv/issues/18155>
+///
+/// Uses idna which has releases at:
+/// - 3.6: 2023-11-25
+/// - 3.7: 2024-04-11
+#[test]
+fn lock_exclude_newer_relative_no_update_on_upgrade() -> Result<()> {
+    let context = uv_test::test_context!("3.12");
+    let pyproject_toml = context.temp_dir.child("pyproject.toml");
+    pyproject_toml.write_str(
+        r#"
+        [project]
+        name = "project"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        dependencies = ["idna"]
+        "#,
+    )?;
+
+    // 3 weeks before 2024-05-01 is 2024-04-10, which is before idna 3.7 (released 2024-04-11).
+    let current_timestamp = "2024-05-01T00:00:00Z";
+    uv_snapshot!(context.filters(), context
+        .lock()
+        .env_remove(EnvVars::UV_EXCLUDE_NEWER)
+        .env(EnvVars::UV_TEST_CURRENT_TIMESTAMP, current_timestamp)
+        .arg("--exclude-newer")
+        .arg("3 weeks"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Resolved 2 packages in [TIME]
+    ");
+
+    let lock = context.read("uv.lock");
+    assert!(
+        lock.contains("exclude-newer = \"2024-04-10T00:00:00Z\""),
+        "Expected exclude-newer timestamp from first resolution"
+    );
+
+    // Running `--upgrade` with a different timestamp but the same span should NOT update
+    // the lock file when no packages changed. The later timestamp is chosen so that
+    // `later - 3 weeks = 2024-04-10T06:00:00Z` is still before idna 3.7 (released 2024-04-11).
+    let later_timestamp = "2024-05-01T06:00:00Z";
+    uv_snapshot!(context.filters(), context
+        .lock()
+        .env_remove(EnvVars::UV_EXCLUDE_NEWER)
+        .env(EnvVars::UV_TEST_CURRENT_TIMESTAMP, later_timestamp)
+        .arg("--exclude-newer")
+        .arg("3 weeks")
+        .arg("--upgrade"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Resolved 2 packages in [TIME]
+    ");
+
+    // The lock file should still have the original timestamp.
+    let lock = context.read("uv.lock");
+    assert!(
+        lock.contains("exclude-newer = \"2024-04-10T00:00:00Z\""),
+        "Expected exclude-newer timestamp to be preserved after --upgrade"
+    );
+    assert!(
+        lock.contains("exclude-newer-span = \"P3W\""),
+        "Expected span to be preserved"
+    );
+
+    // Running `--refresh` with a different timestamp but the same span should also NOT update.
+    uv_snapshot!(context.filters(), context
+        .lock()
+        .env_remove(EnvVars::UV_EXCLUDE_NEWER)
+        .env(EnvVars::UV_TEST_CURRENT_TIMESTAMP, later_timestamp)
+        .arg("--exclude-newer")
+        .arg("3 weeks")
+        .arg("--refresh"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Resolved 2 packages in [TIME]
+    ");
+
+    let lock = context.read("uv.lock");
+    assert!(
+        lock.contains("exclude-newer = \"2024-04-10T00:00:00Z\""),
+        "Expected exclude-newer timestamp to be preserved after --refresh"
+    );
+
+    // But if the span changes, the lock file SHOULD be updated.
+    // 2 weeks before 2024-05-01 is 2024-04-17, which allows idna 3.7.
+    uv_snapshot!(context.filters(), context
+        .lock()
+        .env_remove(EnvVars::UV_EXCLUDE_NEWER)
+        .env(EnvVars::UV_TEST_CURRENT_TIMESTAMP, current_timestamp)
+        .arg("--exclude-newer")
+        .arg("2 weeks")
+        .arg("--upgrade"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Ignoring existing lockfile due to change of exclude newer span from `P3W` to `P2W`
+    Resolved 2 packages in [TIME]
+    Updated idna v3.6 -> v3.7
+    ");
+
+    let lock = context.read("uv.lock");
+    assert!(
+        lock.contains("exclude-newer = \"2024-04-17T00:00:00Z\""),
+        "Expected new exclude-newer timestamp after span change"
+    );
+    assert!(
+        lock.contains("exclude-newer-span = \"P2W\""),
+        "Expected new span"
+    );
 
     Ok(())
 }

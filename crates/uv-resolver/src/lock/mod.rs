@@ -993,6 +993,11 @@ impl Lock {
         self.options.exclude_newer.clone().into()
     }
 
+    /// Set the exclude-newer options for this lock.
+    pub fn set_exclude_newer(&mut self, exclude_newer: ExcludeNewer) {
+        self.options.exclude_newer = exclude_newer.into();
+    }
+
     /// Returns the conflicting groups that were used to generate this lock.
     pub fn conflicts(&self) -> &Conflicts {
         &self.conflicts
