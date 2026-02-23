@@ -463,10 +463,17 @@ pub fn bounce(is_gui: bool) -> ! {
 
     // SAFETY: child.process is a valid process handle returned by spawn_child.
     if let Err(e) = unsafe { job.assign_process(child.process) } {
-        print_job_error_and_exit(
-            "uv trampoline failed to assign child process to job object",
-            e,
-        );
+        if e.is_access_denied() {
+            warn!(
+                "Failed to assign child to job object (access denied), \
+                 continuing without dedicated child job supervision"
+            );
+        } else {
+            print_job_error_and_exit(
+                "uv trampoline failed to assign child process to job object",
+                e,
+            );
+        }
     }
 
     // SAFETY: child.thread is a valid thread handle returned by CreateProcessA.

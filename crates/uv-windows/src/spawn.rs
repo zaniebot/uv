@@ -44,25 +44,36 @@ fn resume_process(process: HANDLE) -> std::io::Result<()> {
     Ok(())
 }
 
-/// A child process supervised by a [`Job`] object.
+/// A child process optionally supervised by a [`Job`] object.
 ///
 /// The [`BorrowedHandle`] ties the lifetime of the job to the child process,
 /// ensuring the job cannot outlive the child's process handle.
 struct SupervisedChild<'a> {
-    _job: Job,
+    /// The job object managing this child, if assignment succeeded.
+    _job: Option<Job>,
     handle: BorrowedHandle<'a>,
 }
 
 #[allow(unsafe_code)]
 impl<'a> SupervisedChild<'a> {
     /// Creates a new supervised child by assigning it to a job object.
+    ///
+    /// `AssignProcessToJobObject` may return `ERROR_ACCESS_DENIED` in valid
+    /// scenarios (for example, inherited non-nestable parent jobs). In that
+    /// case we continue without our own job supervision.
     fn new(child: &'a Child) -> Result<Self, JobError> {
         let job = Job::new()?;
         let handle = child.as_handle();
         // SAFETY: The borrowed handle is valid for `'a` because we hold a
         // reference to `child`.
-        unsafe { job.assign_process(HANDLE(handle.as_raw_handle())) }?;
-        Ok(Self { _job: job, handle })
+        match unsafe { job.assign_process(HANDLE(handle.as_raw_handle())) } {
+            Ok(()) => Ok(Self {
+                _job: Some(job),
+                handle,
+            }),
+            Err(err) if err.is_access_denied() => Ok(Self { _job: None, handle }),
+            Err(err) => Err(err),
+        }
     }
 
     /// Returns the raw Windows `HANDLE` for the child process.
