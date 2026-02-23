@@ -5,20 +5,7 @@
 //!
 #![cfg(all(feature = "test-python", unix))]
 
-use std::process::Command;
-
-use uv_static::EnvVars;
-
-use uv_test::packse::PackseServer;
-use uv_test::{TestContext, uv_snapshot};
-
-/// Create a `pip install` command with options shared across all scenarios.
-fn command(context: &TestContext, server: &PackseServer) -> Command {
-    let mut command = context.pip_install();
-    command.arg("--index-url").arg(server.index_url());
-    command.env_remove(EnvVars::UV_EXCLUDE_NEWER);
-    command
-}
+use uv_test::uv_snapshot;
 
 /// There are two packages, `a` and `b`. All versions of `b` require a specific
 /// version of `a`, but that version requires a package `c` that does not exist. The resolver
@@ -54,10 +41,12 @@ fn command(context: &TestContext, server: &PackseServer) -> Command {
 /// ```
 #[test]
 fn backtrack_to_missing_package() {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("backtracking/backtrack-to-missing-package.toml");
+    let context = uv_test::test_context!("3.12")
+        .with_scenario("backtracking/backtrack-to-missing-package.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("a")
                 .arg("b")
         , @"
@@ -104,10 +93,12 @@ fn backtrack_to_missing_package() {
 /// ```
 #[test]
 fn backtrack_with_missing_package() {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("backtracking/backtrack-with-missing-package.toml");
+    let context = uv_test::test_context!("3.12")
+        .with_scenario("backtracking/backtrack-with-missing-package.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("a")
                 .arg("b")
         , @"
@@ -141,10 +132,12 @@ fn backtrack_with_missing_package() {
 /// ```
 #[test]
 fn requires_exact_version_does_not_exist() {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("does_not_exist/requires-exact-version-does-not-exist.toml");
+    let context = uv_test::test_context!("3.12")
+        .with_scenario("does_not_exist/requires-exact-version-does-not-exist.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("a==2.0.0")
         , @"
     success: false
@@ -174,10 +167,12 @@ fn requires_exact_version_does_not_exist() {
 /// ```
 #[test]
 fn requires_greater_version_does_not_exist() {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("does_not_exist/requires-greater-version-does-not-exist.toml");
+    let context = uv_test::test_context!("3.12")
+        .with_scenario("does_not_exist/requires-greater-version-does-not-exist.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("a>1.0.0")
         , @"
     success: false
@@ -208,10 +203,12 @@ fn requires_greater_version_does_not_exist() {
 /// ```
 #[test]
 fn requires_less_version_does_not_exist() {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("does_not_exist/requires-less-version-does-not-exist.toml");
+    let context = uv_test::test_context!("3.12")
+        .with_scenario("does_not_exist/requires-less-version-does-not-exist.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("a<2.0.0")
         , @"
     success: false
@@ -238,10 +235,12 @@ fn requires_less_version_does_not_exist() {
 /// ```
 #[test]
 fn requires_package_does_not_exist() {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("does_not_exist/requires-package-does-not-exist.toml");
+    let context = uv_test::test_context!("3.12")
+        .with_scenario("does_not_exist/requires-package-does-not-exist.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("a")
         , @"
     success: false
@@ -272,11 +271,12 @@ fn requires_package_does_not_exist() {
 /// ```
 #[test]
 fn transitive_requires_package_does_not_exist() {
-    let context = uv_test::test_context!("3.12");
-    let server =
-        PackseServer::new("does_not_exist/transitive-requires-package-does-not-exist.toml");
+    let context = uv_test::test_context!("3.12")
+        .with_scenario("does_not_exist/transitive-requires-package-does-not-exist.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("a")
         , @"
     success: false
@@ -352,12 +352,13 @@ fn transitive_requires_package_does_not_exist() {
 /// ```
 #[test]
 fn dependency_excludes_non_contiguous_range_of_compatible_versions() {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new(
+    let context = uv_test::test_context!("3.12").with_scenario(
         "excluded/dependency-excludes-non-contiguous-range-of-compatible-versions.toml",
     );
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("a")
                 .arg("b>=2.0.0,<3.0.0")
                 .arg("c")
@@ -448,11 +449,12 @@ fn dependency_excludes_non_contiguous_range_of_compatible_versions() {
 /// ```
 #[test]
 fn dependency_excludes_range_of_compatible_versions() {
-    let context = uv_test::test_context!("3.12");
-    let server =
-        PackseServer::new("excluded/dependency-excludes-range-of-compatible-versions.toml");
+    let context = uv_test::test_context!("3.12")
+        .with_scenario("excluded/dependency-excludes-range-of-compatible-versions.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("a")
                 .arg("b>=2.0.0,<3.0.0")
                 .arg("c")
@@ -520,10 +522,12 @@ fn dependency_excludes_range_of_compatible_versions() {
 /// ```
 #[test]
 fn excluded_only_compatible_version() {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("excluded/excluded-only-compatible-version.toml");
+    let context = uv_test::test_context!("3.12")
+        .with_scenario("excluded/excluded-only-compatible-version.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("a!=2.0.0")
                 .arg("b>=2.0.0,<3.0.0")
         , @"
@@ -570,10 +574,12 @@ fn excluded_only_compatible_version() {
 /// ```
 #[test]
 fn excluded_only_version() {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("excluded/excluded-only-version.toml");
+    let context =
+        uv_test::test_context!("3.12").with_scenario("excluded/excluded-only-version.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("a!=1.0.0")
         , @"
     success: false
@@ -630,10 +636,11 @@ fn excluded_only_version() {
 /// ```
 #[test]
 fn all_extras_required() {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("extras/all-extras-required.toml");
+    let context = uv_test::test_context!("3.12").with_scenario("extras/all-extras-required.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("a[all]")
         , @"
     success: true
@@ -678,10 +685,12 @@ fn all_extras_required() {
 /// ```
 #[test]
 fn extra_does_not_exist_backtrack() {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("extras/extra-does-not-exist-backtrack.toml");
+    let context =
+        uv_test::test_context!("3.12").with_scenario("extras/extra-does-not-exist-backtrack.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("a[extra]")
         , @"
     success: true
@@ -725,10 +734,12 @@ fn extra_does_not_exist_backtrack() {
 /// ```
 #[test]
 fn extra_incompatible_with_extra_not_requested() {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("extras/extra-incompatible-with-extra-not-requested.toml");
+    let context = uv_test::test_context!("3.12")
+        .with_scenario("extras/extra-incompatible-with-extra-not-requested.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("a[extra_c]")
         , @"
     success: true
@@ -773,10 +784,12 @@ fn extra_incompatible_with_extra_not_requested() {
 /// ```
 #[test]
 fn extra_incompatible_with_extra() {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("extras/extra-incompatible-with-extra.toml");
+    let context =
+        uv_test::test_context!("3.12").with_scenario("extras/extra-incompatible-with-extra.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("a[extra_b,extra_c]")
         , @"
     success: false
@@ -817,10 +830,12 @@ fn extra_incompatible_with_extra() {
 /// ```
 #[test]
 fn extra_incompatible_with_root() {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("extras/extra-incompatible-with-root.toml");
+    let context =
+        uv_test::test_context!("3.12").with_scenario("extras/extra-incompatible-with-root.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("a[extra]")
                 .arg("b==2.0.0")
         , @"
@@ -859,10 +874,11 @@ fn extra_incompatible_with_root() {
 /// ```
 #[test]
 fn extra_required() {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("extras/extra-required.toml");
+    let context = uv_test::test_context!("3.12").with_scenario("extras/extra-required.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("a[extra]")
         , @"
     success: true
@@ -895,10 +911,11 @@ fn extra_required() {
 /// ```
 #[test]
 fn missing_extra() {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("extras/missing-extra.toml");
+    let context = uv_test::test_context!("3.12").with_scenario("extras/missing-extra.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("a[extra]")
         , @"
     success: true
@@ -943,10 +960,12 @@ fn missing_extra() {
 /// ```
 #[test]
 fn multiple_extras_required() {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("extras/multiple-extras-required.toml");
+    let context =
+        uv_test::test_context!("3.12").with_scenario("extras/multiple-extras-required.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("a[extra_b,extra_c]")
         , @"
     success: true
@@ -984,10 +1003,12 @@ fn multiple_extras_required() {
 /// ```
 #[test]
 fn direct_incompatible_versions() {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("incompatible_versions/direct-incompatible-versions.toml");
+    let context = uv_test::test_context!("3.12")
+        .with_scenario("incompatible_versions/direct-incompatible-versions.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("a==1.0.0")
                 .arg("a==2.0.0")
         , @"
@@ -1022,10 +1043,12 @@ fn direct_incompatible_versions() {
 /// ```
 #[test]
 fn transitive_incompatible_versions() {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("incompatible_versions/transitive-incompatible-versions.toml");
+    let context = uv_test::test_context!("3.12")
+        .with_scenario("incompatible_versions/transitive-incompatible-versions.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("a==1.0.0")
         , @"
     success: false
@@ -1062,11 +1085,12 @@ fn transitive_incompatible_versions() {
 /// ```
 #[test]
 fn transitive_incompatible_with_root_version() {
-    let context = uv_test::test_context!("3.12");
-    let server =
-        PackseServer::new("incompatible_versions/transitive-incompatible-with-root-version.toml");
+    let context = uv_test::test_context!("3.12")
+        .with_scenario("incompatible_versions/transitive-incompatible-with-root-version.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("a")
                 .arg("b==1.0.0")
         , @"
@@ -1109,11 +1133,12 @@ fn transitive_incompatible_with_root_version() {
 /// ```
 #[test]
 fn transitive_incompatible_with_transitive() {
-    let context = uv_test::test_context!("3.12");
-    let server =
-        PackseServer::new("incompatible_versions/transitive-incompatible-with-transitive.toml");
+    let context = uv_test::test_context!("3.12")
+        .with_scenario("incompatible_versions/transitive-incompatible-with-transitive.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("a")
                 .arg("b")
         , @"
@@ -1148,10 +1173,12 @@ fn transitive_incompatible_with_transitive() {
 /// ```
 #[test]
 fn local_greater_than_or_equal() {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("local/local-greater-than-or-equal.toml");
+    let context =
+        uv_test::test_context!("3.12").with_scenario("local/local-greater-than-or-equal.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("a>=1.2.3")
         , @"
     success: true
@@ -1183,10 +1210,11 @@ fn local_greater_than_or_equal() {
 /// ```
 #[test]
 fn local_greater_than() {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("local/local-greater-than.toml");
+    let context = uv_test::test_context!("3.12").with_scenario("local/local-greater-than.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("a>1.2.3")
         , @"
     success: false
@@ -1217,10 +1245,12 @@ fn local_greater_than() {
 /// ```
 #[test]
 fn local_less_than_or_equal() {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("local/local-less-than-or-equal.toml");
+    let context =
+        uv_test::test_context!("3.12").with_scenario("local/local-less-than-or-equal.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("a<=1.2.3")
         , @"
     success: true
@@ -1252,10 +1282,11 @@ fn local_less_than_or_equal() {
 /// ```
 #[test]
 fn local_less_than() {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("local/local-less-than.toml");
+    let context = uv_test::test_context!("3.12").with_scenario("local/local-less-than.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("a<1.2.3")
         , @"
     success: false
@@ -1288,10 +1319,11 @@ fn local_less_than() {
 /// ```
 #[test]
 fn local_not_latest() {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("local/local-not-latest.toml");
+    let context = uv_test::test_context!("3.12").with_scenario("local/local-not-latest.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("a>=1")
         , @"
     success: true
@@ -1324,10 +1356,12 @@ fn local_not_latest() {
 /// ```
 #[test]
 fn local_not_used_with_sdist() {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("local/local-not-used-with-sdist.toml");
+    let context =
+        uv_test::test_context!("3.12").with_scenario("local/local-not-used-with-sdist.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("a==1.2.3")
         , @"
     success: true
@@ -1361,10 +1395,11 @@ fn local_not_used_with_sdist() {
 /// ```
 #[test]
 fn local_simple() {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("local/local-simple.toml");
+    let context = uv_test::test_context!("3.12").with_scenario("local/local-simple.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("a==1.2.3")
         , @"
     success: true
@@ -1408,10 +1443,12 @@ fn local_simple() {
 /// ```
 #[test]
 fn local_transitive_backtrack() {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("local/local-transitive-backtrack.toml");
+    let context =
+        uv_test::test_context!("3.12").with_scenario("local/local-transitive-backtrack.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("a")
                 .arg("b==2.0.0+foo")
         , @"
@@ -1453,10 +1490,12 @@ fn local_transitive_backtrack() {
 /// ```
 #[test]
 fn local_transitive_conflicting() {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("local/local-transitive-conflicting.toml");
+    let context =
+        uv_test::test_context!("3.12").with_scenario("local/local-transitive-conflicting.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("a")
                 .arg("b==2.0.0+foo")
         , @"
@@ -1496,10 +1535,12 @@ fn local_transitive_conflicting() {
 /// ```
 #[test]
 fn local_transitive_confounding() {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("local/local-transitive-confounding.toml");
+    let context =
+        uv_test::test_context!("3.12").with_scenario("local/local-transitive-confounding.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("a")
         , @"
     success: true
@@ -1541,10 +1582,12 @@ fn local_transitive_confounding() {
 /// ```
 #[test]
 fn local_transitive_greater_than_or_equal() {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("local/local-transitive-greater-than-or-equal.toml");
+    let context = uv_test::test_context!("3.12")
+        .with_scenario("local/local-transitive-greater-than-or-equal.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("a")
                 .arg("b==2.0.0+foo")
         , @"
@@ -1586,10 +1629,12 @@ fn local_transitive_greater_than_or_equal() {
 /// ```
 #[test]
 fn local_transitive_greater_than() {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("local/local-transitive-greater-than.toml");
+    let context =
+        uv_test::test_context!("3.12").with_scenario("local/local-transitive-greater-than.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("a")
                 .arg("b==2.0.0+foo")
         , @"
@@ -1629,10 +1674,12 @@ fn local_transitive_greater_than() {
 /// ```
 #[test]
 fn local_transitive_less_than_or_equal() {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("local/local-transitive-less-than-or-equal.toml");
+    let context = uv_test::test_context!("3.12")
+        .with_scenario("local/local-transitive-less-than-or-equal.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("a")
                 .arg("b==2.0.0+foo")
         , @"
@@ -1674,10 +1721,12 @@ fn local_transitive_less_than_or_equal() {
 /// ```
 #[test]
 fn local_transitive_less_than() {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("local/local-transitive-less-than.toml");
+    let context =
+        uv_test::test_context!("3.12").with_scenario("local/local-transitive-less-than.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("a")
                 .arg("b==2.0.0+foo")
         , @"
@@ -1717,10 +1766,11 @@ fn local_transitive_less_than() {
 /// ```
 #[test]
 fn local_transitive() {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("local/local-transitive.toml");
+    let context = uv_test::test_context!("3.12").with_scenario("local/local-transitive.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("a")
                 .arg("b==2.0.0+foo")
         , @"
@@ -1757,10 +1807,12 @@ fn local_transitive() {
 /// ```
 #[test]
 fn local_used_without_sdist() {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("local/local-used-without-sdist.toml");
+    let context =
+        uv_test::test_context!("3.12").with_scenario("local/local-used-without-sdist.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("a==1.2.3")
         , @"
     success: true
@@ -1793,10 +1845,11 @@ fn local_used_without_sdist() {
 /// ```
 #[test]
 fn post_equal_available() {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("post/post-equal-available.toml");
+    let context = uv_test::test_context!("3.12").with_scenario("post/post-equal-available.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("a==1.2.3.post0")
         , @"
     success: true
@@ -1829,10 +1882,12 @@ fn post_equal_available() {
 /// ```
 #[test]
 fn post_equal_not_available() {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("post/post-equal-not-available.toml");
+    let context =
+        uv_test::test_context!("3.12").with_scenario("post/post-equal-not-available.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("a==1.2.3.post0")
         , @"
     success: false
@@ -1863,10 +1918,12 @@ fn post_equal_not_available() {
 /// ```
 #[test]
 fn post_greater_than_or_equal_post() {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("post/post-greater-than-or-equal-post.toml");
+    let context =
+        uv_test::test_context!("3.12").with_scenario("post/post-greater-than-or-equal-post.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("a>=1.2.3.post0")
         , @"
     success: true
@@ -1898,10 +1955,12 @@ fn post_greater_than_or_equal_post() {
 /// ```
 #[test]
 fn post_greater_than_or_equal() {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("post/post-greater-than-or-equal.toml");
+    let context =
+        uv_test::test_context!("3.12").with_scenario("post/post-greater-than-or-equal.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("a>=1.2.3")
         , @"
     success: true
@@ -1935,10 +1994,12 @@ fn post_greater_than_or_equal() {
 /// ```
 #[test]
 fn post_greater_than_post_not_available() {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("post/post-greater-than-post-not-available.toml");
+    let context = uv_test::test_context!("3.12")
+        .with_scenario("post/post-greater-than-post-not-available.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("a>1.2.3.post2")
         , @"
     success: false
@@ -1968,10 +2029,11 @@ fn post_greater_than_post_not_available() {
 /// ```
 #[test]
 fn post_greater_than_post() {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("post/post-greater-than-post.toml");
+    let context = uv_test::test_context!("3.12").with_scenario("post/post-greater-than-post.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("a>1.2.3.post0")
         , @"
     success: true
@@ -2003,10 +2065,11 @@ fn post_greater_than_post() {
 /// ```
 #[test]
 fn post_greater_than() {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("post/post-greater-than.toml");
+    let context = uv_test::test_context!("3.12").with_scenario("post/post-greater-than.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("a>1.2.3")
         , @"
     success: false
@@ -2035,10 +2098,11 @@ fn post_greater_than() {
 /// ```
 #[test]
 fn post_less_than_or_equal() {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("post/post-less-than-or-equal.toml");
+    let context = uv_test::test_context!("3.12").with_scenario("post/post-less-than-or-equal.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("a<=1.2.3")
         , @"
     success: false
@@ -2067,10 +2131,11 @@ fn post_less_than_or_equal() {
 /// ```
 #[test]
 fn post_less_than() {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("post/post-less-than.toml");
+    let context = uv_test::test_context!("3.12").with_scenario("post/post-less-than.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("a<1.2.3")
         , @"
     success: false
@@ -2100,10 +2165,12 @@ fn post_less_than() {
 /// ```
 #[test]
 fn post_local_greater_than_post() {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("post/post-local-greater-than-post.toml");
+    let context =
+        uv_test::test_context!("3.12").with_scenario("post/post-local-greater-than-post.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("a>1.2.3.post1")
         , @"
     success: false
@@ -2133,10 +2200,11 @@ fn post_local_greater_than_post() {
 /// ```
 #[test]
 fn post_local_greater_than() {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("post/post-local-greater-than.toml");
+    let context = uv_test::test_context!("3.12").with_scenario("post/post-local-greater-than.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("a>1.2.3")
         , @"
     success: false
@@ -2165,10 +2233,11 @@ fn post_local_greater_than() {
 /// ```
 #[test]
 fn post_simple() {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("post/post-simple.toml");
+    let context = uv_test::test_context!("3.12").with_scenario("post/post-simple.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("a==1.2.3")
         , @"
     success: false
@@ -2201,10 +2270,12 @@ fn post_simple() {
 /// ```
 #[test]
 fn package_multiple_prereleases_kinds() {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("prereleases/package-multiple-prereleases-kinds.toml");
+    let context = uv_test::test_context!("3.12")
+        .with_scenario("prereleases/package-multiple-prereleases-kinds.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("a>=1.0.0a1")
         , @"
     success: true
@@ -2240,10 +2311,12 @@ fn package_multiple_prereleases_kinds() {
 /// ```
 #[test]
 fn package_multiple_prereleases_numbers() {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("prereleases/package-multiple-prereleases-numbers.toml");
+    let context = uv_test::test_context!("3.12")
+        .with_scenario("prereleases/package-multiple-prereleases-numbers.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("a>=1.0.0a1")
         , @"
     success: true
@@ -2277,10 +2350,12 @@ fn package_multiple_prereleases_numbers() {
 /// ```
 #[test]
 fn package_only_prereleases_boundary() {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("prereleases/package-only-prereleases-boundary.toml");
+    let context = uv_test::test_context!("3.12")
+        .with_scenario("prereleases/package-only-prereleases-boundary.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("a<0.2.0")
         , @"
     success: true
@@ -2313,10 +2388,12 @@ fn package_only_prereleases_boundary() {
 /// ```
 #[test]
 fn package_only_prereleases_in_range() {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("prereleases/package-only-prereleases-in-range.toml");
+    let context = uv_test::test_context!("3.12")
+        .with_scenario("prereleases/package-only-prereleases-in-range.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("a>0.1.0")
         , @"
     success: false
@@ -2348,10 +2425,12 @@ fn package_only_prereleases_in_range() {
 /// ```
 #[test]
 fn package_only_prereleases() {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("prereleases/package-only-prereleases.toml");
+    let context =
+        uv_test::test_context!("3.12").with_scenario("prereleases/package-only-prereleases.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("a")
         , @"
     success: true
@@ -2389,10 +2468,12 @@ fn package_only_prereleases() {
 /// ```
 #[test]
 fn package_prerelease_specified_mixed_available() {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("prereleases/package-prerelease-specified-mixed-available.toml");
+    let context = uv_test::test_context!("3.12")
+        .with_scenario("prereleases/package-prerelease-specified-mixed-available.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("a>=0.1.0a1")
         , @"
     success: true
@@ -2428,11 +2509,12 @@ fn package_prerelease_specified_mixed_available() {
 /// ```
 #[test]
 fn package_prerelease_specified_only_final_available() {
-    let context = uv_test::test_context!("3.12");
-    let server =
-        PackseServer::new("prereleases/package-prerelease-specified-only-final-available.toml");
+    let context = uv_test::test_context!("3.12")
+        .with_scenario("prereleases/package-prerelease-specified-only-final-available.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("a>=0.1.0a1")
         , @"
     success: true
@@ -2468,12 +2550,12 @@ fn package_prerelease_specified_only_final_available() {
 /// ```
 #[test]
 fn package_prerelease_specified_only_prerelease_available() {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new(
-        "prereleases/package-prerelease-specified-only-prerelease-available.toml",
-    );
+    let context = uv_test::test_context!("3.12")
+        .with_scenario("prereleases/package-prerelease-specified-only-prerelease-available.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("a>=0.1.0a1")
         , @"
     success: true
@@ -2507,10 +2589,12 @@ fn package_prerelease_specified_only_prerelease_available() {
 /// ```
 #[test]
 fn package_prereleases_boundary() {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("prereleases/package-prereleases-boundary.toml");
+    let context = uv_test::test_context!("3.12")
+        .with_scenario("prereleases/package-prereleases-boundary.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("--prerelease=allow")
         .arg("a<0.2.0")
         , @"
@@ -2545,10 +2629,12 @@ fn package_prereleases_boundary() {
 /// ```
 #[test]
 fn package_prereleases_global_boundary() {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("prereleases/package-prereleases-global-boundary.toml");
+    let context = uv_test::test_context!("3.12")
+        .with_scenario("prereleases/package-prereleases-global-boundary.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("--prerelease=allow")
         .arg("a<0.2.0")
         , @"
@@ -2587,10 +2673,12 @@ fn package_prereleases_global_boundary() {
 /// ```
 #[test]
 fn package_prereleases_specifier_boundary() {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("prereleases/package-prereleases-specifier-boundary.toml");
+    let context = uv_test::test_context!("3.12")
+        .with_scenario("prereleases/package-prereleases-specifier-boundary.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("a<0.2.0a2")
         , @"
     success: true
@@ -2623,12 +2711,12 @@ fn package_prereleases_specifier_boundary() {
 /// ```
 #[test]
 fn requires_package_only_prereleases_in_range_global_opt_in() {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new(
-        "prereleases/requires-package-only-prereleases-in-range-global-opt-in.toml",
-    );
+    let context = uv_test::test_context!("3.12")
+        .with_scenario("prereleases/requires-package-only-prereleases-in-range-global-opt-in.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("--prerelease=allow")
         .arg("a>0.1.0")
         , @"
@@ -2662,10 +2750,12 @@ fn requires_package_only_prereleases_in_range_global_opt_in() {
 /// ```
 #[test]
 fn requires_package_prerelease_and_final_any() {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("prereleases/requires-package-prerelease-and-final-any.toml");
+    let context = uv_test::test_context!("3.12")
+        .with_scenario("prereleases/requires-package-prerelease-and-final-any.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("a")
         , @"
     success: true
@@ -2705,11 +2795,12 @@ fn requires_package_prerelease_and_final_any() {
 /// ```
 #[test]
 fn transitive_package_only_prereleases_in_range_opt_in() {
-    let context = uv_test::test_context!("3.12");
-    let server =
-        PackseServer::new("prereleases/transitive-package-only-prereleases-in-range-opt-in.toml");
+    let context = uv_test::test_context!("3.12")
+        .with_scenario("prereleases/transitive-package-only-prereleases-in-range-opt-in.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("a")
                 .arg("b>0.0.0a1")
         , @"
@@ -2749,10 +2840,12 @@ fn transitive_package_only_prereleases_in_range_opt_in() {
 /// ```
 #[test]
 fn transitive_package_only_prereleases_in_range() {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("prereleases/transitive-package-only-prereleases-in-range.toml");
+    let context = uv_test::test_context!("3.12")
+        .with_scenario("prereleases/transitive-package-only-prereleases-in-range.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("a")
         , @"
     success: false
@@ -2789,10 +2882,12 @@ fn transitive_package_only_prereleases_in_range() {
 /// ```
 #[test]
 fn transitive_package_only_prereleases() {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("prereleases/transitive-package-only-prereleases.toml");
+    let context = uv_test::test_context!("3.12")
+        .with_scenario("prereleases/transitive-package-only-prereleases.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("a")
         , @"
     success: true
@@ -2880,12 +2975,13 @@ fn transitive_package_only_prereleases() {
 /// ```
 #[test]
 fn transitive_prerelease_and_stable_dependency_many_versions_holes() {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new(
+    let context = uv_test::test_context!("3.12").with_scenario(
         "prereleases/transitive-prerelease-and-stable-dependency-many-versions-holes.toml",
     );
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("a")
                 .arg("b")
         , @"
@@ -2987,12 +3083,13 @@ fn transitive_prerelease_and_stable_dependency_many_versions_holes() {
 /// ```
 #[test]
 fn transitive_prerelease_and_stable_dependency_many_versions() {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new(
+    let context = uv_test::test_context!("3.12").with_scenario(
         "prereleases/transitive-prerelease-and-stable-dependency-many-versions.toml",
     );
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("a")
                 .arg("b")
         , @"
@@ -3044,11 +3141,12 @@ fn transitive_prerelease_and_stable_dependency_many_versions() {
 /// ```
 #[test]
 fn transitive_prerelease_and_stable_dependency_opt_in() {
-    let context = uv_test::test_context!("3.12");
-    let server =
-        PackseServer::new("prereleases/transitive-prerelease-and-stable-dependency-opt-in.toml");
+    let context = uv_test::test_context!("3.12")
+        .with_scenario("prereleases/transitive-prerelease-and-stable-dependency-opt-in.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("a")
                 .arg("b")
                 .arg("c>=0.0.0a1")
@@ -3098,10 +3196,12 @@ fn transitive_prerelease_and_stable_dependency_opt_in() {
 /// ```
 #[test]
 fn transitive_prerelease_and_stable_dependency() {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("prereleases/transitive-prerelease-and-stable-dependency.toml");
+    let context = uv_test::test_context!("3.12")
+        .with_scenario("prereleases/transitive-prerelease-and-stable-dependency.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("a")
                 .arg("b")
         , @"
@@ -3145,10 +3245,12 @@ fn transitive_prerelease_and_stable_dependency() {
 /// ```
 #[test]
 fn python_greater_than_current_backtrack() {
-    let context = uv_test::test_context!("3.9");
-    let server = PackseServer::new("requires_python/python-greater-than-current-backtrack.toml");
+    let context = uv_test::test_context!("3.9")
+        .with_scenario("requires_python/python-greater-than-current-backtrack.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("a")
         , @"
     success: true
@@ -3187,10 +3289,12 @@ fn python_greater_than_current_backtrack() {
 /// ```
 #[test]
 fn python_greater_than_current_excluded() {
-    let context = uv_test::test_context!("3.9");
-    let server = PackseServer::new("requires_python/python-greater-than-current-excluded.toml");
+    let context = uv_test::test_context!("3.9")
+        .with_scenario("requires_python/python-greater-than-current-excluded.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("a>=2.0.0")
         , @"
     success: false
@@ -3254,10 +3358,12 @@ fn python_greater_than_current_excluded() {
 /// ```
 #[test]
 fn python_greater_than_current_many() {
-    let context = uv_test::test_context!("3.9");
-    let server = PackseServer::new("requires_python/python-greater-than-current-many.toml");
+    let context = uv_test::test_context!("3.9")
+        .with_scenario("requires_python/python-greater-than-current-many.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("a==1.0.0")
         , @"
     success: false
@@ -3288,21 +3394,15 @@ fn python_greater_than_current_many() {
 #[cfg(feature = "test-python-patch")]
 #[test]
 fn python_greater_than_current_patch() {
-    let context = uv_test::test_context!("3.13.0");
-    let server = PackseServer::new("requires_python/python-greater-than-current-patch.toml");
+    let context = uv_test::test_context!("3.13.0")
+        .with_scenario("requires_python/python-greater-than-current-patch.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("a==1.0.0")
-        , @"
-    success: false
-    exit_code: 1
-    ----- stdout -----
-
-    ----- stderr -----
-      × No solution found when resolving dependencies:
-      ╰─▶ Because the current Python version (3.13) does not satisfy Python>=3.13.2 and a==1.0.0 depends on Python>=3.13.2, we can conclude that a==1.0.0 cannot be used.
-          And because you require a==1.0.0, we can conclude that your requirements are unsatisfiable.
-    ");
+        , @r#"<snapshot>
+    "#);
 
     context.assert_not_installed("a");
 }
@@ -3322,10 +3422,12 @@ fn python_greater_than_current_patch() {
 /// ```
 #[test]
 fn python_greater_than_current() {
-    let context = uv_test::test_context!("3.9");
-    let server = PackseServer::new("requires_python/python-greater-than-current.toml");
+    let context = uv_test::test_context!("3.9")
+        .with_scenario("requires_python/python-greater-than-current.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("a==1.0.0")
         , @"
     success: false
@@ -3356,10 +3458,12 @@ fn python_greater_than_current() {
 /// ```
 #[test]
 fn python_less_than_current() {
-    let context = uv_test::test_context!("3.9");
-    let server = PackseServer::new("requires_python/python-less-than-current.toml");
+    let context = uv_test::test_context!("3.9")
+        .with_scenario("requires_python/python-less-than-current.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("a==1.0.0")
         , @"
     success: true
@@ -3391,10 +3495,12 @@ fn python_less_than_current() {
 /// ```
 #[test]
 fn python_version_does_not_exist() {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("requires_python/python-version-does-not-exist.toml");
+    let context = uv_test::test_context!("3.12")
+        .with_scenario("requires_python/python-version-does-not-exist.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("a==1.0.0")
         , @"
     success: false
@@ -3424,10 +3530,11 @@ fn python_version_does_not_exist() {
 /// ```
 #[test]
 fn no_binary() {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("wheels/no-binary.toml");
+    let context = uv_test::test_context!("3.12").with_scenario("wheels/no-binary.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("--no-binary")
         .arg("a")
         .arg("a")
@@ -3460,10 +3567,11 @@ fn no_binary() {
 /// ```
 #[test]
 fn no_build() {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("wheels/no-build.toml");
+    let context = uv_test::test_context!("3.12").with_scenario("wheels/no-build.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("--only-binary")
         .arg("a")
         .arg("a")
@@ -3496,10 +3604,12 @@ fn no_build() {
 /// ```
 #[test]
 fn no_sdist_no_wheels_with_matching_abi() {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("wheels/no-sdist-no-wheels-with-matching-abi.toml");
+    let context = uv_test::test_context!("3.12")
+        .with_scenario("wheels/no-sdist-no-wheels-with-matching-abi.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("--python-platform=x86_64-manylinux2014")
         .arg("a")
         , @"
@@ -3532,10 +3642,12 @@ fn no_sdist_no_wheels_with_matching_abi() {
 /// ```
 #[test]
 fn no_sdist_no_wheels_with_matching_platform() {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("wheels/no-sdist-no-wheels-with-matching-platform.toml");
+    let context = uv_test::test_context!("3.12")
+        .with_scenario("wheels/no-sdist-no-wheels-with-matching-platform.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("--python-platform=x86_64-manylinux2014")
         .arg("a")
         , @"
@@ -3568,10 +3680,12 @@ fn no_sdist_no_wheels_with_matching_platform() {
 /// ```
 #[test]
 fn no_sdist_no_wheels_with_matching_python() {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("wheels/no-sdist-no-wheels-with-matching-python.toml");
+    let context = uv_test::test_context!("3.12")
+        .with_scenario("wheels/no-sdist-no-wheels-with-matching-python.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("--python-platform=x86_64-manylinux2014")
         .arg("a")
         , @"
@@ -3604,10 +3718,11 @@ fn no_sdist_no_wheels_with_matching_python() {
 /// ```
 #[test]
 fn no_wheels_no_build() {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("wheels/no-wheels-no-build.toml");
+    let context = uv_test::test_context!("3.12").with_scenario("wheels/no-wheels-no-build.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("--only-binary")
         .arg("a")
         .arg("a")
@@ -3641,10 +3756,12 @@ fn no_wheels_no_build() {
 /// ```
 #[test]
 fn no_wheels_with_matching_platform() {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("wheels/no-wheels-with-matching-platform.toml");
+    let context = uv_test::test_context!("3.12")
+        .with_scenario("wheels/no-wheels-with-matching-platform.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("a")
         , @"
     success: true
@@ -3673,10 +3790,11 @@ fn no_wheels_with_matching_platform() {
 /// ```
 #[test]
 fn no_wheels() {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("wheels/no-wheels.toml");
+    let context = uv_test::test_context!("3.12").with_scenario("wheels/no-wheels.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("a")
         , @"
     success: true
@@ -3705,10 +3823,11 @@ fn no_wheels() {
 /// ```
 #[test]
 fn only_wheels_no_binary() {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("wheels/only-wheels-no-binary.toml");
+    let context = uv_test::test_context!("3.12").with_scenario("wheels/only-wheels-no-binary.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("--no-binary")
         .arg("a")
         .arg("a")
@@ -3742,10 +3861,11 @@ fn only_wheels_no_binary() {
 /// ```
 #[test]
 fn only_wheels() {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("wheels/only-wheels.toml");
+    let context = uv_test::test_context!("3.12").with_scenario("wheels/only-wheels.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("a")
         , @"
     success: true
@@ -3774,10 +3894,12 @@ fn only_wheels() {
 /// ```
 #[test]
 fn specific_tag_and_default() {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("wheels/specific-tag-and-default.toml");
+    let context =
+        uv_test::test_context!("3.12").with_scenario("wheels/specific-tag-and-default.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("a")
         , @"
     success: true
@@ -3807,10 +3929,12 @@ fn specific_tag_and_default() {
 /// ```
 #[test]
 fn package_only_yanked_in_range() {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("yanked/package-only-yanked-in-range.toml");
+    let context =
+        uv_test::test_context!("3.12").with_scenario("yanked/package-only-yanked-in-range.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("a>0.1.0")
         , @"
     success: false
@@ -3844,10 +3968,11 @@ fn package_only_yanked_in_range() {
 /// ```
 #[test]
 fn package_only_yanked() {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("yanked/package-only-yanked.toml");
+    let context = uv_test::test_context!("3.12").with_scenario("yanked/package-only-yanked.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("a")
         , @"
     success: false
@@ -3882,10 +4007,12 @@ fn package_only_yanked() {
 /// ```
 #[test]
 fn package_yanked_specified_mixed_available() {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("yanked/package-yanked-specified-mixed-available.toml");
+    let context = uv_test::test_context!("3.12")
+        .with_scenario("yanked/package-yanked-specified-mixed-available.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("a>=0.1.0")
         , @"
     success: true
@@ -3918,10 +4045,12 @@ fn package_yanked_specified_mixed_available() {
 /// ```
 #[test]
 fn requires_package_yanked_and_unyanked_any() {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("yanked/requires-package-yanked-and-unyanked-any.toml");
+    let context = uv_test::test_context!("3.12")
+        .with_scenario("yanked/requires-package-yanked-and-unyanked-any.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("a")
         , @"
     success: true
@@ -3960,10 +4089,12 @@ fn requires_package_yanked_and_unyanked_any() {
 /// ```
 #[test]
 fn transitive_package_only_yanked_in_range_opt_in() {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("yanked/transitive-package-only-yanked-in-range-opt-in.toml");
+    let context = uv_test::test_context!("3.12")
+        .with_scenario("yanked/transitive-package-only-yanked-in-range-opt-in.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("a")
                 .arg("b==1.0.0")
         , @"
@@ -4004,10 +4135,12 @@ fn transitive_package_only_yanked_in_range_opt_in() {
 /// ```
 #[test]
 fn transitive_package_only_yanked_in_range() {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("yanked/transitive-package-only-yanked-in-range.toml");
+    let context = uv_test::test_context!("3.12")
+        .with_scenario("yanked/transitive-package-only-yanked-in-range.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("a")
         , @"
     success: false
@@ -4046,10 +4179,12 @@ fn transitive_package_only_yanked_in_range() {
 /// ```
 #[test]
 fn transitive_package_only_yanked() {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("yanked/transitive-package-only-yanked.toml");
+    let context =
+        uv_test::test_context!("3.12").with_scenario("yanked/transitive-package-only-yanked.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("a")
         , @"
     success: false
@@ -4094,10 +4229,12 @@ fn transitive_package_only_yanked() {
 /// ```
 #[test]
 fn transitive_yanked_and_unyanked_dependency_opt_in() {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("yanked/transitive-yanked-and-unyanked-dependency-opt-in.toml");
+    let context = uv_test::test_context!("3.12")
+        .with_scenario("yanked/transitive-yanked-and-unyanked-dependency-opt-in.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("a")
                 .arg("b")
                 .arg("c==2.0.0")
@@ -4147,10 +4284,12 @@ fn transitive_yanked_and_unyanked_dependency_opt_in() {
 /// ```
 #[test]
 fn transitive_yanked_and_unyanked_dependency() {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("yanked/transitive-yanked-and-unyanked-dependency.toml");
+    let context = uv_test::test_context!("3.12")
+        .with_scenario("yanked/transitive-yanked-and-unyanked-dependency.toml");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         .arg("a")
                 .arg("b")
         , @"

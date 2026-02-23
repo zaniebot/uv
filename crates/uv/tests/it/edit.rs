@@ -4846,8 +4846,7 @@ fn add_lower_bound_optional() -> Result<()> {
 /// Omit the local segment when adding dependencies (since `>=1.2.3+local` is invalid).
 #[test]
 fn add_lower_bound_local() -> Result<()> {
-    let server = uv_test::packse::PackseServer::new("local/local-simple.toml");
-    let context = uv_test::test_context!("3.12");
+    let context = uv_test::test_context!("3.12").with_scenario("local/local-simple.toml");
 
     let pyproject_toml = context.temp_dir.child("pyproject.toml");
     pyproject_toml.write_str(indoc! {r#"
@@ -4859,7 +4858,7 @@ fn add_lower_bound_local() -> Result<()> {
     "#})?;
 
     // Adding `a` should include a lower-bound, but no local segment.
-    uv_snapshot!(context.filters(), context.add().arg("a").arg("--index").arg(server.index_url()).env_remove(EnvVars::UV_EXCLUDE_NEWER), @"
+    uv_snapshot!(context.filters(), context.add().arg("a").arg("--index").arg(context.index_url().unwrap()), @"
     success: true
     exit_code: 0
     ----- stdout -----

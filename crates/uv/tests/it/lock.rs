@@ -11401,8 +11401,8 @@ fn lock_upgrade_package() -> Result<()> {
 /// Check that we discard the fork marker from the lockfile when using `--upgrade`.
 #[test]
 fn lock_upgrade_drop_fork_markers() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("fork/fork-upgrade.toml");
+    let context = uv_test::test_context!("3.12").with_scenario("fork/fork-upgrade.toml");
+    let index_url = context.index_url().unwrap();
 
     let requirements = r#"[project]
     name = "forking"
@@ -11420,8 +11420,7 @@ fn lock_upgrade_drop_fork_markers() -> Result<()> {
     context
         .lock()
         .arg("--index-url")
-        .arg(server.index_url())
-        .env_remove(EnvVars::UV_EXCLUDE_NEWER)
+        .arg(&index_url)
         .assert()
         .success();
     let lock = context.read("uv.lock");
@@ -11432,8 +11431,7 @@ fn lock_upgrade_drop_fork_markers() -> Result<()> {
     context
         .lock()
         .arg("--index-url")
-        .arg(server.index_url())
-        .env_remove(EnvVars::UV_EXCLUDE_NEWER)
+        .arg(&index_url)
         .arg("--upgrade")
         .assert()
         .success();

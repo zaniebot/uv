@@ -5,22 +5,7 @@
 //!
 #![cfg(all(feature = "test-python", unix))]
 
-use std::process::Command;
-
-use uv_static::EnvVars;
-
-use uv_test::packse::PackseServer;
-use uv_test::{TestContext, uv_snapshot};
-
-/// Create a `pip install` command with options shared across all scenarios.
-fn command(context: &TestContext, server: &PackseServer) -> Command {
-    let mut command = context.pip_install();
-    command
-        .arg("--index-url")
-        .arg(server.index_url());
-    command.env_remove(EnvVars::UV_EXCLUDE_NEWER);
-    command
-}
+use uv_test::uv_snapshot;
 
 {{#scenarios}}
 
@@ -37,10 +22,12 @@ fn command(context: &TestContext, server: &PackseServer) -> Command {
 {{/python_patch}}
 #[test]
 fn {{module_name}}() {
-    let context = uv_test::test_context!("{{environment.python}}");
-    let server = PackseServer::new("{{scenario_path}}");
+    let context = uv_test::test_context!("{{environment.python}}")
+        .with_scenario("{{scenario_path}}");
 
-    uv_snapshot!(context.filters(), command(&context, &server)
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
         {{#resolver_options.prereleases}}
         .arg("--prerelease=allow")
         {{/resolver_options.prereleases}}

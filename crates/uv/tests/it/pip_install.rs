@@ -19,7 +19,7 @@ use uv_fs::Simplified;
 use uv_static::EnvVars;
 #[cfg(feature = "test-git")]
 use uv_test::decode_token;
-use uv_test::packse::PackseServer;
+
 use uv_test::{
     DEFAULT_PYTHON_VERSION, TestContext, download_to_disk, get_bin, uv_snapshot, venv_bin_path,
 };
@@ -3847,8 +3847,8 @@ fn install_git_source_respects_offline_mode() {
 /// Build requirements should explain how to opt into prereleases when they are the only solution.
 #[test]
 fn build_prerelease_hint() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("prereleases/transitive-package-only-prereleases-in-range.toml");
+    let context = uv_test::test_context!("3.12")
+        .with_scenario("prereleases/transitive-package-only-prereleases-in-range.toml");
 
     let pyproject_toml = context.temp_dir.child("pyproject.toml");
     pyproject_toml.write_str(indoc! {r#"
@@ -3863,8 +3863,10 @@ fn build_prerelease_hint() -> Result<()> {
     "#})?;
 
     let mut command = context.pip_install();
-    command.arg("--index-url").arg(server.index_url()).arg(".");
-    command.env_remove(EnvVars::UV_EXCLUDE_NEWER);
+    command
+        .arg("--index-url")
+        .arg(context.index_url().unwrap())
+        .arg(".");
 
     uv_snapshot!(
         context.filters(),

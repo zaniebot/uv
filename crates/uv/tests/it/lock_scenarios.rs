@@ -13,9 +13,6 @@ use assert_cmd::assert::OutputAssertExt;
 use assert_fs::prelude::*;
 use insta::assert_snapshot;
 
-use uv_static::EnvVars;
-
-use uv_test::packse::PackseServer;
 use uv_test::uv_snapshot;
 
 /// There are two packages, `a` and `b`. We select `a` with `a==2.0.0` first, and then `b`, but `a==2.0.0` conflicts with all new versions of `b`, so we backtrack through versions of `b`.
@@ -84,8 +81,9 @@ use uv_test::uv_snapshot;
 /// ```
 #[test]
 fn wrong_backtracking_basic() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("backtracking/wrong-backtracking-basic.toml");
+    let context =
+        uv_test::test_context!("3.12").with_scenario("backtracking/wrong-backtracking-basic.toml");
+    let index_url = context.index_url().unwrap();
 
     let pyproject_toml = context.temp_dir.child("pyproject.toml");
     pyproject_toml.write_str(
@@ -106,8 +104,7 @@ fn wrong_backtracking_basic() -> Result<()> {
     filters.push((r"\n\s+hint: .*", ""));
 
     let mut cmd = context.lock();
-    cmd.env_remove(EnvVars::UV_EXCLUDE_NEWER);
-    cmd.arg("--index-url").arg(server.index_url());
+    cmd.arg("--index-url").arg(&index_url);
     uv_snapshot!(filters, cmd, @"
     success: true
     exit_code: 0
@@ -171,9 +168,8 @@ fn wrong_backtracking_basic() -> Result<()> {
     context
         .lock()
         .arg("--locked")
-        .env_remove(EnvVars::UV_EXCLUDE_NEWER)
         .arg("--index-url")
-        .arg(server.index_url())
+        .arg(&index_url)
         .assert()
         .success();
 
@@ -252,8 +248,9 @@ fn wrong_backtracking_basic() -> Result<()> {
 /// ```
 #[test]
 fn wrong_backtracking_indirect() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("backtracking/wrong-backtracking-indirect.toml");
+    let context = uv_test::test_context!("3.12")
+        .with_scenario("backtracking/wrong-backtracking-indirect.toml");
+    let index_url = context.index_url().unwrap();
 
     let pyproject_toml = context.temp_dir.child("pyproject.toml");
     pyproject_toml.write_str(
@@ -274,8 +271,7 @@ fn wrong_backtracking_indirect() -> Result<()> {
     filters.push((r"\n\s+hint: .*", ""));
 
     let mut cmd = context.lock();
-    cmd.env_remove(EnvVars::UV_EXCLUDE_NEWER);
-    cmd.arg("--index-url").arg(server.index_url());
+    cmd.arg("--index-url").arg(&index_url);
     uv_snapshot!(filters, cmd, @"
     success: true
     exit_code: 0
@@ -360,9 +356,8 @@ fn wrong_backtracking_indirect() -> Result<()> {
     context
         .lock()
         .arg("--locked")
-        .env_remove(EnvVars::UV_EXCLUDE_NEWER)
         .arg("--index-url")
-        .arg(server.index_url())
+        .arg(&index_url)
         .assert()
         .success();
 
@@ -395,8 +390,9 @@ fn wrong_backtracking_indirect() -> Result<()> {
 /// ```
 #[test]
 fn fork_allows_non_conflicting_non_overlapping_dependencies() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("fork/allows-non-conflicting-non-overlapping-dependencies.toml");
+    let context = uv_test::test_context!("3.12")
+        .with_scenario("fork/allows-non-conflicting-non-overlapping-dependencies.toml");
+    let index_url = context.index_url().unwrap();
 
     let pyproject_toml = context.temp_dir.child("pyproject.toml");
     pyproject_toml.write_str(
@@ -417,8 +413,7 @@ fn fork_allows_non_conflicting_non_overlapping_dependencies() -> Result<()> {
     filters.push((r"\n\s+hint: .*", ""));
 
     let mut cmd = context.lock();
-    cmd.env_remove(EnvVars::UV_EXCLUDE_NEWER);
-    cmd.arg("--index-url").arg(server.index_url());
+    cmd.arg("--index-url").arg(&index_url);
     uv_snapshot!(filters, cmd, @"
     success: true
     exit_code: 0
@@ -474,9 +469,8 @@ fn fork_allows_non_conflicting_non_overlapping_dependencies() -> Result<()> {
     context
         .lock()
         .arg("--locked")
-        .env_remove(EnvVars::UV_EXCLUDE_NEWER)
         .arg("--index-url")
-        .arg(server.index_url())
+        .arg(&index_url)
         .assert()
         .success();
 
@@ -511,8 +505,9 @@ fn fork_allows_non_conflicting_non_overlapping_dependencies() -> Result<()> {
 /// ```
 #[test]
 fn fork_allows_non_conflicting_repeated_dependencies() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("fork/allows-non-conflicting-repeated-dependencies.toml");
+    let context = uv_test::test_context!("3.12")
+        .with_scenario("fork/allows-non-conflicting-repeated-dependencies.toml");
+    let index_url = context.index_url().unwrap();
 
     let pyproject_toml = context.temp_dir.child("pyproject.toml");
     pyproject_toml.write_str(
@@ -533,8 +528,7 @@ fn fork_allows_non_conflicting_repeated_dependencies() -> Result<()> {
     filters.push((r"\n\s+hint: .*", ""));
 
     let mut cmd = context.lock();
-    cmd.env_remove(EnvVars::UV_EXCLUDE_NEWER);
-    cmd.arg("--index-url").arg(server.index_url());
+    cmd.arg("--index-url").arg(&index_url);
     uv_snapshot!(filters, cmd, @"
     success: true
     exit_code: 0
@@ -585,9 +579,8 @@ fn fork_allows_non_conflicting_repeated_dependencies() -> Result<()> {
     context
         .lock()
         .arg("--locked")
-        .env_remove(EnvVars::UV_EXCLUDE_NEWER)
         .arg("--index-url")
-        .arg(server.index_url())
+        .arg(&index_url)
         .assert()
         .success();
 
@@ -612,8 +605,8 @@ fn fork_allows_non_conflicting_repeated_dependencies() -> Result<()> {
 /// ```
 #[test]
 fn fork_basic() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("fork/basic.toml");
+    let context = uv_test::test_context!("3.12").with_scenario("fork/basic.toml");
+    let index_url = context.index_url().unwrap();
 
     let pyproject_toml = context.temp_dir.child("pyproject.toml");
     pyproject_toml.write_str(
@@ -634,8 +627,7 @@ fn fork_basic() -> Result<()> {
     filters.push((r"\n\s+hint: .*", ""));
 
     let mut cmd = context.lock();
-    cmd.env_remove(EnvVars::UV_EXCLUDE_NEWER);
-    cmd.arg("--index-url").arg(server.index_url());
+    cmd.arg("--index-url").arg(&index_url);
     uv_snapshot!(filters, cmd, @"
     success: true
     exit_code: 0
@@ -707,9 +699,8 @@ fn fork_basic() -> Result<()> {
     context
         .lock()
         .arg("--locked")
-        .env_remove(EnvVars::UV_EXCLUDE_NEWER)
         .arg("--index-url")
-        .arg(server.index_url())
+        .arg(&index_url)
         .assert()
         .success();
 
@@ -748,8 +739,8 @@ fn fork_basic() -> Result<()> {
 /// ```
 #[test]
 fn conflict_in_fork() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("fork/conflict-in-fork.toml");
+    let context = uv_test::test_context!("3.12").with_scenario("fork/conflict-in-fork.toml");
+    let index_url = context.index_url().unwrap();
 
     let pyproject_toml = context.temp_dir.child("pyproject.toml");
     pyproject_toml.write_str(
@@ -770,8 +761,7 @@ fn conflict_in_fork() -> Result<()> {
     filters.push((r"\n\s+hint: .*", ""));
 
     let mut cmd = context.lock();
-    cmd.env_remove(EnvVars::UV_EXCLUDE_NEWER);
-    cmd.arg("--index-url").arg(server.index_url());
+    cmd.arg("--index-url").arg(&index_url);
     uv_snapshot!(filters, cmd, @"
     success: false
     exit_code: 1
@@ -817,8 +807,8 @@ fn conflict_in_fork() -> Result<()> {
 /// ```
 #[test]
 fn fork_conflict_unsatisfiable() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("fork/conflict-unsatisfiable.toml");
+    let context = uv_test::test_context!("3.12").with_scenario("fork/conflict-unsatisfiable.toml");
+    let index_url = context.index_url().unwrap();
 
     let pyproject_toml = context.temp_dir.child("pyproject.toml");
     pyproject_toml.write_str(
@@ -839,8 +829,7 @@ fn fork_conflict_unsatisfiable() -> Result<()> {
     filters.push((r"\n\s+hint: .*", ""));
 
     let mut cmd = context.lock();
-    cmd.env_remove(EnvVars::UV_EXCLUDE_NEWER);
-    cmd.arg("--index-url").arg(server.index_url());
+    cmd.arg("--index-url").arg(&index_url);
     uv_snapshot!(filters, cmd, @"
     success: false
     exit_code: 1
@@ -899,8 +888,9 @@ fn fork_conflict_unsatisfiable() -> Result<()> {
 /// ```
 #[test]
 fn fork_filter_sibling_dependencies() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("fork/filter-sibling-dependencies.toml");
+    let context =
+        uv_test::test_context!("3.12").with_scenario("fork/filter-sibling-dependencies.toml");
+    let index_url = context.index_url().unwrap();
 
     let pyproject_toml = context.temp_dir.child("pyproject.toml");
     pyproject_toml.write_str(
@@ -923,8 +913,7 @@ fn fork_filter_sibling_dependencies() -> Result<()> {
     filters.push((r"\n\s+hint: .*", ""));
 
     let mut cmd = context.lock();
-    cmd.env_remove(EnvVars::UV_EXCLUDE_NEWER);
-    cmd.arg("--index-url").arg(server.index_url());
+    cmd.arg("--index-url").arg(&index_url);
     uv_snapshot!(filters, cmd, @"
     success: true
     exit_code: 0
@@ -1048,9 +1037,8 @@ fn fork_filter_sibling_dependencies() -> Result<()> {
     context
         .lock()
         .arg("--locked")
-        .env_remove(EnvVars::UV_EXCLUDE_NEWER)
         .arg("--index-url")
-        .arg(server.index_url())
+        .arg(&index_url)
         .assert()
         .success();
 
@@ -1082,8 +1070,8 @@ fn fork_filter_sibling_dependencies() -> Result<()> {
 /// ```
 #[test]
 fn fork_upgrade() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("fork/fork-upgrade.toml");
+    let context = uv_test::test_context!("3.12").with_scenario("fork/fork-upgrade.toml");
+    let index_url = context.index_url().unwrap();
 
     let pyproject_toml = context.temp_dir.child("pyproject.toml");
     pyproject_toml.write_str(
@@ -1103,8 +1091,7 @@ fn fork_upgrade() -> Result<()> {
     filters.push((r"\n\s+hint: .*", ""));
 
     let mut cmd = context.lock();
-    cmd.env_remove(EnvVars::UV_EXCLUDE_NEWER);
-    cmd.arg("--index-url").arg(server.index_url());
+    cmd.arg("--index-url").arg(&index_url);
     uv_snapshot!(filters, cmd, @"
     success: true
     exit_code: 0
@@ -1164,9 +1151,8 @@ fn fork_upgrade() -> Result<()> {
     context
         .lock()
         .arg("--locked")
-        .env_remove(EnvVars::UV_EXCLUDE_NEWER)
         .arg("--index-url")
-        .arg(server.index_url())
+        .arg(&index_url)
         .assert()
         .success();
 
@@ -1202,8 +1188,8 @@ fn fork_upgrade() -> Result<()> {
 /// ```
 #[test]
 fn fork_incomplete_markers() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("fork/incomplete-markers.toml");
+    let context = uv_test::test_context!("3.12").with_scenario("fork/incomplete-markers.toml");
+    let index_url = context.index_url().unwrap();
 
     let pyproject_toml = context.temp_dir.child("pyproject.toml");
     pyproject_toml.write_str(
@@ -1225,8 +1211,7 @@ fn fork_incomplete_markers() -> Result<()> {
     filters.push((r"\n\s+hint: .*", ""));
 
     let mut cmd = context.lock();
-    cmd.env_remove(EnvVars::UV_EXCLUDE_NEWER);
-    cmd.arg("--index-url").arg(server.index_url());
+    cmd.arg("--index-url").arg(&index_url);
     uv_snapshot!(filters, cmd, @"
     success: true
     exit_code: 0
@@ -1321,9 +1306,8 @@ fn fork_incomplete_markers() -> Result<()> {
     context
         .lock()
         .arg("--locked")
-        .env_remove(EnvVars::UV_EXCLUDE_NEWER)
         .arg("--index-url")
-        .arg(server.index_url())
+        .arg(&index_url)
         .assert()
         .success();
 
@@ -1358,8 +1342,8 @@ fn fork_incomplete_markers() -> Result<()> {
 /// ```
 #[test]
 fn fork_marker_accrue() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("fork/marker-accrue.toml");
+    let context = uv_test::test_context!("3.12").with_scenario("fork/marker-accrue.toml");
+    let index_url = context.index_url().unwrap();
 
     let pyproject_toml = context.temp_dir.child("pyproject.toml");
     pyproject_toml.write_str(
@@ -1380,8 +1364,7 @@ fn fork_marker_accrue() -> Result<()> {
     filters.push((r"\n\s+hint: .*", ""));
 
     let mut cmd = context.lock();
-    cmd.env_remove(EnvVars::UV_EXCLUDE_NEWER);
-    cmd.arg("--index-url").arg(server.index_url());
+    cmd.arg("--index-url").arg(&index_url);
     uv_snapshot!(filters, cmd, @"
     success: true
     exit_code: 0
@@ -1457,9 +1440,8 @@ fn fork_marker_accrue() -> Result<()> {
     context
         .lock()
         .arg("--locked")
-        .env_remove(EnvVars::UV_EXCLUDE_NEWER)
         .arg("--index-url")
-        .arg(server.index_url())
+        .arg(&index_url)
         .assert()
         .success();
 
@@ -1493,8 +1475,8 @@ fn fork_marker_accrue() -> Result<()> {
 /// ```
 #[test]
 fn fork_marker_disjoint() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("fork/marker-disjoint.toml");
+    let context = uv_test::test_context!("3.12").with_scenario("fork/marker-disjoint.toml");
+    let index_url = context.index_url().unwrap();
 
     let pyproject_toml = context.temp_dir.child("pyproject.toml");
     pyproject_toml.write_str(
@@ -1515,8 +1497,7 @@ fn fork_marker_disjoint() -> Result<()> {
     filters.push((r"\n\s+hint: .*", ""));
 
     let mut cmd = context.lock();
-    cmd.env_remove(EnvVars::UV_EXCLUDE_NEWER);
-    cmd.arg("--index-url").arg(server.index_url());
+    cmd.arg("--index-url").arg(&index_url);
     uv_snapshot!(filters, cmd, @"
     success: false
     exit_code: 1
@@ -1564,8 +1545,9 @@ fn fork_marker_disjoint() -> Result<()> {
 /// ```
 #[test]
 fn fork_marker_inherit_combined_allowed() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("fork/marker-inherit-combined-allowed.toml");
+    let context =
+        uv_test::test_context!("3.12").with_scenario("fork/marker-inherit-combined-allowed.toml");
+    let index_url = context.index_url().unwrap();
 
     let pyproject_toml = context.temp_dir.child("pyproject.toml");
     pyproject_toml.write_str(
@@ -1586,8 +1568,7 @@ fn fork_marker_inherit_combined_allowed() -> Result<()> {
     filters.push((r"\n\s+hint: .*", ""));
 
     let mut cmd = context.lock();
-    cmd.env_remove(EnvVars::UV_EXCLUDE_NEWER);
-    cmd.arg("--index-url").arg(server.index_url());
+    cmd.arg("--index-url").arg(&index_url);
     uv_snapshot!(filters, cmd, @"
     success: true
     exit_code: 0
@@ -1703,9 +1684,8 @@ fn fork_marker_inherit_combined_allowed() -> Result<()> {
     context
         .lock()
         .arg("--locked")
-        .env_remove(EnvVars::UV_EXCLUDE_NEWER)
         .arg("--index-url")
-        .arg(server.index_url())
+        .arg(&index_url)
         .assert()
         .success();
 
@@ -1746,8 +1726,9 @@ fn fork_marker_inherit_combined_allowed() -> Result<()> {
 /// ```
 #[test]
 fn fork_marker_inherit_combined_disallowed() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("fork/marker-inherit-combined-disallowed.toml");
+    let context = uv_test::test_context!("3.12")
+        .with_scenario("fork/marker-inherit-combined-disallowed.toml");
+    let index_url = context.index_url().unwrap();
 
     let pyproject_toml = context.temp_dir.child("pyproject.toml");
     pyproject_toml.write_str(
@@ -1768,8 +1749,7 @@ fn fork_marker_inherit_combined_disallowed() -> Result<()> {
     filters.push((r"\n\s+hint: .*", ""));
 
     let mut cmd = context.lock();
-    cmd.env_remove(EnvVars::UV_EXCLUDE_NEWER);
-    cmd.arg("--index-url").arg(server.index_url());
+    cmd.arg("--index-url").arg(&index_url);
     uv_snapshot!(filters, cmd, @"
     success: true
     exit_code: 0
@@ -1873,9 +1853,8 @@ fn fork_marker_inherit_combined_disallowed() -> Result<()> {
     context
         .lock()
         .arg("--locked")
-        .env_remove(EnvVars::UV_EXCLUDE_NEWER)
         .arg("--index-url")
-        .arg(server.index_url())
+        .arg(&index_url)
         .assert()
         .success();
 
@@ -1917,8 +1896,8 @@ fn fork_marker_inherit_combined_disallowed() -> Result<()> {
 /// ```
 #[test]
 fn fork_marker_inherit_combined() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("fork/marker-inherit-combined.toml");
+    let context = uv_test::test_context!("3.12").with_scenario("fork/marker-inherit-combined.toml");
+    let index_url = context.index_url().unwrap();
 
     let pyproject_toml = context.temp_dir.child("pyproject.toml");
     pyproject_toml.write_str(
@@ -1939,8 +1918,7 @@ fn fork_marker_inherit_combined() -> Result<()> {
     filters.push((r"\n\s+hint: .*", ""));
 
     let mut cmd = context.lock();
-    cmd.env_remove(EnvVars::UV_EXCLUDE_NEWER);
-    cmd.arg("--index-url").arg(server.index_url());
+    cmd.arg("--index-url").arg(&index_url);
     uv_snapshot!(filters, cmd, @"
     success: true
     exit_code: 0
@@ -2044,9 +2022,8 @@ fn fork_marker_inherit_combined() -> Result<()> {
     context
         .lock()
         .arg("--locked")
-        .env_remove(EnvVars::UV_EXCLUDE_NEWER)
         .arg("--index-url")
-        .arg(server.index_url())
+        .arg(&index_url)
         .assert()
         .success();
 
@@ -2081,8 +2058,8 @@ fn fork_marker_inherit_combined() -> Result<()> {
 /// ```
 #[test]
 fn fork_marker_inherit_isolated() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("fork/marker-inherit-isolated.toml");
+    let context = uv_test::test_context!("3.12").with_scenario("fork/marker-inherit-isolated.toml");
+    let index_url = context.index_url().unwrap();
 
     let pyproject_toml = context.temp_dir.child("pyproject.toml");
     pyproject_toml.write_str(
@@ -2103,8 +2080,7 @@ fn fork_marker_inherit_isolated() -> Result<()> {
     filters.push((r"\n\s+hint: .*", ""));
 
     let mut cmd = context.lock();
-    cmd.env_remove(EnvVars::UV_EXCLUDE_NEWER);
-    cmd.arg("--index-url").arg(server.index_url());
+    cmd.arg("--index-url").arg(&index_url);
     uv_snapshot!(filters, cmd, @"
     success: true
     exit_code: 0
@@ -2188,9 +2164,8 @@ fn fork_marker_inherit_isolated() -> Result<()> {
     context
         .lock()
         .arg("--locked")
-        .env_remove(EnvVars::UV_EXCLUDE_NEWER)
         .arg("--index-url")
-        .arg(server.index_url())
+        .arg(&index_url)
         .assert()
         .success();
 
@@ -2231,8 +2206,9 @@ fn fork_marker_inherit_isolated() -> Result<()> {
 /// ```
 #[test]
 fn fork_marker_inherit_transitive() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("fork/marker-inherit-transitive.toml");
+    let context =
+        uv_test::test_context!("3.12").with_scenario("fork/marker-inherit-transitive.toml");
+    let index_url = context.index_url().unwrap();
 
     let pyproject_toml = context.temp_dir.child("pyproject.toml");
     pyproject_toml.write_str(
@@ -2253,8 +2229,7 @@ fn fork_marker_inherit_transitive() -> Result<()> {
     filters.push((r"\n\s+hint: .*", ""));
 
     let mut cmd = context.lock();
-    cmd.env_remove(EnvVars::UV_EXCLUDE_NEWER);
-    cmd.arg("--index-url").arg(server.index_url());
+    cmd.arg("--index-url").arg(&index_url);
     uv_snapshot!(filters, cmd, @"
     success: true
     exit_code: 0
@@ -2350,9 +2325,8 @@ fn fork_marker_inherit_transitive() -> Result<()> {
     context
         .lock()
         .arg("--locked")
-        .env_remove(EnvVars::UV_EXCLUDE_NEWER)
         .arg("--index-url")
-        .arg(server.index_url())
+        .arg(&index_url)
         .assert()
         .success();
 
@@ -2389,8 +2363,8 @@ fn fork_marker_inherit_transitive() -> Result<()> {
 /// ```
 #[test]
 fn fork_marker_inherit() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("fork/marker-inherit.toml");
+    let context = uv_test::test_context!("3.12").with_scenario("fork/marker-inherit.toml");
+    let index_url = context.index_url().unwrap();
 
     let pyproject_toml = context.temp_dir.child("pyproject.toml");
     pyproject_toml.write_str(
@@ -2411,8 +2385,7 @@ fn fork_marker_inherit() -> Result<()> {
     filters.push((r"\n\s+hint: .*", ""));
 
     let mut cmd = context.lock();
-    cmd.env_remove(EnvVars::UV_EXCLUDE_NEWER);
-    cmd.arg("--index-url").arg(server.index_url());
+    cmd.arg("--index-url").arg(&index_url);
     uv_snapshot!(filters, cmd, @"
     success: true
     exit_code: 0
@@ -2484,9 +2457,8 @@ fn fork_marker_inherit() -> Result<()> {
     context
         .lock()
         .arg("--locked")
-        .env_remove(EnvVars::UV_EXCLUDE_NEWER)
         .arg("--index-url")
-        .arg(server.index_url())
+        .arg(&index_url)
         .assert()
         .success();
 
@@ -2528,8 +2500,8 @@ fn fork_marker_inherit() -> Result<()> {
 /// ```
 #[test]
 fn fork_marker_limited_inherit() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("fork/marker-limited-inherit.toml");
+    let context = uv_test::test_context!("3.12").with_scenario("fork/marker-limited-inherit.toml");
+    let index_url = context.index_url().unwrap();
 
     let pyproject_toml = context.temp_dir.child("pyproject.toml");
     pyproject_toml.write_str(
@@ -2551,8 +2523,7 @@ fn fork_marker_limited_inherit() -> Result<()> {
     filters.push((r"\n\s+hint: .*", ""));
 
     let mut cmd = context.lock();
-    cmd.env_remove(EnvVars::UV_EXCLUDE_NEWER);
-    cmd.arg("--index-url").arg(server.index_url());
+    cmd.arg("--index-url").arg(&index_url);
     uv_snapshot!(filters, cmd, @"
     success: true
     exit_code: 0
@@ -2647,9 +2618,8 @@ fn fork_marker_limited_inherit() -> Result<()> {
     context
         .lock()
         .arg("--locked")
-        .env_remove(EnvVars::UV_EXCLUDE_NEWER)
         .arg("--index-url")
-        .arg(server.index_url())
+        .arg(&index_url)
         .assert()
         .success();
 
@@ -2685,8 +2655,8 @@ fn fork_marker_limited_inherit() -> Result<()> {
 /// ```
 #[test]
 fn fork_marker_selection() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("fork/marker-selection.toml");
+    let context = uv_test::test_context!("3.12").with_scenario("fork/marker-selection.toml");
+    let index_url = context.index_url().unwrap();
 
     let pyproject_toml = context.temp_dir.child("pyproject.toml");
     pyproject_toml.write_str(
@@ -2708,8 +2678,7 @@ fn fork_marker_selection() -> Result<()> {
     filters.push((r"\n\s+hint: .*", ""));
 
     let mut cmd = context.lock();
-    cmd.env_remove(EnvVars::UV_EXCLUDE_NEWER);
-    cmd.arg("--index-url").arg(server.index_url());
+    cmd.arg("--index-url").arg(&index_url);
     uv_snapshot!(filters, cmd, @"
     success: true
     exit_code: 0
@@ -2792,9 +2761,8 @@ fn fork_marker_selection() -> Result<()> {
     context
         .lock()
         .arg("--locked")
-        .env_remove(EnvVars::UV_EXCLUDE_NEWER)
         .arg("--index-url")
-        .arg(server.index_url())
+        .arg(&index_url)
         .assert()
         .success();
 
@@ -2842,8 +2810,8 @@ fn fork_marker_selection() -> Result<()> {
 /// ```
 #[test]
 fn fork_marker_track() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("fork/marker-track.toml");
+    let context = uv_test::test_context!("3.12").with_scenario("fork/marker-track.toml");
+    let index_url = context.index_url().unwrap();
 
     let pyproject_toml = context.temp_dir.child("pyproject.toml");
     pyproject_toml.write_str(
@@ -2865,8 +2833,7 @@ fn fork_marker_track() -> Result<()> {
     filters.push((r"\n\s+hint: .*", ""));
 
     let mut cmd = context.lock();
-    cmd.env_remove(EnvVars::UV_EXCLUDE_NEWER);
-    cmd.arg("--index-url").arg(server.index_url());
+    cmd.arg("--index-url").arg(&index_url);
     uv_snapshot!(filters, cmd, @"
     success: true
     exit_code: 0
@@ -2961,9 +2928,8 @@ fn fork_marker_track() -> Result<()> {
     context
         .lock()
         .arg("--locked")
-        .env_remove(EnvVars::UV_EXCLUDE_NEWER)
         .arg("--index-url")
-        .arg(server.index_url())
+        .arg(&index_url)
         .assert()
         .success();
 
@@ -2997,8 +2963,9 @@ fn fork_marker_track() -> Result<()> {
 /// ```
 #[test]
 fn fork_non_fork_marker_transitive() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("fork/non-fork-marker-transitive.toml");
+    let context =
+        uv_test::test_context!("3.12").with_scenario("fork/non-fork-marker-transitive.toml");
+    let index_url = context.index_url().unwrap();
 
     let pyproject_toml = context.temp_dir.child("pyproject.toml");
     pyproject_toml.write_str(
@@ -3019,8 +2986,7 @@ fn fork_non_fork_marker_transitive() -> Result<()> {
     filters.push((r"\n\s+hint: .*", ""));
 
     let mut cmd = context.lock();
-    cmd.env_remove(EnvVars::UV_EXCLUDE_NEWER);
-    cmd.arg("--index-url").arg(server.index_url());
+    cmd.arg("--index-url").arg(&index_url);
     uv_snapshot!(filters, cmd, @"
     success: true
     exit_code: 0
@@ -3096,9 +3062,8 @@ fn fork_non_fork_marker_transitive() -> Result<()> {
     context
         .lock()
         .arg("--locked")
-        .env_remove(EnvVars::UV_EXCLUDE_NEWER)
         .arg("--index-url")
-        .arg(server.index_url())
+        .arg(&index_url)
         .assert()
         .success();
 
@@ -3133,8 +3098,9 @@ fn fork_non_fork_marker_transitive() -> Result<()> {
 /// ```
 #[test]
 fn fork_non_local_fork_marker_direct() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("fork/non-local-fork-marker-direct.toml");
+    let context =
+        uv_test::test_context!("3.12").with_scenario("fork/non-local-fork-marker-direct.toml");
+    let index_url = context.index_url().unwrap();
 
     let pyproject_toml = context.temp_dir.child("pyproject.toml");
     pyproject_toml.write_str(
@@ -3155,8 +3121,7 @@ fn fork_non_local_fork_marker_direct() -> Result<()> {
     filters.push((r"\n\s+hint: .*", ""));
 
     let mut cmd = context.lock();
-    cmd.env_remove(EnvVars::UV_EXCLUDE_NEWER);
-    cmd.arg("--index-url").arg(server.index_url());
+    cmd.arg("--index-url").arg(&index_url);
     uv_snapshot!(filters, cmd, @"
     success: false
     exit_code: 1
@@ -3206,8 +3171,9 @@ fn fork_non_local_fork_marker_direct() -> Result<()> {
 /// ```
 #[test]
 fn fork_non_local_fork_marker_transitive() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("fork/non-local-fork-marker-transitive.toml");
+    let context =
+        uv_test::test_context!("3.12").with_scenario("fork/non-local-fork-marker-transitive.toml");
+    let index_url = context.index_url().unwrap();
 
     let pyproject_toml = context.temp_dir.child("pyproject.toml");
     pyproject_toml.write_str(
@@ -3228,8 +3194,7 @@ fn fork_non_local_fork_marker_transitive() -> Result<()> {
     filters.push((r"\n\s+hint: .*", ""));
 
     let mut cmd = context.lock();
-    cmd.env_remove(EnvVars::UV_EXCLUDE_NEWER);
-    cmd.arg("--index-url").arg(server.index_url());
+    cmd.arg("--index-url").arg(&index_url);
     uv_snapshot!(filters, cmd, @"
     success: false
     exit_code: 1
@@ -3295,8 +3260,9 @@ fn fork_non_local_fork_marker_transitive() -> Result<()> {
 /// ```
 #[test]
 fn fork_overlapping_markers_basic() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("fork/overlapping-markers-basic.toml");
+    let context =
+        uv_test::test_context!("3.12").with_scenario("fork/overlapping-markers-basic.toml");
+    let index_url = context.index_url().unwrap();
 
     let pyproject_toml = context.temp_dir.child("pyproject.toml");
     pyproject_toml.write_str(
@@ -3318,8 +3284,7 @@ fn fork_overlapping_markers_basic() -> Result<()> {
     filters.push((r"\n\s+hint: .*", ""));
 
     let mut cmd = context.lock();
-    cmd.env_remove(EnvVars::UV_EXCLUDE_NEWER);
-    cmd.arg("--index-url").arg(server.index_url());
+    cmd.arg("--index-url").arg(&index_url);
     uv_snapshot!(filters, cmd, @"
     success: true
     exit_code: 0
@@ -3376,9 +3341,8 @@ fn fork_overlapping_markers_basic() -> Result<()> {
     context
         .lock()
         .arg("--locked")
-        .env_remove(EnvVars::UV_EXCLUDE_NEWER)
         .arg("--index-url")
-        .arg(server.index_url())
+        .arg(&index_url)
         .assert()
         .success();
 
@@ -3466,8 +3430,9 @@ fn fork_overlapping_markers_basic() -> Result<()> {
 /// ```
 #[test]
 fn preferences_dependent_forking_bistable() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("fork/preferences-dependent-forking-bistable.toml");
+    let context = uv_test::test_context!("3.12")
+        .with_scenario("fork/preferences-dependent-forking-bistable.toml");
+    let index_url = context.index_url().unwrap();
 
     let pyproject_toml = context.temp_dir.child("pyproject.toml");
     pyproject_toml.write_str(
@@ -3487,8 +3452,7 @@ fn preferences_dependent_forking_bistable() -> Result<()> {
     filters.push((r"\n\s+hint: .*", ""));
 
     let mut cmd = context.lock();
-    cmd.env_remove(EnvVars::UV_EXCLUDE_NEWER);
-    cmd.arg("--index-url").arg(server.index_url());
+    cmd.arg("--index-url").arg(&index_url);
     uv_snapshot!(filters, cmd, @"
     success: true
     exit_code: 0
@@ -3618,9 +3582,8 @@ fn preferences_dependent_forking_bistable() -> Result<()> {
     context
         .lock()
         .arg("--locked")
-        .env_remove(EnvVars::UV_EXCLUDE_NEWER)
         .arg("--index-url")
-        .arg(server.index_url())
+        .arg(&index_url)
         .assert()
         .success();
 
@@ -3702,8 +3665,9 @@ fn preferences_dependent_forking_bistable() -> Result<()> {
 /// ```
 #[test]
 fn preferences_dependent_forking_conflicting() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("fork/preferences-dependent-forking-conflicting.toml");
+    let context = uv_test::test_context!("3.12")
+        .with_scenario("fork/preferences-dependent-forking-conflicting.toml");
+    let index_url = context.index_url().unwrap();
 
     let pyproject_toml = context.temp_dir.child("pyproject.toml");
     pyproject_toml.write_str(
@@ -3725,8 +3689,7 @@ fn preferences_dependent_forking_conflicting() -> Result<()> {
     filters.push((r"\n\s+hint: .*", ""));
 
     let mut cmd = context.lock();
-    cmd.env_remove(EnvVars::UV_EXCLUDE_NEWER);
-    cmd.arg("--index-url").arg(server.index_url());
+    cmd.arg("--index-url").arg(&index_url);
     uv_snapshot!(filters, cmd, @"
     success: true
     exit_code: 0
@@ -3845,8 +3808,9 @@ fn preferences_dependent_forking_conflicting() -> Result<()> {
 /// ```
 #[test]
 fn preferences_dependent_forking_tristable() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("fork/preferences-dependent-forking-tristable.toml");
+    let context = uv_test::test_context!("3.12")
+        .with_scenario("fork/preferences-dependent-forking-tristable.toml");
+    let index_url = context.index_url().unwrap();
 
     let pyproject_toml = context.temp_dir.child("pyproject.toml");
     pyproject_toml.write_str(
@@ -3868,8 +3832,7 @@ fn preferences_dependent_forking_tristable() -> Result<()> {
     filters.push((r"\n\s+hint: .*", ""));
 
     let mut cmd = context.lock();
-    cmd.env_remove(EnvVars::UV_EXCLUDE_NEWER);
-    cmd.arg("--index-url").arg(server.index_url());
+    cmd.arg("--index-url").arg(&index_url);
     uv_snapshot!(filters, cmd, @"
     success: true
     exit_code: 0
@@ -4047,9 +4010,8 @@ fn preferences_dependent_forking_tristable() -> Result<()> {
     context
         .lock()
         .arg("--locked")
-        .env_remove(EnvVars::UV_EXCLUDE_NEWER)
         .arg("--index-url")
-        .arg(server.index_url())
+        .arg(&index_url)
         .assert()
         .success();
 
@@ -4130,8 +4092,9 @@ fn preferences_dependent_forking_tristable() -> Result<()> {
 /// ```
 #[test]
 fn preferences_dependent_forking() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("fork/preferences-dependent-forking.toml");
+    let context =
+        uv_test::test_context!("3.12").with_scenario("fork/preferences-dependent-forking.toml");
+    let index_url = context.index_url().unwrap();
 
     let pyproject_toml = context.temp_dir.child("pyproject.toml");
     pyproject_toml.write_str(
@@ -4153,8 +4116,7 @@ fn preferences_dependent_forking() -> Result<()> {
     filters.push((r"\n\s+hint: .*", ""));
 
     let mut cmd = context.lock();
-    cmd.env_remove(EnvVars::UV_EXCLUDE_NEWER);
-    cmd.arg("--index-url").arg(server.index_url());
+    cmd.arg("--index-url").arg(&index_url);
     uv_snapshot!(filters, cmd, @"
     success: true
     exit_code: 0
@@ -4250,9 +4212,8 @@ fn preferences_dependent_forking() -> Result<()> {
     context
         .lock()
         .arg("--locked")
-        .env_remove(EnvVars::UV_EXCLUDE_NEWER)
         .arg("--index-url")
-        .arg(server.index_url())
+        .arg(&index_url)
         .assert()
         .success();
 
@@ -4307,8 +4268,9 @@ fn preferences_dependent_forking() -> Result<()> {
 /// ```
 #[test]
 fn fork_remaining_universe_partitioning() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("fork/remaining-universe-partitioning.toml");
+    let context =
+        uv_test::test_context!("3.12").with_scenario("fork/remaining-universe-partitioning.toml");
+    let index_url = context.index_url().unwrap();
 
     let pyproject_toml = context.temp_dir.child("pyproject.toml");
     pyproject_toml.write_str(
@@ -4329,8 +4291,7 @@ fn fork_remaining_universe_partitioning() -> Result<()> {
     filters.push((r"\n\s+hint: .*", ""));
 
     let mut cmd = context.lock();
-    cmd.env_remove(EnvVars::UV_EXCLUDE_NEWER);
-    cmd.arg("--index-url").arg(server.index_url());
+    cmd.arg("--index-url").arg(&index_url);
     uv_snapshot!(filters, cmd, @"
     success: true
     exit_code: 0
@@ -4434,9 +4395,8 @@ fn fork_remaining_universe_partitioning() -> Result<()> {
     context
         .lock()
         .arg("--locked")
-        .env_remove(EnvVars::UV_EXCLUDE_NEWER)
         .arg("--index-url")
-        .arg(server.index_url())
+        .arg(&index_url)
         .assert()
         .success();
 
@@ -4461,8 +4421,9 @@ fn fork_remaining_universe_partitioning() -> Result<()> {
 /// ```
 #[test]
 fn fork_requires_python_full_prerelease() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("fork/requires-python-full-prerelease.toml");
+    let context =
+        uv_test::test_context!("3.12").with_scenario("fork/requires-python-full-prerelease.toml");
+    let index_url = context.index_url().unwrap();
 
     let pyproject_toml = context.temp_dir.child("pyproject.toml");
     pyproject_toml.write_str(
@@ -4482,8 +4443,7 @@ fn fork_requires_python_full_prerelease() -> Result<()> {
     filters.push((r"\n\s+hint: .*", ""));
 
     let mut cmd = context.lock();
-    cmd.env_remove(EnvVars::UV_EXCLUDE_NEWER);
-    cmd.arg("--index-url").arg(server.index_url());
+    cmd.arg("--index-url").arg(&index_url);
     uv_snapshot!(filters, cmd, @"
     success: true
     exit_code: 0
@@ -4519,9 +4479,8 @@ fn fork_requires_python_full_prerelease() -> Result<()> {
     context
         .lock()
         .arg("--locked")
-        .env_remove(EnvVars::UV_EXCLUDE_NEWER)
         .arg("--index-url")
-        .arg(server.index_url())
+        .arg(&index_url)
         .assert()
         .success();
 
@@ -4546,8 +4505,8 @@ fn fork_requires_python_full_prerelease() -> Result<()> {
 /// ```
 #[test]
 fn fork_requires_python_full() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("fork/requires-python-full.toml");
+    let context = uv_test::test_context!("3.12").with_scenario("fork/requires-python-full.toml");
+    let index_url = context.index_url().unwrap();
 
     let pyproject_toml = context.temp_dir.child("pyproject.toml");
     pyproject_toml.write_str(
@@ -4567,8 +4526,7 @@ fn fork_requires_python_full() -> Result<()> {
     filters.push((r"\n\s+hint: .*", ""));
 
     let mut cmd = context.lock();
-    cmd.env_remove(EnvVars::UV_EXCLUDE_NEWER);
-    cmd.arg("--index-url").arg(server.index_url());
+    cmd.arg("--index-url").arg(&index_url);
     uv_snapshot!(filters, cmd, @"
     success: true
     exit_code: 0
@@ -4604,9 +4562,8 @@ fn fork_requires_python_full() -> Result<()> {
     context
         .lock()
         .arg("--locked")
-        .env_remove(EnvVars::UV_EXCLUDE_NEWER)
         .arg("--index-url")
-        .arg(server.index_url())
+        .arg(&index_url)
         .assert()
         .success();
 
@@ -4636,8 +4593,9 @@ fn fork_requires_python_full() -> Result<()> {
 /// ```
 #[test]
 fn fork_requires_python_patch_overlap() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("fork/requires-python-patch-overlap.toml");
+    let context =
+        uv_test::test_context!("3.12").with_scenario("fork/requires-python-patch-overlap.toml");
+    let index_url = context.index_url().unwrap();
 
     let pyproject_toml = context.temp_dir.child("pyproject.toml");
     pyproject_toml.write_str(
@@ -4657,8 +4615,7 @@ fn fork_requires_python_patch_overlap() -> Result<()> {
     filters.push((r"\n\s+hint: .*", ""));
 
     let mut cmd = context.lock();
-    cmd.env_remove(EnvVars::UV_EXCLUDE_NEWER);
-    cmd.arg("--index-url").arg(server.index_url());
+    cmd.arg("--index-url").arg(&index_url);
     uv_snapshot!(filters, cmd, @"
     success: true
     exit_code: 0
@@ -4706,9 +4663,8 @@ fn fork_requires_python_patch_overlap() -> Result<()> {
     context
         .lock()
         .arg("--locked")
-        .env_remove(EnvVars::UV_EXCLUDE_NEWER)
         .arg("--index-url")
-        .arg(server.index_url())
+        .arg(&index_url)
         .assert()
         .success();
 
@@ -4730,8 +4686,8 @@ fn fork_requires_python_patch_overlap() -> Result<()> {
 /// ```
 #[test]
 fn fork_requires_python() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("fork/requires-python.toml");
+    let context = uv_test::test_context!("3.12").with_scenario("fork/requires-python.toml");
+    let index_url = context.index_url().unwrap();
 
     let pyproject_toml = context.temp_dir.child("pyproject.toml");
     pyproject_toml.write_str(
@@ -4751,8 +4707,7 @@ fn fork_requires_python() -> Result<()> {
     filters.push((r"\n\s+hint: .*", ""));
 
     let mut cmd = context.lock();
-    cmd.env_remove(EnvVars::UV_EXCLUDE_NEWER);
-    cmd.arg("--index-url").arg(server.index_url());
+    cmd.arg("--index-url").arg(&index_url);
     uv_snapshot!(filters, cmd, @"
     success: true
     exit_code: 0
@@ -4788,9 +4743,8 @@ fn fork_requires_python() -> Result<()> {
     context
         .lock()
         .arg("--locked")
-        .env_remove(EnvVars::UV_EXCLUDE_NEWER)
         .arg("--index-url")
-        .arg(server.index_url())
+        .arg(&index_url)
         .assert()
         .success();
 
@@ -4812,8 +4766,9 @@ fn fork_requires_python() -> Result<()> {
 /// ```
 #[test]
 fn requires_python_wheels() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("tag_and_markers/requires-python-wheels.toml");
+    let context =
+        uv_test::test_context!("3.12").with_scenario("tag_and_markers/requires-python-wheels.toml");
+    let index_url = context.index_url().unwrap();
 
     let pyproject_toml = context.temp_dir.child("pyproject.toml");
     pyproject_toml.write_str(
@@ -4833,8 +4788,7 @@ fn requires_python_wheels() -> Result<()> {
     filters.push((r"\n\s+hint: .*", ""));
 
     let mut cmd = context.lock();
-    cmd.env_remove(EnvVars::UV_EXCLUDE_NEWER);
-    cmd.arg("--index-url").arg(server.index_url());
+    cmd.arg("--index-url").arg(&index_url);
     uv_snapshot!(filters, cmd, @"
     success: true
     exit_code: 0
@@ -4883,9 +4837,8 @@ fn requires_python_wheels() -> Result<()> {
     context
         .lock()
         .arg("--locked")
-        .env_remove(EnvVars::UV_EXCLUDE_NEWER)
         .arg("--index-url")
-        .arg(server.index_url())
+        .arg(&index_url)
         .assert()
         .success();
 
@@ -4910,8 +4863,9 @@ fn requires_python_wheels() -> Result<()> {
 /// ```
 #[test]
 fn unreachable_package() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("tag_and_markers/unreachable-package.toml");
+    let context =
+        uv_test::test_context!("3.12").with_scenario("tag_and_markers/unreachable-package.toml");
+    let index_url = context.index_url().unwrap();
 
     let pyproject_toml = context.temp_dir.child("pyproject.toml");
     pyproject_toml.write_str(
@@ -4931,8 +4885,7 @@ fn unreachable_package() -> Result<()> {
     filters.push((r"\n\s+hint: .*", ""));
 
     let mut cmd = context.lock();
-    cmd.env_remove(EnvVars::UV_EXCLUDE_NEWER);
-    cmd.arg("--index-url").arg(server.index_url());
+    cmd.arg("--index-url").arg(&index_url);
     uv_snapshot!(filters, cmd, @"
     success: true
     exit_code: 0
@@ -4980,9 +4933,8 @@ fn unreachable_package() -> Result<()> {
     context
         .lock()
         .arg("--locked")
-        .env_remove(EnvVars::UV_EXCLUDE_NEWER)
         .arg("--index-url")
-        .arg(server.index_url())
+        .arg(&index_url)
         .assert()
         .success();
 
@@ -5011,8 +4963,9 @@ fn unreachable_package() -> Result<()> {
 /// ```
 #[test]
 fn unreachable_wheels() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("tag_and_markers/unreachable-wheels.toml");
+    let context =
+        uv_test::test_context!("3.12").with_scenario("tag_and_markers/unreachable-wheels.toml");
+    let index_url = context.index_url().unwrap();
 
     let pyproject_toml = context.temp_dir.child("pyproject.toml");
     pyproject_toml.write_str(
@@ -5034,8 +4987,7 @@ fn unreachable_wheels() -> Result<()> {
     filters.push((r"\n\s+hint: .*", ""));
 
     let mut cmd = context.lock();
-    cmd.env_remove(EnvVars::UV_EXCLUDE_NEWER);
-    cmd.arg("--index-url").arg(server.index_url());
+    cmd.arg("--index-url").arg(&index_url);
     uv_snapshot!(filters, cmd, @"
     success: true
     exit_code: 0
@@ -5108,9 +5060,8 @@ fn unreachable_wheels() -> Result<()> {
     context
         .lock()
         .arg("--locked")
-        .env_remove(EnvVars::UV_EXCLUDE_NEWER)
         .arg("--index-url")
-        .arg(server.index_url())
+        .arg(&index_url)
         .assert()
         .success();
 
@@ -5144,8 +5095,9 @@ fn unreachable_wheels() -> Result<()> {
 /// ```
 #[test]
 fn marker_variants_have_different_extras() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("tag_and_markers/virtual-package-extra-priorities.toml");
+    let context = uv_test::test_context!("3.12")
+        .with_scenario("tag_and_markers/virtual-package-extra-priorities.toml");
+    let index_url = context.index_url().unwrap();
 
     let pyproject_toml = context.temp_dir.child("pyproject.toml");
     pyproject_toml.write_str(
@@ -5166,8 +5118,7 @@ fn marker_variants_have_different_extras() -> Result<()> {
     filters.push((r"\n\s+hint: .*", ""));
 
     let mut cmd = context.lock();
-    cmd.env_remove(EnvVars::UV_EXCLUDE_NEWER);
-    cmd.arg("--index-url").arg(server.index_url());
+    cmd.arg("--index-url").arg(&index_url);
     uv_snapshot!(filters, cmd, @"
     success: true
     exit_code: 0
@@ -5249,9 +5200,8 @@ fn marker_variants_have_different_extras() -> Result<()> {
     context
         .lock()
         .arg("--locked")
-        .env_remove(EnvVars::UV_EXCLUDE_NEWER)
         .arg("--index-url")
-        .arg(server.index_url())
+        .arg(&index_url)
         .assert()
         .success();
 
@@ -5283,8 +5233,9 @@ fn marker_variants_have_different_extras() -> Result<()> {
 /// ```
 #[test]
 fn virtual_package_extra_priorities() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("tag_and_markers/virtual-package-marker-priorities.toml");
+    let context = uv_test::test_context!("3.12")
+        .with_scenario("tag_and_markers/virtual-package-marker-priorities.toml");
+    let index_url = context.index_url().unwrap();
 
     let pyproject_toml = context.temp_dir.child("pyproject.toml");
     pyproject_toml.write_str(
@@ -5305,8 +5256,7 @@ fn virtual_package_extra_priorities() -> Result<()> {
     filters.push((r"\n\s+hint: .*", ""));
 
     let mut cmd = context.lock();
-    cmd.env_remove(EnvVars::UV_EXCLUDE_NEWER);
-    cmd.arg("--index-url").arg(server.index_url());
+    cmd.arg("--index-url").arg(&index_url);
     uv_snapshot!(filters, cmd, @"
     success: true
     exit_code: 0
@@ -5370,14 +5320,14 @@ fn virtual_package_extra_priorities() -> Result<()> {
     context
         .lock()
         .arg("--locked")
-        .env_remove(EnvVars::UV_EXCLUDE_NEWER)
         .arg("--index-url")
-        .arg(server.index_url())
+        .arg(&index_url)
         .assert()
         .success();
 
     Ok(())
 }
+
 /// While both Linux and Windows are required and `win-only` has only a Windows wheel, `win-only` is also used only on Windows.
 ///
 /// ```text
@@ -5392,8 +5342,9 @@ fn virtual_package_extra_priorities() -> Result<()> {
 /// ```
 #[test]
 fn requires_python_subset() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("wheels/requires-python-subset.toml");
+    let context =
+        uv_test::test_context!("3.12").with_scenario("wheels/requires-python-subset.toml");
+    let index_url = context.index_url().unwrap();
 
     let pyproject_toml = context.temp_dir.child("pyproject.toml");
     pyproject_toml.write_str(
@@ -5418,8 +5369,7 @@ fn requires_python_subset() -> Result<()> {
     filters.push((r"\n\s+hint: .*", ""));
 
     let mut cmd = context.lock();
-    cmd.env_remove(EnvVars::UV_EXCLUDE_NEWER);
-    cmd.arg("--index-url").arg(server.index_url());
+    cmd.arg("--index-url").arg(&index_url);
     uv_snapshot!(filters, cmd, @"
     success: true
     exit_code: 0
@@ -5470,9 +5420,8 @@ fn requires_python_subset() -> Result<()> {
     context
         .lock()
         .arg("--locked")
-        .env_remove(EnvVars::UV_EXCLUDE_NEWER)
         .arg("--index-url")
-        .arg(server.index_url())
+        .arg(&index_url)
         .assert()
         .success();
 
@@ -5505,8 +5454,8 @@ fn requires_python_subset() -> Result<()> {
 /// ```
 #[test]
 fn specific_architecture() -> Result<()> {
-    let context = uv_test::test_context!("3.12");
-    let server = PackseServer::new("wheels/specific-architecture.toml");
+    let context = uv_test::test_context!("3.12").with_scenario("wheels/specific-architecture.toml");
+    let index_url = context.index_url().unwrap();
 
     let pyproject_toml = context.temp_dir.child("pyproject.toml");
     pyproject_toml.write_str(
@@ -5526,8 +5475,7 @@ fn specific_architecture() -> Result<()> {
     filters.push((r"\n\s+hint: .*", ""));
 
     let mut cmd = context.lock();
-    cmd.env_remove(EnvVars::UV_EXCLUDE_NEWER);
-    cmd.arg("--index-url").arg(server.index_url());
+    cmd.arg("--index-url").arg(&index_url);
     uv_snapshot!(filters, cmd, @"
     success: true
     exit_code: 0
@@ -5612,9 +5560,8 @@ fn specific_architecture() -> Result<()> {
     context
         .lock()
         .arg("--locked")
-        .env_remove(EnvVars::UV_EXCLUDE_NEWER)
         .arg("--index-url")
-        .arg(server.index_url())
+        .arg(&index_url)
         .assert()
         .success();
 

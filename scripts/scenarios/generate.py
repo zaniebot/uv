@@ -361,7 +361,10 @@ class Scenario:
             buffer += line + "\n"
 
         package_names = sorted(self.packages.keys())
-        pointers_list = [tee] * (len(package_names) - 1) + [last]
+        if package_names:
+            pointers_list = [tee] * (len(package_names) - 1) + [last]
+        else:
+            pointers_list = []
         for pointer, package_name in zip(pointers_list, package_names, strict=True):
             buffer += pointer + package_name + "\n"
             prefix = branch if pointer == tee else space

@@ -13,9 +13,6 @@ use assert_cmd::assert::OutputAssertExt;
 use assert_fs::prelude::*;
 use insta::assert_snapshot;
 
-use uv_static::EnvVars;
-
-use uv_test::packse::PackseServer;
 use uv_test::uv_snapshot;
 
 {{#scenarios}}
@@ -30,8 +27,9 @@ use uv_test::uv_snapshot;
 /// ```
 #[test]
 fn {{module_name}}() -> Result<()> {
-    let context = uv_test::test_context!("{{environment.python}}");
-    let server = PackseServer::new("{{scenario_path}}");
+    let context = uv_test::test_context!("{{environment.python}}")
+        .with_scenario("{{scenario_path}}");
+    let index_url = context.index_url().unwrap();
 
     let pyproject_toml = context.temp_dir.child("pyproject.toml");
     pyproject_toml.write_str(
@@ -63,8 +61,7 @@ fn {{module_name}}() -> Result<()> {
     filters.push((r"\n\s+hint: .*", ""));
 
     let mut cmd = context.lock();
-    cmd.env_remove(EnvVars::UV_EXCLUDE_NEWER);
-    cmd.arg("--index-url").arg(server.index_url());
+    cmd.arg("--index-url").arg(&index_url);
     {{#expected.explanation}}
     // {{expected.explanation}}
     {{/expected.explanation}}
@@ -87,9 +84,8 @@ fn {{module_name}}() -> Result<()> {
     context
         .lock()
         .arg("--locked")
-        .env_remove(EnvVars::UV_EXCLUDE_NEWER)
         .arg("--index-url")
-        .arg(server.index_url())
+        .arg(&index_url)
         .assert()
         .success();
     {{/expected.satisfiable}}

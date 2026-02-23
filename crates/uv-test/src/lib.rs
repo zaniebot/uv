@@ -146,9 +146,15 @@ pub struct TestContext {
     /// Extra environment variables to apply to all commands.
     extra_env: Vec<(OsString, OsString)>,
 
-    /// When set, commands use this local package index instead of PyPI, and
-    /// `UV_EXCLUDE_NEWER` is removed (synthetic packages have no upload dates).
-    bypy: Option<packse::PackseServer>,
+    /// When `true`, use the shared bird-themed local package index instead
+    /// of PyPI.  `UV_INDEX_URL` is set and `UV_EXCLUDE_NEWER` is removed.
+    use_bypy: bool,
+
+    /// When set, a per-test packse scenario server.  `UV_EXCLUDE_NEWER` is
+    /// removed but the index URL is NOT automatically injected — tests must
+    /// call `context.index_url()` and pass it however they need (e.g. via
+    /// `--index-url`, `--index`, or in `pyproject.toml`).
+    scenario_server: Option<packse::PackseServer>,
 
     #[allow(dead_code)]
     _root: tempfile::TempDir,
@@ -952,7 +958,8 @@ impl TestContext {
             uv_bin,
             filters,
             extra_env: vec![],
-            bypy: None,
+            use_bypy: false,
+            scenario_server: None,
             _root: root,
         }
     }
@@ -1067,9 +1074,12 @@ impl TestContext {
             .env(EnvVars::UV_PYTHON_DOWNLOADS, "never")
             .env(EnvVars::UV_TEST_PYTHON_PATH, self.python_path());
         // Lock to a point in time view of the world.
-        // Disabled when using bypy (synthetic packages have no upload dates).
-        if let Some(server) = &self.bypy {
-            command.env(EnvVars::UV_INDEX_URL, server.index_url());
+        // Disabled when using a local index (synthetic packages have no upload dates).
+        if self.use_bypy {
+            command.env(EnvVars::UV_INDEX_URL, packse::shared_bypy_index_url());
+        } else if self.scenario_server.is_some() {
+            // Scenario server present — skip EXCLUDE_NEWER but don't set UV_INDEX_URL
+            // (tests pass the URL via --index-url, --index, or pyproject.toml).
         } else {
             command
                 .env(EnvVars::UV_EXCLUDE_NEWER, EXCLUDE_NEWER)
@@ -1118,9 +1128,36 @@ impl TestContext {
     /// (synthetic packages have no upload dates).
     #[must_use]
     pub fn with_bypy(mut self) -> Self {
-        let server = packse::PackseServer::for_packages("general.toml");
-        self.bypy = Some(server);
+        self.use_bypy = true;
         self
+    }
+
+    /// Use a packse scenario as the package index for this test context.
+    ///
+    /// The scenario TOML is loaded from `test/scenarios/{path}` and a
+    /// per-test mock server is started.  `UV_EXCLUDE_NEWER` is removed, but
+    /// the index URL is NOT automatically injected — call
+    /// [`Self::index_url()`] and pass it via `--index-url`, `--index`, or
+    /// in `pyproject.toml`.
+    #[must_use]
+    pub fn with_scenario(mut self, path: &str) -> Self {
+        let server = packse::PackseServer::new(path);
+        self.scenario_server = Some(server);
+        self
+    }
+
+    /// Return the index URL of the local package server, if any.
+    ///
+    /// Returns the shared bird-themed index URL for `with_bypy()` contexts,
+    /// or the per-test scenario server URL for `with_scenario()` contexts.
+    pub fn index_url(&self) -> Option<String> {
+        if let Some(server) = &self.scenario_server {
+            Some(server.index_url())
+        } else if self.use_bypy {
+            Some(packse::shared_bypy_index_url())
+        } else {
+            None
+        }
     }
 
     /// Create a `pip compile` command for testing.

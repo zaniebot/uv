@@ -14582,7 +14582,6 @@ fn universal_conflicting_override_urls() -> Result<()> {
 #[test]
 fn compile_lowest_extra_unpinned_warning() -> Result<()> {
     let context = uv_test::test_context!("3.12").with_bypy();
-    let server = uv_test::packse::PackseServer::new("extras/all-extras-required.toml");
 
     let requirements_in = context.temp_dir.child("requirements.in");
     requirements_in.write_str(indoc::indoc! {r"

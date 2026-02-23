@@ -12589,9 +12589,8 @@ fn direct_url_dependency_metadata() -> Result<()> {
 
 #[test]
 fn sync_required_environment_hint() -> Result<()> {
-    let server =
-        uv_test::packse::PackseServer::new("wheels/no-sdist-no-wheels-with-matching-platform.toml");
-    let context = uv_test::test_context!("3.13");
+    let context = uv_test::test_context!("3.13")
+        .with_scenario("wheels/no-sdist-no-wheels-with-matching-platform.toml");
 
     let pyproject_toml = context.temp_dir.child("pyproject.toml");
     pyproject_toml.write_str(&formatdoc! {r#"
@@ -12606,10 +12605,10 @@ fn sync_required_environment_hint() -> Result<()> {
         url = "{index_url}"
         default = true
         "#,
-        index_url = server.index_url()
+        index_url = context.index_url().unwrap()
     })?;
 
-    uv_snapshot!(context.filters(), context.lock().env_remove(EnvVars::UV_EXCLUDE_NEWER), @"
+    uv_snapshot!(context.filters(), context.lock(), @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -12628,7 +12627,7 @@ fn sync_required_environment_hint() -> Result<()> {
         "sys_platform == '[PLATFORM]' and platform_machine == '[MACHINE]'",
     ));
 
-    uv_snapshot!(filters, context.sync().env_remove(EnvVars::UV_EXCLUDE_NEWER), @r#"
+    uv_snapshot!(filters, context.sync(), @r#"
     success: false
     exit_code: 2
     ----- stdout -----

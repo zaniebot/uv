@@ -4,6 +4,7 @@
 //! `__init__.py`. We generate them directly without invoking a Python build backend.
 
 use std::collections::BTreeMap;
+use std::fmt::Write as _;
 use std::io::{Cursor, Write};
 
 use flate2::Compression;
@@ -40,7 +41,7 @@ pub fn generate_wheel(
             .unwrap_or("");
         if !dep_name.is_empty() {
             let dep_module = dep_name.replace('-', "_");
-            init_py.push_str(&format!("import {dep_module}\n"));
+            writeln!(init_py, "import {dep_module}").unwrap();
         }
     }
     zip.start_file(format!("{normalized}/__init__.py"), opts)
@@ -125,7 +126,7 @@ pub fn generate_sdist(
             .unwrap_or("");
         if !dep_name.is_empty() {
             let dep_module = dep_name.replace('-', "_");
-            init_py.push_str(&format!("import {dep_module}\n"));
+            writeln!(init_py, "import {dep_module}").unwrap();
         }
     }
     append_tar_file(

@@ -5,7 +5,6 @@
 //!
 #![cfg(all(feature = "test-python", unix))]
 
-use std::env;
 use std::process::Command;
 
 use anyhow::Result;
@@ -15,11 +14,10 @@ use predicates::prelude::predicate;
 
 use uv_static::EnvVars;
 
-use uv_test::packse::PackseServer;
 use uv_test::{TestContext, python_path_with_versions, uv_snapshot};
 
 /// Provision python binaries and return a `pip compile` command with options shared across all scenarios.
-fn command(context: &TestContext, python_versions: &[&str], server: &PackseServer) -> Command {
+fn command(context: &TestContext, python_versions: &[&str]) -> Command {
     let python_path = python_path_with_versions(&context.temp_dir, python_versions)
         .expect("Failed to create Python test path");
     let mut command = Command::new(uv_test::get_bin!());
@@ -28,9 +26,8 @@ fn command(context: &TestContext, python_versions: &[&str], server: &PackseServe
         .arg("compile")
         .arg("requirements.in")
         .arg("--index-url")
-        .arg(server.index_url());
+        .arg(context.index_url().unwrap());
     context.add_shared_options(&mut command, true);
-    command.env_remove(EnvVars::UV_EXCLUDE_NEWER);
     command.env(EnvVars::UV_TEST_PYTHON_PATH, python_path);
 
     command
@@ -51,14 +48,14 @@ fn command(context: &TestContext, python_versions: &[&str], server: &PackseServe
 /// ```
 #[test]
 fn compatible_python_incompatible_override() -> Result<()> {
-    let context = uv_test::test_context!("3.11");
+    let context = uv_test::test_context!("3.11")
+        .with_scenario("requires_python/compatible-python-incompatible-override.toml");
     let python_versions = &[];
-    let server = PackseServer::new("requires_python/compatible-python-incompatible-override.toml");
 
     let requirements_in = context.temp_dir.child("requirements.in");
     requirements_in.write_str("a==1.0.0")?;
 
-    let output = uv_snapshot!(context.filters(), command(&context, python_versions, &server)
+    let output = uv_snapshot!(context.filters(), command(&context, python_versions)
         .arg("--python-version=3.9")
         , @"
     success: false
@@ -96,17 +93,16 @@ fn compatible_python_incompatible_override() -> Result<()> {
 /// ```
 #[test]
 fn incompatible_python_compatible_override_available_no_wheels() -> Result<()> {
-    let context = uv_test::test_context!("3.9");
-    let python_versions = &["3.11"];
-    let server = PackseServer::new(
+    let context = uv_test::test_context!("3.9").with_scenario(
         "requires_python/incompatible-python-compatible-override-available-no-wheels.toml",
     );
+    let python_versions = &["3.11"];
 
     let requirements_in = context.temp_dir.child("requirements.in");
     requirements_in.write_str("a==1.0.0")?;
 
     // Since there is a compatible Python version available on the system, it should be used to build the source distributions.
-    let output = uv_snapshot!(context.filters(), command(&context, python_versions, &server)
+    let output = uv_snapshot!(context.filters(), command(&context, python_versions)
         .arg("--python-version=3.11")
         , @"
     success: true
@@ -145,17 +141,16 @@ fn incompatible_python_compatible_override_available_no_wheels() -> Result<()> {
 /// ```
 #[test]
 fn incompatible_python_compatible_override_no_compatible_wheels() -> Result<()> {
-    let context = uv_test::test_context!("3.9");
-    let python_versions = &[];
-    let server = PackseServer::new(
+    let context = uv_test::test_context!("3.9").with_scenario(
         "requires_python/incompatible-python-compatible-override-no-compatible-wheels.toml",
     );
+    let python_versions = &[];
 
     let requirements_in = context.temp_dir.child("requirements.in");
     requirements_in.write_str("a==1.0.0")?;
 
     // Since there are no compatible wheels for the package and it is not compatible with the local installation, we cannot build the source distribution to determine its dependencies. However, the source distribution includes static metadata, which we can use to determine dependencies without building the package.
-    let output = uv_snapshot!(context.filters(), command(&context, python_versions, &server)
+    let output = uv_snapshot!(context.filters(), command(&context, python_versions)
         .arg("--python-version=3.11")
         , @"
     success: true
@@ -195,17 +190,15 @@ fn incompatible_python_compatible_override_no_compatible_wheels() -> Result<()> 
 /// ```
 #[test]
 fn incompatible_python_compatible_override_other_wheel() -> Result<()> {
-    let context = uv_test::test_context!("3.9");
+    let context = uv_test::test_context!("3.9")
+        .with_scenario("requires_python/incompatible-python-compatible-override-other-wheel.toml");
     let python_versions = &[];
-    let server = PackseServer::new(
-        "requires_python/incompatible-python-compatible-override-other-wheel.toml",
-    );
 
     let requirements_in = context.temp_dir.child("requirements.in");
     requirements_in.write_str("a")?;
 
     // Since there are no wheels for the version of the package compatible with the target and it is not compatible with the local installation, we cannot build the source distribution to determine its dependencies. However, the source distribution includes static metadata, which we can use to determine dependencies without building the package.
-    let output = uv_snapshot!(context.filters(), command(&context, python_versions, &server)
+    let output = uv_snapshot!(context.filters(), command(&context, python_versions)
         .arg("--python-version=3.11")
         , @"
     success: true
@@ -242,17 +235,16 @@ fn incompatible_python_compatible_override_other_wheel() -> Result<()> {
 /// ```
 #[test]
 fn incompatible_python_compatible_override_unavailable_no_wheels() -> Result<()> {
-    let context = uv_test::test_context!("3.9");
-    let python_versions = &[];
-    let server = PackseServer::new(
+    let context = uv_test::test_context!("3.9").with_scenario(
         "requires_python/incompatible-python-compatible-override-unavailable-no-wheels.toml",
     );
+    let python_versions = &[];
 
     let requirements_in = context.temp_dir.child("requirements.in");
     requirements_in.write_str("a==1.0.0")?;
 
     // Since there are no wheels for the package and it is not compatible with the local installation, we cannot build the source distribution to determine its dependencies. However, the source distribution includes static metadata, which we can use to determine dependencies without building the package.
-    let output = uv_snapshot!(context.filters(), command(&context, python_versions, &server)
+    let output = uv_snapshot!(context.filters(), command(&context, python_versions)
         .arg("--python-version=3.11")
         , @"
     success: true
@@ -289,14 +281,14 @@ fn incompatible_python_compatible_override_unavailable_no_wheels() -> Result<()>
 /// ```
 #[test]
 fn incompatible_python_compatible_override() -> Result<()> {
-    let context = uv_test::test_context!("3.9");
+    let context = uv_test::test_context!("3.9")
+        .with_scenario("requires_python/incompatible-python-compatible-override.toml");
     let python_versions = &[];
-    let server = PackseServer::new("requires_python/incompatible-python-compatible-override.toml");
 
     let requirements_in = context.temp_dir.child("requirements.in");
     requirements_in.write_str("a==1.0.0")?;
 
-    let output = uv_snapshot!(context.filters(), command(&context, python_versions, &server)
+    let output = uv_snapshot!(context.filters(), command(&context, python_versions)
         .arg("--python-version=3.11")
         , @"
     success: true
@@ -337,28 +329,18 @@ fn incompatible_python_compatible_override() -> Result<()> {
 #[cfg(feature = "test-python-patch")]
 #[test]
 fn python_patch_override_no_patch() -> Result<()> {
-    let context = uv_test::test_context!("3.9.21");
+    let context = uv_test::test_context!("3.9.21")
+        .with_scenario("requires_python/python-patch-override-no-patch.toml");
     let python_versions = &[];
-    let server = PackseServer::new("requires_python/python-patch-override-no-patch.toml");
 
     let requirements_in = context.temp_dir.child("requirements.in");
     requirements_in.write_str("a==1.0.0")?;
 
     // Since the resolver is asked to solve with 3.9, the minimum compatible Python requirement is treated as 3.9.0.
-    let output = uv_snapshot!(context.filters(), command(&context, python_versions, &server)
+    let output = uv_snapshot!(context.filters(), command(&context, python_versions)
         .arg("--python-version=3.9")
-        , @"
-    success: false
-    exit_code: 1
-    ----- stdout -----
-
-    ----- stderr -----
-      × No solution found when resolving dependencies:
-      ╰─▶ Because the requested Python version (>=3.9) does not satisfy Python>=3.9.4 and a==1.0.0 depends on Python>=3.9.4, we can conclude that a==1.0.0 cannot be used.
-          And because you require a==1.0.0, we can conclude that your requirements are unsatisfiable.
-
-          hint: The `--python-version` value (>=3.9) includes Python versions that are not supported by your dependencies (e.g., a==1.0.0 only supports >=3.9.4). Consider using a higher `--python-version` value.
-    "
+        , @r###"<snapshot>
+    "###
     );
 
     output.assert().failure();
@@ -382,28 +364,17 @@ fn python_patch_override_no_patch() -> Result<()> {
 #[cfg(feature = "test-python-patch")]
 #[test]
 fn python_patch_override_patch_compatible() -> Result<()> {
-    let context = uv_test::test_context!("3.9.21");
+    let context = uv_test::test_context!("3.9.21")
+        .with_scenario("requires_python/python-patch-override-patch-compatible.toml");
     let python_versions = &[];
-    let server = PackseServer::new("requires_python/python-patch-override-patch-compatible.toml");
 
     let requirements_in = context.temp_dir.child("requirements.in");
     requirements_in.write_str("a==1.0.0")?;
 
-    let output = uv_snapshot!(context.filters(), command(&context, python_versions, &server)
+    let output = uv_snapshot!(context.filters(), command(&context, python_versions)
         .arg("--python-version=3.9.0")
-        , @"
-    success: true
-    exit_code: 0
-    ----- stdout -----
-    # This file was autogenerated by uv via the following command:
-    #    uv pip compile requirements.in --cache-dir [CACHE_DIR] --python-version=3.9.0
-    a==1.0.0
-        # via -r requirements.in
-
-    ----- stderr -----
-    warning: The requested Python version 3.9.0 is not available; 3.9.21 will be used to build dependencies instead.
-    Resolved 1 package in [TIME]
-    "
+        , @r###"<snapshot>
+    "###
     );
 
     output
