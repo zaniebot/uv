@@ -5,6 +5,40 @@ use uv_keyring::{Entry, Error};
 
 mod common;
 
+/// Maximum number of retries for transient platform errors (e.g., D-Bus disconnects in CI).
+const MAX_RETRIES: u32 = 3;
+
+/// Retry an async keyring operation on transient `PlatformFailure` errors.
+///
+/// In CI environments, the D-Bus secret service can transiently disconnect under concurrent load,
+/// causing `PlatformFailure` errors. This helper retries the operation with a short delay.
+async fn retry_on_platform_failure<F, Fut, T>(description: &str, f: F) -> Result<T, Error>
+where
+    F: Fn() -> Fut,
+    Fut: std::future::Future<Output = Result<T, Error>>,
+{
+    let mut last_err = None;
+    for attempt in 0..=MAX_RETRIES {
+        match f().await {
+            Ok(value) => return Ok(value),
+            Err(Error::PlatformFailure(err)) if attempt < MAX_RETRIES => {
+                eprintln!(
+                    "Retrying {description} after transient platform failure (attempt {}/{}): {err}",
+                    attempt + 1,
+                    MAX_RETRIES
+                );
+                tokio::time::sleep(std::time::Duration::from_millis(
+                    100 * u64::from(attempt + 1),
+                ))
+                .await;
+                last_err = Some(Error::PlatformFailure(err));
+            }
+            Err(err) => return Err(err),
+        }
+    }
+    Err(last_err.expect("loop should have run at least once"))
+}
+
 #[tokio::test]
 async fn test_create_then_move() {
     init_logger();
@@ -62,20 +96,18 @@ async fn test_simultaneous_create_then_move() {
         let entry = Entry::new(&name, &name).expect("Can't create entry");
 
         let handle = tokio::spawn(async move {
-            entry
-                .set_password(&name)
+            retry_on_platform_failure("set_password", || entry.set_password(&name))
                 .await
                 .expect("Can't set ascii password");
-            let stored_password = entry
-                .get_password()
-                .await
-                .expect("Can't get ascii password");
+            let stored_password =
+                retry_on_platform_failure("get_password", || entry.get_password())
+                    .await
+                    .expect("Can't get ascii password");
             assert_eq!(
                 stored_password, name,
                 "Retrieved and set ascii passwords don't match"
             );
-            entry
-                .delete_credential()
+            retry_on_platform_failure("delete_credential", || entry.delete_credential())
                 .await
                 .expect("Can't delete ascii password");
             assert!(
@@ -135,22 +167,20 @@ async fn test_simultaneous_create_set_then_move() {
     for i in 0..10 {
         let name = format!("{}-{}", generate_random_string(), i);
         let entry = Entry::new(&name, &name).expect("Can't create entry");
-        entry
-            .set_password(&name)
+        retry_on_platform_failure("set_password", || entry.set_password(&name))
             .await
             .expect("Can't set ascii password");
 
         let handle = tokio::spawn(async move {
-            let stored_password = entry
-                .get_password()
-                .await
-                .expect("Can't get ascii password");
+            let stored_password =
+                retry_on_platform_failure("get_password", || entry.get_password())
+                    .await
+                    .expect("Can't get ascii password");
             assert_eq!(
                 stored_password, name,
                 "Retrieved and set ascii passwords don't match"
             );
-            entry
-                .delete_credential()
+            retry_on_platform_failure("delete_credential", || entry.delete_credential())
                 .await
                 .expect("Can't delete ascii password");
             assert!(
@@ -176,20 +206,18 @@ async fn test_simultaneous_independent_create_set() {
         let name = format!("thread_entry{i}");
         let handle = tokio::spawn(async move {
             let entry = Entry::new(&name, &name).expect("Can't create entry");
-            entry
-                .set_password(&name)
+            retry_on_platform_failure("set_password", || entry.set_password(&name))
                 .await
                 .expect("Can't set ascii password");
-            let stored_password = entry
-                .get_password()
-                .await
-                .expect("Can't get ascii password");
+            let stored_password =
+                retry_on_platform_failure("get_password", || entry.get_password())
+                    .await
+                    .expect("Can't get ascii password");
             assert_eq!(
                 stored_password, name,
                 "Retrieved and set ascii passwords don't match"
             );
-            entry
-                .delete_credential()
+            retry_on_platform_failure("delete_credential", || entry.delete_credential())
                 .await
                 .expect("Can't delete ascii password");
             assert!(
@@ -252,20 +280,18 @@ async fn test_simultaneous_multiple_create_delete_single_thread() {
             let entry = Entry::new(&name, &name).expect("Can't create entry");
             let repeats = 10;
             for _i in 0..repeats {
-                entry
-                    .set_password(&name)
+                retry_on_platform_failure("set_password", || entry.set_password(&name))
                     .await
                     .expect("Can't set ascii password");
-                let stored_password = entry
-                    .get_password()
-                    .await
-                    .expect("Can't get ascii password");
+                let stored_password =
+                    retry_on_platform_failure("get_password", || entry.get_password())
+                        .await
+                        .expect("Can't get ascii password");
                 assert_eq!(
                     stored_password, name,
                     "Retrieved and set ascii passwords don't match"
                 );
-                entry
-                    .delete_credential()
+                retry_on_platform_failure("delete_credential", || entry.delete_credential())
                     .await
                     .expect("Can't delete ascii password");
                 assert!(
