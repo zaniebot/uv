@@ -14,6 +14,9 @@ fail-fast = false
 
 [profile.ci-linux]
 inherits = "ci"
+# Retry failed tests once to handle transient Linux CI flakes
+# (e.g., D-Bus secret service disconnects in keyring threading tests)
+retries = 2
 
 [profile.ci-macos]
 inherits = "ci"
