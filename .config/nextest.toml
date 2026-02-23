@@ -21,6 +21,9 @@ test-threads = 12
 
 [profile.ci-windows]
 inherits = "ci"
+# Retry failed tests once to handle transient Windows CI flakes
+# (e.g., trampoline "failed to assign child process to job object" errors)
+retries = 2
 
 [test-groups]
 serial = { max-threads = 1 }
