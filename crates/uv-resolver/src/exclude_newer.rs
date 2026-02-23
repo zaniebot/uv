@@ -720,27 +720,20 @@ impl ExcludeNewerPackage {
         None
     }
 
-    /// Create a new [`ExcludeNewerPackage`] that preserves timestamps from `previous` where the
-    /// relative span matches. This avoids unnecessary lock file updates when only the computed
-    /// timestamp from a relative span changed.
-    fn preserve_relative_timestamps(self, previous: &Self) -> Self {
-        Self(
-            self.0
-                .into_iter()
-                .map(|(name, setting)| {
-                    let merged = match (&setting, previous.get(&name)) {
-                        (
-                            PackageExcludeNewer::Enabled(current),
-                            Some(PackageExcludeNewer::Enabled(prev)),
-                        ) if current.span().is_some() && current.span() == prev.span() => {
-                            PackageExcludeNewer::Enabled(prev.clone())
-                        }
-                        _ => setting,
-                    };
-                    (name, merged)
-                })
-                .collect(),
-        )
+    /// Preserve timestamps from `previous` where the relative span matches. This avoids
+    /// unnecessary lock file updates when only the computed timestamp from a relative span changed.
+    pub(crate) fn preserve_relative_timestamps(&mut self, previous: &Self) {
+        for (name, setting) in &mut self.0 {
+            if let Some(prev_setting) = previous.get(name) {
+                if let (PackageExcludeNewer::Enabled(current), PackageExcludeNewer::Enabled(prev)) =
+                    (&*setting, prev_setting)
+                {
+                    if current.span().is_some() && current.span() == prev.span() {
+                        *setting = PackageExcludeNewer::Enabled(prev.clone());
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -813,25 +806,6 @@ impl ExcludeNewer {
         self.package
             .compare(&other.package)
             .map(ExcludeNewerChange::Package)
-    }
-
-    /// Create a new [`ExcludeNewer`] that preserves timestamps from `previous` where the
-    /// relative span is unchanged. This avoids unnecessary lock file updates when only the
-    /// computed timestamp from a relative span changed.
-    #[must_use]
-    pub fn preserve_relative_timestamps(self, previous: &Self) -> Self {
-        let global = match (self.global, &previous.global) {
-            (Some(current), Some(prev))
-                if current.span().is_some() && current.span() == prev.span() =>
-            {
-                Some(prev.clone())
-            }
-            (current, _) => current,
-        };
-
-        let package = self.package.preserve_relative_timestamps(&previous.package);
-
-        Self { global, package }
     }
 }
 

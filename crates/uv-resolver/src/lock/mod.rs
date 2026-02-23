@@ -993,9 +993,16 @@ impl Lock {
         self.options.exclude_newer.clone().into()
     }
 
-    /// Set the exclude-newer options for this lock.
-    pub fn set_exclude_newer(&mut self, exclude_newer: ExcludeNewer) {
-        self.options.exclude_newer = exclude_newer.into();
+    /// Preserve relative exclude-newer timestamps from `previous` to avoid unnecessary lock file
+    /// updates when only the computed timestamp from a relative span changed.
+    #[must_use]
+    pub fn with_preserved_exclude_newer(mut self, previous: Option<&Self>) -> Self {
+        if let Some(previous) = previous {
+            self.options
+                .exclude_newer
+                .preserve_relative_timestamps(&previous.options.exclude_newer);
+        }
+        self
     }
 
     /// Returns the conflicting groups that were used to generate this lock.
@@ -2351,6 +2358,22 @@ struct ExcludeNewerWire {
     exclude_newer_span: Option<ExcludeNewerSpan>,
     #[serde(default, skip_serializing_if = "ExcludeNewerPackage::is_empty")]
     exclude_newer_package: ExcludeNewerPackage,
+}
+
+impl ExcludeNewerWire {
+    /// Preserve timestamps from `previous` where the relative span is unchanged. This avoids
+    /// unnecessary lock file updates when only the computed timestamp from a relative span changed.
+    fn preserve_relative_timestamps(&mut self, previous: &Self) {
+        // Global: if both have a span and the spans match, keep the previous timestamp.
+        if self.exclude_newer_span.is_some()
+            && self.exclude_newer_span == previous.exclude_newer_span
+        {
+            self.exclude_newer = previous.exclude_newer;
+        }
+        // Per-package: carry over timestamps where spans match.
+        self.exclude_newer_package
+            .preserve_relative_timestamps(&previous.exclude_newer_package);
+    }
 }
 
 impl From<ExcludeNewerWire> for ExcludeNewer {

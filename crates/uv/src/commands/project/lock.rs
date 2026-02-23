@@ -955,7 +955,7 @@ async fn do_lock(
             .relative_to(target.install_path())?;
 
             let previous = existing_lock.map(ValidatedLock::into_lock);
-            let mut lock = Lock::from_resolution(&resolution, target.install_path())?
+            let lock = Lock::from_resolution(&resolution, target.install_path())?
                 .with_manifest(manifest)
                 .with_conflicts(conflicts)
                 .with_supported_environments(
@@ -969,18 +969,11 @@ async fn do_lock(
                         .cloned()
                         .map(SupportedEnvironments::into_markers)
                         .unwrap_or_default(),
-                );
-
-            // If the exclude-newer only changed due to a relative timestamp shift
-            // (same span, different computed timestamp), preserve the previous
-            // timestamp to avoid unnecessary lock file updates.
-            // See: https://github.com/astral-sh/uv/issues/18155
-            if let Some(previous) = &previous {
-                let preserved = lock
-                    .exclude_newer()
-                    .preserve_relative_timestamps(&previous.exclude_newer());
-                lock.set_exclude_newer(preserved);
-            }
+                )
+                // Preserve relative exclude-newer timestamps from the previous
+                // lock to avoid unnecessary lock file updates when only the
+                // computed timestamp changed (see: #18155).
+                .with_preserved_exclude_newer(previous.as_ref());
 
             if previous.as_ref().is_some_and(|previous| *previous == lock) {
                 Ok(LockResult::Unchanged(lock))
