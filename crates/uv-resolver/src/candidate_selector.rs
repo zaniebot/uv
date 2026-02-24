@@ -6,7 +6,7 @@ use pubgrub::Range;
 use smallvec::SmallVec;
 use tracing::{debug, trace};
 
-use uv_configuration::IndexStrategy;
+use uv_configuration::{IndexStrategy, Upgrade};
 use uv_distribution_types::{CompatibleDist, IncompatibleDist, IncompatibleSource, IndexUrl};
 use uv_distribution_types::{DistributionMetadata, IncompatibleWheel, Name, PrioritizedDist};
 use uv_normalize::PackageName;
@@ -21,11 +21,11 @@ use crate::version_map::{VersionMap, VersionMapDistHandle};
 use crate::{Exclusions, Manifest, Options, ResolverEnvironment};
 
 #[derive(Debug, Clone)]
-#[expect(clippy::struct_field_names)]
 pub(crate) struct CandidateSelector {
     resolution_strategy: ResolutionStrategy,
     prerelease_strategy: PrereleaseStrategy,
     index_strategy: IndexStrategy,
+    upgrade: Upgrade,
 }
 
 impl CandidateSelector {
@@ -49,6 +49,7 @@ impl CandidateSelector {
                 options.dependency_mode,
             ),
             index_strategy: options.index_strategy,
+            upgrade: manifest.exclusions.upgrade().clone(),
         }
     }
 
@@ -88,7 +89,7 @@ impl CandidateSelector {
         tags: Option<&'a Tags>,
     ) -> Option<Candidate<'a>> {
         let reinstall = exclusions.reinstall(package_name);
-        let upgrade = exclusions.upgrade(package_name);
+        let upgrade = exclusions.upgrade_package(package_name);
 
         // If we have a preference (e.g., from a lockfile), search for a version matching that
         // preference.
@@ -506,11 +507,27 @@ impl CandidateSelector {
 
     /// By default, we select the latest version, but we also allow using the lowest version instead
     /// to check the lower bounds.
+    ///
+    /// When a package is being upgraded via `--upgrade-package`, the highest version is always
+    /// preferred, regardless of the resolution strategy (e.g., `lowest` or `lowest-direct`).
+    /// This only applies to explicitly named packages (i.e., `Upgrade::Packages`), not to
+    /// blanket upgrades via `--upgrade` / `Upgrade::All`, which should respect the resolution
+    /// strategy.
     pub(crate) fn use_highest_version(
         &self,
         package_name: &PackageName,
         env: &ResolverEnvironment,
     ) -> bool {
+        // When a package is explicitly targeted for upgrade via `--upgrade-package <pkg>`,
+        // always use the highest version. This ensures that the user's explicit request to
+        // upgrade a specific package picks the latest compatible version even when the
+        // resolution strategy would otherwise prefer a lower version (e.g., `lowest-direct`).
+        //
+        // This does NOT apply to `--upgrade` (i.e., `Upgrade::All`), which re-resolves all
+        // packages and should respect the resolution strategy.
+        if self.upgrade.contains_package(package_name) {
+            return true;
+        }
         match &self.resolution_strategy {
             ResolutionStrategy::Highest => true,
             ResolutionStrategy::Lowest => false,

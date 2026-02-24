@@ -11384,6 +11384,65 @@ fn lock_upgrade_package() -> Result<()> {
     Ok(())
 }
 
+/// Ensure that `--upgrade-package` picks the highest version even when using
+/// `--resolution lowest-direct`.
+///
+/// See: <https://github.com/astral-sh/uv/issues/18178>
+#[test]
+fn lock_upgrade_package_lowest_direct() -> Result<()> {
+    let context = uv_test::test_context!("3.12");
+
+    // Use `lowest-direct` resolution with lower bounds.
+    let pyproject_toml = context.temp_dir.child("pyproject.toml");
+    pyproject_toml.write_str(
+        r#"
+        [project]
+        name = "project"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        dependencies = ["anyio>=3", "idna>=3"]
+
+        [tool.uv]
+        resolution = "lowest-direct"
+        "#,
+    )?;
+
+    // Lock the project. Direct dependencies should resolve to their lowest compatible
+    // versions (anyio 3.0.0, idna 3.0).
+    uv_snapshot!(context.filters(), context.lock(), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Resolved 4 packages in [TIME]
+    ");
+
+    // Upgrade `anyio` only. Even though the resolution mode is `lowest-direct`,
+    // `--upgrade-package` should pick the highest version for the specified package.
+    uv_snapshot!(context.filters(), context.lock().arg("--upgrade-package").arg("anyio"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Resolved 4 packages in [TIME]
+    Updated anyio v3.0.0 -> v4.3.0
+    ");
+
+    // Re-run with `--locked` to verify consistency.
+    uv_snapshot!(context.filters(), context.lock().arg("--locked"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Resolved 4 packages in [TIME]
+    ");
+
+    Ok(())
+}
+
 /// Check that we discard the fork marker from the lockfile when using `--upgrade`.
 #[test]
 fn lock_upgrade_drop_fork_markers() -> Result<()> {

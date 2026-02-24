@@ -195,6 +195,18 @@ impl Upgrade {
         }
     }
 
+    /// Returns `true` if the specified package was explicitly targeted for upgrade
+    /// via `--upgrade-package`.
+    ///
+    /// Unlike [`Upgrade::contains`], this returns `false` for [`Upgrade::All`] (i.e., `--upgrade`),
+    /// which re-resolves all packages without targeting specific ones.
+    pub fn contains_package(&self, package_name: &PackageName) -> bool {
+        match self {
+            Self::None | Self::All => false,
+            Self::Packages(packages) => packages.contains_key(package_name),
+        }
+    }
+
     /// Returns an iterator over the constraints.
     ///
     /// When upgrading, users can provide bounds on the upgrade (e.g., `--upgrade-package flask<3`).
