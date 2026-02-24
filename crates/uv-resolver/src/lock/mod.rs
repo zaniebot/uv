@@ -245,6 +245,85 @@ pub(crate) struct HashedDist {
     pub(crate) hashes: HashDigests,
 }
 
+/// Fork markers stored with both simplified and complexified representations.
+///
+/// `PartialEq` compares the simplified forms. This ensures that markers from the
+/// resolver (which don't include `requires-python` bounds) compare equal to
+/// markers deserialized from the lockfile (which get complexified on read),
+/// as long as they represent the same simplified marker.
+///
+/// This is analogous to how [`Dependency`] stores both a `simplified_marker`
+/// and `complexified_marker`.
+#[derive(Clone, Debug, Default)]
+struct ForkMarkers {
+    /// Simplified markers, used for equality comparison.
+    simplified: Vec<SimplifiedMarkerTree>,
+    /// Complexified markers, used for marker algebra (disjointness, evaluation).
+    complexified: Vec<UniversalMarker>,
+}
+
+impl ForkMarkers {
+    /// Creates fork markers from complexified [`UniversalMarker`]s by computing
+    /// their simplified form via `requires-python`.
+    fn new(requires_python: &RequiresPython, markers: Vec<UniversalMarker>) -> Self {
+        let simplified = markers
+            .iter()
+            .map(|marker| SimplifiedMarkerTree::new(requires_python, marker.combined()))
+            .collect();
+        Self {
+            simplified,
+            complexified: markers,
+        }
+    }
+
+    /// Creates fork markers from already-simplified markers by complexifying them.
+    fn from_simplified(
+        requires_python: &RequiresPython,
+        simplified: Vec<SimplifiedMarkerTree>,
+    ) -> Self {
+        let complexified = simplified
+            .iter()
+            .map(|s| UniversalMarker::from_combined(s.into_marker(requires_python)))
+            .collect();
+        Self {
+            simplified,
+            complexified,
+        }
+    }
+
+    /// Returns `true` if there are no fork markers.
+    fn is_empty(&self) -> bool {
+        self.complexified.is_empty()
+    }
+
+    /// Returns an iterator over the complexified fork markers.
+    fn iter(&self) -> std::slice::Iter<'_, UniversalMarker> {
+        self.complexified.iter()
+    }
+
+    /// Returns the complexified fork markers as a slice.
+    fn as_slice(&self) -> &[UniversalMarker] {
+        &self.complexified
+    }
+}
+
+impl PartialEq for ForkMarkers {
+    fn eq(&self, other: &Self) -> bool {
+        self.simplified == other.simplified
+    }
+}
+
+impl Eq for ForkMarkers {}
+
+impl<'a> IntoIterator for &'a ForkMarkers {
+    type Item = &'a UniversalMarker;
+    type IntoIter = std::slice::Iter<'a, UniversalMarker>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.complexified.iter()
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, serde::Deserialize)]
 #[serde(try_from = "LockWire")]
 pub struct Lock {
@@ -265,7 +344,7 @@ pub struct Lock {
     revision: u32,
     /// If this lockfile was built from a forking resolution with non-identical forks, store the
     /// forks in the lockfile so we can recreate them in subsequent resolutions.
-    fork_markers: Vec<UniversalMarker>,
+    fork_markers: ForkMarkers,
     /// The conflicting groups/extras specified by the user.
     conflicts: Conflicts,
     /// The list of supported environments specified by the user.
@@ -327,14 +406,15 @@ impl Lock {
             // If there are multiple distributions for the same package, include the markers of all
             // forks that included the current distribution.
             let fork_markers = if duplicates.contains(dist.name()) {
-                resolution
+                let markers: Vec<UniversalMarker> = resolution
                     .fork_markers
                     .iter()
                     .filter(|fork_markers| !fork_markers.is_disjoint(dist.marker))
                     .copied()
-                    .collect()
+                    .collect();
+                ForkMarkers::new(&requires_python, markers)
             } else {
-                vec![]
+                ForkMarkers::default()
             };
 
             let mut package = Package::from_annotated_dist(dist, fork_markers, root)?;
@@ -424,6 +504,7 @@ impl Lock {
             fork_strategy: resolution.options.fork_strategy,
             exclude_newer: resolution.options.exclude_newer.clone().into(),
         };
+        let fork_markers = ForkMarkers::new(&requires_python, resolution.fork_markers.clone());
         let lock = Self::new(
             VERSION,
             REVISION,
@@ -434,7 +515,7 @@ impl Lock {
             Conflicts::empty(),
             vec![],
             vec![],
-            resolution.fork_markers.clone(),
+            fork_markers,
         )?;
         Ok(lock)
     }
@@ -724,7 +805,7 @@ impl Lock {
         conflicts: Conflicts,
         supported_environments: Vec<MarkerTree>,
         required_environments: Vec<MarkerTree>,
-        fork_markers: Vec<UniversalMarker>,
+        fork_markers: ForkMarkers,
     ) -> Result<Self, LockError> {
         // Put all dependencies for each package in a canonical order and
         // check for duplicates.
@@ -1163,7 +1244,8 @@ impl Lock {
 
         if !self.fork_markers.is_empty() {
             let fork_markers = each_element_on_its_line_array(
-                simplified_universal_markers(&self.fork_markers, &self.requires_python).into_iter(),
+                simplified_universal_markers(self.fork_markers.as_slice(), &self.requires_python)
+                    .into_iter(),
             );
             if !fork_markers.is_empty() {
                 doc.insert("resolution-markers", value(fork_markers));
@@ -2541,12 +2623,7 @@ impl TryFrom<LockWire> for Lock {
             .into_iter()
             .map(|simplified_marker| simplified_marker.into_marker(&wire.requires_python))
             .collect();
-        let fork_markers = wire
-            .fork_markers
-            .into_iter()
-            .map(|simplified_marker| simplified_marker.into_marker(&wire.requires_python))
-            .map(UniversalMarker::from_combined)
-            .collect();
+        let fork_markers = ForkMarkers::from_simplified(&wire.requires_python, wire.fork_markers);
         let lock = Self::new(
             wire.version,
             wire.revision.unwrap_or(0),
@@ -2590,7 +2667,7 @@ pub struct Package {
     /// the next resolution.
     ///
     /// Named `resolution-markers` in `uv.lock`.
-    fork_markers: Vec<UniversalMarker>,
+    fork_markers: ForkMarkers,
     /// The resolved dependencies of the package.
     dependencies: Vec<Dependency>,
     /// The resolved optional dependencies of the package.
@@ -2604,7 +2681,7 @@ pub struct Package {
 impl Package {
     fn from_annotated_dist(
         annotated_dist: &AnnotatedDist,
-        fork_markers: Vec<UniversalMarker>,
+        fork_markers: ForkMarkers,
         root: &Path,
     ) -> Result<Self, LockError> {
         let id = PackageId::from_annotated_dist(annotated_dist, root)?;
@@ -3204,7 +3281,8 @@ impl Package {
 
         if !self.fork_markers.is_empty() {
             let fork_markers = each_element_on_its_line_array(
-                simplified_universal_markers(&self.fork_markers, requires_python).into_iter(),
+                simplified_universal_markers(self.fork_markers.as_slice(), requires_python)
+                    .into_iter(),
             );
             if !fork_markers.is_empty() {
                 table.insert("resolution-markers", value(fork_markers));
@@ -3572,12 +3650,7 @@ impl PackageWire {
             metadata: self.metadata,
             sdist: self.sdist,
             wheels: self.wheels,
-            fork_markers: self
-                .fork_markers
-                .into_iter()
-                .map(|simplified_marker| simplified_marker.into_marker(requires_python))
-                .map(UniversalMarker::from_combined)
-                .collect(),
+            fork_markers: ForkMarkers::from_simplified(requires_python, self.fork_markers),
             dependencies: unwire_deps(self.dependencies)?,
             optional_dependencies: self
                 .optional_dependencies
