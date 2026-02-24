@@ -14924,6 +14924,55 @@ fn invalid_platform() -> Result<()> {
     Ok(())
 }
 
+/// When resolving for a musl-based platform (like Alpine Linux) and only manylinux wheels are
+/// available, hint that manylinux wheels require glibc.
+///
+/// See: <https://github.com/astral-sh/uv/issues/18169>
+#[test]
+fn invalid_platform_musl_manylinux_hint() -> Result<()> {
+    let context = uv_test::test_context!("3.11");
+    let requirements_in = context.temp_dir.child("requirements.in");
+    requirements_in.write_str("open3d")?;
+
+    uv_snapshot!(context
+        .pip_compile()
+        .arg("--python-platform")
+        .arg("aarch64-unknown-linux-musl")
+        .arg("requirements.in"), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+
+    ----- stderr -----
+      × No solution found when resolving dependencies:
+      ╰─▶ Because only the following versions of open3d are available:
+              open3d==0.8.0.0
+              open3d==0.9.0.0
+              open3d==0.10.0.0
+              open3d==0.10.0.1
+              open3d==0.11.0
+              open3d==0.11.1
+              open3d==0.11.2
+              open3d==0.12.0
+              open3d==0.13.0
+              open3d==0.14.1
+              open3d==0.15.1
+              open3d==0.15.2
+              open3d==0.16.0
+              open3d==0.16.1
+              open3d==0.17.0
+              open3d==0.18.0
+          and open3d<=0.17.0 has no wheels with a matching Python ABI tag (e.g., `cp311`), we can conclude that open3d<=0.17.0 cannot be used.
+          And because open3d==0.18.0 has no wheels with a matching platform tag (e.g., `linux_aarch64`) and you require open3d, we can conclude that your requirements are unsatisfiable.
+
+          hint: You require CPython 3.11 (`cp311`), but we only found wheels for `open3d` (v0.17.0) with the following Python ABI tags: `cp37m`, `cp38`, `cp39`, `cp310`
+
+          hint: Wheels are available for `open3d` (v0.18.0) on the following platforms: `manylinux_2_27_aarch64`, `manylinux_2_27_x86_64`, `macosx_10_15_universal2`, `macosx_13_0_arm64`, `win_amd64`. You're on `musllinux_1_2_aarch64`, but `manylinux` wheels require glibc, which is not available on musl-based distributions like Alpine Linux
+    ");
+
+    Ok(())
+}
+
 /// Treat `sys_platform` and `sys.platform` as equivalent markers in the marker algebra.
 #[test]
 fn universal_disjoint_deprecated_markers() -> Result<()> {

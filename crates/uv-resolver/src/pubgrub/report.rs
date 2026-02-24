@@ -16,7 +16,7 @@ use uv_distribution_types::{
 use uv_normalize::PackageName;
 use uv_pep440::{Version, VersionSpecifier, VersionSpecifiers};
 use uv_pep508::{MarkerEnvironment, MarkerExpression, MarkerTree, MarkerValueVersion};
-use uv_platform_tags::{AbiTag, IncompatibleTag, LanguageTag, PlatformTag, Tags};
+use uv_platform_tags::{AbiTag, IncompatibleTag, LanguageTag, Os, PlatformTag, Tags};
 
 use crate::candidate_selector::CandidateSelector;
 use crate::error::{ErrorTree, PrefixMatch};
@@ -812,17 +812,30 @@ impl PubGrubReportFormatter<'_> {
                 // So, instead, we only show the platforms that are linked to otherwise-compatible
                 // wheels (e.g., `manylinux2014` in `cp313-cp313-manylinux2014`). In other words,
                 // we only show platforms for ABI-compatible wheels.
+                let current_tags = self.tags?;
                 let tags = prioritized
-                    .platform_tags(self.tags?)
+                    .platform_tags(current_tags)
                     .cloned()
                     .collect::<BTreeSet<_>>();
                 if tags.is_empty() {
                     None
                 } else {
+                    let current_platform = if let Os::Musllinux { major, minor } =
+                        current_tags.python_platform().os()
+                    {
+                        Some(PlatformTag::Musllinux {
+                            major: *major,
+                            minor: *minor,
+                            arch: current_tags.python_platform().arch(),
+                        })
+                    } else {
+                        None
+                    };
                     Some(PubGrubHint::PlatformTags {
                         package: name.clone(),
                         version: candidate.version().clone(),
                         tags,
+                        current_platform,
                     })
                 }
             }
@@ -1203,6 +1216,11 @@ pub(crate) enum PubGrubHint {
         version: Version,
         // excluded from `PartialEq` and `Hash`
         tags: BTreeSet<PlatformTag>,
+        // excluded from `PartialEq` and `Hash`
+        /// The current platform tag, if the platform uses musl libc (e.g., Alpine Linux). When
+        /// set and available wheels are manylinux-only, the hint explains that manylinux wheels
+        /// require glibc, and shows the user's actual platform tag.
+        current_platform: Option<PlatformTag>,
     },
     /// The resolution failed for a Python version that is different from the current Python version.
     DisjointPythonVersion {
@@ -1773,6 +1791,7 @@ impl std::fmt::Display for PubGrubHint {
                 package,
                 version,
                 tags,
+                current_platform,
             } => {
                 let s = if tags.len() == 1 { "" } else { "s" };
                 write!(
@@ -1785,7 +1804,19 @@ impl std::fmt::Display for PubGrubHint {
                     tags.iter()
                         .map(|tag| format!("`{}`", tag.cyan()))
                         .join(", "),
-                )
+                )?;
+                if let Some(platform) = current_platform {
+                    if tags.iter().any(PlatformTag::is_manylinux) {
+                        write!(
+                            f,
+                            ". You're on `{}`, but `{}` wheels require glibc, which is not \
+                             available on musl-based distributions like Alpine Linux",
+                            platform.cyan(),
+                            "manylinux".cyan(),
+                        )?;
+                    }
+                }
+                Ok(())
             }
             Self::DisjointPythonVersion { python_version } => {
                 write!(
