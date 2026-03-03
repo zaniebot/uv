@@ -89,9 +89,6 @@ jobs:
     environment:
       name: ${{ needs.docker-plan.outputs.push-version == 'true' && 'release' || (needs.docker-plan.outputs.push == 'true' && 'release-test' || '') }}
     outputs:
-      image-tags: ${{ steps.meta.outputs.tags }}
-      image-annotations: ${{ steps.meta.outputs.annotations }}
-      image-digest: ${{ steps.build.outputs.digest }}
       image-version: ${{ steps.meta.outputs.version }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -161,15 +158,20 @@ jobs:
           push: ${{ needs.docker-plan.outputs.push }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          # TODO(zanieb): Annotations are not supported by Depot yet and are ignored
           annotations: ${{ steps.meta.outputs.annotations }}
 
-      - name: Generate artifact attestation for base image
+      - name: Verify image annotations are present
         if: ${{ needs.docker-plan.outputs.push == 'true' }}
-        uses: actions/attest-build-provenance@96278af6caaf10aea03fd8d33a09a777ca52d62f # v3.2.0
-        with:
-          subject-name: ${{ env.UV_GHCR_IMAGE }}
-          subject-digest: ${{ steps.build.outputs.digest }}
+        env:
+          IMAGE: ${{ env.UV_GHCR_IMAGE }}
+          VERSION: ${{ steps.meta.outputs.version }}
+        run: |
+          annotations="$(docker buildx imagetools inspect "${IMAGE}:${VERSION}" --format '{{json .Manifest.Annotations}}')"
+          if [ "${annotations}" = "null" ] || [ -z "${annotations}" ]; then
+            echo "Missing manifest annotations for ${IMAGE}:${VERSION}" >&2
+            exit 1
+          fi
+          echo "Manifest annotations detected for ${IMAGE}:${VERSION}"
 
   docker-publish-extra:
     name: ${{ needs.docker-plan.outputs.action }} ${{ matrix.image-mapping }}
@@ -299,8 +301,20 @@ jobs:
           push: ${{ needs.docker-plan.outputs.push }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          # TODO(zanieb): Annotations are not supported by Depot yet and are ignored
           annotations: ${{ steps.meta.outputs.annotations }}
+
+      - name: Verify image annotations are present
+        if: ${{ needs.docker-plan.outputs.push == 'true' }}
+        env:
+          IMAGE: ${{ env.UV_GHCR_IMAGE }}
+          VERSION: ${{ steps.meta.outputs.version }}
+        run: |
+          annotations="$(docker buildx imagetools inspect "${IMAGE}:${VERSION}" --format '{{json .Manifest.Annotations}}')"
+          if [ "${annotations}" = "null" ] || [ -z "${annotations}" ]; then
+            echo "Missing manifest annotations for ${IMAGE}:${VERSION}" >&2
+            exit 1
+          fi
+          echo "Manifest annotations detected for ${IMAGE}:${VERSION}"
 
       - name: Generate artifact attestation
         if: ${{ needs.docker-plan.outputs.push == 'true' }}
@@ -309,57 +323,12 @@ jobs:
           subject-name: ${{ env.UV_GHCR_IMAGE }}
           subject-digest: ${{ steps.build-and-push.outputs.digest }}
 
-      # Push annotations manually.
-      # See `docker-annotate-base` for details.
-      - name: Add annotations to images
-        if: ${{ needs.docker-plan.outputs.push == 'true' }}
-        env:
-          IMAGES: "${{ env.UV_GHCR_IMAGE }} ${{ env.UV_DOCKERHUB_IMAGE }}"
-          DIGEST: ${{ steps.build-and-push.outputs.digest }}
-          TAGS: ${{ steps.meta.outputs.tags }}
-          ANNOTATIONS: ${{ steps.meta.outputs.annotations }}
-        run: |
-          set -x
-          readarray -t lines <<< "$ANNOTATIONS"; annotations=(); for line in "${lines[@]}"; do annotations+=(--annotation "$line"); done
-          for image in $IMAGES; do
-            readarray -t lines < <(grep "^${image}:" <<< "$TAGS"); tags=(); for line in "${lines[@]}"; do tags+=(-t "$line"); done
-            docker buildx imagetools create \
-              "${annotations[@]}" \
-              "${tags[@]}" \
-              "${image}@${DIGEST}"
-          done
-
-      # See `docker-annotate-base` for details.
-      - name: Export manifest digest
-        id: manifest-digest
-        if: ${{ needs.docker-plan.outputs.push == 'true' }}
-        env:
-          IMAGE: ${{ env.UV_GHCR_IMAGE }}
-          VERSION: ${{ steps.meta.outputs.version }}
-        run: |
-          digest="$(
-            docker buildx imagetools inspect \
-              "${IMAGE}:${VERSION}" \
-              --format '{{json .Manifest}}' \
-            | jq -r '.digest'
-          )"
-          echo "digest=${digest}" >> "$GITHUB_OUTPUT"
-
-      # See `docker-annotate-base` for details.
-      - name: Generate artifact attestation
-        if: ${{ needs.docker-plan.outputs.push == 'true' }}
-        uses: actions/attest-build-provenance@96278af6caaf10aea03fd8d33a09a777ca52d62f # v3.2.0
-        with:
-          subject-name: ${{ env.UV_GHCR_IMAGE }}
-          subject-digest: ${{ steps.manifest-digest.outputs.digest }}
-
-  # Annotate the base image
-  docker-annotate-base:
-    name: annotate uv
+  # Touch the base GHCR manifest after all pushes so it appears first in the package listing.
+  docker-touch-base-manifest:
+    name: touch uv manifest
     runs-on: ubuntu-latest
     timeout-minutes: 2
     permissions:
-      contents: read
       id-token: write # for GHCR signing
       packages: write # for GHCR image pushes
       attestations: write # for GHCR attestations
@@ -373,54 +342,31 @@ jobs:
     steps:
       - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
         with:
-          username: astral
-          password: ${{ secrets.DOCKERHUB_TOKEN_RW }}
-
-      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
-        with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # Depot doesn't support annotating images, so we need to do so manually
-      # afterwards. Mutating the manifest is desirable regardless, because we
-      # want to bump the base image to appear at the top of the list on GHCR.
-      # However, once annotation support is added to Depot, this step can be
-      # minimized to just touch the GHCR manifest.
-      - name: Add annotations to images
+      # Re-create the manifest from itself so GHCR records the base image as the newest update.
+      - name: Touch manifest
         env:
-          IMAGES: "${{ env.UV_GHCR_IMAGE }} ${{ env.UV_DOCKERHUB_IMAGE }}"
-          DIGEST: ${{ needs.docker-publish-base.outputs.image-digest }}
-          TAGS: ${{ needs.docker-publish-base.outputs.image-tags }}
-          ANNOTATIONS: ${{ needs.docker-publish-base.outputs.image-annotations }}
-        # The readarray part is used to make sure the quoting and special characters are preserved on expansion (e.g. spaces)
-        # The final command becomes `docker buildx imagetools create --annotation 'index:foo=1' --annotation 'index:bar=2' ... -t tag1 -t tag2 ... <IMG>@sha256:<sha256>`
+          IMAGE: ${{ env.UV_GHCR_IMAGE }}
+          VERSION: ${{ needs.docker-publish-base.outputs.image-version }}
         run: |
-          set -x
-          readarray -t lines <<< "$ANNOTATIONS"; annotations=(); for line in "${lines[@]}"; do annotations+=(--annotation "$line"); done
-          for image in $IMAGES; do
-            readarray -t lines < <(grep "^${image}:" <<< "$TAGS"); tags=(); for line in "${lines[@]}"; do tags+=(-t "$line"); done
-            docker buildx imagetools create \
-              "${annotations[@]}" \
-              "${tags[@]}" \
-              "${image}@${DIGEST}"
-          done
+          digest="$(
+            docker buildx imagetools inspect \
+              "${IMAGE}:${VERSION}" \
+              --format '{{json .Manifest}}' \
+            | jq -r '.digest'
+          )"
+          docker buildx imagetools create \
+            -t "${IMAGE}:${VERSION}" \
+            "${IMAGE}@${digest}"
 
-      # Now that we've modified the manifest, we need to attest it again.
-      # Note we only generate an attestation for GHCR.
       - name: Export manifest digest
         id: manifest-digest
         env:
           IMAGE: ${{ env.UV_GHCR_IMAGE }}
           VERSION: ${{ needs.docker-publish-base.outputs.image-version }}
-        # To sign the manifest, we need it's digest. Unfortunately "docker
-        # buildx imagetools create" does not (yet) have a clean way of sharing
-        # the digest of the manifest it creates (see docker/buildx#2407), so
-        # we use a separate command to retrieve it.
-        # imagetools inspect [TAG] --format '{{json .Manifest}}' gives us
-        # the machine readable JSON description of the manifest, and the
-        # jq command extracts the digest from this. The digest is then
-        # sent to the Github step output file for sharing with other steps.
         run: |
           digest="$(
             docker buildx imagetools inspect \
@@ -430,7 +376,7 @@ jobs:
           )"
           echo "digest=${digest}" >> "$GITHUB_OUTPUT"
 
-      - name: Generate artifact attestation
+      - name: Generate artifact attestation for base image
         uses: actions/attest-build-provenance@96278af6caaf10aea03fd8d33a09a777ca52d62f # v3.2.0
         with:
           subject-name: ${{ env.UV_GHCR_IMAGE }}
