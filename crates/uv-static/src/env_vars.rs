@@ -1334,4 +1334,29 @@ impl EnvVars {
     /// Defaults to 300s (5 min).
     #[attr_added_in("0.9.4")]
     pub const UV_LOCK_TIMEOUT: &'static str = "UV_LOCK_TIMEOUT";
+
+    /// Set by snapd to the snap's user data directory (e.g., `~/snap/code/109`).
+    ///
+    /// Used to detect when `XDG_DATA_HOME` has been overridden by a snap-confined application
+    /// (such as the VS Code snap), which can cause uv to install binaries into
+    /// version-specific directories that break on snap updates.
+    #[attr_hidden]
+    #[attr_added_in("next version")]
+    pub const SNAP_USER_DATA: &'static str = "SNAP_USER_DATA";
+
+    /// Set by snapd to the snap's common user data directory (e.g., `~/snap/code/common`).
+    ///
+    /// Used alongside `SNAP_USER_DATA` to detect snap-confined environments.
+    #[attr_hidden]
+    #[attr_added_in("next version")]
+    pub const SNAP_USER_COMMON: &'static str = "SNAP_USER_COMMON";
+
+    /// Set by the VS Code snap launcher to the original value of `XDG_DATA_HOME`
+    /// before VS Code overrode it.
+    ///
+    /// When detected, uv will use this value instead of the snap-overridden `XDG_DATA_HOME`
+    /// to avoid installing binaries into version-specific snap directories.
+    #[attr_hidden]
+    #[attr_added_in("next version")]
+    pub const XDG_DATA_HOME_VSCODE_SNAP_ORIG: &'static str = "XDG_DATA_HOME_VSCODE_SNAP_ORIG";
 }

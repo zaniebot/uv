@@ -27,7 +27,7 @@ pub fn user_executable_directory(override_variable: Option<&'static str>) -> Opt
         .and_then(parse_path)
         .or_else(|| std::env::var_os(EnvVars::XDG_BIN_HOME).and_then(parse_xdg_path))
         .or_else(|| {
-            std::env::var_os(EnvVars::XDG_DATA_HOME)
+            resolve_xdg_data_home()
                 .and_then(parse_xdg_path)
                 .map(|path| path.join("../bin"))
         })
@@ -35,6 +35,93 @@ pub fn user_executable_directory(override_variable: Option<&'static str>) -> Opt
             let home_dir = etcetera::home_dir().ok();
             home_dir.map(|path| path.join(".local").join("bin"))
         })
+}
+
+/// Resolve `XDG_DATA_HOME`, accounting for snap-confined environments.
+///
+/// When running inside a snap-confined application (such as VS Code installed via snap),
+/// `XDG_DATA_HOME` may be set to a version-specific directory like
+/// `~/snap/code/109/.local/share`. This causes uv to install binaries into paths that
+/// break when the snap is updated to a new version.
+///
+/// To work around this, we check for the `XDG_DATA_HOME_VSCODE_SNAP_ORIG` environment
+/// variable that VS Code's snap launcher sets to preserve the original value. If present
+/// and `XDG_DATA_HOME` is under the snap's user data directory, we use the original value
+/// instead.
+///
+/// If `XDG_DATA_HOME` appears to be inside a snap-versioned directory but we cannot determine
+/// the original value, we emit a warning.
+fn resolve_xdg_data_home() -> Option<OsString> {
+    let xdg_data_home = std::env::var_os(EnvVars::XDG_DATA_HOME)?;
+
+    // Check if `XDG_DATA_HOME` is inside a snap user data directory.
+    if is_snap_path(&xdg_data_home) {
+        // Check if VS Code's snap launcher saved the original value.
+        if let Some(original) = std::env::var_os(EnvVars::XDG_DATA_HOME_VSCODE_SNAP_ORIG) {
+            if !original.is_empty() {
+                tracing::debug!(
+                    "Using original `XDG_DATA_HOME` from `XDG_DATA_HOME_VSCODE_SNAP_ORIG` \
+                     instead of snap-overridden value"
+                );
+                return Some(original);
+            }
+        }
+
+        tracing::warn!(
+            "`XDG_DATA_HOME` is set to a snap-specific directory (`{}`). \
+             This may cause installed binaries to become unavailable when the snap is updated. \
+             Consider installing uv from a non-snap terminal, or set `XDG_DATA_HOME` explicitly \
+             (e.g., `export XDG_DATA_HOME=\"$HOME/.local/share\"`).",
+            Path::new(&xdg_data_home).display()
+        );
+    }
+
+    Some(xdg_data_home)
+}
+
+/// Returns `true` if the given path appears to be inside a snap user data directory.
+///
+/// Snap user data directories follow the pattern `~/snap/<name>/<version>/...` where
+/// `<version>` is a numeric revision that changes on snap updates.
+fn is_snap_path(path: &OsString) -> bool {
+    let path = Path::new(path);
+
+    // Check via environment variable: SNAP_USER_DATA or SNAP_USER_COMMON are set by snapd.
+    if let Some(snap_user_data) = std::env::var_os(EnvVars::SNAP_USER_DATA) {
+        let snap_dir = Path::new(&snap_user_data);
+        if path.starts_with(snap_dir) {
+            return true;
+        }
+    }
+    if let Some(snap_user_common) = std::env::var_os(EnvVars::SNAP_USER_COMMON) {
+        let snap_dir = Path::new(&snap_user_common);
+        if path.starts_with(snap_dir) {
+            return true;
+        }
+    }
+
+    // Heuristic: check if the path contains /snap/<name>/<numeric-version>/
+    // This handles cases where SNAP_USER_DATA is not set but XDG_DATA_HOME
+    // was inherited from a snap-confined parent process.
+    for (i, component) in path.components().enumerate() {
+        if let std::path::Component::Normal(name) = component {
+            if name == "snap" {
+                // Check if there's a pattern like /snap/<name>/<number>/...
+                let components: Vec<_> = path.components().collect();
+                if i + 2 < components.len() {
+                    if let std::path::Component::Normal(version) = components[i + 2] {
+                        if let Some(version_str) = version.to_str() {
+                            if version_str.chars().all(|c| c.is_ascii_digit()) {
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    false
 }
 
 /// Returns an appropriate user-level directory for storing the cache.
@@ -200,6 +287,33 @@ mod test {
     use assert_fs::fixture::FixtureError;
     use assert_fs::prelude::*;
     use indoc::indoc;
+
+    #[test]
+    #[cfg(unix)]
+    fn test_is_snap_path_versioned_directory() {
+        use std::ffi::OsString;
+
+        use crate::is_snap_path;
+
+        // Typical VS Code snap path with numeric version.
+        assert!(is_snap_path(&OsString::from(
+            "/home/user/snap/code/109/.local/share"
+        )));
+
+        // Non-snap path should not match.
+        assert!(!is_snap_path(&OsString::from("/home/user/.local/share")));
+
+        // Snap path with "current" (symlink) should not match — this is already stable.
+        assert!(!is_snap_path(&OsString::from(
+            "/home/user/snap/code/current/.local/share"
+        )));
+
+        // Snap path with "common" directory should not match the heuristic
+        // (common is stable across versions).
+        assert!(!is_snap_path(&OsString::from(
+            "/home/user/snap/code/common/.local/share"
+        )));
+    }
 
     #[test]
     #[cfg(not(windows))]
