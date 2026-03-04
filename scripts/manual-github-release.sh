@@ -20,14 +20,15 @@ if [ ! -n "$RUN_ID" ]; then
     exit 1
 fi
 
-# Create directory for artifacts
-mkdir -p "release_$RUN_ID"
-cd "release_$RUN_ID"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+RELEASE_DIR="release_$RUN_ID"
+
+# Download artifacts using the shared script.
+"$SCRIPT_DIR/download-release-artifacts.sh" "$RUN_ID" "$RELEASE_DIR"
+
+cd "$RELEASE_DIR"
 
 REPO=$(gh repo view --json nameWithOwner | jq .nameWithOwner -r)
-
-# Download all artifacts for the workflow run
-gh run download "$RUN_ID" --repo "$REPO" --pattern 'artifacts-*'
 
 MANIFEST="artifacts-dist-manifest/dist-manifest.json"
 
