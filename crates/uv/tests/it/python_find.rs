@@ -4,6 +4,7 @@ use assert_fs::{fixture::FileWriteStr, prelude::PathCreateDir};
 use indoc::indoc;
 
 use uv_platform::{Arch, Os};
+use uv_python::managed::platform_key_from_env;
 use uv_static::EnvVars;
 
 use uv_test::{uv_snapshot, venv_bin_path};
@@ -1509,6 +1510,48 @@ fn python_find_prerelease_with_patch_request() {
     exit_code: 0
     ----- stdout -----
     [TEMP_DIR]/managed/cpython-3.14.0-[PLATFORM]/[INSTALL-BIN]/[PYTHON]
+
+    ----- stderr -----
+    ");
+}
+
+/// When an explicit platform is included in the request, we should find managed installations
+/// that match the requested platform rather than filtering by host platform compatibility.
+///
+/// See: <https://github.com/astral-sh/uv/pull/18195>
+#[test]
+#[cfg(feature = "test-python-managed")]
+fn python_find_managed_explicit_platform() {
+    let context = uv_test::test_context_with_versions!(&[])
+        .with_filtered_python_keys()
+        .with_filtered_python_sources()
+        .with_managed_python_dirs()
+        .with_python_download_cache()
+        .with_filtered_python_install_bin()
+        .with_filtered_python_names()
+        .with_filtered_exe_suffix();
+
+    // Install a managed Python
+    context.python_install().arg("3.12").assert().success();
+
+    // We should find it with a plain version request
+    uv_snapshot!(context.filters(), context.python_find().arg("3.12"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    [TEMP_DIR]/managed/cpython-3.12-[PLATFORM]/[INSTALL-BIN]/[PYTHON]
+
+    ----- stderr -----
+    ");
+
+    // We should also find it when explicitly requesting the current platform
+    let platform_key = platform_key_from_env().unwrap();
+    let request = format!("cpython-3.12-{platform_key}");
+    uv_snapshot!(context.filters(), context.python_find().arg(&request), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    [TEMP_DIR]/managed/cpython-3.12-[PLATFORM]/[INSTALL-BIN]/[PYTHON]
 
     ----- stderr -----
     ");
