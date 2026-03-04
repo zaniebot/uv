@@ -1,53 +1,61 @@
 #!/usr/bin/env bash
-## Check that release artifacts from a CI run are code-signed.
+## Check that release artifacts are code-signed.
 ##
-## Downloads macOS and Windows artifacts and wheels from the given GitHub
-## Actions run, extracts binaries, and verifies:
+## Examines macOS and Windows artifacts and wheels, extracts binaries, and
+## verifies:
 ##   - macOS:   codesign identity signature (not ad-hoc)
 ##   - Windows: Authenticode signature present
 ##
+## Only artifacts whose required tool is available are checked. Artifacts that
+## are skipped due to a missing tool are reported as SKIP. If no artifacts are
+## checked at all, the script exits with an error.
+##
+## Tools:
+##   macOS binaries:   codesign  (requires macOS)
+##   Windows binaries: osslsigncode  (apt install osslsigncode / brew install osslsigncode)
+##
 ## Usage:
-##   scripts/check-release-artifacts-signed.sh <run-id>
+##   scripts/check-release-artifacts-signed.sh <artifacts-dir>
+##
+## The artifacts directory should contain extracted artifact subdirectories
+## (e.g., as produced by scripts/download-release-artifacts.sh).
 
 set -euo pipefail
 
 if [ $# -lt 1 ]; then
-    echo "Usage: $0 <run-id>" >&2
+    echo "Usage: $0 <artifacts-dir>" >&2
     exit 1
 fi
 
-missing=()
-command -v gh >/dev/null 2>&1 || missing+=(gh)
-command -v codesign >/dev/null 2>&1 || missing+=(codesign)
-command -v osslsigncode >/dev/null 2>&1 || missing+=(osslsigncode)
+ARTIFACTS_DIR="$1"
 
-if [ ${#missing[@]} -gt 0 ]; then
-    echo "error: missing required tools: ${missing[*]}" >&2
-    echo "" >&2
-    echo "Install with:" >&2
-    for tool in "${missing[@]}"; do
-        case "$tool" in
-            gh)            echo "  brew install gh" >&2 ;;
-            codesign)      echo "  (requires macOS)" >&2 ;;
-            osslsigncode)  echo "  brew install osslsigncode" >&2 ;;
-        esac
-    done
+if [ ! -d "$ARTIFACTS_DIR" ]; then
+    echo "error: not a directory: $ARTIFACTS_DIR" >&2
     exit 1
 fi
 
-RUN_ID="$1"
-WORK_DIR="$(mktemp -d)"
-trap 'rm -rf "$WORK_DIR"' EXIT
+HAS_CODESIGN=false
+HAS_OSSLSIGNCODE=false
+command -v codesign >/dev/null 2>&1 && HAS_CODESIGN=true
+command -v osslsigncode >/dev/null 2>&1 && HAS_OSSLSIGNCODE=true
 
 PASS=0
 FAIL=0
+SKIP=0
 
 pass() { echo "PASS $1"; PASS=$((PASS + 1)); }
 fail() { echo "FAIL $1"; FAIL=$((FAIL + 1)); }
+skip() { echo "SKIP $1"; SKIP=$((SKIP + 1)); }
 
 check_macos() {
     local binary="$1"
     local label="$2"
+
+    if ! $HAS_CODESIGN; then
+        skip "$label (codesign not available)"
+        return
+    fi
+
     local info
     info=$(codesign -dv "$binary" 2>&1) || true
     if echo "$info" | grep -q "Signature=adhoc"; then
@@ -62,6 +70,12 @@ check_macos() {
 check_windows() {
     local binary="$1"
     local label="$2"
+
+    if ! $HAS_OSSLSIGNCODE; then
+        skip "$label (osslsigncode not available)"
+        return
+    fi
+
     local output
     output=$(osslsigncode verify -in "$binary" 2>&1) || true
     if echo "$output" | grep -q "Signer's certificate:"; then
@@ -73,14 +87,12 @@ check_windows() {
     fi
 }
 
-echo "Fetching artifacts for run $RUN_ID..."
-ALL_ARTIFACTS=$(gh api "repos/{owner}/{repo}/actions/runs/$RUN_ID/artifacts" \
-    --paginate --jq '.artifacts[].name')
+for artifact_dir in "$ARTIFACTS_DIR"/artifacts-* "$ARTIFACTS_DIR"/wheels_uv-*; do
+    [ -d "$artifact_dir" ] || continue
 
-echo ""
+    artifact=$(basename "$artifact_dir")
 
-for artifact in $ALL_ARTIFACTS; do
-    # Only check macOS and Windows archives and wheels.
+    # Only check macOS and Windows artifacts.
     case "$artifact" in
         artifacts-*apple-darwin*|artifacts-macos-*)  check=check_macos ;;
         artifacts-*windows*|artifacts-*win*)         check=check_windows ;;
@@ -89,38 +101,27 @@ for artifact in $ALL_ARTIFACTS; do
         *) continue ;;
     esac
 
-    dest="$WORK_DIR/$artifact"
-    mkdir -p "$dest"
-    if ! gh run download "$RUN_ID" -n "$artifact" -D "$dest"; then
-        fail "$artifact (download failed)"
-        continue
-    fi
-
-    # Extract everything: tar.gz archives, zip archives, and wheels.
-    for tarball in "$dest"/*.tar.gz; do
-        [ -f "$tarball" ] || continue
-        tar xzf "$tarball" -C "$dest"
-    done
-    for zip in "$dest"/*.zip "$dest"/*.whl; do
-        [ -f "$zip" ] || continue
-        unzip -qo "$zip" -d "$dest"
+    # Find the archive or wheel name for labeling.
+    archive=""
+    for f in "$artifact_dir"/*.tar.gz "$artifact_dir"/*.zip "$artifact_dir"/*.whl; do
+        [ -f "$f" ] && archive=$(basename "$f") && break
     done
 
-    # Check each binary. The label shows the archive/wheel filename and binary name,
-    # e.g. "uv-x86_64-apple-darwin.tar.gz uv" or "uv-0.10.8-py3-none-win_amd64.whl uv.exe".
+    # Check each binary.
     while IFS= read -r binary; do
         bin_name=$(basename "$binary")
-        # Walk up to find the archive or wheel this binary came from.
-        archive=""
-        for f in "$dest"/*.tar.gz "$dest"/*.zip "$dest"/*.whl; do
-            [ -f "$f" ] && archive=$(basename "$f") && break
-        done
         $check "$binary" "${archive:-$artifact} / $bin_name"
-    done < <(find "$dest" \( -name "uv" -o -name "uvx" -o -name "uv.exe" -o -name "uvx.exe" -o -name "uvw.exe" \) -type f ! -name "*.sha256")
+    done < <(find "$artifact_dir" \( -name "uv" -o -name "uvx" -o -name "uv.exe" -o -name "uvx.exe" -o -name "uvw.exe" \) -type f ! -name "*.sha256")
 done
 
 echo ""
-echo "PASS $PASS / FAIL $FAIL"
+TOTAL=$((PASS + FAIL + SKIP))
+echo "PASS $PASS / FAIL $FAIL / SKIP $SKIP"
+
+if [ "$TOTAL" -eq 0 ]; then
+    echo "error: no artifacts were checked" >&2
+    exit 1
+fi
 
 if [ "$FAIL" -gt 0 ]; then
     exit 1

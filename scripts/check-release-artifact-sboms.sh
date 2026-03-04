@@ -5,27 +5,30 @@
 ##   cargo install rust-audit-info --locked
 ##
 ## Usage:
-##   scripts/check-release-artifact-sboms.sh <run-id>
+##   scripts/check-release-artifact-sboms.sh <artifacts-dir>
+##
+## The artifacts directory should contain extracted artifact subdirectories
+## (e.g., as produced by scripts/download-release-artifacts.sh).
 
 set -euo pipefail
 
 if [ $# -ne 1 ]; then
-    echo "Usage: $0 <github-actions-run-id>" >&2
+    echo "Usage: $0 <artifacts-dir>" >&2
     exit 1
 fi
 
-missing=""
-command -v gh >/dev/null 2>&1 || missing="$missing gh"
-command -v rust-audit-info >/dev/null 2>&1 || missing="$missing rust-audit-info"
+command -v rust-audit-info >/dev/null 2>&1 || {
+    echo "error: missing required tool: rust-audit-info" >&2
+    echo "  cargo install rust-audit-info --locked" >&2
+    exit 1
+}
 
-if [ -n "$missing" ]; then
-    echo "error: missing required tools:$missing" >&2
+ARTIFACTS_DIR="$1"
+
+if [ ! -d "$ARTIFACTS_DIR" ]; then
+    echo "error: not a directory: $ARTIFACTS_DIR" >&2
     exit 1
 fi
-
-RUN_ID="$1"
-WORKDIR="$(mktemp -d)"
-trap 'rm -rf "$WORKDIR"' EXIT
 
 PASS=0
 FAIL=0
@@ -43,40 +46,20 @@ check() {
     fi
 }
 
-echo "Fetching artifacts for run $RUN_ID..."
-ALL_ARTIFACTS=$(gh api "repos/{owner}/{repo}/actions/runs/$RUN_ID/artifacts" \
-    --paginate --jq '.artifacts[].name')
+for artifact_dir in "$ARTIFACTS_DIR"/artifacts-*/; do
+    [ -d "$artifact_dir" ] || continue
 
-echo ""
-
-for artifact in $ALL_ARTIFACTS; do
-    case "$artifact" in
-        artifacts-*) ;;
-        *) continue ;;
-    esac
-
-    dest="$WORKDIR/$artifact"
-    gh run download "$RUN_ID" -n "$artifact" -D "$dest"
-
-    # Extract the archive.
-    for tarball in "$dest"/*.tar.gz; do
-        [ -f "$tarball" ] || continue
-        tar xzf "$tarball" -C "$dest"
-    done
-    for zip in "$dest"/*.zip; do
-        [ -f "$zip" ] || continue
-        unzip -qo "$zip" -d "$dest"
-    done
+    artifact=$(basename "$artifact_dir")
 
     # Find the archive name for labeling.
     archive=""
-    for f in "$dest"/*.tar.gz "$dest"/*.zip; do
+    for f in "$artifact_dir"/*.tar.gz "$artifact_dir"/*.zip; do
         [ -f "$f" ] && archive=$(basename "$f") && break
     done
 
     # Check uv and uvx binaries.
     for bin in uv uvx; do
-        binary=$(find "$dest" \( -name "$bin" -o -name "$bin.exe" \) -type f | head -1)
+        binary=$(find "$artifact_dir" \( -name "$bin" -o -name "$bin.exe" \) -type f | head -1)
         if [ -n "$binary" ]; then
             check "$binary" "${archive:-$artifact} / $(basename "$binary")"
         fi
