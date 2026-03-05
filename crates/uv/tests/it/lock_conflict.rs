@@ -15941,3 +15941,138 @@ fn project_level_conflict_with_group() -> Result<()> {
 
     Ok(())
 }
+
+/// This tests that when multiple workspace members declare the same
+/// conflict, the duplicates are removed in the lock file.
+///
+/// Regression test for:
+/// <https://github.com/astral-sh/uv/issues/18317>
+#[test]
+fn extra_workspace_dedup_conflicts() -> Result<()> {
+    let context = uv_test::test_context!("3.12");
+
+    let root_pyproject_toml = context.temp_dir.child("pyproject.toml");
+    root_pyproject_toml.write_str(
+        r#"
+        [project]
+        name = "workspace-root"
+        version = "0.1.0"
+        requires-python = "==3.12.*"
+        dependencies = []
+
+        [project.optional-dependencies]
+        extra1 = ["anyio==4.1.0"]
+        extra2 = ["anyio==4.2.0"]
+
+        [tool.uv.workspace]
+        members = ["packages/*"]
+
+        [tool.uv]
+        conflicts = [
+          [
+            { extra = "extra1" },
+            { extra = "extra2" },
+          ],
+        ]
+
+        [build-system]
+        requires = ["hatchling"]
+        build-backend = "hatchling.build"
+        "#,
+    )?;
+
+    // Two workspace members that each re-declare the same conflict.
+    let package_a = context.temp_dir.child("packages").child("package-a");
+    package_a.child("pyproject.toml").write_str(
+        r#"
+        [project]
+        name = "package-a"
+        version = "0.1.0"
+        requires-python = "==3.12.*"
+        dependencies = ["workspace-root"]
+
+        [project.optional-dependencies]
+        extra1 = ["workspace-root[extra1]"]
+        extra2 = ["workspace-root[extra2]"]
+
+        [tool.uv.sources]
+        workspace-root = { workspace = true }
+
+        [tool.uv]
+        conflicts = [
+          [
+            { package = "workspace-root", extra = "extra1" },
+            { package = "workspace-root", extra = "extra2" },
+          ],
+        ]
+
+        [build-system]
+        requires = ["hatchling"]
+        build-backend = "hatchling.build"
+        "#,
+    )?;
+
+    let package_b = context.temp_dir.child("packages").child("package-b");
+    package_b.child("pyproject.toml").write_str(
+        r#"
+        [project]
+        name = "package-b"
+        version = "0.1.0"
+        requires-python = "==3.12.*"
+        dependencies = ["workspace-root"]
+
+        [project.optional-dependencies]
+        extra1 = ["workspace-root[extra1]"]
+        extra2 = ["workspace-root[extra2]"]
+
+        [tool.uv.sources]
+        workspace-root = { workspace = true }
+
+        [tool.uv]
+        conflicts = [
+          [
+            { package = "workspace-root", extra = "extra1" },
+            { package = "workspace-root", extra = "extra2" },
+          ],
+        ]
+
+        [build-system]
+        requires = ["hatchling"]
+        build-backend = "hatchling.build"
+        "#,
+    )?;
+
+    uv_snapshot!(context.filters(), context.lock(), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Resolved 7 packages in [TIME]
+    ");
+
+    // The lock file should only contain a single conflict set,
+    // not three (one from each of the root, package-a, package-b).
+    let lock = context.read("uv.lock");
+
+    // Count the number of times the conflict appears — should be exactly once.
+    let conflict_count = lock
+        .matches(r#"{ package = "workspace-root", extra = "extra1" }"#)
+        .count();
+    assert_eq!(
+        conflict_count, 1,
+        "Expected exactly 1 conflict set, but found {conflict_count} duplicates"
+    );
+
+    // Re-run with `--locked`.
+    uv_snapshot!(context.filters(), context.lock().arg("--locked"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Resolved 7 packages in [TIME]
+    ");
+
+    Ok(())
+}

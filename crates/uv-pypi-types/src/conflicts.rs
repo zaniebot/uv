@@ -1,3 +1,4 @@
+use indexmap::IndexSet;
 use petgraph::{
     algo::toposort,
     graph::{DiGraph, NodeIndex},
@@ -15,8 +16,18 @@ use crate::dependency_groups::{DependencyGroupSpecifier, DependencyGroups};
 /// This is useful to force the resolver to fork according to extras that have
 /// unavoidable conflicts with each other. (The alternative is that resolution
 /// will fail.)
-#[derive(Debug, Default, Clone, Eq, PartialEq, serde::Deserialize)]
-pub struct Conflicts(Vec<ConflictSet>);
+#[derive(Debug, Default, Clone, Eq, PartialEq)]
+pub struct Conflicts(IndexSet<ConflictSet>);
+
+impl<'de> serde::Deserialize<'de> for Conflicts {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let sets = Vec::<ConflictSet>::deserialize(deserializer)?;
+        Ok(Self(sets.into_iter().collect()))
+    }
+}
 
 impl Conflicts {
     /// Returns no conflicts.
@@ -26,9 +37,9 @@ impl Conflicts {
         Self::default()
     }
 
-    /// Push a single set of conflicts.
+    /// Insert a single set of conflicts, deduplicating if already present.
     pub fn push(&mut self, set: ConflictSet) {
-        self.0.push(set);
+        self.0.insert(set);
     }
 
     /// Returns an iterator over all sets of conflicting sets.
@@ -52,10 +63,11 @@ impl Conflicts {
         self.0.is_empty()
     }
 
-    /// Appends the given conflicts to this one. This drains all sets from the
-    /// conflicts given, such that after this call, it is empty.
+    /// Appends the given conflicts to this one, deduplicating any identical
+    /// sets. This drains all sets from the conflicts given, such that after
+    /// this call, it is empty.
     pub fn append(&mut self, other: &mut Self) {
-        self.0.append(&mut other.0);
+        self.0.extend(other.0.drain(..));
     }
 
     /// Expand [`Conflicts`]s to include all [`ConflictSet`]s that can
@@ -201,9 +213,7 @@ impl Conflicts {
 
         // Add all newly discovered conflict sets (excluding the originals already in self.0)
         for set in conflict_sets {
-            if !self.0.contains(&set) {
-                self.0.push(set);
-            }
+            self.0.insert(set);
         }
     }
 }
