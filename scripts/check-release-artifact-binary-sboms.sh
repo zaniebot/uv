@@ -5,7 +5,7 @@
 ##   cargo install rust-audit-info --locked
 ##
 ## Usage:
-##   scripts/check-release-artifact-sboms.sh <artifacts-dir>
+##   scripts/check-release-artifact-binary-sboms.sh <artifacts-dir>
 ##
 ## The artifacts directory should contain extracted artifact subdirectories
 ## (e.g., as produced by scripts/download-release-artifacts.sh).
