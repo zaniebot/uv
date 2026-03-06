@@ -674,7 +674,7 @@ jobs:
           docker run --rm \
             -v "$PWD/uv:/uv" \
             -v "$PWD/test/integration/termux.sh:/test-termux.sh" \
-            termux/termux-docker:x86_64 \
+            termux/termux-docker:x86_64@sha256:aa1c8f2e2413d7d058d6884a84bceb0abef7a36848675ac35464b347693d11bc \
             /entrypoint.sh bash /test-termux.sh
 
   integration-test-github-actions:
