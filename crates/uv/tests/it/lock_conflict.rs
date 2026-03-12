@@ -15941,3 +15941,90 @@ fn project_level_conflict_with_group() -> Result<()> {
 
     Ok(())
 }
+
+/// This tests that `tool.uv.environments` correctly filters platform-specific
+/// wheels even when `tool.uv.conflicts` is present.
+///
+/// This is a regression test for:
+/// <https://github.com/astral-sh/uv/issues/18428>
+#[test]
+fn group_conflict_with_constrained_environment() -> Result<()> {
+    let context = uv_test::test_context!("3.12");
+
+    let pyproject_toml = context.temp_dir.child("pyproject.toml");
+    pyproject_toml.write_str(
+        r#"
+        [project]
+        name = "project"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        dependencies = ["markupsafe"]
+
+        [dependency-groups]
+        a = []
+        b = []
+
+        [tool.uv]
+        environments = [
+            "sys_platform == 'linux' and platform_machine == 'x86_64'",
+        ]
+        conflicts = [
+            [
+                { group = "a" },
+                { group = "b" },
+            ],
+        ]
+        "#,
+    )?;
+
+    uv_snapshot!(context.filters(), context.lock(), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Resolved 2 packages in [TIME]
+    ");
+
+    let lock = context.read("uv.lock");
+
+    // The lock file should only contain wheels for Linux x86_64, not for
+    // macOS, Windows, ARM, or other platforms, since the environment is
+    // constrained to `sys_platform == 'linux' and platform_machine == 'x86_64'`.
+    assert!(
+        !lock.contains("macosx"),
+        "Lock file should not contain macOS wheels"
+    );
+    assert!(
+        !lock.contains("win32"),
+        "Lock file should not contain Windows win32 wheels"
+    );
+    assert!(
+        !lock.contains("win_amd64"),
+        "Lock file should not contain Windows amd64 wheels"
+    );
+    assert!(
+        !lock.contains("aarch64"),
+        "Lock file should not contain aarch64 wheels"
+    );
+    assert!(
+        lock.contains("manylinux"),
+        "Lock file should contain manylinux wheels"
+    );
+    assert!(
+        lock.contains("x86_64"),
+        "Lock file should contain x86_64 wheels"
+    );
+
+    // Re-run with `--locked`.
+    uv_snapshot!(context.filters(), context.lock().arg("--locked"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Resolved 2 packages in [TIME]
+    ");
+
+    Ok(())
+}
