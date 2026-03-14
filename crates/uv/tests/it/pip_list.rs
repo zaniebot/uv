@@ -480,6 +480,22 @@ fn list_exclude() {
     ----- stderr -----
     "
     );
+
+    uv_snapshot!(filters, context.pip_list()
+    .arg("--exclude")
+    .arg("numpy,poetry-editable"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    Package Version
+    [UNDERLINE]
+    anyio 4.3.0
+    idna 3.6
+    sniffio 1.3.1
+
+    ----- stderr -----
+    "
+    );
 }
 
 #[test]

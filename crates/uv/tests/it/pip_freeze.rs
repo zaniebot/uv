@@ -611,4 +611,14 @@ fn freeze_exclude() {
     ----- stderr -----
     "###
     );
+
+    // Run `pip freeze --exclude MarkupSafe,tomli` (comma-separated).
+    uv_snapshot!(context.filters(), context.pip_freeze().arg("--exclude").arg("MarkupSafe,tomli").arg("--prefix").arg(prefix.path()), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    "###
+    );
 }
