@@ -6464,6 +6464,13 @@ pub struct PythonInstallArgs {
     #[arg(long, conflicts_with("no_bin"))]
     pub default: bool,
 
+    /// Perform a dry run.
+    ///
+    /// In dry-run mode, uv will resolve the Python versions that would be installed, but will
+    /// not download, install, or modify the system.
+    #[arg(long)]
+    pub dry_run: bool,
+
     #[command(flatten)]
     pub compile_bytecode: PythonInstallCompileBytecodeArgs,
 }

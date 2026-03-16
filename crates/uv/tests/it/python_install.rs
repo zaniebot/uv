@@ -4375,3 +4375,73 @@ fn python_install_compile_bytecode_pypy() {
     Bytecode compiled [COUNT] files in [TIME]
     ");
 }
+
+#[test]
+fn python_install_dry_run() {
+    let context = uv_test::test_context_with_versions!(&[])
+        .with_filtered_python_keys()
+        .with_filtered_exe_suffix()
+        .with_filtered_latest_python_versions()
+        .with_managed_python_dirs()
+        .with_empty_python_install_mirror()
+        .with_python_download_cache();
+
+    // Dry run should report what would be installed without actually installing
+    uv_snapshot!(context.filters(), context.python_install().arg("--dry-run"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Would install Python 3.14.[LATEST]
+     + cpython-3.14.[LATEST]-[PLATFORM]
+    ");
+
+    // Nothing should actually be installed
+    let bin_python = context
+        .bin_dir
+        .child(format!("python3.14{}", std::env::consts::EXE_SUFFIX));
+    bin_python.assert(predicate::path::missing());
+
+    // Now actually install
+    uv_snapshot!(context.filters(), context.python_install(), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Installed Python 3.14.[LATEST] in [TIME]
+     + cpython-3.14.[LATEST]-[PLATFORM] (python3.14)
+    ");
+
+    // Dry run when already installed should report it's already installed
+    uv_snapshot!(context.filters(), context.python_install().arg("--dry-run"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Python is already installed. Use `uv python install <request>` to install another version.
+    ");
+
+    // Dry run with a specific version that's not installed
+    uv_snapshot!(context.filters(), context.python_install().arg("--dry-run").arg("3.12"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Would install Python 3.12.[LATEST]
+     + cpython-3.12.[LATEST]-[PLATFORM]
+    ");
+
+    // Dry run with a version that's already installed
+    uv_snapshot!(context.filters(), context.python_install().arg("--dry-run").arg("3.14"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Python 3.14 is already installed
+    ");
+}

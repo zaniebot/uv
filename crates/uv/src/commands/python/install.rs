@@ -195,6 +195,7 @@ pub(crate) async fn install(
     python_downloads: PythonDownloads,
     no_config: bool,
     compile_bytecode: bool,
+    dry_run: bool,
     concurrency: &Concurrency,
     cache: &Cache,
     preview: Preview,
@@ -242,6 +243,7 @@ pub(crate) async fn install(
         python_downloads,
         no_config,
         compile_bytecode.then_some(sender),
+        dry_run,
         concurrency,
         preview,
         printer,
@@ -301,6 +303,7 @@ async fn perform_install(
     python_downloads: PythonDownloads,
     no_config: bool,
     bytecode_compilation_sender: Option<mpsc::UnboundedSender<ManagedPythonInstallation>>,
+    dry_run: bool,
     concurrency: &Concurrency,
     preview: Preview,
     printer: Printer,
@@ -594,6 +597,17 @@ async fn perform_install(
         // Ensure we only download each version once
         .unique_by(|download| download.key())
         .collect::<Vec<_>>();
+
+    if dry_run {
+        return report_dry_run(
+            &downloads,
+            &satisfied,
+            &requests,
+            upgrade,
+            is_default_install,
+            printer,
+        );
+    }
 
     // Download and unpack the Python versions concurrently
     let reporter = PythonDownloadReporter::new(printer, Some(downloads.len() as u64));
@@ -1334,6 +1348,88 @@ fn find_matching_bin_link<'a>(
     } else {
         unreachable!("Only Unix and Windows are supported")
     }
+}
+
+/// Report what would be installed in dry-run mode.
+fn report_dry_run(
+    downloads: &[&ManagedPythonDownload],
+    satisfied: &[&ManagedPythonInstallation],
+    requests: &[InstallRequest],
+    upgrade: PythonUpgrade,
+    is_default_install: bool,
+    printer: Printer,
+) -> Result<ExitStatus> {
+    if downloads.is_empty() {
+        if is_default_install {
+            if matches!(
+                upgrade,
+                PythonUpgrade::Enabled(PythonUpgradeSource::Install)
+            ) {
+                writeln!(
+                    printer.stderr(),
+                    "The default Python installation is already on the latest supported patch release. Use `uv python install <request>` to install another version.",
+                )?;
+            } else {
+                writeln!(
+                    printer.stderr(),
+                    "Python is already installed. Use `uv python install <request>` to install another version.",
+                )?;
+            }
+        } else if let [request] = requests {
+            let request = &request.request;
+            if matches!(upgrade, PythonUpgrade::Enabled(_)) {
+                writeln!(
+                    printer.stderr(),
+                    "{request} is already on the latest supported patch release"
+                )?;
+            } else {
+                writeln!(printer.stderr(), "{request} is already installed")?;
+            }
+        } else if matches!(upgrade, PythonUpgrade::Enabled(_)) {
+            writeln!(
+                printer.stderr(),
+                "All requested versions already on latest supported patch release"
+            )?;
+        } else {
+            writeln!(printer.stderr(), "All requested versions already installed")?;
+        }
+        return Ok(ExitStatus::Success);
+    }
+
+    if downloads.len() == 1 {
+        let download = downloads[0];
+        writeln!(
+            printer.stderr(),
+            "Would install {}",
+            format!("Python {}", download.key().version()).bold(),
+        )?;
+    } else {
+        writeln!(
+            printer.stderr(),
+            "Would install {} versions",
+            downloads.len().to_string().bold(),
+        )?;
+    }
+
+    for download in downloads {
+        writeln!(
+            printer.stderr(),
+            " {} {}",
+            "+".green(),
+            download.key().bold(),
+        )?;
+    }
+
+    for installation in satisfied {
+        writeln!(
+            printer.stderr(),
+            " {} {} (already installed)",
+            "=".dimmed(),
+            installation.key().dimmed(),
+        )?;
+    }
+
+    Ok(ExitStatus::Success)
 }
 
 /// Check if a download's build version matches an installation's build version.

@@ -1287,6 +1287,7 @@ pub(crate) struct PythonInstallSettings {
     pub(crate) python_downloads_json_url: Option<String>,
     pub(crate) default: bool,
     pub(crate) compile_bytecode: bool,
+    pub(crate) dry_run: bool,
 }
 
 impl PythonInstallSettings {
@@ -1325,6 +1326,7 @@ impl PythonInstallSettings {
             pypy_mirror: _,
             python_downloads_json_url: _,
             default,
+            dry_run,
             compile_bytecode,
         } = args;
 
@@ -1351,6 +1353,7 @@ impl PythonInstallSettings {
                 "compile-bytecode",
             )
             .unwrap_or_default(),
+            dry_run,
         }
     }
 }
