@@ -67,6 +67,15 @@ pub enum SyncFormat {
     Json,
 }
 
+#[derive(Debug, Default, Clone, Copy, clap::ValueEnum)]
+pub enum ToolListFormat {
+    /// Display the list of tools in a human-readable format.
+    #[default]
+    Text,
+    /// Display the list of tools in JSON format.
+    Json,
+}
+
 #[derive(Debug, Default, Clone, clap::ValueEnum)]
 pub enum ListFormat {
     /// Display the list of packages in a human-readable table.
@@ -5798,6 +5807,10 @@ pub struct ToolListArgs {
 
     #[arg(long, overrides_with("outdated"), hide = true)]
     pub no_outdated: bool,
+
+    /// Select the output format.
+    #[arg(long, value_enum, default_value_t = ToolListFormat::default())]
+    pub output_format: ToolListFormat,
 
     // Hide unused global Python options.
     #[arg(long, hide = true)]

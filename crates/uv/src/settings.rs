@@ -17,8 +17,8 @@ use uv_cli::{
     PipInstallArgs, PipListArgs, PipShowArgs, PipSyncArgs, PipTreeArgs, PipUninstallArgs,
     PythonFindArgs, PythonInstallArgs, PythonListArgs, PythonListFormat, PythonPinArgs,
     PythonUninstallArgs, PythonUpgradeArgs, RemoveArgs, RunArgs, SyncArgs, SyncFormat, ToolDirArgs,
-    ToolInstallArgs, ToolListArgs, ToolRunArgs, ToolUninstallArgs, TreeArgs, VenvArgs, VersionArgs,
-    VersionBumpSpec, VersionFormat,
+    ToolInstallArgs, ToolListArgs, ToolListFormat, ToolRunArgs, ToolUninstallArgs, TreeArgs,
+    VenvArgs, VersionArgs, VersionBumpSpec, VersionFormat,
 };
 use uv_cli::{
     AuthorFrom, BuildArgs, ExportArgs, FormatArgs, PublishArgs, PythonDirArgs,
@@ -1093,6 +1093,7 @@ pub(crate) struct ToolListSettings {
     pub(crate) show_extras: bool,
     pub(crate) show_python: bool,
     pub(crate) outdated: bool,
+    pub(crate) output_format: ToolListFormat,
 }
 
 impl ToolListSettings {
@@ -1107,6 +1108,7 @@ impl ToolListSettings {
             show_python,
             outdated,
             no_outdated,
+            output_format,
             python_preference: _,
             no_python_downloads: _,
         } = args;
@@ -1118,6 +1120,7 @@ impl ToolListSettings {
             show_extras,
             show_python,
             outdated: flag(outdated, no_outdated, "outdated").unwrap_or(false),
+            output_format,
         }
     }
 }

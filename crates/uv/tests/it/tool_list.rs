@@ -692,3 +692,110 @@ fn tool_list_show_all() {
     ----- stderr -----
     ");
 }
+
+#[test]
+fn tool_list_json() {
+    let context = uv_test::test_context!("3.12").with_filtered_exe_suffix();
+    let tool_dir = context.temp_dir.child("tools");
+    let bin_dir = context.temp_dir.child("bin");
+
+    // Install `black`
+    context
+        .tool_install()
+        .arg("black==24.2.0")
+        .env(EnvVars::UV_TOOL_DIR, tool_dir.as_os_str())
+        .env(EnvVars::XDG_BIN_HOME, bin_dir.as_os_str())
+        .assert()
+        .success();
+
+    uv_snapshot!(context.filters(), context.tool_list()
+    .arg("--output-format").arg("json")
+    .env(EnvVars::UV_TOOL_DIR, tool_dir.as_os_str())
+    .env(EnvVars::XDG_BIN_HOME, bin_dir.as_os_str()), @r#"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    [{"name":"black","version":"24.2.0","version_specifiers":["==24.2.0"],"python":"CPython 3.12.[X]","entrypoints":[{"name":"black"},{"name":"blackd"}]}]
+
+    ----- stderr -----
+    "#);
+}
+
+#[test]
+fn tool_list_json_empty() {
+    let context = uv_test::test_context!("3.12").with_filtered_exe_suffix();
+    let tool_dir = context.temp_dir.child("tools");
+    let bin_dir = context.temp_dir.child("bin");
+
+    uv_snapshot!(context.filters(), context.tool_list()
+    .arg("--output-format").arg("json")
+    .env(EnvVars::UV_TOOL_DIR, tool_dir.as_os_str())
+    .env(EnvVars::XDG_BIN_HOME, bin_dir.as_os_str()), @r#"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    []
+
+    ----- stderr -----
+    "#);
+}
+
+#[test]
+fn tool_list_json_with_paths() {
+    let context = uv_test::test_context!("3.12").with_filtered_exe_suffix();
+    let tool_dir = context.temp_dir.child("tools");
+    let bin_dir = context.temp_dir.child("bin");
+
+    // Install `black`
+    context
+        .tool_install()
+        .arg("black==24.2.0")
+        .env(EnvVars::UV_TOOL_DIR, tool_dir.as_os_str())
+        .env(EnvVars::XDG_BIN_HOME, bin_dir.as_os_str())
+        .assert()
+        .success();
+
+    uv_snapshot!(context.filters(), context.tool_list()
+    .arg("--output-format").arg("json")
+    .arg("--show-paths")
+    .env(EnvVars::UV_TOOL_DIR, tool_dir.as_os_str())
+    .env(EnvVars::XDG_BIN_HOME, bin_dir.as_os_str()), @r#"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    [{"name":"black","version":"24.2.0","version_specifiers":["==24.2.0"],"python":"CPython 3.12.[X]","path":"[TEMP_DIR]/tools/black","entrypoints":[{"name":"black","path":"[TEMP_DIR]/bin/black"},{"name":"blackd","path":"[TEMP_DIR]/bin/blackd"}]}]
+
+    ----- stderr -----
+    "#);
+}
+
+#[test]
+fn tool_list_json_show_all() {
+    let context = uv_test::test_context!("3.12").with_filtered_exe_suffix();
+    let tool_dir = context.temp_dir.child("tools");
+    let bin_dir = context.temp_dir.child("bin");
+
+    // Install `flask` with extras and additional requirements
+    context
+        .tool_install()
+        .arg("flask[async,dotenv]")
+        .arg("--with")
+        .arg("requests")
+        .env(EnvVars::UV_TOOL_DIR, tool_dir.as_os_str())
+        .env(EnvVars::XDG_BIN_HOME, bin_dir.as_os_str())
+        .assert()
+        .success();
+
+    uv_snapshot!(context.filters(), context.tool_list()
+    .arg("--output-format").arg("json")
+    .arg("--show-paths")
+    .env(EnvVars::UV_TOOL_DIR, tool_dir.as_os_str())
+    .env(EnvVars::XDG_BIN_HOME, bin_dir.as_os_str()), @r#"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    [{"name":"flask","version":"3.0.2","extras":["async","dotenv"],"with":["requests"],"python":"CPython 3.12.[X]","path":"[TEMP_DIR]/tools/flask","entrypoints":[{"name":"flask","path":"[TEMP_DIR]/bin/flask"}]}]
+
+    ----- stderr -----
+    "#);
+}

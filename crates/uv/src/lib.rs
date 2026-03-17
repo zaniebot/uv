@@ -1639,6 +1639,7 @@ async fn run(mut cli: Cli) -> Result<ExitStatus> {
                 args.show_extras,
                 args.show_python,
                 args.outdated,
+                args.output_format,
                 client_builder.subcommand(vec!["tool".to_owned(), "list".to_owned()]),
                 globals.concurrency,
                 &cache,
