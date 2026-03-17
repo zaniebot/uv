@@ -14,7 +14,8 @@ pub struct Options {
     pub fork_strategy: ForkStrategy,
     pub exclude_newer: ExcludeNewer,
     pub index_strategy: IndexStrategy,
-    pub artifact_environments: SupportedEnvironments,
+    pub supported_environments: SupportedEnvironments,
+    pub required_environments: SupportedEnvironments,
     pub flexibility: Flexibility,
     pub build_options: BuildOptions,
     pub torch_backend: Option<TorchStrategy>,
@@ -29,7 +30,8 @@ pub struct OptionsBuilder {
     fork_strategy: ForkStrategy,
     exclude_newer: ExcludeNewer,
     index_strategy: IndexStrategy,
-    artifact_environments: SupportedEnvironments,
+    supported_environments: SupportedEnvironments,
+    required_environments: SupportedEnvironments,
     flexibility: Flexibility,
     build_options: BuildOptions,
     torch_backend: Option<TorchStrategy>,
@@ -83,10 +85,23 @@ impl OptionsBuilder {
         self
     }
 
-    /// Sets the environments that require artifact coverage.
+    /// Sets the supported environments for artifact coverage.
+    ///
+    /// Supported environments will trigger forking when a distribution doesn't cover them, but
+    /// will _not_ error if the environment can't be forked further.
     #[must_use]
-    pub fn artifact_environments(mut self, artifact_environments: SupportedEnvironments) -> Self {
-        self.artifact_environments = artifact_environments;
+    pub fn supported_environments(mut self, supported_environments: SupportedEnvironments) -> Self {
+        self.supported_environments = supported_environments;
+        self
+    }
+
+    /// Sets the required environments for artifact coverage.
+    ///
+    /// Required environments will trigger forking when a distribution doesn't cover them, and
+    /// will error if the environment can't be forked further.
+    #[must_use]
+    pub fn required_environments(mut self, required_environments: SupportedEnvironments) -> Self {
+        self.required_environments = required_environments;
         self
     }
 
@@ -120,7 +135,8 @@ impl OptionsBuilder {
             fork_strategy: self.fork_strategy,
             exclude_newer: self.exclude_newer,
             index_strategy: self.index_strategy,
-            artifact_environments: self.artifact_environments,
+            supported_environments: self.supported_environments,
+            required_environments: self.required_environments,
             flexibility: self.flexibility,
             build_options: self.build_options,
             torch_backend: self.torch_backend,

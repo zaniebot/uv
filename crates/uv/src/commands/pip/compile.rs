@@ -384,7 +384,7 @@ pub(crate) async fn pip_compile(
         PythonRequirement::from_interpreter(&interpreter)
     };
 
-    let artifact_environments = if universal {
+    let supported_environments = if universal {
         environments.clone()
     } else {
         SupportedEnvironments::default()
@@ -560,7 +560,7 @@ pub(crate) async fn pip_compile(
         .index_strategy(index_strategy)
         .torch_backend(torch_backend)
         .build_options(build_options.clone())
-        .artifact_environments(artifact_environments)
+        .supported_environments(supported_environments)
         .build();
 
     // Resolve the requirements.

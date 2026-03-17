@@ -1195,13 +1195,20 @@ impl<InstalledPackages: InstalledPackagesProvider> ResolverState<InstalledPackag
             };
 
             // If the wheel does _not_ cover an environment that requires artifact coverage, it's
-            // incompatible.
-            if env.marker_environment().is_none() && !self.options.artifact_environments.is_empty()
+            // incompatible. For URL dependencies, both supported and required environments
+            // enforce coverage since the wheel is a specific pinned file.
+            if env.marker_environment().is_none()
+                && (!self.options.supported_environments.is_empty()
+                    || !self.options.required_environments.is_empty())
             {
                 let wheel_marker = implied_markers(filename);
-                // If the caller marked an environment as requiring artifact coverage, ensure it
-                // has coverage.
-                for environment_marker in self.options.artifact_environments.iter().copied() {
+                for environment_marker in self
+                    .options
+                    .supported_environments
+                    .iter()
+                    .copied()
+                    .chain(self.options.required_environments.iter().copied())
+                {
                     // If the platform is part of the current environment...
                     if env.included_by_marker(environment_marker)
                         && !find_environments(id, pubgrub).is_disjoint(environment_marker)
@@ -1459,8 +1466,24 @@ impl<InstalledPackages: InstalledPackagesProvider> ResolverState<InstalledPackag
         }
 
         // If the caller marked an environment as requiring artifact coverage, ensure it has
-        // coverage.
-        for marker in self.options.artifact_environments.iter().copied() {
+        // coverage. For both supported and required environments, we attempt to fork. For
+        // required environments, we error if forking fails. For supported environments, we
+        // skip the environment if forking fails (since `tool.uv.environments` narrows the
+        // resolution scope but doesn't enforce artifact coverage).
+        for (marker, required) in self
+            .options
+            .supported_environments
+            .iter()
+            .copied()
+            .map(|m| (m, false))
+            .chain(
+                self.options
+                    .required_environments
+                    .iter()
+                    .copied()
+                    .map(|m| (m, true)),
+            )
+        {
             // If the platform is part of the current environment...
             if env.included_by_marker(marker) {
                 // But isn't supported by the distribution...
@@ -1469,16 +1492,20 @@ impl<InstalledPackages: InstalledPackagesProvider> ResolverState<InstalledPackag
                 {
                     // Then we need to fork.
                     let Some((left, right)) = fork_version_by_marker(env, marker) else {
-                        return Ok(Some(ResolverVersion::Unavailable(
-                            candidate.version().clone(),
-                            UnavailableVersion::IncompatibleDist(IncompatibleDist::Wheel(
-                                IncompatibleWheel::MissingPlatform(marker),
-                            )),
-                        )));
+                        if required {
+                            return Ok(Some(ResolverVersion::Unavailable(
+                                candidate.version().clone(),
+                                UnavailableVersion::IncompatibleDist(IncompatibleDist::Wheel(
+                                    IncompatibleWheel::MissingPlatform(marker),
+                                )),
+                            )));
+                        }
+                        continue;
                     };
 
                     debug!(
-                        "Forking on required platform `{}` for {}=={} ({})",
+                        "Forking on {} platform `{}` for {}=={} ({})",
+                        if required { "required" } else { "supported" },
                         marker.try_to_string().unwrap_or_else(|| "true".to_string()),
                         name,
                         candidate.version(),

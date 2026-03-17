@@ -34082,7 +34082,7 @@ fn lock_supported_environment_wheel_only_package_requires_compatible_wheels() ->
         dependencies = ["pywin32"]
 
         [tool.uv]
-        environments = ["sys_platform == 'linux'"]
+        required-environments = ["sys_platform == 'linux'"]
         "#,
     )?;
 
@@ -34124,6 +34124,188 @@ fn lock_supported_environment_wheel_only_package_requires_compatible_wheels() ->
           And because pywin32>=306 has no Linux-compatible wheels and your project depends on pywin32, we can conclude that your project's requirements are unsatisfiable.
 
           hint: Wheels are available for `pywin32` (v305) with the following Python ABI tags: `cp36m`, `cp37m`, `cp38`, `cp39`, `cp310`, `cp311`
+    ");
+
+    Ok(())
+}
+
+/// Regression test for https://github.com/astral-sh/uv/issues/18527
+///
+/// When `tool.uv.environments` is set, wheel-only packages from custom indexes
+/// that have compatible wheels for the specified environment should resolve
+/// successfully (not fail with "has no compatible wheels").
+#[tokio::test]
+async fn lock_supported_environment_wheel_only_custom_index() -> Result<()> {
+    use serde_json::json;
+    use wiremock::{
+        Mock, MockServer, ResponseTemplate,
+        matchers::{method, path},
+    };
+
+    let context = uv_test::test_context!("3.12");
+    let server = MockServer::start().await;
+
+    // Serve a Linux x86_64 wheel-only package (mimicking a CUDA package from a custom index)
+    let wheel_name =
+        "test_pkg-1.0.0+cu130-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl";
+    let wheel_path = context.workspace_root.join("test/links").join(wheel_name);
+    let wheel_data = fs_err::read(&wheel_path)?;
+    let wheel_hash = {
+        use sha2::Digest;
+        format!("{:x}", sha2::Sha256::digest(&wheel_data))
+    };
+
+    let wheel_url = format!("{}/files/{}", server.uri(), wheel_name);
+
+    Mock::given(method("GET"))
+        .and(path(format!("/files/{}", wheel_name)))
+        .respond_with(ResponseTemplate::new(200).set_body_bytes(wheel_data.clone()))
+        .mount(&server)
+        .await;
+
+    let simple_index = json!({
+        "meta": {
+            "api-version": "1.1"
+        },
+        "name": "test-pkg",
+        "files": [{
+            "filename": wheel_name,
+            "url": wheel_url,
+            "hashes": {
+                "sha256": wheel_hash,
+            },
+            "size": wheel_data.len(),
+        }]
+    });
+
+    Mock::given(method("GET"))
+        .and(path("/simple/test-pkg/"))
+        .respond_with(ResponseTemplate::new(200).set_body_raw(
+            simple_index.to_string().into_bytes(),
+            "application/vnd.pypi.simple.v1+json",
+        ))
+        .mount(&server)
+        .await;
+
+    let pyproject_toml = context.temp_dir.child("pyproject.toml");
+    pyproject_toml.write_str(&formatdoc! { r#"
+        [project]
+        name = "project"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        dependencies = ["test-pkg==1.0.0+cu130"]
+
+        [tool.uv]
+        environments = [
+            "sys_platform == 'linux' and platform_machine == 'x86_64' and python_version == '3.12'"
+        ]
+
+        [tool.uv.sources]
+        test-pkg = {{ index = "custom-index" }}
+
+        [[tool.uv.index]]
+        name = "custom-index"
+        url = "{}/simple"
+        "#,
+        server.uri()
+    })?;
+
+    // This should succeed: the wheel IS compatible with the specified environment.
+    uv_snapshot!(context.filters(), context.lock().env_remove(EnvVars::UV_EXCLUDE_NEWER), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Resolved 2 packages in [TIME]
+    ");
+
+    Ok(())
+}
+
+/// Same as above but with a pure Python wheel (py3-none-any).
+/// Regression test for https://github.com/astral-sh/uv/issues/18527
+#[tokio::test]
+async fn lock_supported_environment_pure_python_wheel_custom_index() -> Result<()> {
+    use serde_json::json;
+    use wiremock::{
+        Mock, MockServer, ResponseTemplate,
+        matchers::{method, path},
+    };
+
+    let context = uv_test::test_context!("3.12");
+    let server = MockServer::start().await;
+
+    // Serve a pure Python wheel with a local version (mimicking flashinfer-jit-cache)
+    let wheel_name = "test_pkg-1.0.0+cu130-py3-none-any.whl";
+    let wheel_path = context.workspace_root.join("test/links").join(wheel_name);
+    let wheel_data = fs_err::read(&wheel_path)?;
+    let wheel_hash = {
+        use sha2::Digest;
+        format!("{:x}", sha2::Sha256::digest(&wheel_data))
+    };
+
+    let wheel_url = format!("{}/files/{}", server.uri(), wheel_name);
+
+    Mock::given(method("GET"))
+        .and(path(format!("/files/{}", wheel_name)))
+        .respond_with(ResponseTemplate::new(200).set_body_bytes(wheel_data.clone()))
+        .mount(&server)
+        .await;
+
+    let simple_index = json!({
+        "meta": {
+            "api-version": "1.1"
+        },
+        "name": "test-pkg",
+        "files": [{
+            "filename": wheel_name,
+            "url": wheel_url,
+            "hashes": {
+                "sha256": wheel_hash,
+            },
+            "size": wheel_data.len(),
+        }]
+    });
+
+    Mock::given(method("GET"))
+        .and(path("/simple/test-pkg/"))
+        .respond_with(ResponseTemplate::new(200).set_body_raw(
+            simple_index.to_string().into_bytes(),
+            "application/vnd.pypi.simple.v1+json",
+        ))
+        .mount(&server)
+        .await;
+
+    let pyproject_toml = context.temp_dir.child("pyproject.toml");
+    pyproject_toml.write_str(&formatdoc! { r#"
+        [project]
+        name = "project"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        dependencies = ["test-pkg==1.0.0+cu130"]
+
+        [tool.uv]
+        environments = [
+            "sys_platform == 'linux' and platform_machine == 'x86_64' and python_version == '3.12'"
+        ]
+
+        [[tool.uv.index]]
+        name = "custom-index"
+        url = "{}/simple"
+        default = true
+        "#,
+        server.uri()
+    })?;
+
+    // This should succeed: the pure Python wheel IS compatible with any environment.
+    uv_snapshot!(context.filters(), context.lock().env_remove(EnvVars::UV_EXCLUDE_NEWER), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Resolved 2 packages in [TIME]
     ");
 
     Ok(())
