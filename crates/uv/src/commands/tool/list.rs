@@ -2,7 +2,6 @@ use std::fmt::Write;
 
 use anyhow::Result;
 use futures::StreamExt;
-use itertools::Itertools;
 use owo_colors::OwoColorize;
 use rustc_hash::FxHashMap;
 use serde::Serialize;
@@ -27,7 +26,7 @@ use crate::commands::pip::latest::LatestClient;
 use crate::commands::reporters::LatestVersionReporter;
 use crate::printer::Printer;
 
-/// A JSON entry for a single tool.
+/// An entry representing a single installed tool.
 #[derive(Debug, Serialize)]
 struct ToolEntry {
     /// The tool package name.
@@ -44,26 +43,115 @@ struct ToolEntry {
     #[serde(skip_serializing_if = "Vec::is_empty")]
     with: Vec<String>,
     /// The Python interpreter for the tool environment.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    python: Option<String>,
+    python: String,
     /// The latest available version, if outdated.
     #[serde(skip_serializing_if = "Option::is_none")]
     latest_version: Option<Version>,
     /// The path to the tool environment directory.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    path: Option<String>,
+    path: String,
     /// The entry points provided by the tool.
     entrypoints: Vec<EntrypointEntry>,
 }
 
-/// A JSON entry for a single tool entrypoint.
+/// An entry representing a single tool entrypoint.
 #[derive(Debug, Serialize)]
 struct EntrypointEntry {
     /// The name of the entrypoint executable.
     name: String,
     /// The install path of the entrypoint executable.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    path: Option<String>,
+    path: String,
+}
+
+impl ToolEntry {
+    /// Format this entry as human-readable text.
+    #[expect(clippy::fn_params_excessive_bools)]
+    fn format_text(
+        &self,
+        show_paths: bool,
+        show_version_specifiers: bool,
+        show_with: bool,
+        show_extras: bool,
+        show_python: bool,
+        outdated: bool,
+    ) -> String {
+        let mut output = String::new();
+
+        let version_specifier = if show_version_specifiers && !self.version_specifiers.is_empty() {
+            format!(" [required: {}]", self.version_specifiers.join(", "))
+        } else {
+            String::new()
+        };
+
+        let extra_requirements = if show_extras && !self.extras.is_empty() {
+            format!(" [extras: {}]", self.extras.join(", "))
+        } else {
+            String::new()
+        };
+
+        let with_requirements = if show_with && !self.with.is_empty() {
+            format!(" [with: {}]", self.with.join(", "))
+        } else {
+            String::new()
+        };
+
+        let python_version = if show_python {
+            format!(" [{}]", self.python)
+        } else {
+            String::new()
+        };
+
+        let latest_version = if outdated {
+            self.latest_version
+                .as_ref()
+                .map(|version| format!(" [latest: {version}]"))
+                .unwrap_or_default()
+        } else {
+            String::new()
+        };
+
+        if show_paths {
+            writeln!(
+                output,
+                "{} ({})",
+                format!(
+                    "{name} v{version}{version_specifier}{extra_requirements}{with_requirements}{python_version}{latest_version}",
+                    name = self.name,
+                    version = self.version,
+                )
+                .bold(),
+                self.path.cyan(),
+            )
+            .expect("write to String");
+        } else {
+            writeln!(
+                output,
+                "{}",
+                format!(
+                    "{name} v{version}{version_specifier}{extra_requirements}{with_requirements}{python_version}{latest_version}",
+                    name = self.name,
+                    version = self.version,
+                )
+                .bold()
+            )
+            .expect("write to String");
+        }
+
+        for entrypoint in &self.entrypoints {
+            if show_paths {
+                writeln!(output, "- {}", entrypoint.to_string().cyan()).expect("write to String");
+            } else {
+                writeln!(output, "- {}", entrypoint.name).expect("write to String");
+            }
+        }
+
+        output
+    }
+}
+
+impl std::fmt::Display for EntrypointEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} ({})", self.name, self.path)
+    }
 }
 
 /// List installed tools.
@@ -218,208 +306,102 @@ pub(crate) async fn list(
         FxHashMap::default()
     };
 
+    // Build tool entries from the collected data.
+    let mut entries = Vec::new();
+    for (name, tool, tool_env, version) in valid_tools {
+        // If `--outdated` is set, skip tools that are up-to-date.
+        if outdated {
+            let is_outdated = latest
+                .get(&name)
+                .and_then(Option::as_ref)
+                .is_some_and(|filename| filename.version() > &version);
+            if !is_outdated {
+                continue;
+            }
+        }
+
+        let version_specifiers = tool
+            .requirements()
+            .iter()
+            .filter(|req| req.name == name)
+            .map(|req| req.source.to_string())
+            .filter(|s| !s.is_empty())
+            .collect::<Vec<_>>();
+
+        let extras = tool
+            .requirements()
+            .iter()
+            .filter(|req| req.name == name)
+            .flat_map(|req| req.extras.iter())
+            .map(ToString::to_string)
+            .collect::<Vec<_>>();
+
+        let with = tool
+            .requirements()
+            .iter()
+            .filter(|req| req.name != name)
+            .map(|req| format!("{}{}", req.name, req.source))
+            .collect::<Vec<_>>();
+
+        let interpreter = tool_env.environment().interpreter();
+        let implementation = LenientImplementationName::from(interpreter.implementation_name());
+        let python = format!(
+            "{} {}",
+            implementation.pretty(),
+            interpreter.python_full_version()
+        );
+
+        let latest_version = latest
+            .get(&name)
+            .and_then(Option::as_ref)
+            .map(|filename| filename.version().clone());
+
+        let path = installed_tools
+            .tool_dir(&name)
+            .simplified_display()
+            .to_string();
+
+        let entrypoints = tool
+            .entrypoints()
+            .iter()
+            .map(|ep| EntrypointEntry {
+                name: ep.name.clone(),
+                path: ep.install_path.simplified_display().to_string(),
+            })
+            .collect();
+
+        entries.push(ToolEntry {
+            name,
+            version,
+            version_specifiers,
+            extras,
+            with,
+            python,
+            latest_version,
+            path,
+            entrypoints,
+        });
+    }
+
     match output_format {
         ToolListFormat::Json => {
-            let mut entries = Vec::new();
-
-            for (name, tool, tool_env, version) in valid_tools {
-                // If `--outdated` is set, skip tools that are up-to-date.
-                if outdated {
-                    let is_outdated = latest
-                        .get(&name)
-                        .and_then(Option::as_ref)
-                        .is_some_and(|filename| filename.version() > &version);
-                    if !is_outdated {
-                        continue;
-                    }
-                }
-
-                let version_specifiers = tool
-                    .requirements()
-                    .iter()
-                    .filter(|req| req.name == name)
-                    .map(|req| req.source.to_string())
-                    .filter(|s| !s.is_empty())
-                    .collect::<Vec<_>>();
-
-                let extras = tool
-                    .requirements()
-                    .iter()
-                    .filter(|req| req.name == name)
-                    .flat_map(|req| req.extras.iter())
-                    .map(ToString::to_string)
-                    .collect::<Vec<_>>();
-
-                let with = tool
-                    .requirements()
-                    .iter()
-                    .filter(|req| req.name != name)
-                    .map(|req| format!("{}{}", req.name, req.source))
-                    .collect::<Vec<_>>();
-
-                let python = {
-                    let interpreter = tool_env.environment().interpreter();
-                    let implementation =
-                        LenientImplementationName::from(interpreter.implementation_name());
-                    Some(format!(
-                        "{} {}",
-                        implementation.pretty(),
-                        interpreter.python_full_version()
-                    ))
-                };
-
-                let latest_version = latest
-                    .get(&name)
-                    .and_then(Option::as_ref)
-                    .map(|filename| filename.version().clone());
-
-                let path = show_paths.then(|| {
-                    installed_tools
-                        .tool_dir(&name)
-                        .simplified_display()
-                        .to_string()
-                });
-
-                let entrypoints = tool
-                    .entrypoints()
-                    .iter()
-                    .map(|ep| EntrypointEntry {
-                        name: ep.name.clone(),
-                        path: show_paths.then(|| ep.install_path.simplified_display().to_string()),
-                    })
-                    .collect();
-
-                entries.push(ToolEntry {
-                    name,
-                    version,
-                    version_specifiers,
-                    extras,
-                    with,
-                    python,
-                    latest_version,
-                    path,
-                    entrypoints,
-                });
-            }
-
             let output = serde_json::to_string(&entries)?;
             writeln!(printer.stdout(), "{output}")?;
         }
         ToolListFormat::Text => {
-            for (name, tool, tool_env, version) in valid_tools {
-                // If `--outdated` is set, skip tools that are up-to-date.
-                if outdated {
-                    let is_outdated = latest
-                        .get(&name)
-                        .and_then(Option::as_ref)
-                        .is_some_and(|filename| filename.version() > &version);
-                    if !is_outdated {
-                        continue;
-                    }
-                }
-
-                let version_specifier = show_version_specifiers
-                    .then(|| {
-                        tool.requirements()
-                            .iter()
-                            .filter(|req| req.name == name)
-                            .map(|req| req.source.to_string())
-                            .filter(|s| !s.is_empty())
-                            .peekable()
-                    })
-                    .take_if(|specifiers| specifiers.peek().is_some())
-                    .map(|mut specifiers| {
-                        let specifiers = specifiers.join(", ");
-                        format!(" [required: {specifiers}]")
-                    })
-                    .unwrap_or_default();
-
-                let extra_requirements = show_extras
-                    .then(|| {
-                        tool.requirements()
-                            .iter()
-                            .filter(|req| req.name == name)
-                            .flat_map(|req| req.extras.iter())
-                            .peekable()
-                    })
-                    .take_if(|extras| extras.peek().is_some())
-                    .map(|extras| {
-                        let extras_str = extras.map(ToString::to_string).join(", ");
-                        format!(" [extras: {extras_str}]")
-                    })
-                    .unwrap_or_default();
-
-                let python_version = if show_python {
-                    let interpreter = tool_env.environment().interpreter();
-                    let implementation =
-                        LenientImplementationName::from(interpreter.implementation_name());
-                    format!(
-                        " [{} {}]",
-                        implementation.pretty(),
-                        interpreter.python_full_version()
+            for entry in &entries {
+                write!(
+                    printer.stdout(),
+                    "{}",
+                    entry.format_text(
+                        show_paths,
+                        show_version_specifiers,
+                        show_with,
+                        show_extras,
+                        show_python,
+                        outdated,
                     )
-                } else {
-                    String::new()
-                };
-
-                let with_requirements = show_with
-                    .then(|| {
-                        tool.requirements()
-                            .iter()
-                            .filter(|req| req.name != name)
-                            .peekable()
-                    })
-                    .take_if(|requirements| requirements.peek().is_some())
-                    .map(|requirements| {
-                        let requirements = requirements
-                            .map(|req| format!("{}{}", req.name, req.source))
-                            .join(", ");
-                        format!(" [with: {requirements}]")
-                    })
-                    .unwrap_or_default();
-
-                let latest_version = if outdated {
-                    latest
-                        .get(&name)
-                        .and_then(Option::as_ref)
-                        .map(|filename| format!(" [latest: {}]", filename.version()))
-                        .unwrap_or_default()
-                } else {
-                    String::new()
-                };
-
-                if show_paths {
-                    writeln!(
-                        printer.stdout(),
-                        "{} ({})",
-                        format!(
-                            "{name} v{version}{version_specifier}{extra_requirements}{with_requirements}{python_version}{latest_version}"
-                        )
-                        .bold(),
-                        installed_tools
-                            .tool_dir(&name)
-                            .simplified_display()
-                            .cyan(),
-                    )?;
-                } else {
-                    writeln!(
-                        printer.stdout(),
-                        "{}",
-                        format!(
-                            "{name} v{version}{version_specifier}{extra_requirements}{with_requirements}{python_version}{latest_version}"
-                        )
-                        .bold()
-                    )?;
-                }
-
-                // Output tool entrypoints
-                for entrypoint in tool.entrypoints() {
-                    if show_paths {
-                        writeln!(printer.stdout(), "- {}", entrypoint.to_string().cyan())?;
-                    } else {
-                        writeln!(printer.stdout(), "- {}", entrypoint.name)?;
-                    }
-                }
+                )?;
             }
         }
     }

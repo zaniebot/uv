@@ -715,7 +715,7 @@ fn tool_list_json() {
     success: true
     exit_code: 0
     ----- stdout -----
-    [{"name":"black","version":"24.2.0","version_specifiers":["==24.2.0"],"python":"CPython 3.12.[X]","entrypoints":[{"name":"black"},{"name":"blackd"}]}]
+    [{"name":"black","version":"24.2.0","version_specifiers":["==24.2.0"],"python":"CPython 3.12.[X]","path":"[TEMP_DIR]/tools/black","entrypoints":[{"name":"black","path":"[TEMP_DIR]/bin/black"},{"name":"blackd","path":"[TEMP_DIR]/bin/blackd"}]}]
 
     ----- stderr -----
     "#);
@@ -741,35 +741,6 @@ fn tool_list_json_empty() {
 }
 
 #[test]
-fn tool_list_json_with_paths() {
-    let context = uv_test::test_context!("3.12").with_filtered_exe_suffix();
-    let tool_dir = context.temp_dir.child("tools");
-    let bin_dir = context.temp_dir.child("bin");
-
-    // Install `black`
-    context
-        .tool_install()
-        .arg("black==24.2.0")
-        .env(EnvVars::UV_TOOL_DIR, tool_dir.as_os_str())
-        .env(EnvVars::XDG_BIN_HOME, bin_dir.as_os_str())
-        .assert()
-        .success();
-
-    uv_snapshot!(context.filters(), context.tool_list()
-    .arg("--output-format").arg("json")
-    .arg("--show-paths")
-    .env(EnvVars::UV_TOOL_DIR, tool_dir.as_os_str())
-    .env(EnvVars::XDG_BIN_HOME, bin_dir.as_os_str()), @r#"
-    success: true
-    exit_code: 0
-    ----- stdout -----
-    [{"name":"black","version":"24.2.0","version_specifiers":["==24.2.0"],"python":"CPython 3.12.[X]","path":"[TEMP_DIR]/tools/black","entrypoints":[{"name":"black","path":"[TEMP_DIR]/bin/black"},{"name":"blackd","path":"[TEMP_DIR]/bin/blackd"}]}]
-
-    ----- stderr -----
-    "#);
-}
-
-#[test]
 fn tool_list_json_show_all() {
     let context = uv_test::test_context!("3.12").with_filtered_exe_suffix();
     let tool_dir = context.temp_dir.child("tools");
@@ -788,7 +759,6 @@ fn tool_list_json_show_all() {
 
     uv_snapshot!(context.filters(), context.tool_list()
     .arg("--output-format").arg("json")
-    .arg("--show-paths")
     .env(EnvVars::UV_TOOL_DIR, tool_dir.as_os_str())
     .env(EnvVars::XDG_BIN_HOME, bin_dir.as_os_str()), @r#"
     success: true
