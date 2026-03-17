@@ -1,10 +1,13 @@
+mod wrap;
+
 use std::borrow::Cow;
 use std::error::Error;
 use std::fmt;
 use std::iter;
 
 use owo_colors::{DynColor, OwoColorize};
-use uv_static::EnvVars;
+
+use wrap::{get_wrap_width, wrap_text};
 
 /// An error that may carry user-facing hints.
 ///
@@ -47,6 +50,11 @@ impl Hints<'_> {
     /// Whether the collection is empty.
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
+    }
+
+    /// Iterate over the hints by reference.
+    pub fn iter(&self) -> impl Iterator<Item = &str> {
+        self.0.iter().map(AsRef::as_ref)
     }
 
     /// Extend with another set of hints, converting borrowed hints to owned.
@@ -101,91 +109,6 @@ impl fmt::Display for HintPrefix {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Line wrapping
-// ---------------------------------------------------------------------------
-
-/// Checks if line wrapping should be enabled.
-///
-/// Returns `false` if `UV_NO_WRAP` is set.
-fn should_wrap_lines() -> bool {
-    std::env::var_os(EnvVars::UV_NO_WRAP).is_none()
-}
-
-/// Gets the terminal width for wrapping.
-///
-/// Checks `width_override`, then `COLUMNS` env var, then terminal size detection.
-/// Returns `None` if width cannot be determined (no wrapping should occur).
-fn get_wrap_width(width_override: Option<usize>) -> Option<usize> {
-    if !should_wrap_lines() {
-        return None;
-    }
-
-    // Use override if provided (for testing).
-    if let Some(width) = width_override {
-        return Some(width);
-    }
-
-    // Check COLUMNS environment variable.
-    if let Ok(cols) = std::env::var(EnvVars::COLUMNS) {
-        if let Ok(width) = cols.parse::<usize>() {
-            return Some(width);
-        }
-    }
-
-    // Try to detect terminal width.
-    if let Some((terminal_size::Width(width), _)) = terminal_size::terminal_size() {
-        return Some(width as usize);
-    }
-
-    // No width detected — don't wrap.
-    None
-}
-
-/// Wraps text at word boundaries with proper indentation.
-///
-/// Based on miette's `wrap()` implementation from:
-/// <https://github.com/zkat/miette/blob/v7.2.0/src/handlers/graphical.rs#L876-L909>
-fn wrap_text(
-    text: &str,
-    width: Option<usize>,
-    initial_indent: &str,
-    subsequent_indent: &str,
-) -> String {
-    if let Some(width) = width {
-        let options = textwrap::Options::new(width)
-            .initial_indent(initial_indent)
-            .subsequent_indent(subsequent_indent)
-            .break_words(false)
-            .word_separator(textwrap::WordSeparator::AsciiSpace)
-            .word_splitter(textwrap::WordSplitter::NoHyphenation);
-
-        textwrap::fill(text, options)
-    } else {
-        // If not wrapping, apply indentation while preserving line breaks.
-        let mut result = String::with_capacity(2 * text.len());
-
-        for (idx, line) in text.split_terminator('\n').enumerate() {
-            if idx == 0 {
-                result.push_str(initial_indent);
-            } else {
-                result.push('\n');
-                // Don't add indent to empty lines (avoid trailing whitespace).
-                if !line.is_empty() {
-                    result.push_str(subsequent_indent);
-                }
-            }
-            result.push_str(line);
-        }
-
-        result
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Error chain formatting
-// ---------------------------------------------------------------------------
-
 /// Format an error or warning chain with custom level and color.
 ///
 /// # Example
@@ -206,7 +129,7 @@ pub fn write_error_chain(
     level: impl AsRef<str>,
     color: impl DynColor + Copy,
 ) -> fmt::Result {
-    write_error_chain_with_hints(err, stream, level, color, std::iter::empty::<&str>(), None)
+    write_error_chain_with_hints(err, stream, level, color, &Hints::none(), None)
 }
 
 /// Format an error chain with hints appended at the end.
@@ -215,12 +138,12 @@ pub fn write_error_chain(
 ///
 /// `width_override` allows callers to override the terminal width for wrapping
 /// (primarily for testing). Pass `None` for automatic detection.
-pub fn write_error_chain_with_hints<'a>(
+pub fn write_error_chain_with_hints(
     err: &dyn Error,
     mut stream: impl fmt::Write,
     level: impl AsRef<str>,
     color: impl DynColor + Copy,
-    hints: impl IntoIterator<Item = impl fmt::Display + 'a>,
+    hints: &Hints<'_>,
     width_override: Option<usize>,
 ) -> fmt::Result {
     let width = get_wrap_width(width_override);
@@ -268,7 +191,7 @@ pub fn write_error_chain_with_hints<'a>(
     }
 
     // Write hints.
-    for hint in hints {
+    for hint in hints.iter() {
         writeln!(&mut stream, "\n{HintPrefix} {hint}")?;
     }
 
@@ -305,7 +228,7 @@ mod tests {
             &mut output,
             "error",
             AnsiColors::Red,
-            std::iter::empty::<&str>(),
+            &Hints::none(),
             Some(80),
         )
         .unwrap();
@@ -358,7 +281,7 @@ mod tests {
             &mut output,
             "error",
             AnsiColors::Red,
-            std::iter::empty::<&str>(),
+            &Hints::none(),
             Some(50),
         )
         .unwrap();
@@ -384,7 +307,7 @@ mod tests {
             &mut output,
             "error",
             AnsiColors::Red,
-            std::iter::empty::<&str>(),
+            &Hints::none(),
             Some(40),
         )
         .unwrap();
@@ -425,7 +348,7 @@ mod tests {
             &mut output,
             "error",
             AnsiColors::Red,
-            std::iter::empty::<&str>(),
+            &Hints::none(),
             Some(60),
         )
         .unwrap();
@@ -450,7 +373,7 @@ mod tests {
             &mut output,
             "error",
             AnsiColors::Red,
-            std::iter::empty::<&str>(),
+            &Hints::none(),
             Some(50),
         )
         .unwrap();
@@ -465,10 +388,12 @@ mod tests {
     fn format_with_hints() {
         let err = anyhow!("Permission denied").context("Failed to fetch package");
 
-        let hints = vec![
-            "Try running with `--verbose` for more information.",
-            "Try running without --offline.",
-        ];
+        let hints: Hints<'_> = [
+            "Try running with `--verbose` for more information.".to_string(),
+            "Try running without --offline.".to_string(),
+        ]
+        .into_iter()
+        .collect();
 
         let mut rendered = String::new();
         write_error_chain_with_hints(
@@ -476,7 +401,7 @@ mod tests {
             &mut rendered,
             "error",
             AnsiColors::Red,
-            hints,
+            &hints,
             None,
         )
         .unwrap();
