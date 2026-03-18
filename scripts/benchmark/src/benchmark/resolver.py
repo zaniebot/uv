@@ -68,6 +68,7 @@ class Benchmark(enum.Enum):
     RESOLVE_WARM = "resolve-warm"
     RESOLVE_INCREMENTAL = "resolve-incremental"
     RESOLVE_NOOP = "resolve-noop"
+    RESOLVE_CHECK = "resolve-check"
     INSTALL_COLD = "install-cold"
     INSTALL_WARM = "install-warm"
 
@@ -98,6 +99,8 @@ class Suite(abc.ABC):
                 return self.resolve_incremental(requirements_file, cwd=cwd)
             case Benchmark.RESOLVE_NOOP:
                 return self.resolve_noop(requirements_file, cwd=cwd)
+            case Benchmark.RESOLVE_CHECK:
+                return self.resolve_check(requirements_file, cwd=cwd)
             case Benchmark.INSTALL_COLD:
                 return self.install_cold(requirements_file, cwd=cwd)
             case Benchmark.INSTALL_WARM:
@@ -138,6 +141,14 @@ class Suite(abc.ABC):
 
         The resolution is performed with an existing lockfile, and the cache directory
         is _not_ cleared between runs.
+        """
+
+    @abc.abstractmethod
+    def resolve_check(self, requirements_file: str, *, cwd: str) -> Command | None:
+        """Check an existing lockfile using the `--check` flag.
+
+        The check is performed with an existing, valid lockfile, and the cache
+        directory is _not_ cleared between runs.
         """
 
     @abc.abstractmethod
@@ -277,6 +288,8 @@ class PipCompile(Suite):
             ],
         )
 
+    def resolve_check(self, requirements_file: str, *, cwd: str) -> Command | None: ...
+
     def install_cold(self, requirements_file: str, *, cwd: str) -> Command | None: ...
 
     def install_warm(self, requirements_file: str, *, cwd: str) -> Command | None: ...
@@ -297,6 +310,8 @@ class PipSync(Suite):
     ) -> Command | None: ...
 
     def resolve_noop(self, requirements_file: str, *, cwd: str) -> Command | None: ...
+
+    def resolve_check(self, requirements_file: str, *, cwd: str) -> Command | None: ...
 
     def install_cold(self, requirements_file: str, *, cwd: str) -> Command | None:
         cache_dir = os.path.join(cwd, ".cache")
@@ -531,6 +546,8 @@ class Poetry(Suite):
                 cwd,
             ],
         )
+
+    def resolve_check(self, requirements_file: str, *, cwd: str) -> Command | None: ...
 
     def install_cold(self, requirements_file: str, *, cwd: str) -> Command | None:
         self.setup(requirements_file, cwd=cwd)
@@ -771,6 +788,8 @@ class Pdm(Suite):
             ],
         )
 
+    def resolve_check(self, requirements_file: str, *, cwd: str) -> Command | None: ...
+
     def install_cold(self, requirements_file: str, *, cwd: str) -> Command | None:
         self.setup(requirements_file, cwd=cwd)
 
@@ -964,6 +983,8 @@ class UvPip(Suite):
                 output_file,
             ],
         )
+
+    def resolve_check(self, requirements_file: str, *, cwd: str) -> Command | None: ...
 
     def install_cold(self, requirements_file: str, *, cwd: str) -> Command | None:
         cache_dir = os.path.join(cwd, ".cache")
@@ -1173,6 +1194,40 @@ class UvProject(Suite):
             command=[
                 self.path,
                 "lock",
+                "--cache-dir",
+                cache_dir,
+                "--directory",
+                cwd,
+                "--python",
+                self.python,
+            ],
+        )
+
+    def resolve_check(self, requirements_file: str, *, cwd: str) -> Command | None:
+        self.setup(requirements_file, cwd=cwd)
+
+        uv_lock = os.path.join(cwd, "uv.lock")
+        assert not os.path.exists(uv_lock), f"Lockfile already exists at: {uv_lock}"
+
+        # Run a resolution, to ensure that the lockfile exists.
+        # TODO(charlie): Make this a `setup`.
+        subprocess.check_call(
+            [self.path, "lock"],
+            cwd=cwd,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        assert os.path.exists(uv_lock), f"Lockfile doesn't exist at: {uv_lock}"
+
+        cache_dir = os.path.join(cwd, ".cache")
+
+        return Command(
+            name=f"{self.name} ({Benchmark.RESOLVE_CHECK.value})",
+            prepare=None,
+            command=[
+                self.path,
+                "lock",
+                "--check",
                 "--cache-dir",
                 cache_dir,
                 "--directory",
