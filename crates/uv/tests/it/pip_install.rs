@@ -8609,6 +8609,46 @@ fn local_index_fallback() -> Result<()> {
     Ok(())
 }
 
+/// When the first index is unreachable, fall back to the next index.
+///
+/// Ref: <https://github.com/astral-sh/uv/issues/18547>
+#[test]
+fn index_unreachable_fallback() -> Result<()> {
+    let context = uv_test::test_context!("3.12");
+
+    let pyproject_toml = context.temp_dir.child("pyproject.toml");
+    pyproject_toml.write_str(indoc! {r#"
+        [project]
+        name = "example"
+        version = "0.0.0"
+        requires-python = ">=3.12"
+
+        [[tool.uv.index]]
+        name = "unreachable"
+        url = "https://invalid.test/simple"
+
+        [tool.uv.pip]
+        index-url = "https://pypi.org/simple"
+    "#})?;
+
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("iniconfig")
+        .arg("--no-deps"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Resolved 1 package in [TIME]
+    Prepared 1 package in [TIME]
+    Installed 1 package in [TIME]
+     + iniconfig==2.0.0
+    "
+    );
+
+    Ok(())
+}
+
 #[test]
 fn accept_existing_prerelease() -> Result<()> {
     let context = uv_test::test_context!("3.12").with_filtered_counts();

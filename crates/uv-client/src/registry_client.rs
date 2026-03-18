@@ -556,7 +556,10 @@ impl RegistryClient {
                 // The package could not be found in the remote index.
                 ErrorKind::WrappedReqwestError(.., reqwest_err) => {
                     let Some(status_code) = reqwest_err.status() else {
-                        return Err(err);
+                        // Connection-level error (e.g., DNS resolution failure, timeout).
+                        // Treat as "not found" to allow falling through to the next index.
+                        warn!("Failed to fetch package metadata from {index}: {reqwest_err}");
+                        return Ok(SimpleMetadataSearchOutcome::NotFound);
                     };
                     let decision =
                         status_code_strategy.handle_status_code(status_code, index, capabilities);
