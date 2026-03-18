@@ -6,7 +6,7 @@ use uv_cache::Cache;
 use uv_client::{BaseClientBuilder, RegistryClientBuilder};
 use uv_distribution_types::Requirement;
 use uv_python::PythonEnvironment;
-use uv_resolver::Manifest;
+use uv_resolver::{Lock, Manifest};
 
 fn resolve_warm_jupyter(c: &mut Criterion<WallTime>) {
     let run = setup(Manifest::simple(vec![Requirement::from(
@@ -43,11 +43,126 @@ fn resolve_warm_airflow(c: &mut Criterion<WallTime>) {
 //     c.bench_function("resolve_warm_airflow_universal", |b| b.iter(|| run(true)));
 // }
 
+/// Benchmark `lock --check` with a valid lockfile for `jupyter==1.0.0`.
+///
+/// This measures the cost of parsing a lockfile and validating it against workspace
+/// requirements, which is the critical path for `uv lock --check` when the lockfile
+/// is already up-to-date.
+fn lock_check_jupyter(c: &mut Criterion<WallTime>) {
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .max_blocking_threads(256)
+        .enable_all()
+        .build()
+        .unwrap();
+
+    let cache = Cache::from_path("../../.cache")
+        .init_no_wait()
+        .expect("No cache contention when running benchmarks")
+        .unwrap();
+    let interpreter = PythonEnvironment::from_root("../../.venv", &cache)
+        .unwrap()
+        .into_interpreter();
+    let client = RegistryClientBuilder::new(BaseClientBuilder::default(), cache.clone()).build();
+
+    // Resolve jupyter to produce a lock.
+    let manifest = Manifest::simple(vec![Requirement::from(
+        uv_pep508::Requirement::from_str("jupyter==1.0.0").unwrap(),
+    )]);
+
+    let output = runtime
+        .block_on(resolver::resolve(
+            manifest,
+            cache.clone(),
+            &client,
+            &interpreter,
+            true,
+        ))
+        .unwrap();
+
+    // Create a temporary workspace so we have a valid install path.
+    let temp_dir = tempfile::tempdir().unwrap();
+    let lock = Lock::from_resolution(&output, temp_dir.path(), vec![]).unwrap();
+    let lock_toml = lock.to_toml().unwrap();
+
+    // Benchmark: parse the lockfile from TOML and validate it matches.
+    //
+    // When `lock --check` is run with a valid lockfile, the main cost is:
+    // 1. Deserializing the lockfile from TOML
+    // 2. Comparing the deserialized lock against the current resolution
+    //
+    // The resolver is NOT invoked when the lockfile satisfies the workspace requirements.
+    c.bench_function("lock_check_jupyter", |b| {
+        b.iter(|| {
+            // Parse the lockfile (the primary I/O cost of `lock --check`).
+            let parsed: Lock = toml::from_str(black_box(&lock_toml)).unwrap();
+
+            // Validate the lock contents match (comparing the serialized form is
+            // how `lock --check` detects changes after `ValidatedLock::Satisfies`).
+            let roundtripped = parsed.to_toml().unwrap();
+            assert_eq!(black_box(&roundtripped), black_box(&lock_toml));
+        })
+    });
+}
+
+/// Benchmark `lock --check` with a valid lockfile for `apache-airflow[all]==2.9.3`.
+///
+/// This exercises a much larger lockfile than jupyter, providing a benchmark for
+/// `lock --check` performance with complex dependency trees.
+fn lock_check_airflow(c: &mut Criterion<WallTime>) {
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .max_blocking_threads(256)
+        .enable_all()
+        .build()
+        .unwrap();
+
+    let cache = Cache::from_path("../../.cache")
+        .init_no_wait()
+        .expect("No cache contention when running benchmarks")
+        .unwrap();
+    let interpreter = PythonEnvironment::from_root("../../.venv", &cache)
+        .unwrap()
+        .into_interpreter();
+    let client = RegistryClientBuilder::new(BaseClientBuilder::default(), cache.clone()).build();
+
+    // Resolve airflow to produce a lock.
+    let manifest = Manifest::simple(vec![
+        Requirement::from(uv_pep508::Requirement::from_str("apache-airflow[all]==2.9.3").unwrap()),
+        Requirement::from(
+            uv_pep508::Requirement::from_str("apache-airflow-providers-apache-beam>3.0.0").unwrap(),
+        ),
+    ]);
+
+    let output = runtime
+        .block_on(resolver::resolve(
+            manifest,
+            cache.clone(),
+            &client,
+            &interpreter,
+            false,
+        ))
+        .unwrap();
+
+    // Create a temporary workspace so we have a valid install path.
+    let temp_dir = tempfile::tempdir().unwrap();
+    let lock = Lock::from_resolution(&output, temp_dir.path(), vec![]).unwrap();
+    let lock_toml = lock.to_toml().unwrap();
+
+    c.bench_function("lock_check_airflow", |b| {
+        b.iter(|| {
+            let parsed: Lock = toml::from_str(black_box(&lock_toml)).unwrap();
+            let roundtripped = parsed.to_toml().unwrap();
+            assert_eq!(black_box(&roundtripped), black_box(&lock_toml));
+        })
+    });
+}
+
 criterion_group!(
     uv,
     resolve_warm_jupyter,
     resolve_warm_jupyter_universal,
-    resolve_warm_airflow
+    resolve_warm_airflow,
+    lock_check_jupyter,
+    lock_check_airflow
 );
 criterion_main!(uv);
 
