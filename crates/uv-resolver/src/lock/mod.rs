@@ -645,6 +645,16 @@ impl Lock {
                 }
             }
         }
+        // Normalize fork markers to match what would survive serialization.
+        //
+        // During serialization, fork markers are simplified and written as
+        // `resolution-markers`. If all fork markers have the same PEP 508
+        // component (e.g., only conflict-based forks), they may simplify to
+        // `true` and not be written at all. When the lockfile is read back,
+        // `fork_markers` would be empty. To ensure that the in-memory
+        // representation matches the deserialized form, we apply the same
+        // normalization here.
+        let fork_markers = normalize_fork_markers(fork_markers, &requires_python);
         let lock = Self {
             version,
             revision,
@@ -6209,6 +6219,51 @@ fn simplified_universal_markers(
     markers
         .into_iter()
         .filter_map(MarkerTree::try_to_string)
+        .collect()
+}
+
+/// Normalize fork markers to match what would survive a serialization round-trip.
+///
+/// During serialization, fork markers are simplified relative to `requires-python` and written
+/// as `resolution-markers`. Depending on the markers, this serialization may:
+///
+/// 1. Omit conflict markers entirely (when PEP 508 parts are disjoint, only PEP 508 parts
+///    are written).
+/// 2. Omit all markers (when all simplified markers reduce to `true`, e.g., purely
+///    conflict-based forks with no PEP 508 differentiation).
+///
+/// When the lockfile is read back, `fork_markers` is reconstructed from the serialized form,
+/// which may differ from the original in-memory representation.
+///
+/// This normalization ensures the in-memory representation matches the deserialized form,
+/// preventing false positives in `--check` mode where the lock appears changed despite
+/// producing byte-identical serialized output.
+fn normalize_fork_markers(
+    fork_markers: Vec<UniversalMarker>,
+    requires_python: &RequiresPython,
+) -> Vec<UniversalMarker> {
+    if fork_markers.is_empty() {
+        return fork_markers;
+    }
+    // Apply the same logic as `simplified_universal_markers` to determine
+    // what would actually be serialized.
+    let serialized = simplified_universal_markers(&fork_markers, requires_python);
+    if serialized.is_empty() {
+        // No markers would be written, so after deserialization fork_markers
+        // would be empty.
+        return vec![];
+    }
+    // Reconstruct fork markers from the serialized form by parsing the
+    // simplified markers, complexifying them, and wrapping in UniversalMarker.
+    // This mirrors the deserialization path in `TryFrom<LockWire>`.
+    serialized
+        .into_iter()
+        .filter_map(|s| {
+            let simplified =
+                SimplifiedMarkerTree::new(requires_python, s.parse::<MarkerTree>().ok()?);
+            let complexified = simplified.into_marker(requires_python);
+            Some(UniversalMarker::from_combined(complexified))
+        })
         .collect()
 }
 

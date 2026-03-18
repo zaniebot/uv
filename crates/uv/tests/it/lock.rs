@@ -4267,6 +4267,144 @@ fn lock_conflicting_mixed() -> Result<()> {
     Ok(())
 }
 
+/// Ensure `uv lock --check --refresh` does not produce a false positive for
+/// workspaces with extra-based conflicts that generate purely conflict-based
+/// fork markers (no PEP 508 differentiation).
+///
+/// See: <https://github.com/astral-sh/uv/issues/18553>
+#[test]
+fn lock_check_refresh_conflict_extras() -> Result<()> {
+    let context = uv_test::test_context!("3.12");
+
+    let pyproject_toml = context.temp_dir.child("pyproject.toml");
+    pyproject_toml.write_str(
+        r#"
+        [project]
+        name = "workspace-demo"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        dependencies = [
+            "pkg-a",
+            "pkg-b",
+        ]
+
+        [project.optional-dependencies]
+        prod = []
+        non-prod = []
+
+        [tool.uv.workspace]
+        members = ["packages/*"]
+
+        [tool.uv.sources]
+        pkg-a = { workspace = true }
+        pkg-b = { workspace = true }
+
+        [tool.uv]
+        conflicts = [
+            [
+                { extra = "non-prod", package = "workspace-demo" },
+                { extra = "prod", package = "workspace-demo" },
+            ],
+            [
+                { extra = "non-prod", package = "pkg-a" },
+                { extra = "prod", package = "pkg-a" },
+            ],
+            [
+                { extra = "non-prod", package = "pkg-b" },
+                { extra = "prod", package = "pkg-b" },
+            ],
+        ]
+
+        [build-system]
+        requires = ["setuptools>=42"]
+        build-backend = "setuptools.build_meta"
+
+        [tool.setuptools.packages.find]
+        include = ["workspace_demo"]
+        "#,
+    )?;
+
+    // Create pkg-a
+    let pkg_a_dir = context.temp_dir.child("packages").child("pkg-a");
+    pkg_a_dir.create_dir_all()?;
+    pkg_a_dir.child("pyproject.toml").write_str(
+        r#"
+        [project]
+        name = "pkg-a"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        dependencies = []
+
+        [project.optional-dependencies]
+        prod = ["idna>=3.6"]
+        non-prod = ["sniffio>=1.3"]
+
+        [build-system]
+        requires = ["setuptools>=42"]
+        build-backend = "setuptools.build_meta"
+
+        [tool.setuptools.packages.find]
+        include = ["pkg_a"]
+        "#,
+    )?;
+
+    // Create pkg-b
+    let pkg_b_dir = context.temp_dir.child("packages").child("pkg-b");
+    pkg_b_dir.create_dir_all()?;
+    pkg_b_dir.child("pyproject.toml").write_str(
+        r#"
+        [project]
+        name = "pkg-b"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        dependencies = []
+
+        [project.optional-dependencies]
+        prod = ["idna>=3.6"]
+        non-prod = ["sniffio>=1.3"]
+
+        [build-system]
+        requires = ["setuptools>=42"]
+        build-backend = "setuptools.build_meta"
+
+        [tool.setuptools.packages.find]
+        include = ["pkg_b"]
+        "#,
+    )?;
+
+    // Lock should succeed.
+    uv_snapshot!(context.filters(), context.lock(), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Resolved 5 packages in [TIME]
+    ");
+
+    // `--check --refresh` should not report a false positive.
+    uv_snapshot!(context.filters(), context.lock().arg("--check").arg("--refresh"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Resolved 5 packages in [TIME]
+    ");
+
+    // `--locked --refresh` should also pass.
+    uv_snapshot!(context.filters(), context.lock().arg("--locked").arg("--refresh"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Resolved 5 packages in [TIME]
+    ");
+
+    Ok(())
+}
+
 /// Show updated dependencies on `lock --upgrade`.
 #[test]
 fn lock_upgrade_log() -> Result<()> {
