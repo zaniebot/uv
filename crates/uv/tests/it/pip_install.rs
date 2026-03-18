@@ -8609,11 +8609,18 @@ fn local_index_fallback() -> Result<()> {
     Ok(())
 }
 
-/// When the first index is unreachable, fall back to the next index.
+/// When the first index is unreachable due to a DNS error, fall back to the next index.
+/// DNS errors are mapped to `Offline` errors, which allows the resolver to continue
+/// searching subsequent indexes.
+///
+/// This test requires real DNS resolution (no proxy) to trigger a DNS error for
+/// the `.test` TLD (RFC 6761). It must be run outside of proxied/containerized
+/// environments.
 ///
 /// Ref: <https://github.com/astral-sh/uv/issues/18547>
 #[test]
-fn index_unreachable_fallback() -> Result<()> {
+#[ignore = "requires real DNS resolution without proxy"]
+fn index_unreachable_dns_fallback() -> Result<()> {
     let context = uv_test::test_context!("3.12");
 
     let pyproject_toml = context.temp_dir.child("pyproject.toml");
@@ -8631,9 +8638,14 @@ fn index_unreachable_fallback() -> Result<()> {
         index-url = "https://pypi.org/simple"
     "#})?;
 
+    // Bypass any proxy so that the invalid hostname triggers a real DNS error,
+    // which gets mapped to the `Offline` error kind and allows fallback.
     uv_snapshot!(context.filters(), context.pip_install()
         .arg("iniconfig")
-        .arg("--no-deps"), @"
+        .arg("--no-deps")
+        .env("HTTP_PROXY", "")
+        .env("HTTPS_PROXY", "")
+        .env("ALL_PROXY", ""), @"
     success: true
     exit_code: 0
     ----- stdout -----

@@ -217,10 +217,14 @@ impl Error {
                 );
             }
         }
-        Self::from(ErrorKind::WrappedReqwestError(
-            url,
-            WrappedReqwestError::from(err),
-        ))
+        let wrapped = WrappedReqwestError::from(err);
+        // A DNS error indicates that the server is unreachable. Treat this the
+        // same as the explicit `--offline` case so that the resolver can fall
+        // through to the next index instead of failing immediately.
+        if wrapped.is_likely_offline() {
+            return ErrorKind::Offline(url.to_string()).into();
+        }
+        Self::from(ErrorKind::WrappedReqwestError(url, wrapped))
     }
 
     /// Returns `true` if this error corresponds to an offline error.
