@@ -400,6 +400,7 @@ jobs:
       - check-docs
       - check-generated-files
       - test
+      - test-integration
       - build-dev-binaries
     runs-on: ubuntu-slim
     steps:
