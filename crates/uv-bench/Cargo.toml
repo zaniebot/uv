@@ -43,10 +43,11 @@ uv-workspace = { workspace = true }
 
 anyhow = { workspace = true }
 criterion = { version = "4.0.3", default-features = false, package = "codspeed-criterion-compat", features = ["async_tokio"] }
+fs-err = { workspace = true }
+indoc = { workspace = true }
 jiff = { workspace = true }
 tempfile = { workspace = true }
 tokio = { workspace = true }
-toml = { workspace = true }
 
 [package.metadata.cargo-shear]
 ignored = ["uv-extract"]

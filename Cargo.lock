@@ -5866,10 +5866,11 @@ version = "0.0.30"
 dependencies = [
  "anyhow",
  "codspeed-criterion-compat",
+ "fs-err",
+ "indoc",
  "jiff",
  "tempfile",
  "tokio",
- "toml",
  "uv-cache",
  "uv-client",
  "uv-configuration",

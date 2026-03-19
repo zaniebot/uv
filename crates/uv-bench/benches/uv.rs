@@ -1,4 +1,6 @@
 use std::hint::black_box;
+use std::path::PathBuf;
+use std::process::Command;
 use std::str::FromStr;
 
 use criterion::{Criterion, criterion_group, criterion_main, measurement::WallTime};
@@ -6,7 +8,7 @@ use uv_cache::Cache;
 use uv_client::{BaseClientBuilder, RegistryClientBuilder};
 use uv_distribution_types::Requirement;
 use uv_python::PythonEnvironment;
-use uv_resolver::{Lock, Manifest};
+use uv_resolver::Manifest;
 
 fn resolve_warm_jupyter(c: &mut Criterion<WallTime>) {
     let run = setup(Manifest::simple(vec![Requirement::from(
@@ -45,62 +47,55 @@ fn resolve_warm_airflow(c: &mut Criterion<WallTime>) {
 
 /// Benchmark `lock --check` with a valid lockfile for `jupyter==1.0.0`.
 ///
-/// This measures the cost of parsing a lockfile and validating it against workspace
-/// requirements, which is the critical path for `uv lock --check` when the lockfile
-/// is already up-to-date.
+/// This runs the actual `uv lock --check` command against a project with an
+/// already-valid lockfile, exercising the real code path end-to-end: workspace
+/// discovery, lockfile parsing, `Lock::satisfies()` validation, and early return.
 fn lock_check_jupyter(c: &mut Criterion<WallTime>) {
-    let runtime = tokio::runtime::Builder::new_current_thread()
-        .max_blocking_threads(256)
-        .enable_all()
-        .build()
-        .unwrap();
+    let uv = uv_bin();
 
-    let cache = Cache::from_path("../../.cache")
-        .init_no_wait()
-        .expect("No cache contention when running benchmarks")
-        .unwrap();
-    let interpreter = PythonEnvironment::from_root("../../.venv", &cache)
-        .unwrap()
-        .into_interpreter();
-    let client = RegistryClientBuilder::new(BaseClientBuilder::default(), cache.clone()).build();
-
-    // Resolve jupyter to produce a lock.
-    let manifest = Manifest::simple(vec![Requirement::from(
-        uv_pep508::Requirement::from_str("jupyter==1.0.0").unwrap(),
-    )]);
-
-    let output = runtime
-        .block_on(resolver::resolve(
-            manifest,
-            cache.clone(),
-            &client,
-            &interpreter,
-            true,
-        ))
-        .unwrap();
-
-    // Create a temporary workspace so we have a valid install path.
+    // Create a temporary project with a `pyproject.toml`.
     let temp_dir = tempfile::tempdir().unwrap();
-    let lock = Lock::from_resolution(&output, temp_dir.path(), vec![]).unwrap();
-    let lock_toml = lock.to_toml().unwrap();
+    let cache_dir = temp_dir.path().join("cache");
+    let project_dir = temp_dir.path().join("project");
+    fs_err::create_dir_all(&project_dir).unwrap();
 
-    // Benchmark: parse the lockfile from TOML and validate it matches.
-    //
-    // When `lock --check` is run with a valid lockfile, the main cost is:
-    // 1. Deserializing the lockfile from TOML
-    // 2. Comparing the deserialized lock against the current resolution
-    //
-    // The resolver is NOT invoked when the lockfile satisfies the workspace requirements.
+    fs_err::write(
+        project_dir.join("pyproject.toml"),
+        indoc::indoc! {r#"
+            [project]
+            name = "bench"
+            version = "0.1.0"
+            requires-python = ">=3.12"
+            dependencies = ["jupyter==1.0.0"]
+        "#},
+    )
+    .unwrap();
+
+    // Run `uv lock` once to produce a valid lockfile.
+    let status = Command::new(&uv)
+        .args(["lock", "--cache-dir"])
+        .arg(&cache_dir)
+        .arg("--directory")
+        .arg(&project_dir)
+        .status()
+        .unwrap();
+    assert!(status.success(), "initial `uv lock` failed");
+
     c.bench_function("lock_check_jupyter", |b| {
         b.iter(|| {
-            // Parse the lockfile (the primary I/O cost of `lock --check`).
-            let parsed: Lock = toml::from_str(black_box(&lock_toml)).unwrap();
-
-            // Validate the lock contents match (comparing the serialized form is
-            // how `lock --check` detects changes after `ValidatedLock::Satisfies`).
-            let roundtripped = parsed.to_toml().unwrap();
-            assert_eq!(black_box(&roundtripped), black_box(&lock_toml));
-        })
+            let output = Command::new(black_box(&uv))
+                .args(["lock", "--check", "--cache-dir"])
+                .arg(&cache_dir)
+                .arg("--directory")
+                .arg(&project_dir)
+                .output()
+                .unwrap();
+            assert!(
+                output.status.success(),
+                "`uv lock --check` failed: {}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+        });
     });
 }
 
@@ -109,51 +104,75 @@ fn lock_check_jupyter(c: &mut Criterion<WallTime>) {
 /// This exercises a much larger lockfile than jupyter, providing a benchmark for
 /// `lock --check` performance with complex dependency trees.
 fn lock_check_airflow(c: &mut Criterion<WallTime>) {
-    let runtime = tokio::runtime::Builder::new_current_thread()
-        .max_blocking_threads(256)
-        .enable_all()
-        .build()
-        .unwrap();
+    let uv = uv_bin();
 
-    let cache = Cache::from_path("../../.cache")
-        .init_no_wait()
-        .expect("No cache contention when running benchmarks")
-        .unwrap();
-    let interpreter = PythonEnvironment::from_root("../../.venv", &cache)
-        .unwrap()
-        .into_interpreter();
-    let client = RegistryClientBuilder::new(BaseClientBuilder::default(), cache.clone()).build();
-
-    // Resolve airflow to produce a lock.
-    let manifest = Manifest::simple(vec![
-        Requirement::from(uv_pep508::Requirement::from_str("apache-airflow[all]==2.9.3").unwrap()),
-        Requirement::from(
-            uv_pep508::Requirement::from_str("apache-airflow-providers-apache-beam>3.0.0").unwrap(),
-        ),
-    ]);
-
-    let output = runtime
-        .block_on(resolver::resolve(
-            manifest,
-            cache.clone(),
-            &client,
-            &interpreter,
-            false,
-        ))
-        .unwrap();
-
-    // Create a temporary workspace so we have a valid install path.
+    // Create a temporary project with a `pyproject.toml`.
     let temp_dir = tempfile::tempdir().unwrap();
-    let lock = Lock::from_resolution(&output, temp_dir.path(), vec![]).unwrap();
-    let lock_toml = lock.to_toml().unwrap();
+    let cache_dir = temp_dir.path().join("cache");
+    let project_dir = temp_dir.path().join("project");
+    fs_err::create_dir_all(&project_dir).unwrap();
+
+    fs_err::write(
+        project_dir.join("pyproject.toml"),
+        indoc::indoc! {r#"
+            [project]
+            name = "bench"
+            version = "0.1.0"
+            requires-python = ">=3.12"
+            dependencies = [
+                "apache-airflow[all]==2.9.3",
+                "apache-airflow-providers-apache-beam>3.0.0",
+            ]
+        "#},
+    )
+    .unwrap();
+
+    // Run `uv lock` once to produce a valid lockfile.
+    let status = Command::new(&uv)
+        .args(["lock", "--cache-dir"])
+        .arg(&cache_dir)
+        .arg("--directory")
+        .arg(&project_dir)
+        .status()
+        .unwrap();
+    assert!(status.success(), "initial `uv lock` failed");
 
     c.bench_function("lock_check_airflow", |b| {
         b.iter(|| {
-            let parsed: Lock = toml::from_str(black_box(&lock_toml)).unwrap();
-            let roundtripped = parsed.to_toml().unwrap();
-            assert_eq!(black_box(&roundtripped), black_box(&lock_toml));
-        })
+            let output = Command::new(black_box(&uv))
+                .args(["lock", "--check", "--cache-dir"])
+                .arg(&cache_dir)
+                .arg("--directory")
+                .arg(&project_dir)
+                .output()
+                .unwrap();
+            assert!(
+                output.status.success(),
+                "`uv lock --check` failed: {}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+        });
     });
+}
+
+/// Locate the `uv` binary to use for benchmarks.
+///
+/// Checks the `UV_BIN` environment variable first, then falls back to the release
+/// binary in the target directory.
+fn uv_bin() -> PathBuf {
+    if let Ok(bin) = std::env::var("UV_BIN") {
+        let path = PathBuf::from(bin);
+        assert!(path.exists(), "UV_BIN does not exist: {}", path.display());
+        return path;
+    }
+
+    let release = PathBuf::from("../../target/release/uv");
+    assert!(
+        release.exists(),
+        "uv binary not found at {}; build with `cargo build --release` or set UV_BIN",
+        release.display()
+    );
+    release
 }
 
 criterion_group!(
