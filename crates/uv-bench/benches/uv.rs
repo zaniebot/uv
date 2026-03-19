@@ -1,5 +1,5 @@
 use std::hint::black_box;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::str::FromStr;
 
@@ -157,8 +157,8 @@ fn lock_check_airflow(c: &mut Criterion<WallTime>) {
 
 /// Locate the `uv` binary to use for benchmarks.
 ///
-/// Checks the `UV_BIN` environment variable first, then falls back to the release
-/// binary in the target directory.
+/// Checks the `UV_BIN` environment variable first, then falls back to looking for
+/// a release or debug binary in the workspace's target directory.
 fn uv_bin() -> PathBuf {
     if let Ok(bin) = std::env::var("UV_BIN") {
         let path = PathBuf::from(bin);
@@ -166,13 +166,25 @@ fn uv_bin() -> PathBuf {
         return path;
     }
 
-    let release = PathBuf::from("../../target/release/uv");
-    assert!(
-        release.exists(),
-        "uv binary not found at {}; build with `cargo build --release` or set UV_BIN",
-        release.display()
+    let workspace_root = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(Path::parent)
+        .expect("CARGO_MANIFEST_DIR should be nested in the workspace");
+
+    let release = workspace_root.join("target/release/uv");
+    if release.exists() {
+        return release;
+    }
+
+    let debug = workspace_root.join("target/debug/uv");
+    if debug.exists() {
+        return debug;
+    }
+
+    panic!(
+        "uv binary not found in {}; build with `cargo build --release` or set UV_BIN",
+        workspace_root.join("target").display()
     );
-    release
 }
 
 criterion_group!(
