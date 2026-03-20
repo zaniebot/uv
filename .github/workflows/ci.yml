@@ -406,9 +406,19 @@ jobs:
     steps:
       - name: "Check required jobs passed"
         run: |
-          failing=$(echo "$NEEDS_JSON" | jq -r 'to_entries[] | select(.value.result != "success" and .value.result != "skipped") | "\(.key): \(.value.result)"')
+          failing=$(echo "$NEEDS_JSON" | jq -r 'to_entries[] | select(.key != "test-integration") | select(.value.result != "success" and .value.result != "skipped") | "\(.key): \(.value.result)"')
           if [ -n "$failing" ]; then
             echo "$failing"
+            exit 1
+          fi
+        env:
+          NEEDS_JSON: ${{ toJSON(needs) }}
+      - name: "Check integration tests passed (if required by label)"
+        if: ${{ contains(github.event.pull_request.labels.*.name, 'test:integration') }}
+        run: |
+          result=$(echo "$NEEDS_JSON" | jq -r '.["test-integration"].result')
+          if [ "$result" != "success" ]; then
+            echo "test-integration: $result"
             exit 1
           fi
         env:
