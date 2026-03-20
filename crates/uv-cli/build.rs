@@ -113,5 +113,5 @@ fn git_head(git_dir: &Path) -> Option<PathBuf> {
         return None;
     }
     let worktree_path = worktree_path.trim();
-    Some(PathBuf::from(worktree_path))
+    Some(PathBuf::from(worktree_path).join("HEAD"))
 }
