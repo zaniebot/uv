@@ -3111,6 +3111,18 @@ impl ForkState {
             *culprit_count += 1;
             if *culprit_count == CONFLICT_THRESHOLD {
                 self.conflict_tracker.deprioritize.push(incompatible);
+                // When a culprit is deprioritized, also prioritize the package
+                // currently being resolved (`self.next`) so it gets decided before
+                // the culprit. The `affected` parameter points to the intermediary
+                // package from the incompatibility, which may be removed during
+                // backtracking. `self.next` is the package whose version choice
+                // triggered the conflict chain and survives the backtrack.
+                if self.pubgrub.package_store[self.next]
+                    .name_no_root()
+                    .is_some()
+                {
+                    self.conflict_tracker.prioritize.push(self.next);
+                }
             }
         }
         // Don't track conflicts between a marker package and the main package, when the

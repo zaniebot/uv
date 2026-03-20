@@ -34263,3 +34263,133 @@ fn lock_frozen_warning() -> Result<()> {
 
     Ok(())
 }
+
+/// When a culprit package repeatedly causes conflicts for an affected package
+/// through an intermediary, the resolver should deprioritize the culprit and
+/// prioritize the affected package so that the highest compatible version of the
+/// affected package is selected.
+///
+/// This tests the scenario where:
+/// - `bt-a-culprit` has versions 1.0.0, 2.0.0, 3.0.0
+/// - `bt-b-intermediary` 1.0.0 depends on `bt-a-culprit>=1.0.0,<3.0.0`
+/// - `bt-c-affected` versions 2-6 depend on `bt-b-intermediary==1.0.0`
+///   (which transitively requires `bt-a-culprit<3.0.0`)
+/// - `bt-c-affected` 1.0.0 depends on `bt-a-culprit>=1.0.0` (no upper bound)
+///
+/// Without the fix, the resolver would downgrade `bt-c-affected` instead of
+/// `bt-a-culprit`, resulting in `bt-c-affected==1.0.0` instead of the expected
+/// `bt-c-affected==6.0.0` with `bt-a-culprit==2.0.0`.
+#[test]
+fn lock_backtrack_culprit_through_intermediary() -> Result<()> {
+    let context = uv_test::test_context!("3.12");
+
+    // Populate the `--find-links` entries.
+    fs_err::create_dir_all(context.temp_dir.join("links"))?;
+
+    for entry in fs_err::read_dir(context.workspace_root.join("test/links"))? {
+        let entry = entry?;
+        let path = entry.path();
+        if path
+            .file_name()
+            .and_then(|file_name| file_name.to_str())
+            .is_some_and(|file_name| file_name.starts_with("bt_"))
+        {
+            let dest = context
+                .temp_dir
+                .join("links")
+                .join(path.file_name().unwrap());
+            fs_err::copy(&path, &dest)?;
+        }
+    }
+
+    let pyproject_toml = context.temp_dir.child("pyproject.toml");
+    pyproject_toml.write_str(&formatdoc! { r#"
+        [project]
+        name = "project"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        dependencies = [
+            "bt-c-affected>=1.0.0",
+            "bt-a-culprit>=1.0.0",
+        ]
+
+        [tool.uv]
+        no-index = true
+        find-links = ["{}"]
+        "#,
+        context.temp_dir.join("links/").portable_display(),
+    })?;
+
+    uv_snapshot!(context.filters(), context.lock(), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Resolved 4 packages in [TIME]
+    ");
+
+    let lock = context.read("uv.lock");
+
+    insta::with_settings!({
+        filters => context.filters(),
+    }, {
+        assert_snapshot!(
+            lock, @r#"
+        version = 1
+        revision = 3
+        requires-python = ">=3.12"
+
+        [options]
+        exclude-newer = "2024-03-25T00:00:00Z"
+
+        [[package]]
+        name = "bt-a-culprit"
+        version = "2.0.0"
+        source = { registry = "[TEMP_DIR]/links" }
+        wheels = [
+            { path = "[TEMP_DIR]/links/bt_a_culprit-2.0.0-py3-none-any.whl" },
+        ]
+
+        [[package]]
+        name = "bt-b-intermediary"
+        version = "1.0.0"
+        source = { registry = "[TEMP_DIR]/links" }
+        dependencies = [
+            { name = "bt-a-culprit" },
+        ]
+        wheels = [
+            { path = "[TEMP_DIR]/links/bt_b_intermediary-1.0.0-py3-none-any.whl" },
+        ]
+
+        [[package]]
+        name = "bt-c-affected"
+        version = "6.0.0"
+        source = { registry = "[TEMP_DIR]/links" }
+        dependencies = [
+            { name = "bt-b-intermediary" },
+        ]
+        wheels = [
+            { path = "[TEMP_DIR]/links/bt_c_affected-6.0.0-py3-none-any.whl" },
+        ]
+
+        [[package]]
+        name = "project"
+        version = "0.1.0"
+        source = { virtual = "." }
+        dependencies = [
+            { name = "bt-a-culprit" },
+            { name = "bt-c-affected" },
+        ]
+
+        [package.metadata]
+        requires-dist = [
+            { name = "bt-a-culprit", specifier = ">=1.0.0" },
+            { name = "bt-c-affected", specifier = ">=1.0.0" },
+        ]
+        "#
+        );
+    });
+
+    Ok(())
+}
