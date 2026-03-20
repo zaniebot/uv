@@ -39,44 +39,67 @@ pub struct ResolutionMetadata {
 }
 
 /// From <https://github.com/PyO3/python-pkginfo-rs/blob/d719988323a0cfea86d4737116d7917f30e819e2/src/metadata.rs#LL78C2-L91C26>
+fn parse_name(headers: &Headers) -> Result<PackageName, MetadataError> {
+    Ok(PackageName::from_owned(
+        headers
+            .get_first_value("Name")
+            .ok_or(MetadataError::FieldNotFound("Name"))?,
+    )?)
+}
+
+fn parse_version(headers: &Headers) -> Result<Version, MetadataError> {
+    Version::from_str(
+        &headers
+            .get_first_value("Version")
+            .ok_or(MetadataError::FieldNotFound("Version"))?,
+    )
+    .map_err(MetadataError::Pep440VersionError)
+}
+
+fn parse_dependency_metadata(
+    headers: &Headers,
+) -> Result<
+    (
+        Box<[Requirement<VerbatimParsedUrl>]>,
+        Option<VersionSpecifiers>,
+        Box<[ExtraName]>,
+    ),
+    MetadataError,
+> {
+    let requires_dist = headers
+        .get_all_values("Requires-Dist")
+        .map(|requires_dist| LenientRequirement::from_str(&requires_dist))
+        .map_ok(Requirement::from)
+        .collect::<Result<Box<_>, _>>()?;
+    let requires_python = headers
+        .get_first_value("Requires-Python")
+        .map(|requires_python| LenientVersionSpecifiers::from_str(&requires_python))
+        .transpose()?
+        .map(VersionSpecifiers::from);
+    let provides_extra = headers
+        .get_all_values("Provides-Extra")
+        .filter_map(
+            |provides_extra| match ExtraName::from_owned(provides_extra) {
+                Ok(extra_name) => Some(extra_name),
+                Err(err) => {
+                    warn!("Ignoring invalid extra: {err}");
+                    None
+                }
+            },
+        )
+        .collect::<Box<_>>();
+
+    Ok((requires_dist, requires_python, provides_extra))
+}
+
 impl ResolutionMetadata {
     /// Parse the [`ResolutionMetadata`] from a `METADATA` file, as included in a built distribution (wheel).
     pub fn parse_metadata(content: &[u8]) -> Result<Self, MetadataError> {
         let headers = Headers::parse(content)?;
 
-        let name = PackageName::from_owned(
-            headers
-                .get_first_value("Name")
-                .ok_or(MetadataError::FieldNotFound("Name"))?,
-        )?;
-        let version = Version::from_str(
-            &headers
-                .get_first_value("Version")
-                .ok_or(MetadataError::FieldNotFound("Version"))?,
-        )
-        .map_err(MetadataError::Pep440VersionError)?;
-        let requires_dist = headers
-            .get_all_values("Requires-Dist")
-            .map(|requires_dist| LenientRequirement::from_str(&requires_dist))
-            .map_ok(Requirement::from)
-            .collect::<Result<Box<_>, _>>()?;
-        let requires_python = headers
-            .get_first_value("Requires-Python")
-            .map(|requires_python| LenientVersionSpecifiers::from_str(&requires_python))
-            .transpose()?
-            .map(VersionSpecifiers::from);
-        let provides_extra = headers
-            .get_all_values("Provides-Extra")
-            .filter_map(
-                |provides_extra| match ExtraName::from_owned(provides_extra) {
-                    Ok(extra_name) => Some(extra_name),
-                    Err(err) => {
-                        warn!("Ignoring invalid extra: {err}");
-                        None
-                    }
-                },
-            )
-            .collect::<Box<_>>();
+        let name = parse_name(&headers)?;
+        let version = parse_version(&headers)?;
+        let (requires_dist, requires_python, provides_extra) = parse_dependency_metadata(&headers)?;
         let dynamic = headers
             .get_all_values("Dynamic")
             .any(|field| field == "Version");
@@ -122,41 +145,11 @@ impl ResolutionMetadata {
         }
 
         // The `Name` and `Version` fields are required, and can't be dynamic.
-        let name = PackageName::from_owned(
-            headers
-                .get_first_value("Name")
-                .ok_or(MetadataError::FieldNotFound("Name"))?,
-        )?;
-        let version = Version::from_str(
-            &headers
-                .get_first_value("Version")
-                .ok_or(MetadataError::FieldNotFound("Version"))?,
-        )
-        .map_err(MetadataError::Pep440VersionError)?;
+        let name = parse_name(&headers)?;
+        let version = parse_version(&headers)?;
 
         // The remaining fields are required to be present.
-        let requires_dist = headers
-            .get_all_values("Requires-Dist")
-            .map(|requires_dist| LenientRequirement::from_str(&requires_dist))
-            .map_ok(Requirement::from)
-            .collect::<Result<Box<_>, _>>()?;
-        let requires_python = headers
-            .get_first_value("Requires-Python")
-            .map(|requires_python| LenientVersionSpecifiers::from_str(&requires_python))
-            .transpose()?
-            .map(VersionSpecifiers::from);
-        let provides_extra = headers
-            .get_all_values("Provides-Extra")
-            .filter_map(
-                |provides_extra| match ExtraName::from_owned(provides_extra) {
-                    Ok(extra_name) => Some(extra_name),
-                    Err(err) => {
-                        warn!("Ignoring invalid extra: {err}");
-                        None
-                    }
-                },
-            )
-            .collect::<Box<_>>();
+        let (requires_dist, requires_python, provides_extra) = parse_dependency_metadata(&headers)?;
 
         Ok(Self {
             name,
