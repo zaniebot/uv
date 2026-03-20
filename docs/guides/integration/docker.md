@@ -563,12 +563,22 @@ COPY . .
 RUN uv pip install -e .
 ```
 
-## Verifying image provenance
+## Supply-chain security
 
-The Docker images are signed during the build process to provide proof of their origin. These
-attestations can be used to verify that an image was produced from an official channel.
+uv's Docker images include multiple layers of supply-chain metadata to help you verify image
+integrity and audit image contents:
 
-For example, you can verify the attestations with the
+- **GitHub artifact attestations** — signed [SLSA](https://slsa.dev/) build provenance stored in
+  the GitHub Attestations API, proving the image was built by the official uv release workflow.
+- **Embedded build provenance** — an [in-toto](https://in-toto.io/) SLSA provenance statement
+  attached directly to the image index, describing the builder, source repository, and build
+  parameters.
+- **Embedded SBOM** — a Software Bill of Materials (SBOM) attached directly to the image index,
+  listing every package included in the image.
+
+### Verifying build provenance
+
+You can verify that an image was produced by the official uv release workflow using the
 [GitHub CLI tool `gh`](https://cli.github.com/):
 
 ```console
@@ -618,3 +628,64 @@ Verified OK
     These examples use `latest`, but best practice is to verify the attestation for a specific
     version tag, e.g., `ghcr.io/astral-sh/uv:0.10.10`, or (even better) the specific image digest,
     such as `ghcr.io/astral-sh/uv:0.5.27@sha256:5adf09a5a526f380237408032a9308000d14d5947eafa687ad6c6a2476787b4f`.
+
+### Inspecting the embedded provenance
+
+In addition to the GitHub attestation, each image embeds an
+[in-toto](https://in-toto.io/) SLSA provenance statement directly in the image index. This means
+you can inspect the build provenance without relying on the GitHub API.
+
+The provenance is stored per-platform. Use `docker buildx imagetools inspect` to view it, then
+select the platform with `jq`:
+
+```console
+$ docker buildx imagetools inspect ghcr.io/astral-sh/uv:latest \
+    --format '{{json .Provenance}}' | jq '."linux/amd64".SLSA'
+```
+
+The output is a JSON document describing the builder, source repository, build configuration, and
+materials used to produce the image.
+
+### Inspecting the embedded SBOM
+
+Each image also embeds an SBOM (Software Bill of Materials) in the image index. The SBOM provides a
+complete inventory of packages included in the image, which is useful for vulnerability scanning and
+license compliance.
+
+Like provenance, the SBOM is stored per-platform. Use `docker buildx imagetools inspect` to view
+it:
+
+```console
+$ docker buildx imagetools inspect ghcr.io/astral-sh/uv:latest \
+    --format '{{json .SBOM}}' | jq '."linux/amd64".SPDX'
+```
+
+To list just the packages included in the image:
+
+```console
+$ docker buildx imagetools inspect ghcr.io/astral-sh/uv:latest \
+    --format '{{json .SBOM}}' | jq -r '."linux/amd64".SPDX.packages[].name'
+```
+
+!!! tip
+
+    The embedded SBOM covers the system packages and binaries in the image itself. For a
+    Python-level SBOM of your project's dependencies, see
+    [`uv export --format cyclonedx1.5`](../../concepts/projects/export.md#cyclonedx-sbom-format).
+
+### Scanning for vulnerabilities
+
+The embedded SBOM and provenance can be consumed by vulnerability scanners to check for known CVEs
+in the image's packages. For example, [Docker Scout](https://docs.docker.com/scout/) automatically
+reads the embedded attestations:
+
+```console
+$ docker scout cves ghcr.io/astral-sh/uv:latest
+    ✓ SBOM obtained from attestation, packages found
+    ✓ Provenance obtained from attestation
+    ...
+```
+
+Because the SBOM is embedded directly in the image, Docker Scout (and similar tools like
+[Grype](https://github.com/anchore/grype) and [Trivy](https://github.com/aquasecurity/trivy)) can
+scan without needing to pull and extract the full image contents.
