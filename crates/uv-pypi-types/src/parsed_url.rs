@@ -82,29 +82,8 @@ impl UnnamedRequirementUrl for VerbatimParsedUrl {
     ) -> Result<Self, Self::Err> {
         let verbatim = VerbatimUrl::from_path(&path, &working_dir)?;
         let verbatim_path = verbatim.as_path()?;
-        let is_dir = if let Ok(metadata) = verbatim_path.metadata() {
-            metadata.is_dir()
-        } else {
-            verbatim_path.extension().is_none()
-        };
-        let url = verbatim.to_url();
-        let install_path = verbatim.as_path()?.into_boxed_path();
-        let parsed_url = if is_dir {
-            ParsedUrl::Directory(ParsedDirectoryUrl {
-                url,
-                install_path,
-                editable: None,
-                r#virtual: None,
-            })
-        } else {
-            ParsedUrl::Path(ParsedPathUrl {
-                url,
-                install_path,
-                ext: DistExtension::from_path(&path).map_err(|err| {
-                    ParsedUrlError::MissingExtensionPath(path.as_ref().to_path_buf(), err)
-                })?,
-            })
-        };
+        let parsed_url =
+            ParsedUrl::from_local_path(&verbatim_path, path.as_ref(), verbatim.to_url())?;
         Ok(Self {
             parsed_url,
             verbatim,
@@ -114,29 +93,8 @@ impl UnnamedRequirementUrl for VerbatimParsedUrl {
     fn parse_absolute_path(path: impl AsRef<Path>) -> Result<Self, Self::Err> {
         let verbatim = VerbatimUrl::from_absolute_path(&path)?;
         let verbatim_path = verbatim.as_path()?;
-        let is_dir = if let Ok(metadata) = verbatim_path.metadata() {
-            metadata.is_dir()
-        } else {
-            verbatim_path.extension().is_none()
-        };
-        let url = verbatim.to_url();
-        let install_path = verbatim.as_path()?.into_boxed_path();
-        let parsed_url = if is_dir {
-            ParsedUrl::Directory(ParsedDirectoryUrl {
-                url,
-                install_path,
-                editable: None,
-                r#virtual: None,
-            })
-        } else {
-            ParsedUrl::Path(ParsedPathUrl {
-                url,
-                install_path,
-                ext: DistExtension::from_path(&path).map_err(|err| {
-                    ParsedUrlError::MissingExtensionPath(path.as_ref().to_path_buf(), err)
-                })?,
-            })
-        };
+        let parsed_url =
+            ParsedUrl::from_local_path(&verbatim_path, path.as_ref(), verbatim.to_url())?;
         Ok(Self {
             parsed_url,
             verbatim,
@@ -190,6 +148,29 @@ pub enum ParsedUrl {
 }
 
 impl ParsedUrl {
+    fn from_local_path(
+        path: &Path,
+        source_path: &Path,
+        url: DisplaySafeUrl,
+    ) -> Result<Self, ParsedUrlError> {
+        if is_local_directory_path(path) {
+            Ok(Self::Directory(ParsedDirectoryUrl {
+                url,
+                install_path: path.to_path_buf().into_boxed_path(),
+                editable: None,
+                r#virtual: None,
+            }))
+        } else {
+            Ok(Self::Path(ParsedPathUrl {
+                url,
+                install_path: path.to_path_buf().into_boxed_path(),
+                ext: DistExtension::from_path(source_path).map_err(|err| {
+                    ParsedUrlError::MissingExtensionPath(source_path.to_path_buf(), err)
+                })?,
+            }))
+        }
+    }
+
     /// Returns `true` if the URL is editable.
     pub fn is_editable(&self) -> bool {
         matches!(
@@ -199,6 +180,14 @@ impl ParsedUrl {
                 ..
             })
         )
+    }
+}
+
+fn is_local_directory_path(path: &Path) -> bool {
+    if let Ok(metadata) = path.metadata() {
+        metadata.is_dir()
+    } else {
+        path.extension().is_none()
     }
 }
 
@@ -405,26 +394,7 @@ impl TryFrom<DisplaySafeUrl> for ParsedUrl {
             let path = url
                 .to_file_path()
                 .map_err(|()| ParsedUrlError::InvalidFileUrl(url.to_string()))?;
-            let is_dir = if let Ok(metadata) = path.metadata() {
-                metadata.is_dir()
-            } else {
-                path.extension().is_none()
-            };
-            if is_dir {
-                Ok(Self::Directory(ParsedDirectoryUrl {
-                    url,
-                    install_path: path.into_boxed_path(),
-                    editable: None,
-                    r#virtual: None,
-                }))
-            } else {
-                Ok(Self::Path(ParsedPathUrl {
-                    url,
-                    ext: DistExtension::from_path(&path)
-                        .map_err(|err| ParsedUrlError::MissingExtensionPath(path.clone(), err))?,
-                    install_path: path.into_boxed_path(),
-                }))
-            }
+            Self::from_local_path(&path, &path, url)
         } else {
             Ok(Self::Archive(ParsedArchiveUrl::try_from(url)?))
         }
@@ -550,10 +520,22 @@ impl From<ParsedGitUrl> for DisplaySafeUrl {
 
 #[cfg(test)]
 mod tests {
+    use std::fs;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
     use anyhow::Result;
 
-    use crate::parsed_url::ParsedUrl;
+    use crate::parsed_url::{ParsedUrl, VerbatimParsedUrl};
+    use uv_pep508::UnnamedRequirementUrl;
     use uv_redacted::DisplaySafeUrl;
+
+    fn temp_test_path(name: &str) -> std::path::PathBuf {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        std::env::temp_dir().join(format!("uv-pypi-types-{name}-{unique}"))
+    }
 
     #[test]
     fn direct_url_from_url() -> Result<()> {
@@ -599,6 +581,32 @@ mod tests {
         let expected = DisplaySafeUrl::parse("file:///path/to/directory")?;
         let actual = DisplaySafeUrl::from(ParsedUrl::try_from(expected.clone())?);
         assert_eq!(expected, actual);
+        Ok(())
+    }
+
+    #[test]
+    fn parse_absolute_path_classifies_directories() -> Result<()> {
+        let directory = temp_test_path("directory");
+        fs::create_dir_all(&directory)?;
+
+        let parsed = VerbatimParsedUrl::parse_absolute_path(&directory)?;
+        assert!(matches!(parsed.parsed_url, ParsedUrl::Directory(_)));
+
+        fs::remove_dir_all(&directory)?;
+        Ok(())
+    }
+
+    #[test]
+    fn parse_absolute_path_classifies_archives() -> Result<()> {
+        let root = temp_test_path("archive-root");
+        fs::create_dir_all(&root)?;
+        let archive = root.join("demo-0.1.0.tar.gz");
+        fs::write(&archive, [])?;
+
+        let parsed = VerbatimParsedUrl::parse_absolute_path(&archive)?;
+        assert!(matches!(parsed.parsed_url, ParsedUrl::Path(_)));
+
+        fs::remove_dir_all(&root)?;
         Ok(())
     }
 }
