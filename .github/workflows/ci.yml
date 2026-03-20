@@ -31,6 +31,7 @@ jobs:
       test-macos: ${{ steps.plan.outputs.test_macos }}
       build-docker: ${{ steps.plan.outputs.build_docker }}
       push-docker: ${{ steps.plan.outputs.push_docker }}
+      extra-required-jobs: ${{ steps.plan.outputs.extra_required_jobs }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -116,6 +117,10 @@ jobs:
           [[ ! $has_build_skip_label && ! $has_build_skip_docker_label && ($docker_build_changed || $has_build_push_docker_label) ]] && build_docker=1
           [[ $has_build_push_docker_label ]] && push_docker=1
 
+          # Extra required jobs (label-gated jobs that must pass when their label is present)
+          extra_required_jobs=()
+          [[ $has_integration_label ]] && extra_required_jobs+=("test-integration")
+
           # Output (convert 1/empty to true/false for GHA)
           out() { [[ "$2" ]] && echo "$1=true" || echo "$1=false"; }
           {
@@ -134,6 +139,7 @@ jobs:
             out test_macos              "$test_macos"
             out build_docker            "$build_docker"
             out push_docker             "$push_docker"
+            echo "extra_required_jobs=$(printf '%s\n' "${extra_required_jobs[@]}" | jq -R 'select(length > 0)' | jq -sc .)"
           } >> "$GITHUB_OUTPUT"
 
   check-fmt:
@@ -395,6 +401,7 @@ jobs:
     name: "all required jobs passed"
     if: always()
     needs:
+      - plan
       - check-fmt
       - check-lint
       - check-docs
@@ -406,19 +413,34 @@ jobs:
     steps:
       - name: "Check required jobs passed"
         run: |
-          failing=$(echo "$NEEDS_JSON" | jq -r 'to_entries[] | select(.key != "test-integration") | select(.value.result != "success" and .value.result != "skipped") | "\(.key): \(.value.result)"')
+          # Always-required jobs (exclude plan and any extra-required jobs from this check)
+          extra_jobs='${{ needs.plan.outputs.extra-required-jobs }}'
+          failing=$(echo "$NEEDS_JSON" | jq -r --argjson extra "$extra_jobs" '
+            ($extra | map({(.): true}) | add // {}) as $skip |
+            to_entries[] |
+            select(.key != "plan") |
+            select($skip[.key] != true) |
+            select(.value.result != "success" and .value.result != "skipped") |
+            "\(.key): \(.value.result)"
+          ')
           if [ -n "$failing" ]; then
             echo "$failing"
             exit 1
           fi
         env:
           NEEDS_JSON: ${{ toJSON(needs) }}
-      - name: "Check integration tests passed (if required by label)"
-        if: ${{ contains(github.event.pull_request.labels.*.name, 'test:integration') }}
+      - name: "Check extra required jobs passed"
         run: |
-          result=$(echo "$NEEDS_JSON" | jq -r '.["test-integration"].result')
-          if [ "$result" != "success" ]; then
-            echo "test-integration: $result"
+          extra_jobs='${{ needs.plan.outputs.extra-required-jobs }}'
+          failing=$(echo "$NEEDS_JSON" | jq -r --argjson extra "$extra_jobs" '
+            ($extra | map({(.): true}) | add // {}) as $required |
+            to_entries[] |
+            select($required[.key] == true) |
+            select(.value.result != "success") |
+            "\(.key): \(.value.result)"
+          ')
+          if [ -n "$failing" ]; then
+            echo "$failing"
             exit 1
           fi
         env:
