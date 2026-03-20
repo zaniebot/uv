@@ -187,6 +187,61 @@ fn check_multiple_incompatible_packages() -> Result<()> {
     Ok(())
 }
 
+/// Verify that warnings are emitted without `--strict` when installing conflicting packages.
+#[test]
+fn install_warn_incompatible_without_strict() -> Result<()> {
+    let context = uv_test::test_context!("3.12");
+
+    let requirements_txt = context.temp_dir.child("requirements.txt");
+    requirements_txt.write_str("requests==2.31.0")?;
+
+    uv_snapshot!(context
+        .pip_install()
+        .arg("-r")
+        .arg("requirements.txt"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Resolved 5 packages in [TIME]
+    Prepared 5 packages in [TIME]
+    Installed 5 packages in [TIME]
+     + certifi==2024.2.2
+     + charset-normalizer==3.3.2
+     + idna==3.6
+     + requests==2.31.0
+     + urllib3==2.2.1
+    "
+    );
+
+    // Force-install an incompatible version of idna without --strict.
+    // The warning should still appear, but the command should succeed.
+    let requirements_txt_idna = context.temp_dir.child("requirements_idna.txt");
+    requirements_txt_idna.write_str("idna==2.4")?;
+
+    uv_snapshot!(context
+        .pip_install()
+        .arg("-r")
+        .arg("requirements_idna.txt"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Resolved 1 package in [TIME]
+    Prepared 1 package in [TIME]
+    Uninstalled 1 package in [TIME]
+    Installed 1 package in [TIME]
+     - idna==3.6
+     + idna==2.4
+    warning: The package `requests` requires `idna>=2.5,<4`, but `2.4` is installed
+    "
+    );
+
+    Ok(())
+}
+
 #[test]
 fn check_python_version() {
     let context = uv_test::test_context!("3.12");

@@ -89,7 +89,7 @@ pub(crate) async fn pip_install(
     python_platform: Option<TargetTriple>,
     python_downloads: PythonDownloads,
     install_mirrors: PythonInstallMirrors,
-    strict: bool,
+    _strict: bool,
     exclude_newer: ExcludeNewer,
     sources: NoSources,
     python: Option<String>,
@@ -685,7 +685,7 @@ pub(crate) async fn pip_install(
     operations::diagnose_resolution(resolution.diagnostics(), printer)?;
 
     // Notify the user of any environment diagnostics.
-    if strict && !dry_run.enabled() {
+    if !dry_run.enabled() {
         operations::diagnose_environment(&resolution, &environment, &marker_env, &tags, printer)?;
     }
 

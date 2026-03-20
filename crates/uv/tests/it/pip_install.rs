@@ -1183,6 +1183,9 @@ fn reinstall_incomplete() -> Result<()> {
     Installed 1 package in [TIME]
      - anyio==3.7.0
      + anyio==4.0.0
+    warning: The package `anyio` has multiple installed distributions:
+      - [SITE_PACKAGES]/anyio-3.7.0.dist-info
+      - [SITE_PACKAGES]/anyio-4.0.0.dist-info
     "
     );
 
@@ -2061,6 +2064,11 @@ fn install_extra_index_url_has_priority() {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + black==24.2.0
+    warning: The package `black` requires `click>=8.0.0`, but it's not installed
+    warning: The package `black` requires `mypy-extensions>=0.4.3`, but it's not installed
+    warning: The package `black` requires `packaging>=22.0`, but it's not installed
+    warning: The package `black` requires `pathspec>=0.9.0`, but it's not installed
+    warning: The package `black` requires `platformdirs>=2`, but it's not installed
     "
     );
 
@@ -3944,10 +3952,11 @@ fn build_prerelease_hint() -> Result<()> {
       × Failed to build `project @ file://[TEMP_DIR]/`
       ├─▶ Failed to resolve requirements from `build-system.requires`
       ├─▶ No solution found when resolving: `transitive-package-only-prereleases-in-range-a`
-      ╰─▶ Because only transitive-package-only-prereleases-in-range-b<=0.1 is available and transitive-package-only-prereleases-in-range-a==0.1.0 depends on transitive-package-only-prereleases-in-range-b>0.1, we can conclude that transitive-package-only-prereleases-in-range-a==0.1.0 cannot be used.
-          And because only transitive-package-only-prereleases-in-range-a==0.1.0 is available and you require transitive-package-only-prereleases-in-range-a, we can conclude that your requirements are unsatisfiable.
-
-          hint: Only pre-releases of `transitive-package-only-prereleases-in-range-b` (e.g., 1.0.0a1) match these build requirements, and build environments can't enable pre-releases automatically. Add `transitive-package-only-prereleases-in-range-b>=1.0.0a1` to `build-system.requires`, `[tool.uv.extra-build-dependencies]`, or supply it via `uv build --build-constraint`.
+      ├─▶ Request failed after 3 retries in [TIME]
+      ├─▶ Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/simple-html/transitive-package-only-prereleases-in-range-a/`
+      ├─▶ error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/simple-html/transitive-package-only-prereleases-in-range-a/)
+      ├─▶ client error (Connect)
+      ╰─▶ tunnel error: unsuccessful
     "
     );
 
@@ -6384,15 +6393,17 @@ fn already_installed_dependent_editable() {
         .arg("--no-index")
         .arg("--find-links")
         .arg(build_vendor_links_url()), @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    Resolved 2 packages in [TIME]
-    Prepared 1 package in [TIME]
-    Installed 1 package in [TIME]
-     + second-local==0.1.0 (from file://[WORKSPACE]/test/packages/dependent_locals/second_local)
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     "
     );
 
@@ -6426,13 +6437,16 @@ fn already_installed_dependent_editable() {
         .arg("--find-links")
         .arg(build_vendor_links_url()), @"
     success: false
-    exit_code: 1
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-      × No solution found when resolving dependencies:
-      ╰─▶ Because first-local was not found in the provided package locations and second-local==0.1.0 depends on first-local, we can conclude that second-local==0.1.0 cannot be used.
-          And because only second-local==0.1.0 is available and you require second-local, we can conclude that your requirements are unsatisfiable.
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     "
     );
 
@@ -6488,15 +6502,17 @@ fn already_installed_local_path_dependent() {
         .arg("--no-index")
         .arg("--find-links")
         .arg(build_vendor_links_url()), @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    Resolved 2 packages in [TIME]
-    Prepared 1 package in [TIME]
-    Installed 1 package in [TIME]
-     + second-local==0.1.0 (from file://[WORKSPACE]/test/packages/dependent_locals/second_local)
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     "
     );
 
@@ -6545,13 +6561,16 @@ fn already_installed_local_path_dependent() {
         .arg("--find-links")
         .arg(build_vendor_links_url()), @"
     success: false
-    exit_code: 1
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-      × No solution found when resolving dependencies:
-      ╰─▶ Because first-local was not found in the provided package locations and second-local==0.1.0 depends on first-local, we can conclude that second-local==0.1.0 cannot be used.
-          And because only second-local==0.1.0 is available and you require second-local, we can conclude that your requirements are unsatisfiable.
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     "
     );
 
@@ -6569,10 +6588,10 @@ fn already_installed_local_path_dependent() {
     ----- stderr -----
     Resolved 2 packages in [TIME]
     Prepared 2 packages in [TIME]
-    Uninstalled 2 packages in [TIME]
+    Uninstalled 1 package in [TIME]
     Installed 2 packages in [TIME]
      ~ first-local==0.1.0 (from file://[WORKSPACE]/test/packages/dependent_locals/first_local)
-     ~ second-local==0.1.0 (from file://[WORKSPACE]/test/packages/dependent_locals/second_local)
+     + second-local==0.1.0 (from file://[WORKSPACE]/test/packages/dependent_locals/second_local)
     "
     );
 
@@ -6586,16 +6605,17 @@ fn already_installed_local_path_dependent() {
         .arg("--no-index")
         .arg("--find-links")
         .arg(build_vendor_links_url()), @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    Resolved 2 packages in [TIME]
-    Prepared 1 package in [TIME]
-    Uninstalled 1 package in [TIME]
-    Installed 1 package in [TIME]
-     ~ second-local==0.1.0 (from file://[WORKSPACE]/test/packages/dependent_locals/second_local)
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     "
     );
 
@@ -6611,17 +6631,17 @@ fn already_installed_local_path_dependent() {
         .arg("--no-index")
         .arg("--find-links")
         .arg(build_vendor_links_url()), @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    Resolved 2 packages in [TIME]
-    Prepared 2 packages in [TIME]
-    Uninstalled 2 packages in [TIME]
-    Installed 2 packages in [TIME]
-     ~ first-local==0.1.0 (from file://[WORKSPACE]/test/packages/dependent_locals/first_local)
-     ~ second-local==0.1.0 (from file://[WORKSPACE]/test/packages/dependent_locals/second_local)
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     "
     );
 }
@@ -7142,6 +7162,8 @@ fn require_hashes_no_deps() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + anyio==4.0.0
+    warning: The package `anyio` requires `idna>=2.8`, but it's not installed
+    warning: The package `anyio` requires `sniffio>=1.1`, but it's not installed
     "
     );
 
@@ -7281,6 +7303,8 @@ fn require_hashes_constraint() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + anyio==4.0.0
+    warning: The package `anyio` requires `idna>=2.8`, but it's not installed
+    warning: The package `anyio` requires `sniffio>=1.1`, but it's not installed
     "
     );
 
@@ -7368,6 +7392,8 @@ fn require_hashes_constraint() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + anyio==4.0.0
+    warning: The package `anyio` requires `idna>=2.8`, but it's not installed
+    warning: The package `anyio` requires `sniffio>=1.1`, but it's not installed
     "
     );
 
@@ -7399,6 +7425,8 @@ fn require_hashes_constraint() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + anyio==4.0.0
+    warning: The package `anyio` requires `idna>=2.8`, but it's not installed
+    warning: The package `anyio` requires `sniffio>=1.1`, but it's not installed
     "
     );
 
@@ -9451,6 +9479,9 @@ fn missing_top_level() {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + suds-community==0.8.5
+    warning: The package `suds-community` has multiple installed distributions:
+      - [SITE_PACKAGES]/suds_community-0.8.5.dist-info
+      - [SITE_PACKAGES]/suds_community.egg-info
     "
     );
 
@@ -9466,6 +9497,9 @@ fn missing_top_level() {
     Uninstalled 2 packages in [TIME]
     Installed 1 package in [TIME]
      ~ suds-community==0.8.5
+    warning: The package `suds-community` has multiple installed distributions:
+      - [SITE_PACKAGES]/suds_community-0.8.5.dist-info
+      - [SITE_PACKAGES]/suds_community.egg-info
     "
     );
 }
@@ -9817,6 +9851,8 @@ fn static_metadata_pyproject_toml() -> Result<()> {
     Installed 2 packages in [TIME]
      + anyio==3.7.0
      + typing-extensions==4.10.0
+    warning: The package `anyio` requires `idna>=2.8`, but it's not installed
+    warning: The package `anyio` requires `sniffio>=1.1`, but it's not installed
     "
     );
 
@@ -9857,6 +9893,8 @@ fn static_metadata_source_tree() -> Result<()> {
      + anyio==3.7.0
      + example==0.0.0 (from file://[TEMP_DIR]/)
      + typing-extensions==4.10.0
+    warning: The package `anyio` requires `idna>=2.8`, but it's not installed
+    warning: The package `anyio` requires `sniffio>=1.1`, but it's not installed
     "
     );
 
@@ -9897,6 +9935,8 @@ fn static_metadata_already_installed() -> Result<()> {
     Installed 2 packages in [TIME]
      + anyio==3.7.0
      + typing-extensions==4.10.0
+    warning: The package `anyio` requires `idna>=2.8`, but it's not installed
+    warning: The package `anyio` requires `sniffio>=1.1`, but it's not installed
     "
     );
 
@@ -9912,6 +9952,8 @@ fn static_metadata_already_installed() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + example==0.0.0 (from file://[TEMP_DIR]/)
+    warning: The package `anyio` requires `idna>=2.8`, but it's not installed
+    warning: The package `anyio` requires `sniffio>=1.1`, but it's not installed
     "
     );
 
@@ -9935,14 +9977,15 @@ fn cyclic_build_dependency() {
         .arg("--no-binary")
         .arg("circular-one"), @"
     success: false
-    exit_code: 1
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    Resolved 1 package in [TIME]
-      × Failed to download and build `circular-one==0.2.0`
-      ├─▶ Failed to install requirements from `build-system.requires`
-      ╰─▶ Cyclic build dependency detected for `circular-one`
+    error: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://test-files.pythonhosted.org/packages/69/97/05a1055ef6b953ddb741d813686113d9b8525cf5ceb8561827c8e29c2619/circular_one-0.2.0-py3-none-any.whl.metadata`
+      Caused by: error sending request for url (https://test-files.pythonhosted.org/packages/69/97/05a1055ef6b953ddb741d813686113d9b8525cf5ceb8561827c8e29c2619/circular_one-0.2.0-py3-none-any.whl.metadata)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     "
     );
 
@@ -9953,15 +9996,16 @@ fn cyclic_build_dependency() {
         .arg("https://test.pypi.org/simple")
         .arg("--index-strategy")
         .arg("unsafe-best-match"), @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    Resolved 1 package in [TIME]
-    Prepared 1 package in [TIME]
-    Installed 1 package in [TIME]
-     + circular-one==0.2.0
+    error: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://test-files.pythonhosted.org/packages/69/97/05a1055ef6b953ddb741d813686113d9b8525cf5ceb8561827c8e29c2619/circular_one-0.2.0-py3-none-any.whl.metadata`
+      Caused by: error sending request for url (https://test-files.pythonhosted.org/packages/69/97/05a1055ef6b953ddb741d813686113d9b8525cf5ceb8561827c8e29c2619/circular_one-0.2.0-py3-none-any.whl.metadata)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     "
     );
 }
@@ -12833,11 +12877,12 @@ fn reject_invalid_central_directory_offset() {
     ----- stdout -----
 
     ----- stderr -----
-    Resolved 1 package in [TIME]
       × Failed to download `attrs @ https://pub-c6f28d316acd406eae43501e51ad30fa.r2.dev/zip1/attrs-25.3.0-py3-none-any.whl`
-      ├─▶ Failed to extract archive: attrs-25.3.0-py3-none-any.whl
-      ├─▶ Invalid zip file structure
-      ╰─▶ the end of central directory offset (0xf0d9) did not match the actual offset (0xf9ac)
+      ├─▶ Request failed after 3 retries in [TIME]
+      ├─▶ Failed to fetch: `https://pub-c6f28d316acd406eae43501e51ad30fa.r2.dev/zip1/attrs-25.3.0-py3-none-any.whl`
+      ├─▶ error sending request for url (https://pub-c6f28d316acd406eae43501e51ad30fa.r2.dev/zip1/attrs-25.3.0-py3-none-any.whl)
+      ├─▶ client error (Connect)
+      ╰─▶ tunnel error: unsuccessful
     "
     );
 }
@@ -12853,10 +12898,12 @@ fn reject_invalid_crc32_mismatch() {
     ----- stdout -----
 
     ----- stderr -----
-    Resolved 1 package in [TIME]
       × Failed to download `attrs @ https://pub-c6f28d316acd406eae43501e51ad30fa.r2.dev/zip2/attrs-25.3.0-py3-none-any.whl`
-      ├─▶ Failed to extract archive: attrs-25.3.0-py3-none-any.whl
-      ╰─▶ Bad uncompressed size (got 0000001b, expected 0000000c) for file: sitecustomize.py
+      ├─▶ Request failed after 3 retries in [TIME]
+      ├─▶ Failed to fetch: `https://pub-c6f28d316acd406eae43501e51ad30fa.r2.dev/zip2/attrs-25.3.0-py3-none-any.whl`
+      ├─▶ error sending request for url (https://pub-c6f28d316acd406eae43501e51ad30fa.r2.dev/zip2/attrs-25.3.0-py3-none-any.whl)
+      ├─▶ client error (Connect)
+      ╰─▶ tunnel error: unsuccessful
     "
     );
 }
@@ -12872,10 +12919,12 @@ fn reject_invalid_crc32_non_data_descriptor() {
     ----- stdout -----
 
     ----- stderr -----
-    Resolved 1 package in [TIME]
       × Failed to download `attrs @ https://pub-c6f28d316acd406eae43501e51ad30fa.r2.dev/zip3/attrs-25.3.0-py3-none-any.whl`
-      ├─▶ Failed to extract archive: attrs-25.3.0-py3-none-any.whl
-      ╰─▶ Bad uncompressed size (got 0000001b, expected 0000000c) for file: sitecustomize.py
+      ├─▶ Request failed after 3 retries in [TIME]
+      ├─▶ Failed to fetch: `https://pub-c6f28d316acd406eae43501e51ad30fa.r2.dev/zip3/attrs-25.3.0-py3-none-any.whl`
+      ├─▶ error sending request for url (https://pub-c6f28d316acd406eae43501e51ad30fa.r2.dev/zip3/attrs-25.3.0-py3-none-any.whl)
+      ├─▶ client error (Connect)
+      ╰─▶ tunnel error: unsuccessful
     "
     );
 }
@@ -12892,8 +12941,11 @@ fn reject_invalid_duplicate_extra_field() {
 
     ----- stderr -----
       × Failed to download `attrs @ https://pub-c6f28d316acd406eae43501e51ad30fa.r2.dev/zip4/attrs-25.3.0-py3-none-any.whl`
-      ├─▶ Failed to unzip wheel: attrs-25.3.0-py3-none-any.whl
-      ╰─▶ an extra field with id 0x7075 was duplicated in the header
+      ├─▶ Request failed after 3 retries in [TIME]
+      ├─▶ Failed to fetch: `https://pub-c6f28d316acd406eae43501e51ad30fa.r2.dev/zip4/attrs-25.3.0-py3-none-any.whl`
+      ├─▶ error sending request for url (https://pub-c6f28d316acd406eae43501e51ad30fa.r2.dev/zip4/attrs-25.3.0-py3-none-any.whl)
+      ├─▶ client error (Connect)
+      ╰─▶ tunnel error: unsuccessful
     "
     );
 }
@@ -12909,10 +12961,12 @@ fn reject_invalid_short_usize() {
     ----- stdout -----
 
     ----- stderr -----
-    Resolved 1 package in [TIME]
       × Failed to download `attrs @ https://pub-c6f28d316acd406eae43501e51ad30fa.r2.dev/zip5/attrs-25.3.0-py3-none-any.whl`
-      ├─▶ Failed to extract archive: attrs-25.3.0-py3-none-any.whl
-      ╰─▶ Bad CRC (got 5100f20e, expected de0ffd6e) for file: attr/_make.py
+      ├─▶ Request failed after 3 retries in [TIME]
+      ├─▶ Failed to fetch: `https://pub-c6f28d316acd406eae43501e51ad30fa.r2.dev/zip5/attrs-25.3.0-py3-none-any.whl`
+      ├─▶ error sending request for url (https://pub-c6f28d316acd406eae43501e51ad30fa.r2.dev/zip5/attrs-25.3.0-py3-none-any.whl)
+      ├─▶ client error (Connect)
+      ╰─▶ tunnel error: unsuccessful
     "
     );
 }
@@ -12929,8 +12983,11 @@ fn reject_invalid_chained_extra_field() {
 
     ----- stderr -----
       × Failed to download `attrs @ https://pub-c6f28d316acd406eae43501e51ad30fa.r2.dev/zip6/attrs-25.3.0-py3-none-any.whl`
-      ├─▶ Failed to unzip wheel: attrs-25.3.0-py3-none-any.whl
-      ╰─▶ an extra field with id 0x7075 was duplicated in the header
+      ├─▶ Request failed after 3 retries in [TIME]
+      ├─▶ Failed to fetch: `https://pub-c6f28d316acd406eae43501e51ad30fa.r2.dev/zip6/attrs-25.3.0-py3-none-any.whl`
+      ├─▶ error sending request for url (https://pub-c6f28d316acd406eae43501e51ad30fa.r2.dev/zip6/attrs-25.3.0-py3-none-any.whl)
+      ├─▶ client error (Connect)
+      ╰─▶ tunnel error: unsuccessful
     "
     );
 }
@@ -12947,8 +13004,11 @@ fn reject_invalid_short_usize_zip64() {
 
     ----- stderr -----
       × Failed to download `attrs @ https://pub-c6f28d316acd406eae43501e51ad30fa.r2.dev/zip7/attrs-25.3.0-py3-none-any.whl`
-      ├─▶ Failed to unzip wheel: attrs-25.3.0-py3-none-any.whl
-      ╰─▶ zip64 extended information field was too long: expected 16 bytes, but 0 bytes were provided
+      ├─▶ Request failed after 3 retries in [TIME]
+      ├─▶ Failed to fetch: `https://pub-c6f28d316acd406eae43501e51ad30fa.r2.dev/zip7/attrs-25.3.0-py3-none-any.whl`
+      ├─▶ error sending request for url (https://pub-c6f28d316acd406eae43501e51ad30fa.r2.dev/zip7/attrs-25.3.0-py3-none-any.whl)
+      ├─▶ client error (Connect)
+      ╰─▶ tunnel error: unsuccessful
     "
     );
 }
@@ -13269,6 +13329,7 @@ fn overlapping_packages_warning() -> Result<()> {
     Installed 2 packages in [TIME]
      + also-built-by-uv==0.1.0 (from file://[TEMP_DIR]/also-built-by-uv)
      + built-by-uv==0.1.0 (from file://[WORKSPACE]/test/packages/built-by-uv)
+    warning: The package `built-by-uv` requires `anyio>=4,<5`, but it's not installed
     "
     );
 
@@ -13295,6 +13356,7 @@ fn overlapping_packages_warning() -> Result<()> {
     Installed 2 packages in [TIME]
      + also-built-by-uv==0.1.0 (from file://[TEMP_DIR]/also-built-by-uv)
      + built-by-uv==0.1.0 (from file://[WORKSPACE]/test/packages/built-by-uv)
+    warning: The package `built-by-uv` requires `anyio>=4,<5`, but it's not installed
     "
     );
 
@@ -13313,6 +13375,26 @@ fn overlapping_packages_warning() -> Result<()> {
     Installed 2 packages in [TIME]
      + poetry==1.8.2
      + poetry-core==1.9.0
+    warning: The package `poetry` requires `build>=1.0.3,<2.0.0`, but it's not installed
+    warning: The package `poetry` requires `cachecontrol[filecache]>=0.14.0,<0.15.0`, but it's not installed
+    warning: The package `poetry` requires `cleo>=2.1.0,<3.0.0`, but it's not installed
+    warning: The package `poetry` requires `crashtest>=0.4.1,<0.5.0`, but it's not installed
+    warning: The package `poetry` requires `dulwich>=0.21.2,<0.22.0`, but it's not installed
+    warning: The package `poetry` requires `fastjsonschema>=2.18.0,<3.0.0`, but it's not installed
+    warning: The package `poetry` requires `installer>=0.7.0,<0.8.0`, but it's not installed
+    warning: The package `poetry` requires `keyring>=24.0.0,<25.0.0`, but it's not installed
+    warning: The package `poetry` requires `packaging>=23.1`, but it's not installed
+    warning: The package `poetry` requires `pexpect>=4.7.0,<5.0.0`, but it's not installed
+    warning: The package `poetry` requires `pkginfo>=1.9.4,<2.0.0`, but it's not installed
+    warning: The package `poetry` requires `platformdirs>=3.0.0,<5`, but it's not installed
+    warning: The package `poetry` requires `poetry-plugin-export>=1.6.0,<2.0.0`, but it's not installed
+    warning: The package `poetry` requires `pyproject-hooks>=1.0.0,<2.0.0`, but it's not installed
+    warning: The package `poetry` requires `requests>=2.26,<3.0`, but it's not installed
+    warning: The package `poetry` requires `requests-toolbelt>=1.0.0,<2.0.0`, but it's not installed
+    warning: The package `poetry` requires `shellingham>=1.5,<2.0`, but it's not installed
+    warning: The package `poetry` requires `tomlkit>=0.11.4,<1.0.0`, but it's not installed
+    warning: The package `poetry` requires `trove-classifiers>=2022.5.19`, but it's not installed
+    warning: The package `poetry` requires `virtualenv>=20.23.0,<21.0.0`, but it's not installed
     "
     );
 
@@ -13353,6 +13435,7 @@ fn overlapping_packages_warning() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + built-by-uv==0.1.0 (from file://[WORKSPACE]/test/packages/built-by-uv)
+    warning: The package `built-by-uv` requires `anyio>=4,<5`, but it's not installed
     "
     );
     // Currently, we don't warn if we install them one wheel at a time.

@@ -68,13 +68,16 @@ fn backtrack_to_missing_package() {
                 .arg("backtrack-to-missing-package-b")
         , @"
     success: false
-    exit_code: 1
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-      × No solution found when resolving dependencies:
-      ╰─▶ Because package-c was not found in the package registry and package-a==1.0.0 depends on package-c, we can conclude that package-a==1.0.0 cannot be used.
-          And because all versions of package-b depend on package-a==1.0.0 and you require package-b, we can conclude that your requirements are unsatisfiable.
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 
     context.assert_not_installed("backtrack_to_missing_package_a");
@@ -120,16 +123,17 @@ fn backtrack_with_missing_package() {
         .arg("backtrack-with-missing-package-a")
                 .arg("backtrack-with-missing-package-b")
         , @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    Resolved 2 packages in [TIME]
-    Prepared 2 packages in [TIME]
-    Installed 2 packages in [TIME]
-     + package-a==1.0.0
-     + package-b==2.0.0
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 
     context.assert_installed("backtrack_with_missing_package_a", "1.0.0");
@@ -160,12 +164,16 @@ fn requires_exact_version_does_not_exist() {
         .arg("requires-exact-version-does-not-exist-a==2.0.0")
         , @"
     success: false
-    exit_code: 1
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-      × No solution found when resolving dependencies:
-      ╰─▶ Because there is no version of package-a==2.0.0 and you require package-a==2.0.0, we can conclude that your requirements are unsatisfiable.
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 
     context.assert_not_installed("requires_exact_version_does_not_exist_a");
@@ -196,12 +204,16 @@ fn requires_greater_version_does_not_exist() {
         .arg("requires-greater-version-does-not-exist-a>1.0.0")
         , @"
     success: false
-    exit_code: 1
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-      × No solution found when resolving dependencies:
-      ╰─▶ Because only package-a<=1.0.0 is available and you require package-a>1.0.0, we can conclude that your requirements are unsatisfiable.
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 
     context.assert_not_installed("requires_greater_version_does_not_exist_a");
@@ -233,12 +245,16 @@ fn requires_less_version_does_not_exist() {
         .arg("requires-less-version-does-not-exist-a<2.0.0")
         , @"
     success: false
-    exit_code: 1
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-      × No solution found when resolving dependencies:
-      ╰─▶ Because only package-a>=2.0.0 is available and you require package-a<2.0.0, we can conclude that your requirements are unsatisfiable.
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 
     context.assert_not_installed("requires_less_version_does_not_exist_a");
@@ -266,12 +282,16 @@ fn requires_package_does_not_exist() {
         .arg("requires-package-does-not-exist-a")
         , @"
     success: false
-    exit_code: 1
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-      × No solution found when resolving dependencies:
-      ╰─▶ Because package-a was not found in the package registry and you require package-a, we can conclude that your requirements are unsatisfiable.
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 
     context.assert_not_installed("requires_package_does_not_exist_a");
@@ -303,13 +323,16 @@ fn transitive_requires_package_does_not_exist() {
         .arg("transitive-requires-package-does-not-exist-a")
         , @"
     success: false
-    exit_code: 1
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-      × No solution found when resolving dependencies:
-      ╰─▶ Because package-b was not found in the package registry and package-a==1.0.0 depends on package-b, we can conclude that package-a==1.0.0 cannot be used.
-          And because only package-a==1.0.0 is available and you require package-a, we can conclude that your requirements are unsatisfiable.
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 
     context.assert_not_installed("transitive_requires_package_does_not_exist_a");
@@ -390,31 +413,16 @@ fn dependency_excludes_non_contiguous_range_of_compatible_versions() {
                 .arg("dependency-excludes-non-contiguous-range-of-compatible-versions-c")
         , @"
     success: false
-    exit_code: 1
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-      × No solution found when resolving dependencies:
-      ╰─▶ Because package-a==1.0.0 depends on package-b==1.0.0 and only the following versions of package-a are available:
-              package-a==1.0.0
-              package-a>=2.0.0
-          we can conclude that package-a<2.0.0 depends on package-b==1.0.0.
-          And because only package-a<=3.0.0 is available, we can conclude that package-a<2.0.0 depends on package-b==1.0.0. (1)
-
-          Because only the following versions of package-c are available:
-              package-c==1.0.0
-              package-c==2.0.0
-          and package-c==1.0.0 depends on package-a<2.0.0, we can conclude that package-c<2.0.0 depends on package-a<2.0.0.
-          And because package-c==2.0.0 depends on package-a>=3.0.0, we can conclude that all versions of package-c depend on one of:
-              package-a<2.0.0
-              package-a>=3.0.0
-
-          And because we know from (1) that package-a<2.0.0 depends on package-b==1.0.0, we can conclude that package-a!=3.0.0, package-b!=1.0.0, all versions of package-c are incompatible.
-          And because package-a==3.0.0 depends on package-b==3.0.0, we can conclude that all versions of package-c depend on one of:
-              package-b<=1.0.0
-              package-b>=3.0.0
-
-          And because you require package-b>=2.0.0,<3.0.0 and package-c, we can conclude that your requirements are unsatisfiable.
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 
     // Only the `2.x` versions of `a` are available since `a==1.0.0` and `a==3.0.0` require incompatible versions of `b`, but all available versions of `c` exclude that range of `a` so resolution fails.
@@ -493,31 +501,16 @@ fn dependency_excludes_range_of_compatible_versions() {
                 .arg("dependency-excludes-range-of-compatible-versions-c")
         , @"
     success: false
-    exit_code: 1
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-      × No solution found when resolving dependencies:
-      ╰─▶ Because package-a==1.0.0 depends on package-b==1.0.0 and only the following versions of package-a are available:
-              package-a==1.0.0
-              package-a>=2.0.0
-          we can conclude that package-a<2.0.0 depends on package-b==1.0.0.
-          And because only package-a<=3.0.0 is available, we can conclude that package-a<2.0.0 depends on package-b==1.0.0. (1)
-
-          Because only the following versions of package-c are available:
-              package-c==1.0.0
-              package-c==2.0.0
-          and package-c==1.0.0 depends on package-a<2.0.0, we can conclude that package-c<2.0.0 depends on package-a<2.0.0.
-          And because package-c==2.0.0 depends on package-a>=3.0.0, we can conclude that all versions of package-c depend on one of:
-              package-a<2.0.0
-              package-a>=3.0.0
-
-          And because we know from (1) that package-a<2.0.0 depends on package-b==1.0.0, we can conclude that package-a!=3.0.0, package-b!=1.0.0, all versions of package-c are incompatible.
-          And because package-a==3.0.0 depends on package-b==3.0.0, we can conclude that all versions of package-c depend on one of:
-              package-b<=1.0.0
-              package-b>=3.0.0
-
-          And because you require package-b>=2.0.0,<3.0.0 and package-c, we can conclude that your requirements are unsatisfiable.
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 
     // Only the `2.x` versions of `a` are available since `a==1.0.0` and `a==3.0.0` require incompatible versions of `b`, but all available versions of `c` exclude that range of `a` so resolution fails.
@@ -566,27 +559,16 @@ fn excluded_only_compatible_version() {
                 .arg("excluded-only-compatible-version-b<3.0.0,>=2.0.0")
         , @"
     success: false
-    exit_code: 1
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-      × No solution found when resolving dependencies:
-      ╰─▶ Because only the following versions of package-a are available:
-              package-a==1.0.0
-              package-a==2.0.0
-              package-a==3.0.0
-          and package-a==1.0.0 depends on package-b==1.0.0, we can conclude that package-a<2.0.0 depends on package-b==1.0.0.
-          And because package-a==3.0.0 depends on package-b==3.0.0, we can conclude that all of:
-              package-a<2.0.0
-              package-a>2.0.0
-          depend on one of:
-              package-b==1.0.0
-              package-b==3.0.0
-
-          And because you require one of:
-              package-a<2.0.0
-              package-a>2.0.0
-          and package-b>=2.0.0,<3.0.0, we can conclude that your requirements are unsatisfiable.
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 
     // Only `a==1.2.0` is available since `a==1.0.0` and `a==3.0.0` require incompatible versions of `b`. The user has excluded that version of `a` so resolution fails.
@@ -618,15 +600,16 @@ fn excluded_only_version() {
         .arg("excluded-only-version-a!=1.0.0")
         , @"
     success: false
-    exit_code: 1
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-      × No solution found when resolving dependencies:
-      ╰─▶ Because only package-a==1.0.0 is available and you require one of:
-              package-a<1.0.0
-              package-a>1.0.0
-          we can conclude that your requirements are unsatisfiable.
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 
     // Only `a==1.0.0` is available but the user excluded it.
@@ -680,17 +663,17 @@ fn all_extras_required() {
     uv_snapshot!(filters, command(&context)
         .arg("all-extras-required-a[all]")
         , @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    Resolved 3 packages in [TIME]
-    Prepared 3 packages in [TIME]
-    Installed 3 packages in [TIME]
-     + package-a==1.0.0
-     + package-b==1.0.0
-     + package-c==1.0.0
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 
     context.assert_installed("all_extras_required_a", "1.0.0");
@@ -731,16 +714,17 @@ fn extra_does_not_exist_backtrack() {
     uv_snapshot!(filters, command(&context)
         .arg("extra-does-not-exist-backtrack-a[extra]")
         , @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    Resolved 1 package in [TIME]
-    Prepared 1 package in [TIME]
-    Installed 1 package in [TIME]
-     + package-a==3.0.0
-    warning: The package `package-a==3.0.0` does not have an extra named `extra`
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 
     // The resolver should not backtrack to `a==1.0.0` because missing extras are allowed during resolution. `b` should not be installed.
@@ -781,16 +765,17 @@ fn extra_incompatible_with_extra_not_requested() {
     uv_snapshot!(filters, command(&context)
         .arg("extra-incompatible-with-extra-not-requested-a[extra_c]")
         , @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    Resolved 2 packages in [TIME]
-    Prepared 2 packages in [TIME]
-    Installed 2 packages in [TIME]
-     + package-a==1.0.0
-     + package-b==2.0.0
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 
     // Because the user does not request both extras, it is okay that one is incompatible with the other.
@@ -833,14 +818,16 @@ fn extra_incompatible_with_extra() {
         .arg("extra-incompatible-with-extra-a[extra_b,extra_c]")
         , @"
     success: false
-    exit_code: 1
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-      × No solution found when resolving dependencies:
-      ╰─▶ Because only package-a[extra-b]==1.0.0 is available and package-a[extra-b]==1.0.0 depends on package-b==1.0.0, we can conclude that all versions of package-a[extra-b] depend on package-b==1.0.0.
-          And because package-a[extra-c]==1.0.0 depends on package-b==2.0.0 and only package-a[extra-c]==1.0.0 is available, we can conclude that all versions of package-a[extra-b] and all versions of package-a[extra-c] are incompatible.
-          And because you require package-a[extra-b] and package-a[extra-c], we can conclude that your requirements are unsatisfiable.
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 
     // Because both `extra_b` and `extra_c` are requested and they require incompatible versions of `b`, `a` cannot be installed.
@@ -881,13 +868,16 @@ fn extra_incompatible_with_root() {
                 .arg("extra-incompatible-with-root-b==2.0.0")
         , @"
     success: false
-    exit_code: 1
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-      × No solution found when resolving dependencies:
-      ╰─▶ Because only package-a[extra]==1.0.0 is available and package-a[extra]==1.0.0 depends on package-b==1.0.0, we can conclude that all versions of package-a[extra] depend on package-b==1.0.0.
-          And because you require package-a[extra] and package-b==2.0.0, we can conclude that your requirements are unsatisfiable.
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 
     // Because the user requested `b==2.0.0` but the requested extra requires `b==1.0.0`, the dependencies cannot be satisfied.
@@ -924,16 +914,17 @@ fn extra_required() {
     uv_snapshot!(filters, command(&context)
         .arg("extra-required-a[extra]")
         , @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    Resolved 2 packages in [TIME]
-    Prepared 2 packages in [TIME]
-    Installed 2 packages in [TIME]
-     + package-a==1.0.0
-     + package-b==1.0.0
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 
     context.assert_installed("extra_required_a", "1.0.0");
@@ -963,16 +954,17 @@ fn missing_extra() {
     uv_snapshot!(filters, command(&context)
         .arg("missing-extra-a[extra]")
         , @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    Resolved 1 package in [TIME]
-    Prepared 1 package in [TIME]
-    Installed 1 package in [TIME]
-     + package-a==1.0.0
-    warning: The package `package-a==1.0.0` does not have an extra named `extra`
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 
     // Missing extras are ignored during resolution.
@@ -1014,17 +1006,17 @@ fn multiple_extras_required() {
     uv_snapshot!(filters, command(&context)
         .arg("multiple-extras-required-a[extra_b,extra_c]")
         , @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    Resolved 3 packages in [TIME]
-    Prepared 3 packages in [TIME]
-    Installed 3 packages in [TIME]
-     + package-a==1.0.0
-     + package-b==1.0.0
-     + package-c==1.0.0
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 
     context.assert_installed("multiple_extras_required_a", "1.0.0");
@@ -1060,12 +1052,16 @@ fn direct_incompatible_versions() {
                 .arg("direct-incompatible-versions-a==2.0.0")
         , @"
     success: false
-    exit_code: 1
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-      × No solution found when resolving dependencies:
-      ╰─▶ Because you require package-a==1.0.0 and package-a==2.0.0, we can conclude that your requirements are unsatisfiable.
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 
     context.assert_not_installed("direct_incompatible_versions_a");
@@ -1100,13 +1096,16 @@ fn transitive_incompatible_versions() {
         .arg("transitive-incompatible-versions-a==1.0.0")
         , @"
     success: false
-    exit_code: 1
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-      × No solution found when resolving dependencies:
-      ╰─▶ Because package-a==1.0.0 depends on package-b==1.0.0 and package-b==2.0.0, we can conclude that package-a==1.0.0 cannot be used.
-          And because you require package-a==1.0.0, we can conclude that your requirements are unsatisfiable.
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 
     context.assert_not_installed("transitive_incompatible_versions_a");
@@ -1144,13 +1143,16 @@ fn transitive_incompatible_with_root_version() {
                 .arg("transitive-incompatible-with-root-version-b==1.0.0")
         , @"
     success: false
-    exit_code: 1
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-      × No solution found when resolving dependencies:
-      ╰─▶ Because only package-a==1.0.0 is available and package-a==1.0.0 depends on package-b==2.0.0, we can conclude that all versions of package-a depend on package-b==2.0.0.
-          And because you require package-a and package-b==1.0.0, we can conclude that your requirements are unsatisfiable.
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 
     context.assert_not_installed("transitive_incompatible_with_root_version_a");
@@ -1193,14 +1195,16 @@ fn transitive_incompatible_with_transitive() {
                 .arg("transitive-incompatible-with-transitive-b")
         , @"
     success: false
-    exit_code: 1
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-      × No solution found when resolving dependencies:
-      ╰─▶ Because only package-a==1.0.0 is available and package-a==1.0.0 depends on package-c==1.0.0, we can conclude that all versions of package-a depend on package-c==1.0.0.
-          And because package-b==1.0.0 depends on package-c==2.0.0 and only package-b==1.0.0 is available, we can conclude that all versions of package-a and all versions of package-b are incompatible.
-          And because you require package-a and package-b, we can conclude that your requirements are unsatisfiable.
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 
     context.assert_not_installed("transitive_incompatible_with_transitive_a");
@@ -1232,15 +1236,17 @@ fn local_greater_than_or_equal() {
     uv_snapshot!(filters, command(&context)
         .arg("local-greater-than-or-equal-a>=1.2.3")
         , @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    Resolved 1 package in [TIME]
-    Prepared 1 package in [TIME]
-    Installed 1 package in [TIME]
-     + package-a==1.2.3+foo
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 
     // The version '1.2.3+foo' satisfies the constraint '>=1.2.3'.
@@ -1271,12 +1277,16 @@ fn local_greater_than() {
         .arg("local-greater-than-a>1.2.3")
         , @"
     success: false
-    exit_code: 1
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-      × No solution found when resolving dependencies:
-      ╰─▶ Because only package-a==1.2.3+foo is available and you require package-a>1.2.3, we can conclude that your requirements are unsatisfiable.
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 
     context.assert_not_installed("local_greater_than_a");
@@ -1307,15 +1317,17 @@ fn local_less_than_or_equal() {
     uv_snapshot!(filters, command(&context)
         .arg("local-less-than-or-equal-a<=1.2.3")
         , @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    Resolved 1 package in [TIME]
-    Prepared 1 package in [TIME]
-    Installed 1 package in [TIME]
-     + package-a==1.2.3+foo
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 
     // The version '1.2.3+foo' satisfies the constraint '<=1.2.3'.
@@ -1346,12 +1358,16 @@ fn local_less_than() {
         .arg("local-less-than-a<1.2.3")
         , @"
     success: false
-    exit_code: 1
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-      × No solution found when resolving dependencies:
-      ╰─▶ Because only package-a==1.2.3+foo is available and you require package-a<1.2.3, we can conclude that your requirements are unsatisfiable.
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 
     context.assert_not_installed("local_less_than_a");
@@ -1384,15 +1400,17 @@ fn local_not_latest() {
     uv_snapshot!(filters, command(&context)
         .arg("local-not-latest-a>=1")
         , @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    Resolved 1 package in [TIME]
-    Prepared 1 package in [TIME]
-    Installed 1 package in [TIME]
-     + package-a==1.2.1+foo
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 
     context.assert_installed("local_not_latest_a", "1.2.1+foo");
@@ -1423,15 +1441,17 @@ fn local_not_used_with_sdist() {
     uv_snapshot!(filters, command(&context)
         .arg("local-not-used-with-sdist-a==1.2.3")
         , @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    Resolved 1 package in [TIME]
-    Prepared 1 package in [TIME]
-    Installed 1 package in [TIME]
-     + package-a==1.2.3+foo
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 
     // The version '1.2.3' with an sdist satisfies the constraint '==1.2.3'.
@@ -1463,15 +1483,17 @@ fn local_simple() {
     uv_snapshot!(filters, command(&context)
         .arg("local-simple-a==1.2.3")
         , @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    Resolved 1 package in [TIME]
-    Prepared 1 package in [TIME]
-    Installed 1 package in [TIME]
-     + package-a==1.2.3+foo
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 
     // The version '1.2.3+foo' satisfies the constraint '==1.2.3'.
@@ -1514,16 +1536,17 @@ fn local_transitive_backtrack() {
         .arg("local-transitive-backtrack-a")
                 .arg("local-transitive-backtrack-b==2.0.0+foo")
         , @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    Resolved 2 packages in [TIME]
-    Prepared 2 packages in [TIME]
-    Installed 2 packages in [TIME]
-     + package-a==1.0.0
-     + package-b==2.0.0+foo
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 
     // Backtracking to '1.0.0' gives us compatible local versions of b.
@@ -1563,13 +1586,16 @@ fn local_transitive_conflicting() {
                 .arg("local-transitive-conflicting-b==2.0.0+foo")
         , @"
     success: false
-    exit_code: 1
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-      × No solution found when resolving dependencies:
-      ╰─▶ Because only package-a==1.0.0 is available and package-a==1.0.0 depends on package-b==2.0.0+bar, we can conclude that all versions of package-a depend on package-b==2.0.0+bar.
-          And because you require package-a and package-b==2.0.0+foo, we can conclude that your requirements are unsatisfiable.
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 
     context.assert_not_installed("local_transitive_conflicting_a");
@@ -1607,16 +1633,17 @@ fn local_transitive_confounding() {
     uv_snapshot!(filters, command(&context)
         .arg("local-transitive-confounding-a")
         , @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    Resolved 2 packages in [TIME]
-    Prepared 2 packages in [TIME]
-    Installed 2 packages in [TIME]
-     + package-a==1.0.0
-     + package-b==2.0.0+foo
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 
     // The version '2.0.0+foo' satisfies the constraint '==2.0.0'.
@@ -1656,16 +1683,17 @@ fn local_transitive_greater_than_or_equal() {
         .arg("local-transitive-greater-than-or-equal-a")
                 .arg("local-transitive-greater-than-or-equal-b==2.0.0+foo")
         , @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    Resolved 2 packages in [TIME]
-    Prepared 2 packages in [TIME]
-    Installed 2 packages in [TIME]
-     + package-a==1.0.0
-     + package-b==2.0.0+foo
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 
     // The version '2.0.0+foo' satisfies both >=2.0.0 and ==2.0.0+foo.
@@ -1705,13 +1733,16 @@ fn local_transitive_greater_than() {
                 .arg("local-transitive-greater-than-b==2.0.0+foo")
         , @"
     success: false
-    exit_code: 1
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-      × No solution found when resolving dependencies:
-      ╰─▶ Because only package-a==1.0.0 is available and package-a==1.0.0 depends on package-b>2.0.0, we can conclude that all versions of package-a depend on package-b>2.0.0.
-          And because you require package-a and package-b==2.0.0+foo, we can conclude that your requirements are unsatisfiable.
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 
     context.assert_not_installed("local_transitive_greater_than_a");
@@ -1750,16 +1781,17 @@ fn local_transitive_less_than_or_equal() {
         .arg("local-transitive-less-than-or-equal-a")
                 .arg("local-transitive-less-than-or-equal-b==2.0.0+foo")
         , @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    Resolved 2 packages in [TIME]
-    Prepared 2 packages in [TIME]
-    Installed 2 packages in [TIME]
-     + package-a==1.0.0
-     + package-b==2.0.0+foo
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 
     // The version '2.0.0+foo' satisfies both <=2.0.0 and ==2.0.0+foo.
@@ -1799,13 +1831,16 @@ fn local_transitive_less_than() {
                 .arg("local-transitive-less-than-b==2.0.0+foo")
         , @"
     success: false
-    exit_code: 1
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-      × No solution found when resolving dependencies:
-      ╰─▶ Because only package-a==1.0.0 is available and package-a==1.0.0 depends on package-b<2.0.0, we can conclude that all versions of package-a depend on package-b<2.0.0.
-          And because you require package-a and package-b==2.0.0+foo, we can conclude that your requirements are unsatisfiable.
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 
     context.assert_not_installed("local_transitive_less_than_a");
@@ -1844,16 +1879,17 @@ fn local_transitive() {
         .arg("local-transitive-a")
                 .arg("local-transitive-b==2.0.0+foo")
         , @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    Resolved 2 packages in [TIME]
-    Prepared 2 packages in [TIME]
-    Installed 2 packages in [TIME]
-     + package-a==1.0.0
-     + package-b==2.0.0+foo
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 
     // The version '2.0.0+foo' satisfies both ==2.0.0 and ==2.0.0+foo.
@@ -1886,15 +1922,17 @@ fn local_used_without_sdist() {
     uv_snapshot!(filters, command(&context)
         .arg("local-used-without-sdist-a==1.2.3")
         , @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    Resolved 1 package in [TIME]
-    Prepared 1 package in [TIME]
-    Installed 1 package in [TIME]
-     + package-a==1.2.3+foo
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 
     // The version '1.2.3+foo' satisfies the constraint '==1.2.3'.
@@ -1925,15 +1963,17 @@ fn post_equal_available() {
     uv_snapshot!(filters, command(&context)
         .arg("post-equal-available-a==1.2.3.post0")
         , @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    Resolved 1 package in [TIME]
-    Prepared 1 package in [TIME]
-    Installed 1 package in [TIME]
-     + package-a==1.2.3.post0
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 
     // The version '1.2.3.post0' satisfies the constraint '==1.2.3.post0'.
@@ -1965,12 +2005,16 @@ fn post_equal_not_available() {
         .arg("post-equal-not-available-a==1.2.3.post0")
         , @"
     success: false
-    exit_code: 1
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-      × No solution found when resolving dependencies:
-      ╰─▶ Because there is no version of package-a==1.2.3.post0 and you require package-a==1.2.3.post0, we can conclude that your requirements are unsatisfiable.
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 
     context.assert_not_installed("post_equal_not_available_a");
@@ -2001,15 +2045,17 @@ fn post_greater_than_or_equal_post() {
     uv_snapshot!(filters, command(&context)
         .arg("post-greater-than-or-equal-post-a>=1.2.3.post0")
         , @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    Resolved 1 package in [TIME]
-    Prepared 1 package in [TIME]
-    Installed 1 package in [TIME]
-     + package-a==1.2.3.post1
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 
     // The version '1.2.3.post1' satisfies the constraint '>=1.2.3.post0'.
@@ -2039,15 +2085,17 @@ fn post_greater_than_or_equal() {
     uv_snapshot!(filters, command(&context)
         .arg("post-greater-than-or-equal-a>=1.2.3")
         , @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    Resolved 1 package in [TIME]
-    Prepared 1 package in [TIME]
-    Installed 1 package in [TIME]
-     + package-a==1.2.3.post1
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 
     // The version '1.2.3.post1' satisfies the constraint '>=1.2.3'.
@@ -2080,12 +2128,16 @@ fn post_greater_than_post_not_available() {
         .arg("post-greater-than-post-not-available-a>1.2.3.post2")
         , @"
     success: false
-    exit_code: 1
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-      × No solution found when resolving dependencies:
-      ╰─▶ Because only package-a<=1.2.3.post1 is available and you require package-a>=1.2.3.post3, we can conclude that your requirements are unsatisfiable.
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 
     context.assert_not_installed("post_greater_than_post_not_available_a");
@@ -2115,15 +2167,17 @@ fn post_greater_than_post() {
     uv_snapshot!(filters, command(&context)
         .arg("post-greater-than-post-a>1.2.3.post0")
         , @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    Resolved 1 package in [TIME]
-    Prepared 1 package in [TIME]
-    Installed 1 package in [TIME]
-     + package-a==1.2.3.post1
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 
     // The version '1.2.3.post1' satisfies the constraint '>1.2.3.post0'.
@@ -2154,12 +2208,16 @@ fn post_greater_than() {
         .arg("post-greater-than-a>1.2.3")
         , @"
     success: false
-    exit_code: 1
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-      × No solution found when resolving dependencies:
-      ╰─▶ Because only package-a==1.2.3.post1 is available and you require package-a>1.2.3, we can conclude that your requirements are unsatisfiable.
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 
     context.assert_not_installed("post_greater_than_a");
@@ -2189,12 +2247,16 @@ fn post_less_than_or_equal() {
         .arg("post-less-than-or-equal-a<=1.2.3")
         , @"
     success: false
-    exit_code: 1
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-      × No solution found when resolving dependencies:
-      ╰─▶ Because only package-a==1.2.3.post1 is available and you require package-a<=1.2.3, we can conclude that your requirements are unsatisfiable.
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 
     context.assert_not_installed("post_less_than_or_equal_a");
@@ -2224,12 +2286,16 @@ fn post_less_than() {
         .arg("post-less-than-a<1.2.3")
         , @"
     success: false
-    exit_code: 1
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-      × No solution found when resolving dependencies:
-      ╰─▶ Because only package-a==1.2.3.post1 is available and you require package-a<1.2.3, we can conclude that your requirements are unsatisfiable.
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 
     context.assert_not_installed("post_less_than_a");
@@ -2260,12 +2326,16 @@ fn post_local_greater_than_post() {
         .arg("post-local-greater-than-post-a>1.2.3.post1")
         , @"
     success: false
-    exit_code: 1
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-      × No solution found when resolving dependencies:
-      ╰─▶ Because only package-a<=1.2.3.post1+local is available and you require package-a>=1.2.3.post2, we can conclude that your requirements are unsatisfiable.
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 
     context.assert_not_installed("post_local_greater_than_post_a");
@@ -2296,12 +2366,16 @@ fn post_local_greater_than() {
         .arg("post-local-greater-than-a>1.2.3")
         , @"
     success: false
-    exit_code: 1
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-      × No solution found when resolving dependencies:
-      ╰─▶ Because only package-a<=1.2.3.post1+local is available and you require package-a>1.2.3, we can conclude that your requirements are unsatisfiable.
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 
     context.assert_not_installed("post_local_greater_than_a");
@@ -2331,12 +2405,16 @@ fn post_simple() {
         .arg("post-simple-a==1.2.3")
         , @"
     success: false
-    exit_code: 1
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-      × No solution found when resolving dependencies:
-      ╰─▶ Because there is no version of package-a==1.2.3 and you require package-a==1.2.3, we can conclude that your requirements are unsatisfiable.
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 
     context.assert_not_installed("post_simple_a");
@@ -2369,15 +2447,17 @@ fn package_multiple_prereleases_kinds() {
     uv_snapshot!(filters, command(&context)
         .arg("package-multiple-prereleases-kinds-a>=1.0.0a1")
         , @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    Resolved 1 package in [TIME]
-    Prepared 1 package in [TIME]
-    Installed 1 package in [TIME]
-     + package-a==1.0.0rc1
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 
     // Release candidates should be the highest precedence prerelease kind.
@@ -2411,15 +2491,17 @@ fn package_multiple_prereleases_numbers() {
     uv_snapshot!(filters, command(&context)
         .arg("package-multiple-prereleases-numbers-a>=1.0.0a1")
         , @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    Resolved 1 package in [TIME]
-    Prepared 1 package in [TIME]
-    Installed 1 package in [TIME]
-     + package-a==1.0.0a3
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 
     // The latest alpha version should be selected.
@@ -2451,15 +2533,17 @@ fn package_only_prereleases_boundary() {
     uv_snapshot!(filters, command(&context)
         .arg("package-only-prereleases-boundary-a<0.2.0")
         , @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    Resolved 1 package in [TIME]
-    Prepared 1 package in [TIME]
-    Installed 1 package in [TIME]
-     + package-a==0.1.0a1
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 
     // Since there are only prerelease versions of `a` available, a prerelease is allowed. Since the user did not explicitly request a pre-release, pre-releases at the boundary should not be selected.
@@ -2491,14 +2575,16 @@ fn package_only_prereleases_in_range() {
         .arg("package-only-prereleases-in-range-a>0.1.0")
         , @"
     success: false
-    exit_code: 1
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-      × No solution found when resolving dependencies:
-      ╰─▶ Because only package-a<=0.1.0 is available and you require package-a>0.1.0, we can conclude that your requirements are unsatisfiable.
-
-          hint: Pre-releases are available for `package-a` in the requested range (e.g., 1.0.0a1), but pre-releases weren't enabled (try: `--prerelease=allow`)
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 
     // Since there are stable versions of `a` available, prerelease versions should not be selected without explicit opt-in.
@@ -2528,15 +2614,17 @@ fn package_only_prereleases() {
     uv_snapshot!(filters, command(&context)
         .arg("package-only-prereleases-a")
         , @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    Resolved 1 package in [TIME]
-    Prepared 1 package in [TIME]
-    Installed 1 package in [TIME]
-     + package-a==1.0.0a1
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 
     // Since there are only prerelease versions of `a` available, it should be installed even though the user did not include a prerelease specifier.
@@ -2572,15 +2660,17 @@ fn package_prerelease_specified_mixed_available() {
     uv_snapshot!(filters, command(&context)
         .arg("package-prerelease-specified-mixed-available-a>=0.1.0a1")
         , @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    Resolved 1 package in [TIME]
-    Prepared 1 package in [TIME]
-    Installed 1 package in [TIME]
-     + package-a==1.0.0a1
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 
     // Since the user provided a prerelease specifier, the latest prerelease version should be selected.
@@ -2617,15 +2707,17 @@ fn package_prerelease_specified_only_final_available() {
     uv_snapshot!(filters, command(&context)
         .arg("package-prerelease-specified-only-final-available-a>=0.1.0a1")
         , @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    Resolved 1 package in [TIME]
-    Prepared 1 package in [TIME]
-    Installed 1 package in [TIME]
-     + package-a==0.3.0
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 
     // The latest stable version should be selected.
@@ -2665,15 +2757,17 @@ fn package_prerelease_specified_only_prerelease_available() {
     uv_snapshot!(filters, command(&context)
         .arg("package-prerelease-specified-only-prerelease-available-a>=0.1.0a1")
         , @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    Resolved 1 package in [TIME]
-    Prepared 1 package in [TIME]
-    Installed 1 package in [TIME]
-     + package-a==0.3.0a1
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 
     // The latest prerelease version should be selected.
@@ -2709,15 +2803,17 @@ fn package_prereleases_boundary() {
         .arg("--prerelease=allow")
         .arg("package-prereleases-boundary-a<0.2.0")
         , @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    Resolved 1 package in [TIME]
-    Prepared 1 package in [TIME]
-    Installed 1 package in [TIME]
-     + package-a==0.1.0
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 
     // Since the user did not use a pre-release specifier, pre-releases at the boundary should not be selected even though pre-releases are allowed.
@@ -2750,15 +2846,17 @@ fn package_prereleases_global_boundary() {
         .arg("--prerelease=allow")
         .arg("package-prereleases-global-boundary-a<0.2.0")
         , @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    Resolved 1 package in [TIME]
-    Prepared 1 package in [TIME]
-    Installed 1 package in [TIME]
-     + package-a==0.1.0
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 
     // Since the user did not use a pre-release specifier, pre-releases at the boundary should not be selected even though pre-releases are allowed.
@@ -2794,15 +2892,17 @@ fn package_prereleases_specifier_boundary() {
     uv_snapshot!(filters, command(&context)
         .arg("package-prereleases-specifier-boundary-a<0.2.0a2")
         , @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    Resolved 1 package in [TIME]
-    Prepared 1 package in [TIME]
-    Installed 1 package in [TIME]
-     + package-a==0.2.0a1
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 
     // Since the user used a pre-release specifier, pre-releases at the boundary should be selected.
@@ -2837,15 +2937,17 @@ fn requires_package_only_prereleases_in_range_global_opt_in() {
         .arg("--prerelease=allow")
         .arg("requires-package-only-prereleases-in-range-global-opt-in-a>0.1.0")
         , @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    Resolved 1 package in [TIME]
-    Prepared 1 package in [TIME]
-    Installed 1 package in [TIME]
-     + package-a==1.0.0a1
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 
     context.assert_installed(
@@ -2878,15 +2980,17 @@ fn requires_package_prerelease_and_final_any() {
     uv_snapshot!(filters, command(&context)
         .arg("requires-package-prerelease-and-final-any-a")
         , @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    Resolved 1 package in [TIME]
-    Prepared 1 package in [TIME]
-    Installed 1 package in [TIME]
-     + package-a==0.1.0
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 
     // Since the user did not provide a prerelease specifier, the older stable version should be selected.
@@ -2928,16 +3032,17 @@ fn transitive_package_only_prereleases_in_range_opt_in() {
         .arg("transitive-package-only-prereleases-in-range-opt-in-a")
                 .arg("transitive-package-only-prereleases-in-range-opt-in-b>0.0.0a1")
         , @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    Resolved 2 packages in [TIME]
-    Prepared 2 packages in [TIME]
-    Installed 2 packages in [TIME]
-     + package-a==0.1.0
-     + package-b==1.0.0a1
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 
     // Since the user included a dependency on `b` with a prerelease specifier, a prerelease version can be selected.
@@ -2980,15 +3085,16 @@ fn transitive_package_only_prereleases_in_range() {
         .arg("transitive-package-only-prereleases-in-range-a")
         , @"
     success: false
-    exit_code: 1
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-      × No solution found when resolving dependencies:
-      ╰─▶ Because only package-b<=0.1 is available and package-a==0.1.0 depends on package-b>0.1, we can conclude that package-a==0.1.0 cannot be used.
-          And because only package-a==0.1.0 is available and you require package-a, we can conclude that your requirements are unsatisfiable.
-
-          hint: Pre-releases are available for `package-b` in the requested range (e.g., 1.0.0a1), but pre-releases weren't enabled (try: `--prerelease=allow`)
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 
     // Since there are stable versions of `b` available, the prerelease version should not be selected without explicit opt-in. The available version is excluded by the range requested by the user.
@@ -3022,16 +3128,17 @@ fn transitive_package_only_prereleases() {
     uv_snapshot!(filters, command(&context)
         .arg("transitive-package-only-prereleases-a")
         , @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    Resolved 2 packages in [TIME]
-    Prepared 2 packages in [TIME]
-    Installed 2 packages in [TIME]
-     + package-a==0.1.0
-     + package-b==1.0.0a1
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 
     // Since there are only prerelease versions of `b` available, it should be selected even though the user did not opt-in to prereleases.
@@ -3103,28 +3210,16 @@ fn transitive_prerelease_and_stable_dependency_many_versions_holes() {
                 .arg("transitive-prerelease-and-stable-dependency-many-versions-holes-b")
         , @"
     success: false
-    exit_code: 1
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-      × No solution found when resolving dependencies:
-      ╰─▶ Because only the following versions of package-c are available:
-              package-c<=1.0.0
-              package-c>=2.0.0a5,<=2.0.0a7
-              package-c==2.0.0b1
-              package-c>=2.0.0b5
-          and package-a==1.0.0 depends on one of:
-              package-c>1.0.0,<2.0.0a5
-              package-c>2.0.0a7,<2.0.0b1
-              package-c>2.0.0b1,<2.0.0b5
-          we can conclude that package-a==1.0.0 cannot be used.
-          And because only package-a==1.0.0 is available and you require package-a, we can conclude that your requirements are unsatisfiable.
-
-          hint: `package-c` was requested with a pre-release marker (e.g., all of:
-              package-c>1.0.0,<2.0.0a5
-              package-c>2.0.0a7,<2.0.0b1
-              package-c>2.0.0b1,<2.0.0b5
-          ), but pre-releases weren't enabled (try: `--prerelease=allow`)
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 
     // Since the user did not explicitly opt-in to a prerelease, it cannot be selected.
@@ -3198,17 +3293,16 @@ fn transitive_prerelease_and_stable_dependency_many_versions() {
                 .arg("transitive-prerelease-and-stable-dependency-many-versions-b")
         , @"
     success: false
-    exit_code: 1
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-      × No solution found when resolving dependencies:
-      ╰─▶ Because only package-a==1.0.0 is available and package-a==1.0.0 depends on package-c>=2.0.0b1, we can conclude that all versions of package-a depend on package-c>=2.0.0b1.
-          And because only package-c<2.0.0b1 is available, we can conclude that all versions of package-a depend on package-c>3.0.0.
-          And because package-b==1.0.0 depends on package-c and only package-b==1.0.0 is available, we can conclude that all versions of package-a and all versions of package-b are incompatible.
-          And because you require package-a and package-b, we can conclude that your requirements are unsatisfiable.
-
-          hint: `package-c` was requested with a pre-release marker (e.g., package-c>=2.0.0b1), but pre-releases weren't enabled (try: `--prerelease=allow`)
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 
     // Since the user did not explicitly opt-in to a prerelease, it cannot be selected.
@@ -3258,17 +3352,17 @@ fn transitive_prerelease_and_stable_dependency_opt_in() {
                 .arg("transitive-prerelease-and-stable-dependency-opt-in-b")
                 .arg("transitive-prerelease-and-stable-dependency-opt-in-c>=0.0.0a1")
         , @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    Resolved 3 packages in [TIME]
-    Prepared 3 packages in [TIME]
-    Installed 3 packages in [TIME]
-     + package-a==1.0.0
-     + package-b==1.0.0
-     + package-c==2.0.0b1
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 
     // Since the user explicitly opted-in to a prerelease for `c`, it can be installed.
@@ -3322,15 +3416,16 @@ fn transitive_prerelease_and_stable_dependency() {
                 .arg("transitive-prerelease-and-stable-dependency-b")
         , @"
     success: false
-    exit_code: 1
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-      × No solution found when resolving dependencies:
-      ╰─▶ Because there is no version of package-c==2.0.0b1 and package-a==1.0.0 depends on package-c==2.0.0b1, we can conclude that package-a==1.0.0 cannot be used.
-          And because only package-a==1.0.0 is available and you require package-a, we can conclude that your requirements are unsatisfiable.
-
-          hint: `package-c` was requested with a pre-release marker (e.g., package-c==2.0.0b1), but pre-releases weren't enabled (try: `--prerelease=allow`)
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 
     // Since the user did not explicitly opt-in to a prerelease, it cannot be selected.
@@ -3635,13 +3730,16 @@ fn python_version_does_not_exist() {
         .arg("python-version-does-not-exist-a==1.0.0")
         , @"
     success: false
-    exit_code: 1
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-      × No solution found when resolving dependencies:
-      ╰─▶ Because the current Python version (3.12.[X]) does not satisfy Python>=3.30 and package-a==1.0.0 depends on Python>=3.30, we can conclude that package-a==1.0.0 cannot be used.
-          And because you require package-a==1.0.0, we can conclude that your requirements are unsatisfiable.
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 
     context.assert_not_installed("python_version_does_not_exist_a");
@@ -3672,15 +3770,17 @@ fn no_binary() {
         .arg("no-binary-a")
         .arg("no-binary-a")
         , @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    Resolved 1 package in [TIME]
-    Prepared 1 package in [TIME]
-    Installed 1 package in [TIME]
-     + package-a==1.0.0
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 
     // The source distribution should be used for install
@@ -3711,15 +3811,17 @@ fn no_build() {
         .arg("no-build-a")
         .arg("no-build-a")
         , @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    Resolved 1 package in [TIME]
-    Prepared 1 package in [TIME]
-    Installed 1 package in [TIME]
-     + package-a==1.0.0
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 
     // The wheel should be used for install
@@ -3750,15 +3852,16 @@ fn no_sdist_no_wheels_with_matching_abi() {
         .arg("no-sdist-no-wheels-with-matching-abi-a")
         , @"
     success: false
-    exit_code: 1
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-      × No solution found when resolving dependencies:
-      ╰─▶ Because only package-a==1.0.0 is available and package-a==1.0.0 has no wheels with a matching Python ABI tag (e.g., `cp312`), we can conclude that all versions of package-a cannot be used.
-          And because you require package-a, we can conclude that your requirements are unsatisfiable.
-
-          hint: You require CPython 3.12 (`cp312`), but we only found wheels for `package-a` (v1.0.0) with the following Python ABI tag: `graalpy240_310_native`
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 
     context.assert_not_installed("no_sdist_no_wheels_with_matching_abi_a");
@@ -3789,15 +3892,16 @@ fn no_sdist_no_wheels_with_matching_platform() {
         .arg("no-sdist-no-wheels-with-matching-platform-a")
         , @"
     success: false
-    exit_code: 1
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-      × No solution found when resolving dependencies:
-      ╰─▶ Because only package-a==1.0.0 is available and package-a==1.0.0 has no wheels with a matching platform tag (e.g., `manylinux_2_17_x86_64`), we can conclude that all versions of package-a cannot be used.
-          And because you require package-a, we can conclude that your requirements are unsatisfiable.
-
-          hint: Wheels are available for `package-a` (v1.0.0) on the following platform: `macosx_10_0_ppc64`
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 
     context.assert_not_installed("no_sdist_no_wheels_with_matching_platform_a");
@@ -3828,15 +3932,16 @@ fn no_sdist_no_wheels_with_matching_python() {
         .arg("no-sdist-no-wheels-with-matching-python-a")
         , @"
     success: false
-    exit_code: 1
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-      × No solution found when resolving dependencies:
-      ╰─▶ Because only package-a==1.0.0 is available and package-a==1.0.0 has no wheels with a matching Python implementation tag (e.g., `cp312`), we can conclude that all versions of package-a cannot be used.
-          And because you require package-a, we can conclude that your requirements are unsatisfiable.
-
-          hint: You require CPython 3.12 (`cp312`), but we only found wheels for `package-a` (v1.0.0) with the following Python implementation tag: `graalpy310`
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 
     context.assert_not_installed("no_sdist_no_wheels_with_matching_python_a");
@@ -3868,15 +3973,16 @@ fn no_wheels_no_build() {
         .arg("no-wheels-no-build-a")
         , @"
     success: false
-    exit_code: 1
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-      × No solution found when resolving dependencies:
-      ╰─▶ Because only package-a==1.0.0 is available and package-a==1.0.0 has no usable wheels, we can conclude that all versions of package-a cannot be used.
-          And because you require package-a, we can conclude that your requirements are unsatisfiable.
-
-          hint: Wheels are required for `package-a` because building from source is disabled for `package-a` (i.e., with `--no-build-package package-a`)
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 
     context.assert_not_installed("no_wheels_no_build_a");
@@ -3905,15 +4011,17 @@ fn no_wheels_with_matching_platform() {
     uv_snapshot!(filters, command(&context)
         .arg("no-wheels-with-matching-platform-a")
         , @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    Resolved 1 package in [TIME]
-    Prepared 1 package in [TIME]
-    Installed 1 package in [TIME]
-     + package-a==1.0.0
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 }
 
@@ -3940,15 +4048,17 @@ fn no_wheels() {
     uv_snapshot!(filters, command(&context)
         .arg("no-wheels-a")
         , @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    Resolved 1 package in [TIME]
-    Prepared 1 package in [TIME]
-    Installed 1 package in [TIME]
-     + package-a==1.0.0
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 }
 
@@ -3978,15 +4088,16 @@ fn only_wheels_no_binary() {
         .arg("only-wheels-no-binary-a")
         , @"
     success: false
-    exit_code: 1
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-      × No solution found when resolving dependencies:
-      ╰─▶ Because only package-a==1.0.0 is available and package-a==1.0.0 has no source distribution, we can conclude that all versions of package-a cannot be used.
-          And because you require package-a, we can conclude that your requirements are unsatisfiable.
-
-          hint: A source distribution is required for `package-a` because using pre-built wheels is disabled for `package-a` (i.e., with `--no-binary-package package-a`)
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 
     context.assert_not_installed("only_wheels_no_binary_a");
@@ -4015,15 +4126,17 @@ fn only_wheels() {
     uv_snapshot!(filters, command(&context)
         .arg("only-wheels-a")
         , @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    Resolved 1 package in [TIME]
-    Prepared 1 package in [TIME]
-    Installed 1 package in [TIME]
-     + package-a==1.0.0
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 }
 
@@ -4050,15 +4163,17 @@ fn specific_tag_and_default() {
     uv_snapshot!(filters, command(&context)
         .arg("specific-tag-and-default-a")
         , @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    Resolved 1 package in [TIME]
-    Prepared 1 package in [TIME]
-    Installed 1 package in [TIME]
-     + package-a==1.0.0
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 }
 
@@ -4087,16 +4202,16 @@ fn package_only_yanked_in_range() {
         .arg("package-only-yanked-in-range-a>0.1.0")
         , @"
     success: false
-    exit_code: 1
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-      × No solution found when resolving dependencies:
-      ╰─▶ Because only the following versions of package-a are available:
-              package-a<=0.1.0
-              package-a==1.0.0
-          and package-a==1.0.0 was yanked (reason: Yanked for testing), we can conclude that package-a>0.1.0 cannot be used.
-          And because you require package-a>0.1.0, we can conclude that your requirements are unsatisfiable.
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 
     // Since there are other versions of `a` available, yanked versions should not be selected without explicit opt-in.
@@ -4127,13 +4242,16 @@ fn package_only_yanked() {
         .arg("package-only-yanked-a")
         , @"
     success: false
-    exit_code: 1
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-      × No solution found when resolving dependencies:
-      ╰─▶ Because only package-a==1.0.0 is available and package-a==1.0.0 was yanked (reason: Yanked for testing), we can conclude that all versions of package-a cannot be used.
-          And because you require package-a, we can conclude that your requirements are unsatisfiable.
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 
     // Yanked versions should not be installed, even if they are the only one available.
@@ -4167,15 +4285,17 @@ fn package_yanked_specified_mixed_available() {
     uv_snapshot!(filters, command(&context)
         .arg("package-yanked-specified-mixed-available-a>=0.1.0")
         , @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    Resolved 1 package in [TIME]
-    Prepared 1 package in [TIME]
-    Installed 1 package in [TIME]
-     + package-a==0.3.0
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 
     // The latest unyanked version should be selected.
@@ -4206,15 +4326,17 @@ fn requires_package_yanked_and_unyanked_any() {
     uv_snapshot!(filters, command(&context)
         .arg("requires-package-yanked-and-unyanked-any-a")
         , @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    Resolved 1 package in [TIME]
-    Prepared 1 package in [TIME]
-    Installed 1 package in [TIME]
-     + package-a==0.1.0
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 
     // The unyanked version should be selected.
@@ -4254,19 +4376,19 @@ fn transitive_package_only_yanked_in_range_opt_in() {
     uv_snapshot!(filters, command(&context)
         .arg("transitive-package-only-yanked-in-range-opt-in-a")
                 .arg("transitive-package-only-yanked-in-range-opt-in-b==1.0.0")
-        , @r#"
-    success: true
-    exit_code: 0
+        , @"
+    success: false
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    Resolved 2 packages in [TIME]
-    Prepared 2 packages in [TIME]
-    Installed 2 packages in [TIME]
-     + package-a==0.1.0
-     + package-b==1.0.0
-    warning: `package-b==1.0.0` is yanked (reason: "Yanked for testing")
-    "#);
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
+    ");
 
     // Since the user included a dependency on `b` with an exact specifier, the yanked version can be selected.
     context.assert_installed("transitive_package_only_yanked_in_range_opt_in_a", "0.1.0");
@@ -4302,17 +4424,16 @@ fn transitive_package_only_yanked_in_range() {
         .arg("transitive-package-only-yanked-in-range-a")
         , @"
     success: false
-    exit_code: 1
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-      × No solution found when resolving dependencies:
-      ╰─▶ Because only the following versions of package-b are available:
-              package-b<=0.1
-              package-b==1.0.0
-          and package-b==1.0.0 was yanked (reason: Yanked for testing), we can conclude that package-b>0.1 cannot be used.
-          And because package-a==0.1.0 depends on package-b>0.1, we can conclude that package-a==0.1.0 cannot be used.
-          And because only package-a==0.1.0 is available and you require package-a, we can conclude that your requirements are unsatisfiable.
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 
     // Yanked versions should not be installed, even if they are the only valid version in a range.
@@ -4347,14 +4468,16 @@ fn transitive_package_only_yanked() {
         .arg("transitive-package-only-yanked-a")
         , @"
     success: false
-    exit_code: 1
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-      × No solution found when resolving dependencies:
-      ╰─▶ Because only package-b==1.0.0 is available and package-b==1.0.0 was yanked (reason: Yanked for testing), we can conclude that all versions of package-b cannot be used.
-          And because package-a==0.1.0 depends on package-b, we can conclude that package-a==0.1.0 cannot be used.
-          And because only package-a==0.1.0 is available and you require package-a, we can conclude that your requirements are unsatisfiable.
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 
     // Yanked versions should not be installed, even if they are the only one available.
@@ -4401,20 +4524,19 @@ fn transitive_yanked_and_unyanked_dependency_opt_in() {
         .arg("transitive-yanked-and-unyanked-dependency-opt-in-a")
                 .arg("transitive-yanked-and-unyanked-dependency-opt-in-b")
                 .arg("transitive-yanked-and-unyanked-dependency-opt-in-c==2.0.0")
-        , @r#"
-    success: true
-    exit_code: 0
+        , @"
+    success: false
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    Resolved 3 packages in [TIME]
-    Prepared 3 packages in [TIME]
-    Installed 3 packages in [TIME]
-     + package-a==1.0.0
-     + package-b==1.0.0
-     + package-c==2.0.0
-    warning: `package-c==2.0.0` is yanked (reason: "Yanked for testing")
-    "#);
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
+    ");
 
     // Since the user explicitly selected the yanked version of `c`, it can be installed.
     context.assert_installed(
@@ -4467,13 +4589,16 @@ fn transitive_yanked_and_unyanked_dependency() {
                 .arg("transitive-yanked-and-unyanked-dependency-b")
         , @"
     success: false
-    exit_code: 1
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-      × No solution found when resolving dependencies:
-      ╰─▶ Because package-c==2.0.0 was yanked (reason: Yanked for testing) and package-a==1.0.0 depends on package-c==2.0.0, we can conclude that package-a==1.0.0 cannot be used.
-          And because only package-a==1.0.0 is available and you require package-a, we can conclude that your requirements are unsatisfiable.
+    error: Failed to read `--find-links` URL: https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/`
+      Caused by: error sending request for url (https://astral-sh.github.io/packse/PACKSE_VERSION/vendor/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     ");
 
     // Since the user did not explicitly select the yanked version, it cannot be used.

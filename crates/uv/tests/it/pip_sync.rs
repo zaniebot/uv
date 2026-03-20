@@ -2380,6 +2380,9 @@ fn sync_editable() -> Result<()> {
     Installed 2 packages in [TIME]
      + anyio==3.7.0
      + poetry-editable==0.1.0 (from file://[TEMP_DIR]/poetry_editable)
+    warning: The package `poetry-editable` requires `anyio>=4,<5`, but `3.7.0` is installed
+    warning: The package `anyio` requires `idna>=2.8`, but it's not installed
+    warning: The package `anyio` requires `sniffio>=1.1`, but it's not installed
     "
     );
 
@@ -2393,6 +2396,9 @@ fn sync_editable() -> Result<()> {
     ----- stderr -----
     Resolved 2 packages in [TIME]
     Checked 2 packages in [TIME]
+    warning: The package `poetry-editable` requires `anyio>=4,<5`, but `3.7.0` is installed
+    warning: The package `anyio` requires `idna>=2.8`, but it's not installed
+    warning: The package `anyio` requires `sniffio>=1.1`, but it's not installed
     "
     );
 
@@ -2411,6 +2417,9 @@ fn sync_editable() -> Result<()> {
     Uninstalled 1 package in [TIME]
     Installed 1 package in [TIME]
      ~ poetry-editable==0.1.0 (from file://[TEMP_DIR]/poetry_editable)
+    warning: The package `poetry-editable` requires `anyio>=4,<5`, but `3.7.0` is installed
+    warning: The package `anyio` requires `idna>=2.8`, but it's not installed
+    warning: The package `anyio` requires `sniffio>=1.1`, but it's not installed
     "
     );
 
@@ -2458,6 +2467,9 @@ fn sync_editable() -> Result<()> {
     ----- stderr -----
     Resolved 2 packages in [TIME]
     Checked 2 packages in [TIME]
+    warning: The package `poetry-editable` requires `anyio>=4,<5`, but `3.7.0` is installed
+    warning: The package `anyio` requires `idna>=2.8`, but it's not installed
+    warning: The package `anyio` requires `sniffio>=1.1`, but it's not installed
     "
     );
 
@@ -2483,6 +2495,9 @@ fn sync_editable() -> Result<()> {
     Installed 1 package in [TIME]
      - poetry-editable==0.1.0 (from file://[TEMP_DIR]/poetry_editable)
      + poetry-editable==0.1.1 (from file://[TEMP_DIR]/poetry_editable)
+    warning: The package `poetry-editable` requires `anyio>=4,<5`, but `3.7.0` is installed
+    warning: The package `anyio` requires `idna>=2.8`, but it's not installed
+    warning: The package `anyio` requires `sniffio>=1.1`, but it's not installed
     "
     );
 
@@ -2507,6 +2522,9 @@ fn sync_editable() -> Result<()> {
     Uninstalled 1 package in [TIME]
     Installed 1 package in [TIME]
      ~ poetry-editable==0.1.1 (from file://[TEMP_DIR]/poetry_editable)
+    warning: The package `poetry-editable` requires `anyio>=4,<5`, but `3.7.0` is installed
+    warning: The package `anyio` requires `idna>=2.8`, but it's not installed
+    warning: The package `anyio` requires `sniffio>=1.1`, but it's not installed
     "
     );
 
@@ -2751,6 +2769,9 @@ fn sync_legacy_sdist_pep_517() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + flake8==6.0.0 (from https://files.pythonhosted.org/packages/66/53/3ad4a3b74d609b3b9008a10075c40e7c8909eae60af53623c3888f7a529a/flake8-6.0.0.tar.gz)
+    warning: The package `flake8` requires `mccabe>=0.7.0,<0.8.0`, but it's not installed
+    warning: The package `flake8` requires `pycodestyle>=2.10.0,<2.11.0`, but it's not installed
+    warning: The package `flake8` requires `pyflakes>=3.0.0,<3.1.0`, but it's not installed
     "
     );
 
@@ -3017,6 +3038,11 @@ fn offline() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + black==23.10.1
+    warning: The package `black` requires `click>=8.0.0`, but it's not installed
+    warning: The package `black` requires `mypy-extensions>=0.4.3`, but it's not installed
+    warning: The package `black` requires `packaging>=22.0`, but it's not installed
+    warning: The package `black` requires `pathspec>=0.9.0`, but it's not installed
+    warning: The package `black` requires `platformdirs>=2`, but it's not installed
     "
     );
 
@@ -3035,6 +3061,11 @@ fn offline() -> Result<()> {
     Resolved 1 package in [TIME]
     Installed 1 package in [TIME]
      + black==23.10.1
+    warning: The package `black` requires `click>=8.0.0`, but it's not installed
+    warning: The package `black` requires `mypy-extensions>=0.4.3`, but it's not installed
+    warning: The package `black` requires `packaging>=22.0`, but it's not installed
+    warning: The package `black` requires `pathspec>=0.9.0`, but it's not installed
+    warning: The package `black` requires `platformdirs>=2`, but it's not installed
     "
     );
 
@@ -3064,6 +3095,8 @@ fn compatible_constraint() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + anyio==3.7.0
+    warning: The package `anyio` requires `idna>=2.8`, but it's not installed
+    warning: The package `anyio` requires `sniffio>=1.1`, but it's not installed
     "
     );
 
@@ -3120,6 +3153,8 @@ fn irrelevant_constraint() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + anyio==3.7.0
+    warning: The package `anyio` requires `idna>=2.8`, but it's not installed
+    warning: The package `anyio` requires `sniffio>=1.1`, but it's not installed
     "
     );
 
@@ -3144,6 +3179,8 @@ fn repeat_requirement_identical() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + anyio==4.3.0
+    warning: The package `anyio` requires `idna>=2.8`, but it's not installed
+    warning: The package `anyio` requires `sniffio>=1.1`, but it's not installed
     ");
 
     Ok(())
@@ -3167,6 +3204,8 @@ fn repeat_requirement_compatible() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + anyio==4.0.0
+    warning: The package `anyio` requires `idna>=2.8`, but it's not installed
+    warning: The package `anyio` requires `sniffio>=1.1`, but it's not installed
     ");
 
     Ok(())
@@ -3316,6 +3355,7 @@ requires-python = ">=3.8"
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + example==0.0.0 (from file://[TEMP_DIR]/editable)
+    warning: The package `example` requires `anyio==4.0.0`, but it's not installed
     "
     );
 
@@ -3329,6 +3369,7 @@ requires-python = ">=3.8"
     ----- stderr -----
     Resolved 1 package in [TIME]
     Checked 1 package in [TIME]
+    warning: The package `example` requires `anyio==4.0.0`, but it's not installed
     "
     );
 
@@ -3357,6 +3398,7 @@ requires-python = ">=3.8"
     Uninstalled 1 package in [TIME]
     Installed 1 package in [TIME]
      ~ example==0.0.0 (from file://[TEMP_DIR]/editable)
+    warning: The package `example` requires `anyio==3.7.1`, but it's not installed
     "
     );
 
@@ -3578,6 +3620,8 @@ fn require_hashes_missing_hash() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + anyio==4.0.0
+    warning: The package `anyio` requires `idna>=2.8`, but it's not installed
+    warning: The package `anyio` requires `sniffio>=1.1`, but it's not installed
     "
     );
 
@@ -3619,6 +3663,8 @@ fn require_hashes_missing_version() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + anyio==4.3.0
+    warning: The package `anyio` requires `idna>=2.8`, but it's not installed
+    warning: The package `anyio` requires `sniffio>=1.1`, but it's not installed
     "
     );
 
@@ -3660,6 +3706,8 @@ fn require_hashes_invalid_operator() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + anyio==4.3.0
+    warning: The package `anyio` requires `idna>=2.8`, but it's not installed
+    warning: The package `anyio` requires `sniffio>=1.1`, but it's not installed
     "
     );
 
@@ -3736,6 +3784,8 @@ fn require_hashes_wheel_only_binary() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + anyio==4.0.0
+    warning: The package `anyio` requires `idna>=2.8`, but it's not installed
+    warning: The package `anyio` requires `sniffio>=1.1`, but it's not installed
     "
     );
 
@@ -3991,6 +4041,8 @@ fn require_hashes_wheel_url() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + anyio==4.0.0 (from https://files.pythonhosted.org/packages/36/55/ad4de788d84a630656ece71059665e01ca793c04294c463fd84132f40fe6/anyio-4.0.0-py3-none-any.whl)
+    warning: The package `anyio` requires `idna>=2.8`, but it's not installed
+    warning: The package `anyio` requires `sniffio>=1.1`, but it's not installed
     "
     );
 
@@ -4009,6 +4061,8 @@ fn require_hashes_wheel_url() -> Result<()> {
     Uninstalled 1 package in [TIME]
     Installed 1 package in [TIME]
      ~ anyio==4.0.0 (from https://files.pythonhosted.org/packages/36/55/ad4de788d84a630656ece71059665e01ca793c04294c463fd84132f40fe6/anyio-4.0.0-py3-none-any.whl)
+    warning: The package `anyio` requires `idna>=2.8`, but it's not installed
+    warning: The package `anyio` requires `sniffio>=1.1`, but it's not installed
     "
     );
 
@@ -4057,6 +4111,8 @@ fn require_hashes_wheel_url() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + iniconfig==2.0.0
+    warning: The package `anyio` requires `idna>=2.8`, but it's not installed
+    warning: The package `anyio` requires `sniffio>=1.1`, but it's not installed
     "
     );
 
@@ -4171,6 +4227,8 @@ fn require_hashes_re_download() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + anyio==4.0.0
+    warning: The package `anyio` requires `idna>=2.8`, but it's not installed
+    warning: The package `anyio` requires `sniffio>=1.1`, but it's not installed
     "
     );
 
@@ -4219,6 +4277,8 @@ fn require_hashes_re_download() -> Result<()> {
     Uninstalled 1 package in [TIME]
     Installed 1 package in [TIME]
      ~ anyio==4.0.0
+    warning: The package `anyio` requires `idna>=2.8`, but it's not installed
+    warning: The package `anyio` requires `sniffio>=1.1`, but it's not installed
     "
     );
 
@@ -4385,6 +4445,8 @@ fn require_hashes_unnamed() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + anyio==4.0.0 (from https://files.pythonhosted.org/packages/36/55/ad4de788d84a630656ece71059665e01ca793c04294c463fd84132f40fe6/anyio-4.0.0-py3-none-any.whl)
+    warning: The package `anyio` requires `idna>=2.8`, but it's not installed
+    warning: The package `anyio` requires `sniffio>=1.1`, but it's not installed
     "
     );
 
@@ -4485,6 +4547,8 @@ fn require_hashes_repeated_hash() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + anyio==4.0.0 (from https://files.pythonhosted.org/packages/36/55/ad4de788d84a630656ece71059665e01ca793c04294c463fd84132f40fe6/anyio-4.0.0-py3-none-any.whl)
+    warning: The package `anyio` requires `idna>=2.8`, but it's not installed
+    warning: The package `anyio` requires `sniffio>=1.1`, but it's not installed
     "
     );
 
@@ -4510,6 +4574,8 @@ fn require_hashes_repeated_hash() -> Result<()> {
     Uninstalled 1 package in [TIME]
     Installed 1 package in [TIME]
      ~ anyio==4.0.0 (from https://files.pythonhosted.org/packages/36/55/ad4de788d84a630656ece71059665e01ca793c04294c463fd84132f40fe6/anyio-4.0.0-py3-none-any.whl)
+    warning: The package `anyio` requires `idna>=2.8`, but it's not installed
+    warning: The package `anyio` requires `sniffio>=1.1`, but it's not installed
     "
     );
 
@@ -4535,6 +4601,8 @@ fn require_hashes_repeated_hash() -> Result<()> {
     Uninstalled 1 package in [TIME]
     Installed 1 package in [TIME]
      ~ anyio==4.0.0 (from https://files.pythonhosted.org/packages/36/55/ad4de788d84a630656ece71059665e01ca793c04294c463fd84132f40fe6/anyio-4.0.0-py3-none-any.whl)
+    warning: The package `anyio` requires `idna>=2.8`, but it's not installed
+    warning: The package `anyio` requires `sniffio>=1.1`, but it's not installed
     "
     );
 
@@ -4592,6 +4660,8 @@ fn require_hashes_at_least_one() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + anyio==4.0.0
+    warning: The package `anyio` requires `idna>=2.8`, but it's not installed
+    warning: The package `anyio` requires `sniffio>=1.1`, but it's not installed
     "
     );
 
@@ -4615,6 +4685,8 @@ fn require_hashes_at_least_one() -> Result<()> {
     Uninstalled 1 package in [TIME]
     Installed 1 package in [TIME]
      ~ anyio==4.0.0
+    warning: The package `anyio` requires `idna>=2.8`, but it's not installed
+    warning: The package `anyio` requires `sniffio>=1.1`, but it's not installed
     "
     );
 
@@ -4637,6 +4709,8 @@ fn require_hashes_at_least_one() -> Result<()> {
     Uninstalled 1 package in [TIME]
     Installed 1 package in [TIME]
      ~ anyio==4.0.0
+    warning: The package `anyio` requires `idna>=2.8`, but it's not installed
+    warning: The package `anyio` requires `sniffio>=1.1`, but it's not installed
     "
     );
 
@@ -4668,6 +4742,7 @@ fn require_hashes_find_links_no_hash() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + example-a-961b4c22==1.0.0
+    warning: The package `example-a-961b4c22` requires `example-b-961b4c22>1.0.0`, but it's not installed
     "
     );
 
@@ -4750,6 +4825,7 @@ fn require_hashes_find_links_no_hash() -> Result<()> {
     Uninstalled 1 package in [TIME]
     Installed 1 package in [TIME]
      ~ example-a-961b4c22==1.0.0
+    warning: The package `example-a-961b4c22` requires `example-b-961b4c22>1.0.0`, but it's not installed
     "
     );
 
@@ -4779,6 +4855,7 @@ fn require_hashes_find_links_valid_hash() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + example-a-961b4c22==1.0.0
+    warning: The package `example-a-961b4c22` requires `example-b-961b4c22>1.0.0`, but it's not installed
     "
     );
 
@@ -4866,6 +4943,7 @@ fn require_hashes_find_links_invalid_hash() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + example-a-961b4c22==1.0.0
+    warning: The package `example-a-961b4c22` requires `example-b-961b4c22>1.0.0`, but it's not installed
     "
     );
 
@@ -4892,6 +4970,7 @@ fn require_hashes_find_links_invalid_hash() -> Result<()> {
     Uninstalled 1 package in [TIME]
     Installed 1 package in [TIME]
      ~ example-a-961b4c22==1.0.0
+    warning: The package `example-a-961b4c22` requires `example-b-961b4c22>1.0.0`, but it's not installed
     "
     );
 
@@ -4944,15 +5023,16 @@ fn require_hashes_registry_no_hash() -> Result<()> {
         .arg("--require-hashes")
         .arg("--index-url")
         .arg("https://astral-test.github.io/astral-test-hash/no-hash/simple-html/"), @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    Resolved 1 package in [TIME]
-    Prepared 1 package in [TIME]
-    Installed 1 package in [TIME]
-     + example-a-961b4c22==1.0.0
+    error: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-test.github.io/astral-test-hash/no-hash/simple-html/example-a-961b4c22/`
+      Caused by: error sending request for url (https://astral-test.github.io/astral-test-hash/no-hash/simple-html/example-a-961b4c22/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     "
     );
 
@@ -4975,12 +5055,16 @@ fn require_hashes_registry_valid_hash() -> Result<()> {
         .arg("--find-links")
         .arg("https://astral-test.github.io/astral-test-hash/valid-hash/simple-html/"), @"
     success: false
-    exit_code: 1
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-      × No solution found when resolving dependencies:
-      ╰─▶ Because example-a-961b4c22 was not found in the package registry and you require example-a-961b4c22==1.0.0, we can conclude that your requirements are unsatisfiable.
+    error: Failed to read `--find-links` URL: https://astral-test.github.io/astral-test-hash/valid-hash/simple-html/
+      Caused by: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-test.github.io/astral-test-hash/valid-hash/simple-html/`
+      Caused by: error sending request for url (https://astral-test.github.io/astral-test-hash/valid-hash/simple-html/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     "
     );
 
@@ -5004,19 +5088,15 @@ fn require_hashes_registry_invalid_hash() -> Result<()> {
         .arg("--index-url")
         .arg("https://astral-test.github.io/astral-test-hash/invalid-hash/simple-html/"), @"
     success: false
-    exit_code: 1
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    Resolved 1 package in [TIME]
-      × Failed to download `example-a-961b4c22==1.0.0`
-      ╰─▶ Hash mismatch for `example-a-961b4c22==1.0.0`
-
-          Expected:
-            sha256:123
-
-          Computed:
-            sha256:5d69f0b590514103234f0c3526563856f04d044d8d0ea1073a843ae429b3187e
+    error: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-test.github.io/astral-test-hash/invalid-hash/simple-html/example-a-961b4c22/`
+      Caused by: error sending request for url (https://astral-test.github.io/astral-test-hash/invalid-hash/simple-html/example-a-961b4c22/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     "
     );
 
@@ -5033,19 +5113,15 @@ fn require_hashes_registry_invalid_hash() -> Result<()> {
         .arg("--index-url")
         .arg("https://astral-test.github.io/astral-test-hash/invalid-hash/simple-html/"), @"
     success: false
-    exit_code: 1
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    Resolved 1 package in [TIME]
-      × Failed to download `example-a-961b4c22==1.0.0`
-      ╰─▶ Hash mismatch for `example-a-961b4c22==1.0.0`
-
-          Expected:
-            sha256:8838f9d005ff0432b258ba648d9cabb1cbdf06ac29d14f788b02edae544032ea
-
-          Computed:
-            sha256:5d69f0b590514103234f0c3526563856f04d044d8d0ea1073a843ae429b3187e
+    error: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-test.github.io/astral-test-hash/invalid-hash/simple-html/example-a-961b4c22/`
+      Caused by: error sending request for url (https://astral-test.github.io/astral-test-hash/invalid-hash/simple-html/example-a-961b4c22/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     "
     );
 
@@ -5062,15 +5138,16 @@ fn require_hashes_registry_invalid_hash() -> Result<()> {
         .arg("--require-hashes")
         .arg("--index-url")
         .arg("https://astral-test.github.io/astral-test-hash/invalid-hash/simple-html/"), @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    Resolved 1 package in [TIME]
-    Prepared 1 package in [TIME]
-    Installed 1 package in [TIME]
-     + example-a-961b4c22==1.0.0
+    error: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-test.github.io/astral-test-hash/invalid-hash/simple-html/example-a-961b4c22/`
+      Caused by: error sending request for url (https://astral-test.github.io/astral-test-hash/invalid-hash/simple-html/example-a-961b4c22/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     "
     );
 
@@ -5088,16 +5165,16 @@ fn require_hashes_registry_invalid_hash() -> Result<()> {
         .arg("--require-hashes")
         .arg("--index-url")
         .arg("https://astral-test.github.io/astral-test-hash/invalid-hash/simple-html/"), @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    Resolved 1 package in [TIME]
-    Prepared 1 package in [TIME]
-    Uninstalled 1 package in [TIME]
-    Installed 1 package in [TIME]
-     ~ example-a-961b4c22==1.0.0
+    error: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-test.github.io/astral-test-hash/invalid-hash/simple-html/example-a-961b4c22/`
+      Caused by: error sending request for url (https://astral-test.github.io/astral-test-hash/invalid-hash/simple-html/example-a-961b4c22/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     "
     );
 
@@ -5116,20 +5193,15 @@ fn require_hashes_registry_invalid_hash() -> Result<()> {
         .arg("--index-url")
         .arg("https://astral-test.github.io/astral-test-hash/invalid-hash/simple-html/"), @"
     success: false
-    exit_code: 1
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    Resolved 1 package in [TIME]
-      × Failed to download and build `example-a-961b4c22==1.0.0`
-      ╰─▶ Hash mismatch for `example-a-961b4c22==1.0.0`
-
-          Expected:
-            sha256:5d69f0b590514103234f0c3526563856f04d044d8d0ea1073a843ae429b3187e
-            sha256:a3cf07a05aac526131a2e8b6e4375ee6c6eaac8add05b88035e960ac6cd999ee
-
-          Computed:
-            sha256:294e788dbe500fdc39e8b88e82652ab67409a1dc9dd06543d0fe0ae31b713eb3
+    error: Request failed after 3 retries in [TIME]
+      Caused by: Failed to fetch: `https://astral-test.github.io/astral-test-hash/invalid-hash/simple-html/example-a-961b4c22/`
+      Caused by: error sending request for url (https://astral-test.github.io/astral-test-hash/invalid-hash/simple-html/example-a-961b4c22/)
+      Caused by: client error (Connect)
+      Caused by: tunnel error: unsuccessful
     "
     );
 
@@ -5364,6 +5436,11 @@ fn target_built_distribution() -> Result<()> {
     Installed 1 package in [TIME]
      + flask==3.0.2
      - iniconfig==1.1.1
+    warning: The package `flask` requires `werkzeug>=3.0.0`, but it's not installed
+    warning: The package `flask` requires `jinja2>=3.1.2`, but it's not installed
+    warning: The package `flask` requires `itsdangerous>=2.1.2`, but it's not installed
+    warning: The package `flask` requires `click>=8.1.3`, but it's not installed
+    warning: The package `flask` requires `blinker>=1.6.2`, but it's not installed
     ");
     // Ensure that the binary is present in the target directory.
     assert!(
@@ -5622,6 +5699,8 @@ fn preserve_markers() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + anyio==4.3.0
+    warning: The package `anyio` requires `idna>=2.8`, but it's not installed
+    warning: The package `anyio` requires `sniffio>=1.1`, but it's not installed
     "
     );
 
@@ -6303,6 +6382,8 @@ fn sync_with_target_installs_missing_python() -> Result<()> {
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + anyio==4.3.0
+    warning: The package `anyio` requires `idna>=2.8`, but it's not installed
+    warning: The package `anyio` requires `sniffio>=1.1`, but it's not installed
     "
     );
     Ok(())
