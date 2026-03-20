@@ -89,14 +89,25 @@ fn commit_info(workspace_root: &Path) {
     }
 }
 
+fn worktree_gitdir(git_dir: &Path) -> Option<PathBuf> {
+    if !git_dir.is_file() {
+        return None;
+    }
+
+    let contents = fs::read_to_string(git_dir).ok()?;
+    let (label, worktree_path) = contents.split_once(':')?;
+    if label != "gitdir" {
+        return None;
+    }
+
+    Some(PathBuf::from(worktree_path.trim()))
+}
+
 fn git_head(git_dir: &Path) -> Option<PathBuf> {
     // The typical case is a standard git repository.
     let git_head_path = git_dir.join("HEAD");
     if git_head_path.exists() {
         return Some(git_head_path);
-    }
-    if !git_dir.is_file() {
-        return None;
     }
     // If `.git/HEAD` doesn't exist and `.git` is actually a file,
     // then let's try to attempt to read it as a worktree. If it's
@@ -107,11 +118,5 @@ fn git_head(git_dir: &Path) -> Option<PathBuf> {
     // And the HEAD file we want to watch will be at:
     //
     //     /home/andrew/astral/uv/main/.git/worktrees/pr2/HEAD
-    let contents = fs::read_to_string(git_dir).ok()?;
-    let (label, worktree_path) = contents.split_once(':')?;
-    if label != "gitdir" {
-        return None;
-    }
-    let worktree_path = worktree_path.trim();
-    Some(PathBuf::from(worktree_path).join("HEAD"))
+    Some(worktree_gitdir(git_dir)?.join("HEAD"))
 }
