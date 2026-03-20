@@ -161,6 +161,72 @@ pub struct Options {
     pub build_backend: Option<serde::de::IgnoredAny>,
 }
 
+fn set_index_origins(
+    indexes: &mut Option<Vec<Index>>,
+    index_url: &mut Option<PipIndex>,
+    extra_index_url: &mut Option<Vec<PipExtraIndex>>,
+    origin: Origin,
+) {
+    if let Some(indexes) = indexes {
+        for index in indexes {
+            index.origin.get_or_insert(origin);
+        }
+    }
+    if let Some(index_url) = index_url {
+        index_url.try_set_origin(origin);
+    }
+    if let Some(extra_index_urls) = extra_index_url {
+        for index_url in extra_index_urls {
+            index_url.try_set_origin(origin);
+        }
+    }
+}
+
+struct RelativeIndexSettings {
+    index: Option<Vec<Index>>,
+    index_url: Option<PipIndex>,
+    extra_index_url: Option<Vec<PipExtraIndex>>,
+    find_links: Option<Vec<PipFindLinks>>,
+}
+
+fn relative_index_settings(
+    index: Option<Vec<Index>>,
+    index_url: Option<PipIndex>,
+    extra_index_url: Option<Vec<PipExtraIndex>>,
+    find_links: Option<Vec<PipFindLinks>>,
+    root_dir: &Path,
+) -> Result<RelativeIndexSettings, IndexUrlError> {
+    Ok(RelativeIndexSettings {
+        index: index
+            .map(|index| {
+                index
+                    .into_iter()
+                    .map(|index| index.relative_to(root_dir))
+                    .collect::<Result<Vec<_>, _>>()
+            })
+            .transpose()?,
+        index_url: index_url
+            .map(|index_url| index_url.relative_to(root_dir))
+            .transpose()?,
+        extra_index_url: extra_index_url
+            .map(|extra_index_url| {
+                extra_index_url
+                    .into_iter()
+                    .map(|extra_index_url| extra_index_url.relative_to(root_dir))
+                    .collect::<Result<Vec<_>, _>>()
+            })
+            .transpose()?,
+        find_links: find_links
+            .map(|find_links| {
+                find_links
+                    .into_iter()
+                    .map(|find_link| find_link.relative_to(root_dir))
+                    .collect::<Result<Vec<_>, _>>()
+            })
+            .transpose()?,
+    })
+}
+
 impl Options {
     /// Construct an [`Options`] with the given global and top-level settings.
     pub fn simple(globals: GlobalOptions, top_level: ResolverInstallerSchema) -> Self {
@@ -174,33 +240,9 @@ impl Options {
     /// Set the [`Origin`] on all indexes without an existing origin.
     #[must_use]
     pub fn with_origin(mut self, origin: Origin) -> Self {
-        if let Some(indexes) = &mut self.top_level.index {
-            for index in indexes {
-                index.origin.get_or_insert(origin);
-            }
-        }
-        if let Some(index_url) = &mut self.top_level.index_url {
-            index_url.try_set_origin(origin);
-        }
-        if let Some(extra_index_urls) = &mut self.top_level.extra_index_url {
-            for index_url in extra_index_urls {
-                index_url.try_set_origin(origin);
-            }
-        }
+        self.top_level.set_index_origins(origin);
         if let Some(pip) = &mut self.pip {
-            if let Some(indexes) = &mut pip.index {
-                for index in indexes {
-                    index.origin.get_or_insert(origin);
-                }
-            }
-            if let Some(index_url) = &mut pip.index_url {
-                index_url.try_set_origin(origin);
-            }
-            if let Some(extra_index_urls) = &mut pip.extra_index_url {
-                for index_url in extra_index_urls {
-                    index_url.try_set_origin(origin);
-                }
-            }
+            pip.set_index_origins(origin);
         }
         self
     }
@@ -566,40 +608,35 @@ impl From<ResolverInstallerSchema> for ResolverInstallerOptions {
 }
 
 impl ResolverInstallerSchema {
+    fn set_index_origins(&mut self, origin: Origin) {
+        set_index_origins(
+            &mut self.index,
+            &mut self.index_url,
+            &mut self.extra_index_url,
+            origin,
+        );
+    }
+
     /// Resolve the [`ResolverInstallerSchema`] relative to the given root directory.
     pub fn relative_to(self, root_dir: &Path) -> Result<Self, IndexUrlError> {
+        let RelativeIndexSettings {
+            index,
+            index_url,
+            extra_index_url,
+            find_links,
+        } = relative_index_settings(
+            self.index,
+            self.index_url,
+            self.extra_index_url,
+            self.find_links,
+            root_dir,
+        )?;
+
         Ok(Self {
-            index: self
-                .index
-                .map(|index| {
-                    index
-                        .into_iter()
-                        .map(|index| index.relative_to(root_dir))
-                        .collect::<Result<Vec<_>, _>>()
-                })
-                .transpose()?,
-            index_url: self
-                .index_url
-                .map(|index_url| index_url.relative_to(root_dir))
-                .transpose()?,
-            extra_index_url: self
-                .extra_index_url
-                .map(|extra_index_url| {
-                    extra_index_url
-                        .into_iter()
-                        .map(|extra_index_url| extra_index_url.relative_to(root_dir))
-                        .collect::<Result<Vec<_>, _>>()
-                })
-                .transpose()?,
-            find_links: self
-                .find_links
-                .map(|find_links| {
-                    find_links
-                        .into_iter()
-                        .map(|find_link| find_link.relative_to(root_dir))
-                        .collect::<Result<Vec<_>, _>>()
-                })
-                .transpose()?,
+            index,
+            index_url,
+            extra_index_url,
+            find_links,
             ..self
         })
     }
@@ -1933,40 +1970,35 @@ pub struct PipOptions {
 }
 
 impl PipOptions {
+    fn set_index_origins(&mut self, origin: Origin) {
+        set_index_origins(
+            &mut self.index,
+            &mut self.index_url,
+            &mut self.extra_index_url,
+            origin,
+        );
+    }
+
     /// Resolve the [`PipOptions`] relative to the given root directory.
     pub fn relative_to(self, root_dir: &Path) -> Result<Self, IndexUrlError> {
+        let RelativeIndexSettings {
+            index,
+            index_url,
+            extra_index_url,
+            find_links,
+        } = relative_index_settings(
+            self.index,
+            self.index_url,
+            self.extra_index_url,
+            self.find_links,
+            root_dir,
+        )?;
+
         Ok(Self {
-            index: self
-                .index
-                .map(|index| {
-                    index
-                        .into_iter()
-                        .map(|index| index.relative_to(root_dir))
-                        .collect::<Result<Vec<_>, _>>()
-                })
-                .transpose()?,
-            index_url: self
-                .index_url
-                .map(|index_url| index_url.relative_to(root_dir))
-                .transpose()?,
-            extra_index_url: self
-                .extra_index_url
-                .map(|extra_index_url| {
-                    extra_index_url
-                        .into_iter()
-                        .map(|extra_index_url| extra_index_url.relative_to(root_dir))
-                        .collect::<Result<Vec<_>, _>>()
-                })
-                .transpose()?,
-            find_links: self
-                .find_links
-                .map(|find_links| {
-                    find_links
-                        .into_iter()
-                        .map(|find_link| find_link.relative_to(root_dir))
-                        .collect::<Result<Vec<_>, _>>()
-                })
-                .transpose()?,
+            index,
+            index_url,
+            extra_index_url,
+            find_links,
             ..self
         })
     }
@@ -2520,4 +2552,198 @@ pub struct AddOptions {
         possible_values = true
     )]
     pub add_bounds: Option<AddBoundsKind>,
+}
+
+#[cfg(test)]
+mod tests {
+    use std::str::FromStr;
+
+    use super::*;
+
+    fn pip_index(value: &str) -> PipIndex {
+        PipIndex::from(Index::from_index_url(IndexUrl::from_str(value).unwrap()))
+    }
+
+    fn pip_extra_index(value: &str) -> PipExtraIndex {
+        PipExtraIndex::from(Index::from_extra_index_url(
+            IndexUrl::from_str(value).unwrap(),
+        ))
+    }
+
+    fn pip_find_links(value: &str) -> PipFindLinks {
+        PipFindLinks::from(Index::from_find_links(IndexUrl::from_str(value).unwrap()))
+    }
+
+    fn pip_index_origin(index: &PipIndex) -> Option<Origin> {
+        let index: Index = index.clone().into();
+        index.origin
+    }
+
+    fn pip_extra_index_origin(index: &PipExtraIndex) -> Option<Origin> {
+        let index: Index = index.clone().into();
+        index.origin
+    }
+
+    fn pip_index_raw_url(index: &PipIndex) -> String {
+        let index: Index = index.clone().into();
+        index.raw_url().to_string()
+    }
+
+    fn pip_extra_index_raw_url(index: &PipExtraIndex) -> String {
+        let index: Index = index.clone().into();
+        index.raw_url().to_string()
+    }
+
+    fn pip_find_links_raw_url(index: &PipFindLinks) -> String {
+        let index: Index = index.clone().into();
+        index.raw_url().to_string()
+    }
+
+    #[test]
+    fn with_origin_updates_shared_index_settings_without_overwriting_existing_origins() {
+        let options = Options {
+            top_level: ResolverInstallerSchema {
+                index: Some(vec![
+                    Index::from_str("https://example.com/simple")
+                        .unwrap()
+                        .with_origin(Origin::Cli),
+                ]),
+                index_url: Some(pip_index("https://pypi.org/simple")),
+                extra_index_url: Some(vec![PipExtraIndex::from(
+                    Index::from_extra_index_url(
+                        IndexUrl::from_str("https://extra.example.com/simple").unwrap(),
+                    )
+                    .with_origin(Origin::User),
+                )]),
+                ..Default::default()
+            },
+            pip: Some(PipOptions {
+                index: Some(vec![
+                    Index::from_str("https://pip.example.com/simple").unwrap(),
+                ]),
+                index_url: Some(PipIndex::from(
+                    Index::from_index_url(
+                        IndexUrl::from_str("https://pip-index.example.com/simple").unwrap(),
+                    )
+                    .with_origin(Origin::System),
+                )),
+                extra_index_url: Some(vec![pip_extra_index(
+                    "https://pip-extra.example.com/simple",
+                )]),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+
+        let options = options.with_origin(Origin::Project);
+
+        assert_eq!(
+            options.top_level.index.unwrap()[0].origin,
+            Some(Origin::Cli)
+        );
+        assert_eq!(
+            pip_index_origin(options.top_level.index_url.as_ref().unwrap()),
+            Some(Origin::Project)
+        );
+        assert_eq!(
+            pip_extra_index_origin(&options.top_level.extra_index_url.unwrap()[0]),
+            Some(Origin::User)
+        );
+
+        let pip = options.pip.unwrap();
+        assert_eq!(pip.index.unwrap()[0].origin, Some(Origin::Project));
+        assert_eq!(
+            pip_index_origin(pip.index_url.as_ref().unwrap()),
+            Some(Origin::System)
+        );
+        assert_eq!(
+            pip_extra_index_origin(&pip.extra_index_url.unwrap()[0]),
+            Some(Origin::Project)
+        );
+    }
+
+    #[test]
+    fn relative_to_resolves_shared_index_settings_for_top_level_and_pip() {
+        let root_dir = std::env::temp_dir().join("uv-settings-relative-to");
+        let options = Options {
+            top_level: ResolverInstallerSchema {
+                index: Some(vec![Index::from_str("./top-level-index").unwrap()]),
+                index_url: Some(pip_index("./top-level-default")),
+                extra_index_url: Some(vec![pip_extra_index("./top-level-extra")]),
+                find_links: Some(vec![pip_find_links("./top-level-links")]),
+                ..Default::default()
+            },
+            pip: Some(PipOptions {
+                index: Some(vec![Index::from_str("./pip-index").unwrap()]),
+                index_url: Some(pip_index("./pip-default")),
+                extra_index_url: Some(vec![pip_extra_index("./pip-extra")]),
+                find_links: Some(vec![pip_find_links("./pip-links")]),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+
+        let options = options.relative_to(&root_dir).unwrap();
+
+        assert_eq!(
+            options.top_level.index.as_ref().unwrap()[0]
+                .raw_url()
+                .to_string(),
+            IndexUrl::parse("./top-level-index", Some(&root_dir))
+                .unwrap()
+                .url()
+                .to_string()
+        );
+        assert_eq!(
+            pip_index_raw_url(options.top_level.index_url.as_ref().unwrap()),
+            IndexUrl::parse("./top-level-default", Some(&root_dir))
+                .unwrap()
+                .url()
+                .to_string()
+        );
+        assert_eq!(
+            pip_extra_index_raw_url(&options.top_level.extra_index_url.unwrap()[0]),
+            IndexUrl::parse("./top-level-extra", Some(&root_dir))
+                .unwrap()
+                .url()
+                .to_string()
+        );
+        assert_eq!(
+            pip_find_links_raw_url(&options.top_level.find_links.unwrap()[0]),
+            IndexUrl::parse("./top-level-links", Some(&root_dir))
+                .unwrap()
+                .url()
+                .to_string()
+        );
+
+        let pip = options.pip.unwrap();
+        assert_eq!(
+            pip.index.as_ref().unwrap()[0].raw_url().to_string(),
+            IndexUrl::parse("./pip-index", Some(&root_dir))
+                .unwrap()
+                .url()
+                .to_string()
+        );
+        assert_eq!(
+            pip_index_raw_url(pip.index_url.as_ref().unwrap()),
+            IndexUrl::parse("./pip-default", Some(&root_dir))
+                .unwrap()
+                .url()
+                .to_string()
+        );
+        assert_eq!(
+            pip_extra_index_raw_url(&pip.extra_index_url.unwrap()[0]),
+            IndexUrl::parse("./pip-extra", Some(&root_dir))
+                .unwrap()
+                .url()
+                .to_string()
+        );
+        assert_eq!(
+            pip_find_links_raw_url(&pip.find_links.unwrap()[0]),
+            IndexUrl::parse("./pip-links", Some(&root_dir))
+                .unwrap()
+                .url()
+                .to_string()
+        );
+    }
 }
