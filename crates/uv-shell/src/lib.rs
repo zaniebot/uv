@@ -13,6 +13,27 @@ use uv_static::EnvVars;
 #[cfg(unix)]
 use tracing::debug;
 
+fn non_empty_env_path(variable: &'static str) -> Option<PathBuf> {
+    std::env::var(variable)
+        .ok()
+        .filter(|value| !value.is_empty())
+        .map(PathBuf::from)
+}
+
+fn expand_home_path(path: PathBuf, home_dir: Option<&Path>) -> PathBuf {
+    if let Some(home_dir) = home_dir
+        && path
+            .components()
+            .next()
+            .map(std::path::Component::as_os_str)
+            == Some("~".as_ref())
+    {
+        home_dir.join(path.components().skip(1).collect::<PathBuf>())
+    } else {
+        path
+    }
+}
+
 /// Shells for which virtualenv activation scripts are available.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 #[expect(clippy::doc_markdown)]
@@ -179,10 +200,7 @@ impl Shell {
                 // `.zshenv` to use.
                 //
                 // See: https://github.com/rust-lang/rustup/blob/fede22fea7b160868cece632bd213e6d72f8912f/src/cli/self_update/shell.rs#L197
-                let zsh_dot_dir = std::env::var(EnvVars::ZDOTDIR)
-                    .ok()
-                    .filter(|dir| !dir.is_empty())
-                    .map(PathBuf::from);
+                let zsh_dot_dir = non_empty_env_path(EnvVars::ZDOTDIR);
 
                 // Attempt to update an existing `.zshenv` file.
                 if let Some(zsh_dot_dir) = zsh_dot_dir.as_ref() {
@@ -211,11 +229,7 @@ impl Shell {
                 // login and non-login shells. However, we must respect Fish's logic, which reads
                 // from `$XDG_CONFIG_HOME/fish/config.fish` if set, and `~/.config/fish/config.fish`
                 // otherwise.
-                if let Some(xdg_home_dir) = std::env::var(EnvVars::XDG_CONFIG_HOME)
-                    .ok()
-                    .filter(|dir| !dir.is_empty())
-                    .map(PathBuf::from)
-                {
+                if let Some(xdg_home_dir) = non_empty_env_path(EnvVars::XDG_CONFIG_HOME) {
                     vec![xdg_home_dir.join("fish/config.fish")]
                 } else {
                     vec![home_dir.join(".config/fish/config.fish")]
@@ -241,21 +255,8 @@ impl Shell {
             .as_ref()
             .iter()
             .flat_map(std::env::split_paths)
-            .map(|path| {
-                // If the first component is `~`, expand to the home directory.
-                if let Some(home_dir) = home_dir.as_ref() {
-                    if path
-                        .components()
-                        .next()
-                        .map(std::path::Component::as_os_str)
-                        == Some("~".as_ref())
-                    {
-                        return home_dir.join(path.components().skip(1).collect::<PathBuf>());
-                    }
-                }
-                path
-            })
-            .any(|p| same_file::is_same_file(path, p).unwrap_or(false))
+            .map(|entry| expand_home_path(entry, home_dir.as_deref()))
+            .any(|entry| same_file::is_same_file(path, entry).unwrap_or(false))
     }
 
     /// Returns the command necessary to prepend a directory to the `PATH` in this shell.
@@ -440,6 +441,44 @@ mod tests {
                     Shell::Zsh.configuration_files(),
                     vec![tmp_zdotdir.path().join(".zshenv")]
                 );
+            },
+        );
+    }
+
+    #[test]
+    fn configuration_files_fish_respects_xdg_config_home() {
+        let tmp_home_dir = tempdir().unwrap();
+        let tmp_xdg_dir = tempdir().unwrap();
+
+        with_vars(
+            [
+                (EnvVars::XDG_CONFIG_HOME, tmp_xdg_dir.path().to_str()),
+                (HOME_DIR_ENV_VAR, tmp_home_dir.path().to_str()),
+            ],
+            || {
+                assert_eq!(
+                    Shell::Fish.configuration_files(),
+                    vec![tmp_xdg_dir.path().join("fish/config.fish")]
+                );
+            },
+        );
+    }
+
+    #[test]
+    fn contains_path_expands_tilde_entries() {
+        let tmp_home_dir = tempdir().unwrap();
+        let bin_dir = tmp_home_dir.path().join("bin");
+        fs_err::create_dir_all(&bin_dir).unwrap();
+
+        let path = std::env::join_paths([PathBuf::from("~/bin")]).unwrap();
+
+        with_vars(
+            [
+                (EnvVars::PATH, path.to_str()),
+                (HOME_DIR_ENV_VAR, tmp_home_dir.path().to_str()),
+            ],
+            || {
+                assert!(Shell::contains_path(&bin_dir));
             },
         );
     }
