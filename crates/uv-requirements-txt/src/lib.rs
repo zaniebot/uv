@@ -657,6 +657,47 @@ const fn is_terminal(c: char) -> bool {
     matches!(c, '\n' | '\r' | '#')
 }
 
+fn parse_verbatim_url_option(
+    option: &'static str,
+    content: &str,
+    s: &mut Scanner,
+    start: usize,
+) -> Result<VerbatimUrl, RequirementsTxtParserError> {
+    let given = parse_value(option, content, s, |c: char| !is_terminal(c))?;
+    let given = unquote(given)
+        .ok()
+        .flatten()
+        .map(Cow::Owned)
+        .unwrap_or(Cow::Borrowed(given));
+    let expanded = expand_env_vars(given.as_ref());
+    let end = s.cursor();
+
+    let url = if let Some(path) = std::path::absolute(expanded.as_ref())
+        .ok()
+        .filter(|path| path.exists())
+    {
+        VerbatimUrl::from_absolute_path(path).map_err(|err| {
+            RequirementsTxtParserError::VerbatimUrl {
+                source: err,
+                url: given.to_string(),
+                start,
+                end,
+            }
+        })?
+    } else {
+        VerbatimUrl::parse_url(expanded.as_ref()).map_err(|err| {
+            RequirementsTxtParserError::Url {
+                source: err,
+                url: given.to_string(),
+                start,
+                end,
+            }
+        })?
+    };
+
+    Ok(url.with_given(given))
+}
+
 /// Parse a single entry, that is a requirement, an inclusion or a comment line.
 ///
 /// Consumes all preceding trivia (whitespace and comments). If it returns `None`, we've reached
@@ -736,100 +777,28 @@ fn parse_entry(
             hashes,
         })
     } else if s.eat_if("-i") || s.eat_if("--index-url") {
-        let given = parse_value("--index-url", content, s, |c: char| !is_terminal(c))?;
-        let given = unquote(given)
-            .ok()
-            .flatten()
-            .map(Cow::Owned)
-            .unwrap_or(Cow::Borrowed(given));
-        let expanded = expand_env_vars(given.as_ref());
-        let url = if let Some(path) = std::path::absolute(expanded.as_ref())
-            .ok()
-            .filter(|path| path.exists())
-        {
-            VerbatimUrl::from_absolute_path(path).map_err(|err| {
-                RequirementsTxtParserError::VerbatimUrl {
-                    source: err,
-                    url: given.to_string(),
-                    start,
-                    end: s.cursor(),
-                }
-            })?
-        } else {
-            VerbatimUrl::parse_url(expanded.as_ref()).map_err(|err| {
-                RequirementsTxtParserError::Url {
-                    source: err,
-                    url: given.to_string(),
-                    start,
-                    end: s.cursor(),
-                }
-            })?
-        };
-        RequirementsTxtStatement::IndexUrl(url.with_given(given))
+        RequirementsTxtStatement::IndexUrl(parse_verbatim_url_option(
+            "--index-url",
+            content,
+            s,
+            start,
+        )?)
     } else if s.eat_if("--extra-index-url") {
-        let given = parse_value("--extra-index-url", content, s, |c: char| !is_terminal(c))?;
-        let given = unquote(given)
-            .ok()
-            .flatten()
-            .map(Cow::Owned)
-            .unwrap_or(Cow::Borrowed(given));
-        let expanded = expand_env_vars(given.as_ref());
-        let url = if let Some(path) = std::path::absolute(expanded.as_ref())
-            .ok()
-            .filter(|path| path.exists())
-        {
-            VerbatimUrl::from_absolute_path(path).map_err(|err| {
-                RequirementsTxtParserError::VerbatimUrl {
-                    source: err,
-                    url: given.to_string(),
-                    start,
-                    end: s.cursor(),
-                }
-            })?
-        } else {
-            VerbatimUrl::parse_url(expanded.as_ref()).map_err(|err| {
-                RequirementsTxtParserError::Url {
-                    source: err,
-                    url: given.to_string(),
-                    start,
-                    end: s.cursor(),
-                }
-            })?
-        };
-        RequirementsTxtStatement::ExtraIndexUrl(url.with_given(given))
+        RequirementsTxtStatement::ExtraIndexUrl(parse_verbatim_url_option(
+            "--extra-index-url",
+            content,
+            s,
+            start,
+        )?)
     } else if s.eat_if("--no-index") {
         RequirementsTxtStatement::NoIndex
     } else if s.eat_if("--find-links") || s.eat_if("-f") {
-        let given = parse_value("--find-links", content, s, |c: char| !is_terminal(c))?;
-        let given = unquote(given)
-            .ok()
-            .flatten()
-            .map(Cow::Owned)
-            .unwrap_or(Cow::Borrowed(given));
-        let expanded = expand_env_vars(given.as_ref());
-        let url = if let Some(path) = std::path::absolute(expanded.as_ref())
-            .ok()
-            .filter(|path| path.exists())
-        {
-            VerbatimUrl::from_absolute_path(path).map_err(|err| {
-                RequirementsTxtParserError::VerbatimUrl {
-                    source: err,
-                    url: given.to_string(),
-                    start,
-                    end: s.cursor(),
-                }
-            })?
-        } else {
-            VerbatimUrl::parse_url(expanded.as_ref()).map_err(|err| {
-                RequirementsTxtParserError::Url {
-                    source: err,
-                    url: given.to_string(),
-                    start,
-                    end: s.cursor(),
-                }
-            })?
-        };
-        RequirementsTxtStatement::FindLinks(url.with_given(given))
+        RequirementsTxtStatement::FindLinks(parse_verbatim_url_option(
+            "--find-links",
+            content,
+            s,
+            start,
+        )?)
     } else if s.eat_if("--no-binary") {
         let given = parse_value("--no-binary", content, s, |c: char| !is_terminal(c))?;
         let given = unquote(given)
