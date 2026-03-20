@@ -657,18 +657,27 @@ const fn is_terminal(c: char) -> bool {
     matches!(c, '\n' | '\r' | '#')
 }
 
+fn parse_maybe_quoted_value<'a, T>(
+    option: &'static str,
+    content: &str,
+    s: &mut Scanner<'a>,
+    while_pattern: impl Pattern<T>,
+) -> Result<Cow<'a, str>, RequirementsTxtParserError> {
+    let value = parse_value(option, content, s, while_pattern)?;
+    Ok(unquote(value)
+        .ok()
+        .flatten()
+        .map(Cow::Owned)
+        .unwrap_or(Cow::Borrowed(value)))
+}
+
 fn parse_verbatim_url_option(
     option: &'static str,
     content: &str,
     s: &mut Scanner,
     start: usize,
 ) -> Result<VerbatimUrl, RequirementsTxtParserError> {
-    let given = parse_value(option, content, s, |c: char| !is_terminal(c))?;
-    let given = unquote(given)
-        .ok()
-        .flatten()
-        .map(Cow::Owned)
-        .unwrap_or(Cow::Borrowed(given));
+    let given = parse_maybe_quoted_value(option, content, s, |c: char| !is_terminal(c))?;
     let expanded = expand_env_vars(given.as_ref());
     let end = s.cursor();
 
@@ -718,11 +727,9 @@ fn parse_entry(
 
     let start = s.cursor();
     Ok(Some(if s.eat_if("-r") || s.eat_if("--requirement") {
-        let filename = parse_value("--requirement", content, s, |c: char| !is_terminal(c))?;
-        let filename = unquote(filename)
-            .ok()
-            .flatten()
-            .unwrap_or_else(|| filename.to_string());
+        let filename =
+            parse_maybe_quoted_value("--requirement", content, s, |c: char| !is_terminal(c))?
+                .into_owned();
         let end = s.cursor();
         RequirementsTxtStatement::Requirements {
             filename,
@@ -730,11 +737,9 @@ fn parse_entry(
             end,
         }
     } else if s.eat_if("-c") || s.eat_if("--constraint") {
-        let filename = parse_value("--constraint", content, s, |c: char| !is_terminal(c))?;
-        let filename = unquote(filename)
-            .ok()
-            .flatten()
-            .unwrap_or_else(|| filename.to_string());
+        let filename =
+            parse_maybe_quoted_value("--constraint", content, s, |c: char| !is_terminal(c))?
+                .into_owned();
         let end = s.cursor();
         RequirementsTxtStatement::Constraint {
             filename,
@@ -800,12 +805,7 @@ fn parse_entry(
             start,
         )?)
     } else if s.eat_if("--no-binary") {
-        let given = parse_value("--no-binary", content, s, |c: char| !is_terminal(c))?;
-        let given = unquote(given)
-            .ok()
-            .flatten()
-            .map(Cow::Owned)
-            .unwrap_or(Cow::Borrowed(given));
+        let given = parse_maybe_quoted_value("--no-binary", content, s, |c: char| !is_terminal(c))?;
         let specifier = PackageNameSpecifier::from_str(given.as_ref()).map_err(|err| {
             RequirementsTxtParserError::NoBinary {
                 source: err,
@@ -816,12 +816,8 @@ fn parse_entry(
         })?;
         RequirementsTxtStatement::NoBinary(NoBinary::from_pip_arg(specifier))
     } else if s.eat_if("--only-binary") {
-        let given = parse_value("--only-binary", content, s, |c: char| !is_terminal(c))?;
-        let given = unquote(given)
-            .ok()
-            .flatten()
-            .map(Cow::Owned)
-            .unwrap_or(Cow::Borrowed(given));
+        let given =
+            parse_maybe_quoted_value("--only-binary", content, s, |c: char| !is_terminal(c))?;
         let specifier = PackageNameSpecifier::from_str(given.as_ref()).map_err(|err| {
             RequirementsTxtParserError::NoBinary {
                 source: err,
