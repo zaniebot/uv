@@ -103,6 +103,10 @@ pub enum LockedFileMode {
     Exclusive,
 }
 
+fn open_rw_file(path: &Path) -> Result<fs_err::File, std::io::Error> {
+    fs_err::OpenOptions::new().read(true).write(true).open(path)
+}
+
 impl LockedFileMode {
     /// Try to lock the file and return an error if the lock is already acquired by another process
     /// and cannot be acquired immediately.
@@ -255,11 +259,7 @@ impl LockedFile {
         }
 
         // If path already exists, return it.
-        if let Ok(file) = fs_err::OpenOptions::new()
-            .read(true)
-            .write(true)
-            .open(path.as_ref())
-        {
+        if let Ok(file) = open_rw_file(path.as_ref()) {
             return Ok(file);
         }
 
@@ -278,11 +278,7 @@ impl LockedFile {
             Ok(file) => Ok(fs_err::File::from_parts(file, path.as_ref())),
             Err(err) => {
                 if err.error.kind() == std::io::ErrorKind::AlreadyExists {
-                    fs_err::OpenOptions::new()
-                        .read(true)
-                        .write(true)
-                        .open(path.as_ref())
-                        .map_err(Into::into)
+                    open_rw_file(path.as_ref()).map_err(Into::into)
                 } else if matches!(
                     Errno::from_io_error(&err.error),
                     Some(Errno::NOTSUP | Errno::INVAL)
@@ -386,5 +382,16 @@ mod tests {
             LockedFile::acquire_no_wait(&lock_path, LockedFileMode::Exclusive, "cache");
 
         assert!(second_lock.is_some());
+    }
+
+    #[test]
+    fn create_reuses_existing_lockfile() {
+        let temp_dir = tempdir().unwrap();
+        let lock_path = temp_dir.path().join("lock");
+        fs_err::write(&lock_path, "").unwrap();
+
+        let file = LockedFile::create(&lock_path).expect("existing file should be reopened");
+
+        assert_eq!(file.path(), lock_path.as_path());
     }
 }
