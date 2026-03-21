@@ -361,6 +361,21 @@ where
     Ok((major, minor, target))
 }
 
+fn parse_release_arch(
+    rest: &str,
+    platform: &'static str,
+    tag: &str,
+) -> Result<SmallString, ParsePlatformTagError> {
+    if rest.is_empty() {
+        return Err(ParsePlatformTagError::InvalidFormat {
+            platform,
+            tag: tag.to_string(),
+        });
+    }
+
+    Ok(SmallString::from(rest))
+}
+
 impl std::fmt::Display for PlatformTag {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -520,85 +535,43 @@ impl FromStr for PlatformTag {
 
         if let Some(rest) = s.strip_prefix("freebsd_") {
             // Ex) freebsd_13_x86_64 or freebsd_13_14_x86_64
-            if rest.is_empty() {
-                return Err(ParsePlatformTagError::InvalidFormat {
-                    platform: "freebsd",
-                    tag: s.to_string(),
-                });
-            }
-
             return Ok(Self::FreeBsd {
-                release_arch: SmallString::from(rest),
+                release_arch: parse_release_arch(rest, "freebsd", s)?,
             });
         }
 
         if let Some(rest) = s.strip_prefix("netbsd_") {
             // Ex) netbsd_9_x86_64
-            if rest.is_empty() {
-                return Err(ParsePlatformTagError::InvalidFormat {
-                    platform: "netbsd",
-                    tag: s.to_string(),
-                });
-            }
-
             return Ok(Self::NetBsd {
-                release_arch: SmallString::from(rest),
+                release_arch: parse_release_arch(rest, "netbsd", s)?,
             });
         }
 
         if let Some(rest) = s.strip_prefix("openbsd_") {
             // Ex) openbsd_7_x86_64
-            if rest.is_empty() {
-                return Err(ParsePlatformTagError::InvalidFormat {
-                    platform: "openbsd",
-                    tag: s.to_string(),
-                });
-            }
-
             return Ok(Self::OpenBsd {
-                release_arch: SmallString::from(rest),
+                release_arch: parse_release_arch(rest, "openbsd", s)?,
             });
         }
 
         if let Some(rest) = s.strip_prefix("dragonfly_") {
             // Ex) dragonfly_6_x86_64
-            if rest.is_empty() {
-                return Err(ParsePlatformTagError::InvalidFormat {
-                    platform: "dragonfly",
-                    tag: s.to_string(),
-                });
-            }
-
             return Ok(Self::Dragonfly {
-                release_arch: SmallString::from(rest),
+                release_arch: parse_release_arch(rest, "dragonfly", s)?,
             });
         }
 
         if let Some(rest) = s.strip_prefix("haiku_") {
             // Ex) haiku_1_x86_64
-            if rest.is_empty() {
-                return Err(ParsePlatformTagError::InvalidFormat {
-                    platform: "haiku",
-                    tag: s.to_string(),
-                });
-            }
-
             return Ok(Self::Haiku {
-                release_arch: SmallString::from(rest),
+                release_arch: parse_release_arch(rest, "haiku", s)?,
             });
         }
 
         if let Some(rest) = s.strip_prefix("illumos_") {
             // Ex) illumos_5_11_x86_64
-            if rest.is_empty() {
-                return Err(ParsePlatformTagError::InvalidFormat {
-                    platform: "illumos",
-                    tag: s.to_string(),
-                });
-            }
-
             return Ok(Self::Illumos {
-                release_arch: SmallString::from(rest),
+                release_arch: parse_release_arch(rest, "illumos", s)?,
             });
         }
 
@@ -1018,6 +991,24 @@ mod tests {
             Ok(&tag)
         );
         assert_eq!(tag.to_string(), "illumos_5_11_x86_64");
+    }
+
+    #[test]
+    fn release_arch_platforms_require_suffix() {
+        assert_eq!(
+            PlatformTag::from_str("netbsd_"),
+            Err(ParsePlatformTagError::InvalidFormat {
+                platform: "netbsd",
+                tag: "netbsd_".to_string()
+            })
+        );
+        assert_eq!(
+            PlatformTag::from_str("haiku_"),
+            Err(ParsePlatformTagError::InvalidFormat {
+                platform: "haiku",
+                tag: "haiku_".to_string()
+            })
+        );
     }
 
     #[test]
