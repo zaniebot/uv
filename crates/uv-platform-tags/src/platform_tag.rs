@@ -629,49 +629,7 @@ impl FromStr for PlatformTag {
 
         if let Some(rest) = s.strip_prefix("ios_") {
             // Ex) ios_13_0_arm64_iphoneos
-            let first_underscore = memchr::memchr(b'_', rest.as_bytes()).ok_or_else(|| {
-                ParsePlatformTagError::InvalidFormat {
-                    platform: "ios",
-                    tag: s.to_string(),
-                }
-            })?;
-
-            let second_underscore = memchr::memchr(b'_', &rest.as_bytes()[first_underscore + 1..])
-                .map(|i| i + first_underscore + 1)
-                .ok_or_else(|| ParsePlatformTagError::InvalidFormat {
-                    platform: "ios",
-                    tag: s.to_string(),
-                })?;
-
-            let major = rest[..first_underscore].parse().map_err(|_| {
-                ParsePlatformTagError::InvalidMajorVersion {
-                    platform: "ios",
-                    tag: s.to_string(),
-                }
-            })?;
-
-            let minor = rest[first_underscore + 1..second_underscore]
-                .parse()
-                .map_err(|_| ParsePlatformTagError::InvalidMinorVersion {
-                    platform: "ios",
-                    tag: s.to_string(),
-                })?;
-
-            let multiarch = &rest[second_underscore + 1..];
-            if multiarch.is_empty() {
-                return Err(ParsePlatformTagError::InvalidFormat {
-                    platform: "ios",
-                    tag: s.to_string(),
-                });
-            }
-
-            let multiarch = multiarch
-                .parse()
-                .map_err(|_| ParsePlatformTagError::InvalidArch {
-                    platform: "ios",
-                    tag: s.to_string(),
-                })?;
-
+            let (major, minor, multiarch) = parse_versioned_suffix(rest, "ios", s)?;
             return Ok(Self::Ios {
                 major,
                 minor,
