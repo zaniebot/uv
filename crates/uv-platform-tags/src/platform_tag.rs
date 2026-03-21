@@ -412,6 +412,35 @@ fn parse_android_tag(rest: &str, tag: &str) -> Result<(u16, AndroidAbi), ParsePl
     Ok((api_level, abi))
 }
 
+fn parse_pyodide_tag(rest: &str, tag: &str) -> Result<(u16, u16), ParsePlatformTagError> {
+    let version =
+        rest.strip_suffix("_wasm32")
+            .ok_or_else(|| ParsePlatformTagError::InvalidArch {
+                platform: "pyodide",
+                tag: tag.to_string(),
+            })?;
+    let underscore = memchr::memchr(b'_', version.as_bytes()).ok_or_else(|| {
+        ParsePlatformTagError::InvalidFormat {
+            platform: "pyodide",
+            tag: tag.to_string(),
+        }
+    })?;
+    let major =
+        version[..underscore]
+            .parse()
+            .map_err(|_| ParsePlatformTagError::InvalidMajorVersion {
+                platform: "pyodide",
+                tag: tag.to_string(),
+            })?;
+    let minor = version[underscore + 1..].parse().map_err(|_| {
+        ParsePlatformTagError::InvalidMinorVersion {
+            platform: "pyodide",
+            tag: tag.to_string(),
+        }
+    })?;
+    Ok((major, minor))
+}
+
 impl std::fmt::Display for PlatformTag {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -605,31 +634,7 @@ impl FromStr for PlatformTag {
         }
 
         if let Some(rest) = s.strip_prefix("pyodide_") {
-            let mid =
-                rest.strip_suffix("_wasm32")
-                    .ok_or_else(|| ParsePlatformTagError::InvalidArch {
-                        platform: "pyodide",
-                        tag: s.to_string(),
-                    })?;
-            let underscore = memchr::memchr(b'_', mid.as_bytes()).ok_or_else(|| {
-                ParsePlatformTagError::InvalidFormat {
-                    platform: "pyodide",
-                    tag: s.to_string(),
-                }
-            })?;
-            let major: u16 = mid[..underscore].parse().map_err(|_| {
-                ParsePlatformTagError::InvalidMajorVersion {
-                    platform: "pyodide",
-                    tag: s.to_string(),
-                }
-            })?;
-
-            let minor: u16 = mid[underscore + 1..].parse().map_err(|_| {
-                ParsePlatformTagError::InvalidMinorVersion {
-                    platform: "pyodide",
-                    tag: s.to_string(),
-                }
-            })?;
+            let (major, minor) = parse_pyodide_tag(rest, s)?;
             return Ok(Self::Pyodide { major, minor });
         }
 
