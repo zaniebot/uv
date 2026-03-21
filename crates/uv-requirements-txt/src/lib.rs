@@ -929,6 +929,40 @@ fn eat_trailing_line(content: &str, s: &mut Scanner) -> Result<(), RequirementsT
     Ok(())
 }
 
+fn scan_requirement_end(s: &mut Scanner) -> (usize, bool) {
+    // Termination: s.eat() eventually becomes None.
+    loop {
+        let end = s.cursor();
+
+        //  We look for the end of the line ...
+        if s.eat_if('\n') {
+            return (end, false);
+        }
+        if s.eat_if('\r') {
+            s.eat_if('\n'); // Support `\r\n` but also accept stray `\r`
+            return (end, false);
+        }
+        // ... or `--hash`, an escaped newline or a comment separated by whitespace ...
+        if !eat_wrappable_whitespace(s).is_empty() {
+            if s.after().starts_with("--") {
+                return (end, true);
+            }
+            if s.eat_if('#') {
+                s.eat_until(['\r', '\n']);
+                if s.at('\r') {
+                    s.eat_if('\n'); // `\r\n`, but just `\r` is also accepted
+                }
+                return (end, false);
+            }
+            continue;
+        }
+        // ... or the end of the file, which works like the end of line
+        if s.eat().is_none() {
+            return (end, false);
+        }
+    }
+}
+
 /// Parse a PEP 508 requirement with optional trailing hashes
 fn parse_requirement_and_hashes(
     s: &mut Scanner,
@@ -939,36 +973,7 @@ fn parse_requirement_and_hashes(
 ) -> Result<(RequirementsTxtRequirement, Vec<String>), RequirementsTxtParserError> {
     // PEP 508 requirement
     let start = s.cursor();
-    // Termination: s.eat() eventually becomes None
-    let (end, has_hashes) = loop {
-        let end = s.cursor();
-
-        //  We look for the end of the line ...
-        if s.eat_if('\n') {
-            break (end, false);
-        }
-        if s.eat_if('\r') {
-            s.eat_if('\n'); // Support `\r\n` but also accept stray `\r`
-            break (end, false);
-        }
-        // ... or `--hash`, an escaped newline or a comment separated by whitespace ...
-        if !eat_wrappable_whitespace(s).is_empty() {
-            if s.after().starts_with("--") {
-                break (end, true);
-            } else if s.eat_if('#') {
-                s.eat_until(['\r', '\n']);
-                if s.at('\r') {
-                    s.eat_if('\n'); // `\r\n`, but just `\r` is also accepted
-                }
-                break (end, false);
-            }
-            continue;
-        }
-        // ... or the end of the file, which works like the end of line
-        if s.eat().is_none() {
-            break (end, false);
-        }
-    };
+    let (end, has_hashes) = scan_requirement_end(s);
 
     let requirement = &content[start..end];
 
