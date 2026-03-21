@@ -27,22 +27,28 @@ pub enum DistFilename {
 }
 
 impl DistFilename {
+    fn from_extension(
+        filename: &str,
+        extension: DistExtension,
+        package_name: &PackageName,
+    ) -> Option<Self> {
+        match extension {
+            DistExtension::Wheel => WheelFilename::from_str(filename)
+                .ok()
+                .map(Self::WheelFilename),
+            DistExtension::Source(extension) => {
+                SourceDistFilename::parse(filename, extension, package_name)
+                    .ok()
+                    .map(Self::SourceDistFilename)
+            }
+        }
+    }
+
     /// Parse a filename as wheel or source dist name.
     pub fn try_from_filename(filename: &str, package_name: &PackageName) -> Option<Self> {
-        match DistExtension::from_path(filename) {
-            Ok(DistExtension::Wheel) => {
-                if let Ok(filename) = WheelFilename::from_str(filename) {
-                    return Some(Self::WheelFilename(filename));
-                }
-            }
-            Ok(DistExtension::Source(extension)) => {
-                if let Ok(filename) = SourceDistFilename::parse(filename, extension, package_name) {
-                    return Some(Self::SourceDistFilename(filename));
-                }
-            }
-            Err(_) => {}
-        }
-        None
+        DistExtension::from_path(filename)
+            .ok()
+            .and_then(|extension| Self::from_extension(filename, extension, package_name))
     }
 
     /// Like [`DistFilename::try_from_normalized_filename`], but without knowing the package name.
@@ -100,10 +106,28 @@ impl Display for DistFilename {
 
 #[cfg(test)]
 mod tests {
-    use crate::WheelFilename;
+    use std::str::FromStr;
+
+    use uv_normalize::PackageName;
+
+    use crate::{DistFilename, WheelFilename};
 
     #[test]
     fn wheel_filename_size() {
         assert_eq!(size_of::<WheelFilename>(), 48);
+    }
+
+    #[test]
+    fn try_from_filename_dispatches_by_extension() {
+        let package_name = PackageName::from_str("demo").unwrap();
+
+        assert!(matches!(
+            DistFilename::try_from_filename("demo-1.0.0-py3-none-any.whl", &package_name),
+            Some(DistFilename::WheelFilename(_))
+        ));
+        assert!(matches!(
+            DistFilename::try_from_filename("demo-1.0.0.tar.gz", &package_name),
+            Some(DistFilename::SourceDistFilename(_))
+        ));
     }
 }
