@@ -61,6 +61,44 @@ fn read_repository_tags(directory: &Path) -> Option<Tags> {
     }
 }
 
+fn update_last_changed(
+    last_changed: &mut Option<(PathBuf, Timestamp)>,
+    path: PathBuf,
+    metadata: &std::fs::Metadata,
+) {
+    let timestamp = Timestamp::from_metadata(metadata);
+    if last_changed
+        .as_ref()
+        .is_none_or(|(_, previous_timestamp)| *previous_timestamp < timestamp)
+    {
+        *last_changed = Some((path, timestamp));
+    }
+}
+
+fn read_directory_timestamp(
+    _path: &Path,
+    metadata: &std::fs::Metadata,
+) -> Option<DirectoryTimestamp> {
+    if let Ok(created) = metadata.created() {
+        // Prefer the creation time.
+        return Some(DirectoryTimestamp::Timestamp(Timestamp::from(created)));
+    }
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        Some(DirectoryTimestamp::Inode(metadata.ino()))
+    }
+    #[cfg(not(unix))]
+    {
+        warn!(
+            "Failed to read creation time for directory: `{}`",
+            _path.display()
+        );
+        None
+    }
+}
+
 impl CacheInfo {
     /// Return the [`CacheInfo`] for a given timestamp.
     pub fn from_timestamp(timestamp: Timestamp) -> Self {
@@ -151,12 +189,7 @@ impl CacheInfo {
                         );
                         continue;
                     }
-                    let timestamp = Timestamp::from_metadata(&metadata);
-                    if last_changed.as_ref().is_none_or(|(_, prev_timestamp)| {
-                        *prev_timestamp < Timestamp::from_metadata(&metadata)
-                    }) {
-                        last_changed = Some((path, timestamp));
-                    }
+                    update_last_changed(&mut last_changed, path, &metadata);
                 }
                 CacheKey::Directory { dir } => {
                     // Treat the path as a directory.
@@ -180,28 +213,7 @@ impl CacheInfo {
                         continue;
                     }
 
-                    if let Ok(created) = metadata.created() {
-                        // Prefer the creation time.
-                        directories.insert(
-                            dir,
-                            Some(DirectoryTimestamp::Timestamp(Timestamp::from(created))),
-                        );
-                    } else {
-                        // Fall back to the inode.
-                        #[cfg(unix)]
-                        {
-                            use std::os::unix::fs::MetadataExt;
-                            directories
-                                .insert(dir, Some(DirectoryTimestamp::Inode(metadata.ino())));
-                        }
-                        #[cfg(not(unix))]
-                        {
-                            warn!(
-                                "Failed to read creation time for directory: `{}`",
-                                path.display()
-                            );
-                        }
-                    }
+                    directories.insert(dir, read_directory_timestamp(&path, &metadata));
                 }
                 CacheKey::Git {
                     git: GitPattern::Bool(true),
