@@ -740,6 +740,43 @@ fn parse_include_option(
     Ok((filename, end))
 }
 
+fn parse_requirement_statement(
+    s: &mut Scanner,
+    content: &str,
+    requirements_txt: &Path,
+    working_dir: &Path,
+    start: usize,
+    editable: bool,
+) -> Result<RequirementsTxtStatement, RequirementsTxtParserError> {
+    let source = (requirements_txt != Path::new("-")).then_some(requirements_txt);
+    let (requirement, hashes) =
+        parse_requirement_and_hashes(s, content, source, working_dir, editable)?;
+
+    if editable {
+        let requirement =
+            requirement
+                .into_editable()
+                .map_err(|err| RequirementsTxtParserError::NonEditable {
+                    source: err,
+                    start,
+                    end: s.cursor(),
+                })?;
+        Ok(RequirementsTxtStatement::EditableRequirementEntry(
+            RequirementEntry {
+                requirement,
+                hashes,
+            },
+        ))
+    } else {
+        Ok(RequirementsTxtStatement::RequirementEntry(
+            RequirementEntry {
+                requirement,
+                hashes,
+            },
+        ))
+    }
+}
+
 /// Parse a single entry, that is a requirement, an inclusion or a comment line.
 ///
 /// Consumes all preceding trivia (whitespace and comments). If it returns `None`, we've reached
@@ -788,26 +825,7 @@ fn parse_entry(
             });
         }
 
-        let source = if requirements_txt == Path::new("-") {
-            None
-        } else {
-            Some(requirements_txt)
-        };
-
-        let (requirement, hashes) =
-            parse_requirement_and_hashes(s, content, source, working_dir, true)?;
-        let requirement =
-            requirement
-                .into_editable()
-                .map_err(|err| RequirementsTxtParserError::NonEditable {
-                    source: err,
-                    start,
-                    end: s.cursor(),
-                })?;
-        RequirementsTxtStatement::EditableRequirementEntry(RequirementEntry {
-            requirement,
-            hashes,
-        })
+        parse_requirement_statement(s, content, requirements_txt, working_dir, start, true)?
     } else if s.eat_if("-i") || s.eat_if("--index-url") {
         RequirementsTxtStatement::IndexUrl(parse_verbatim_url_option(
             "--index-url",
@@ -838,18 +856,7 @@ fn parse_entry(
         let specifier = parse_package_name_specifier_option("--only-binary", content, s, start)?;
         RequirementsTxtStatement::OnlyBinary(NoBuild::from_pip_arg(specifier))
     } else if s.at(char::is_ascii_alphanumeric) || s.at(|char| matches!(char, '.' | '/' | '$')) {
-        let source = if requirements_txt == Path::new("-") {
-            None
-        } else {
-            Some(requirements_txt)
-        };
-
-        let (requirement, hashes) =
-            parse_requirement_and_hashes(s, content, source, working_dir, false)?;
-        RequirementsTxtStatement::RequirementEntry(RequirementEntry {
-            requirement,
-            hashes,
-        })
+        parse_requirement_statement(s, content, requirements_txt, working_dir, start, false)?
     } else if let Some(char) = s.peek() {
         // Identify an unsupported option, like `--trusted-host`.
         if let Some(option) = UnsupportedOption::iter().find(|option| s.eat_if(option.name())) {
