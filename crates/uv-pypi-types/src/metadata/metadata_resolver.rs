@@ -56,6 +56,15 @@ fn parse_version(headers: &Headers) -> Result<Version, MetadataError> {
     .map_err(MetadataError::Pep440VersionError)
 }
 
+fn parse_requires_python(
+    value: Option<String>,
+) -> Result<Option<VersionSpecifiers>, MetadataError> {
+    Ok(value
+        .map(|requires_python| LenientVersionSpecifiers::from_str(&requires_python))
+        .transpose()?
+        .map(VersionSpecifiers::from))
+}
+
 fn parse_dependency_metadata(
     headers: &Headers,
 ) -> Result<
@@ -71,11 +80,7 @@ fn parse_dependency_metadata(
         .map(|requires_dist| LenientRequirement::from_str(&requires_dist))
         .map_ok(Requirement::from)
         .collect::<Result<Box<_>, _>>()?;
-    let requires_python = headers
-        .get_first_value("Requires-Python")
-        .map(|requires_python| LenientVersionSpecifiers::from_str(&requires_python))
-        .transpose()?
-        .map(VersionSpecifiers::from);
+    let requires_python = parse_requires_python(headers.get_first_value("Requires-Python"))?;
     let provides_extra = headers
         .get_all_values("Provides-Extra")
         .filter_map(
@@ -242,12 +247,7 @@ impl ResolutionMetadata {
             .ok_or(MetadataError::FieldNotFound("version"))?;
 
         // Parse the Python version requirements.
-        let requires_python = project
-            .requires_python
-            .map(|requires_python| {
-                LenientVersionSpecifiers::from_str(&requires_python).map(VersionSpecifiers::from)
-            })
-            .transpose()?;
+        let requires_python = parse_requires_python(project.requires_python)?;
 
         // Extract the requirements.
         let requires_dist =
