@@ -294,6 +294,31 @@ fn parse_impl_version(
     Ok((major, minor))
 }
 
+fn parse_cpython_variants(
+    tag: &str,
+    suffixes: &str,
+) -> Result<CPythonAbiVariants, ParseAbiTagError> {
+    let mut variant = CPythonAbiVariants::default();
+    for suffix_char in suffixes.chars() {
+        let Some(suffix) = CPythonAbiVariants::from_char(suffix_char) else {
+            return Err(ParseAbiTagError::UnknownAbiTagSuffix {
+                suffix: suffix_char,
+                tag: tag.to_string(),
+            });
+        };
+
+        if variant.contains(suffix) {
+            return Err(ParseAbiTagError::DuplicateAbiTagSuffix {
+                suffix: suffix_char,
+                tag: tag.to_string(),
+            });
+        }
+
+        variant.insert(suffix);
+    }
+    Ok(variant)
+}
+
 impl FromStr for AbiTag {
     type Err = ParseAbiTagError;
 
@@ -308,25 +333,7 @@ impl FromStr for AbiTag {
             let version_end = cp.find(|c: char| !c.is_ascii_digit()).unwrap_or(cp.len());
             let version_str = &cp[..version_end];
             let (major, minor) = parse_python_version(version_str, "CPython", s)?;
-            let abi_suffixes = &cp[version_end..];
-            let mut variant = CPythonAbiVariants::default();
-            for suffix_char in abi_suffixes.chars() {
-                let Some(suffix) = CPythonAbiVariants::from_char(suffix_char) else {
-                    return Err(ParseAbiTagError::UnknownAbiTagSuffix {
-                        suffix: suffix_char,
-                        tag: s.to_string(),
-                    });
-                };
-
-                if variant.contains(suffix) {
-                    return Err(ParseAbiTagError::DuplicateAbiTagSuffix {
-                        suffix: suffix_char,
-                        tag: s.to_string(),
-                    });
-                }
-
-                variant.insert(suffix);
-            }
+            let variant = parse_cpython_variants(s, &cp[version_end..])?;
             Ok(Self::CPython {
                 variant,
                 python_version: (major, minor),
@@ -509,6 +516,12 @@ mod tests {
 
         let err = AbiTag::from_str("cp39dd").unwrap_err();
         assert_snapshot!(err, @"Duplicate suffix `d` in CPython ABI tag: cp39dd");
+    }
+
+    #[test]
+    fn cpython_abi_formats_suffixes_in_canonical_order() {
+        let tag = AbiTag::from_str("cp39md").unwrap();
+        assert_eq!(tag.to_string(), "cp39dm");
     }
 
     #[test]
