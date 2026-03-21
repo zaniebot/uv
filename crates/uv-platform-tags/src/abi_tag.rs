@@ -354,6 +354,28 @@ fn parse_pypy_abi_tag(rest: &str, tag: &str) -> Result<AbiTag, ParseAbiTagError>
     }
 }
 
+fn parse_graalpy_abi_tag(rest: &str, tag: &str) -> Result<AbiTag, ParseAbiTagError> {
+    // Ex) `graalpy240_310_native`
+    let (implementation_version_str, rest) =
+        rest.split_once('_')
+            .ok_or_else(|| ParseAbiTagError::InvalidFormat {
+                implementation: "GraalPy",
+                tag: tag.to_string(),
+            })?;
+    let implementation_version = parse_impl_version(implementation_version_str, "GraalPy", tag)?;
+    let (python_version_str, _) =
+        rest.split_once('_')
+            .ok_or_else(|| ParseAbiTagError::InvalidFormat {
+                implementation: "GraalPy",
+                tag: tag.to_string(),
+            })?;
+    let python_version = parse_python_version(python_version_str, "GraalPy", tag)?;
+    Ok(AbiTag::GraalPy {
+        python_version,
+        implementation_version,
+    })
+}
+
 impl FromStr for AbiTag {
     type Err = ParseAbiTagError;
 
@@ -376,25 +398,7 @@ impl FromStr for AbiTag {
         } else if let Some(rest) = s.strip_prefix("pypy") {
             parse_pypy_abi_tag(rest, s)
         } else if let Some(rest) = s.strip_prefix("graalpy") {
-            // Ex) `graalpy240_310_native`
-            let (impl_ver_str, rest) =
-                rest.split_once('_')
-                    .ok_or_else(|| ParseAbiTagError::InvalidFormat {
-                        implementation: "GraalPy",
-                        tag: s.to_string(),
-                    })?;
-            let (impl_major, impl_minor) = parse_impl_version(impl_ver_str, "GraalPy", s)?;
-            let (py_ver_str, _) =
-                rest.split_once('_')
-                    .ok_or_else(|| ParseAbiTagError::InvalidFormat {
-                        implementation: "GraalPy",
-                        tag: s.to_string(),
-                    })?;
-            let (major, minor) = parse_python_version(py_ver_str, "GraalPy", s)?;
-            Ok(Self::GraalPy {
-                python_version: (major, minor),
-                implementation_version: (impl_major, impl_minor),
-            })
+            parse_graalpy_abi_tag(rest, s)
         } else if let Some(rest) = s.strip_prefix("pyston") {
             // Ex) `pyston_23_x86_64_linux_gnu`
             let rest = rest
