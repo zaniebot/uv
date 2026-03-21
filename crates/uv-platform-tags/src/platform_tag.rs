@@ -462,6 +462,18 @@ fn parse_solaris_tag(rest: &str, tag: &str) -> Result<SmallString, ParsePlatform
     })
 }
 
+fn parse_arch_tag(
+    rest: &str,
+    platform: &'static str,
+    tag: &str,
+) -> Result<Arch, ParsePlatformTagError> {
+    rest.parse()
+        .map_err(|_| ParsePlatformTagError::InvalidArch {
+            platform,
+            tag: tag.to_string(),
+        })
+}
+
 impl std::fmt::Display for PlatformTag {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -526,45 +538,25 @@ impl FromStr for PlatformTag {
 
         if let Some(rest) = s.strip_prefix("manylinux1_") {
             // Ex) manylinux1_x86_64
-            let arch = rest
-                .parse()
-                .map_err(|_| ParsePlatformTagError::InvalidArch {
-                    platform: "manylinux1",
-                    tag: s.to_string(),
-                })?;
+            let arch = parse_arch_tag(rest, "manylinux1", s)?;
             return Ok(Self::Manylinux1 { arch });
         }
 
         if let Some(rest) = s.strip_prefix("manylinux2010_") {
             // Ex) manylinux2010_x86_64
-            let arch = rest
-                .parse()
-                .map_err(|_| ParsePlatformTagError::InvalidArch {
-                    platform: "manylinux2010",
-                    tag: s.to_string(),
-                })?;
+            let arch = parse_arch_tag(rest, "manylinux2010", s)?;
             return Ok(Self::Manylinux2010 { arch });
         }
 
         if let Some(rest) = s.strip_prefix("manylinux2014_") {
             // Ex) manylinux2014_x86_64
-            let arch = rest
-                .parse()
-                .map_err(|_| ParsePlatformTagError::InvalidArch {
-                    platform: "manylinux2014",
-                    tag: s.to_string(),
-                })?;
+            let arch = parse_arch_tag(rest, "manylinux2014", s)?;
             return Ok(Self::Manylinux2014 { arch });
         }
 
         if let Some(rest) = s.strip_prefix("linux_") {
             // Ex) linux_x86_64
-            let arch = rest
-                .parse()
-                .map_err(|_| ParsePlatformTagError::InvalidArch {
-                    platform: "linux",
-                    tag: s.to_string(),
-                })?;
+            let arch = parse_arch_tag(rest, "linux", s)?;
             return Ok(Self::Linux { arch });
         }
 
