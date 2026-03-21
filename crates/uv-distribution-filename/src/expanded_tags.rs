@@ -9,7 +9,7 @@ use uv_platform_tags::{
 };
 
 use crate::splitter::MemchrSplitter;
-use crate::wheel_tag::{WheelTag, WheelTagLarge, WheelTagSmall};
+use crate::wheel_tag::{TagSet, WheelTag, WheelTagLarge, WheelTagSmall};
 
 /// The expanded wheel tags as stored in a `WHEEL` file.
 ///
@@ -119,6 +119,16 @@ fn parse_small_tag(python_tag: &str, abi_tag: &str, platform_tag: &str) -> Optio
     })
 }
 
+fn parse_tag_list<T>(tag: &str) -> TagSet<T>
+where
+    T: FromStr,
+{
+    MemchrSplitter::split(tag, b'.')
+        .map(T::from_str)
+        .filter_map(Result::ok)
+        .collect()
+}
+
 fn parse_large_tag(
     tag: &str,
     python_tag: &str,
@@ -127,18 +137,9 @@ fn parse_large_tag(
 ) -> WheelTagLarge {
     WheelTagLarge {
         build_tag: None,
-        python_tag: MemchrSplitter::split(python_tag, b'.')
-            .map(LanguageTag::from_str)
-            .filter_map(Result::ok)
-            .collect(),
-        abi_tag: MemchrSplitter::split(abi_tag, b'.')
-            .map(AbiTag::from_str)
-            .filter_map(Result::ok)
-            .collect(),
-        platform_tag: MemchrSplitter::split(platform_tag, b'.')
-            .map(PlatformTag::from_str)
-            .filter_map(Result::ok)
-            .collect(),
+        python_tag: parse_tag_list(python_tag),
+        abi_tag: parse_tag_list(abi_tag),
+        platform_tag: parse_tag_list(platform_tag),
         repr: tag.into(),
     }
 }
