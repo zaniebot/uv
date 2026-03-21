@@ -377,6 +377,41 @@ fn parse_release_arch(
     Ok(SmallString::from(rest))
 }
 
+fn parse_android_tag(rest: &str, tag: &str) -> Result<(u16, AndroidAbi), ParsePlatformTagError> {
+    // Ex) android_21_arm64_v8a
+    let underscore = memchr::memchr(b'_', rest.as_bytes()).ok_or_else(|| {
+        ParsePlatformTagError::InvalidFormat {
+            platform: "android",
+            tag: tag.to_string(),
+        }
+    })?;
+
+    let api_level =
+        rest[..underscore]
+            .parse()
+            .map_err(|_| ParsePlatformTagError::InvalidApiLevel {
+                platform: "android",
+                tag: tag.to_string(),
+            })?;
+
+    let abi_str = &rest[underscore + 1..];
+    if abi_str.is_empty() {
+        return Err(ParsePlatformTagError::InvalidFormat {
+            platform: "android",
+            tag: tag.to_string(),
+        });
+    }
+
+    let abi = abi_str
+        .parse()
+        .map_err(|_| ParsePlatformTagError::InvalidArch {
+            platform: "android",
+            tag: tag.to_string(),
+        })?;
+
+    Ok((api_level, abi))
+}
+
 impl std::fmt::Display for PlatformTag {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -500,37 +535,7 @@ impl FromStr for PlatformTag {
         }
 
         if let Some(rest) = s.strip_prefix("android_") {
-            // Ex) android_21_arm64_v8a
-            let underscore = memchr::memchr(b'_', rest.as_bytes()).ok_or_else(|| {
-                ParsePlatformTagError::InvalidFormat {
-                    platform: "android",
-                    tag: s.to_string(),
-                }
-            })?;
-
-            let api_level =
-                rest[..underscore]
-                    .parse()
-                    .map_err(|_| ParsePlatformTagError::InvalidApiLevel {
-                        platform: "android",
-                        tag: s.to_string(),
-                    })?;
-
-            let abi_str = &rest[underscore + 1..];
-            if abi_str.is_empty() {
-                return Err(ParsePlatformTagError::InvalidFormat {
-                    platform: "android",
-                    tag: s.to_string(),
-                });
-            }
-
-            let abi = abi_str
-                .parse()
-                .map_err(|_| ParsePlatformTagError::InvalidArch {
-                    platform: "android",
-                    tag: s.to_string(),
-                })?;
-
+            let (api_level, abi) = parse_android_tag(rest, s)?;
             return Ok(Self::Android { api_level, abi });
         }
 
