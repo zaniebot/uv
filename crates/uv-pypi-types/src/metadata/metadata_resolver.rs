@@ -65,6 +65,19 @@ fn parse_requires_python(
         .map(VersionSpecifiers::from))
 }
 
+fn parse_requirements<T>(
+    requirements: impl IntoIterator<Item = T>,
+) -> Result<Box<[Requirement<VerbatimParsedUrl>]>, MetadataError>
+where
+    T: AsRef<str>,
+{
+    Ok(requirements
+        .into_iter()
+        .map(|requires_dist| LenientRequirement::from_str(requires_dist.as_ref()))
+        .map_ok(Requirement::from)
+        .collect::<Result<Box<_>, _>>()?)
+}
+
 fn parse_dependency_metadata(
     headers: &Headers,
 ) -> Result<
@@ -75,11 +88,7 @@ fn parse_dependency_metadata(
     ),
     MetadataError,
 > {
-    let requires_dist = headers
-        .get_all_values("Requires-Dist")
-        .map(|requires_dist| LenientRequirement::from_str(&requires_dist))
-        .map_ok(Requirement::from)
-        .collect::<Result<Box<_>, _>>()?;
+    let requires_dist = parse_requirements(headers.get_all_values("Requires-Dist"))?;
     let requires_python = parse_requires_python(headers.get_first_value("Requires-Python"))?;
     let provides_extra = headers
         .get_all_values("Provides-Extra")
@@ -101,21 +110,27 @@ fn parse_project_requires_dist(
     dependencies: Option<Vec<String>>,
     optional_dependencies: &Option<indexmap::IndexMap<ExtraName, Vec<String>>>,
 ) -> Result<Box<[Requirement<VerbatimParsedUrl>]>, MetadataError> {
-    Ok(dependencies
-        .unwrap_or_default()
-        .into_iter()
-        .map(|requires_dist| LenientRequirement::from_str(&requires_dist))
-        .map_ok(Requirement::from)
-        .chain(optional_dependencies.as_ref().iter().flat_map(|index| {
+    let requires_dist = parse_requirements(dependencies.as_ref().into_iter().flatten().cloned())?;
+    let optional_requires_dist = optional_dependencies
+        .as_ref()
+        .iter()
+        .flat_map(|index| {
             index.iter().flat_map(|(extras, requirements)| {
                 requirements
                     .iter()
-                    .map(|requires_dist| LenientRequirement::from_str(requires_dist))
+                    .map(String::as_str)
+                    .map(LenientRequirement::from_str)
                     .map_ok(Requirement::from)
                     .map_ok(move |requirement| requirement.with_extra_marker(extras))
             })
-        }))
-        .collect::<Result<Box<_>, _>>()?)
+        })
+        .collect::<Result<Box<_>, _>>()?;
+
+    Ok(requires_dist
+        .into_vec()
+        .into_iter()
+        .chain(optional_requires_dist.into_vec())
+        .collect())
 }
 
 fn parse_project_provides_extra(
