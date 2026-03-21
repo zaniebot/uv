@@ -323,6 +323,37 @@ fn parse_cpython_variants(
     Ok(variant)
 }
 
+fn parse_pypy_abi_tag(rest: &str, tag: &str) -> Result<AbiTag, ParseAbiTagError> {
+    if let Some(rest) = rest.strip_prefix('_') {
+        // Ex) `pypy_73`
+        let implementation_version = parse_impl_version(rest, "PyPy", tag)?;
+        Ok(AbiTag::PyPy {
+            python_version: None,
+            implementation_version,
+        })
+    } else {
+        // Ex) `pypy39_pp73`
+        let (version_str, rest) =
+            rest.split_once('_')
+                .ok_or_else(|| ParseAbiTagError::InvalidFormat {
+                    implementation: "PyPy",
+                    tag: tag.to_string(),
+                })?;
+        let python_version = parse_python_version(version_str, "PyPy", tag)?;
+        let rest = rest
+            .strip_prefix("pp")
+            .ok_or_else(|| ParseAbiTagError::InvalidFormat {
+                implementation: "PyPy",
+                tag: tag.to_string(),
+            })?;
+        let implementation_version = parse_impl_version(rest, "PyPy", tag)?;
+        Ok(AbiTag::PyPy {
+            python_version: Some(python_version),
+            implementation_version,
+        })
+    }
+}
+
 impl FromStr for AbiTag {
     type Err = ParseAbiTagError;
 
@@ -343,34 +374,7 @@ impl FromStr for AbiTag {
                 python_version: (major, minor),
             })
         } else if let Some(rest) = s.strip_prefix("pypy") {
-            if let Some(rest) = rest.strip_prefix('_') {
-                // Ex) `pypy_73`
-                let (impl_major, impl_minor) = parse_impl_version(rest, "PyPy", s)?;
-                Ok(Self::PyPy {
-                    python_version: None,
-                    implementation_version: (impl_major, impl_minor),
-                })
-            } else {
-                // Ex) `pypy39_pp73`
-                let (version_str, rest) =
-                    rest.split_once('_')
-                        .ok_or_else(|| ParseAbiTagError::InvalidFormat {
-                            implementation: "PyPy",
-                            tag: s.to_string(),
-                        })?;
-                let (major, minor) = parse_python_version(version_str, "PyPy", s)?;
-                let rest =
-                    rest.strip_prefix("pp")
-                        .ok_or_else(|| ParseAbiTagError::InvalidFormat {
-                            implementation: "PyPy",
-                            tag: s.to_string(),
-                        })?;
-                let (impl_major, impl_minor) = parse_impl_version(rest, "PyPy", s)?;
-                Ok(Self::PyPy {
-                    python_version: Some((major, minor)),
-                    implementation_version: (impl_major, impl_minor),
-                })
-            }
+            parse_pypy_abi_tag(rest, s)
         } else if let Some(rest) = s.strip_prefix("graalpy") {
             // Ex) `graalpy240_310_native`
             let (impl_ver_str, rest) =
