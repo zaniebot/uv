@@ -617,6 +617,44 @@ impl ResolverInstallerSchema {
         );
     }
 
+    fn exclude_newer(&self) -> ExcludeNewer {
+        ExcludeNewer::from_args(
+            self.exclude_newer.clone(),
+            self.exclude_newer_package
+                .clone()
+                .unwrap_or_default()
+                .into_iter()
+                .map(Into::into)
+                .collect(),
+        )
+    }
+
+    fn upgrade(&self) -> Option<Upgrade> {
+        Upgrade::from_args(
+            self.upgrade,
+            self.upgrade_package
+                .clone()
+                .into_iter()
+                .flatten()
+                .map(Into::into)
+                .collect(),
+        )
+    }
+
+    fn reinstall(&self) -> Option<Reinstall> {
+        Reinstall::from_args(
+            self.reinstall,
+            self.reinstall_package.clone().unwrap_or_default(),
+        )
+    }
+
+    fn build_isolation(&self) -> Option<BuildIsolation> {
+        BuildIsolation::from_args(
+            self.no_build_isolation,
+            self.no_build_isolation_package.clone().unwrap_or_default(),
+        )
+    }
+
     /// Resolve the [`ResolverInstallerSchema`] relative to the given root directory.
     pub fn relative_to(self, root_dir: &Path) -> Result<Self, IndexUrlError> {
         let RelativeIndexSettings {
@@ -2006,6 +2044,10 @@ impl PipOptions {
 
 impl From<ResolverInstallerSchema> for ResolverOptions {
     fn from(value: ResolverInstallerSchema) -> Self {
+        let exclude_newer = value.exclude_newer();
+        let upgrade = value.upgrade();
+        let build_isolation = value.build_isolation();
+
         Self {
             index: value.index,
             index_url: value.index_url,
@@ -2020,33 +2062,14 @@ impl From<ResolverInstallerSchema> for ResolverOptions {
             dependency_metadata: value.dependency_metadata,
             config_settings: value.config_settings,
             config_settings_package: value.config_settings_package,
-            exclude_newer: ExcludeNewer::from_args(
-                value.exclude_newer,
-                value
-                    .exclude_newer_package
-                    .unwrap_or_default()
-                    .into_iter()
-                    .map(Into::into)
-                    .collect(),
-            ),
+            exclude_newer,
             link_mode: value.link_mode,
-            upgrade: Upgrade::from_args(
-                value.upgrade,
-                value
-                    .upgrade_package
-                    .into_iter()
-                    .flatten()
-                    .map(Into::into)
-                    .collect(),
-            ),
+            upgrade,
             no_build: value.no_build,
             no_build_package: value.no_build_package,
             no_binary: value.no_binary,
             no_binary_package: value.no_binary_package,
-            build_isolation: BuildIsolation::from_args(
-                value.no_build_isolation,
-                value.no_build_isolation_package.unwrap_or_default(),
-            ),
+            build_isolation,
             extra_build_dependencies: value.extra_build_dependencies,
             extra_build_variables: value.extra_build_variables,
             no_sources: value.no_sources,
@@ -2058,6 +2081,10 @@ impl From<ResolverInstallerSchema> for ResolverOptions {
 
 impl From<ResolverInstallerSchema> for InstallerOptions {
     fn from(value: ResolverInstallerSchema) -> Self {
+        let exclude_newer = value.exclude_newer();
+        let reinstall = value.reinstall();
+        let build_isolation = value.build_isolation();
+
         Self {
             index: value.index,
             index_url: value.index_url,
@@ -2067,26 +2094,11 @@ impl From<ResolverInstallerSchema> for InstallerOptions {
             index_strategy: value.index_strategy,
             keyring_provider: value.keyring_provider,
             config_settings: value.config_settings,
-            exclude_newer: ExcludeNewer::from_args(
-                value.exclude_newer,
-                value
-                    .exclude_newer_package
-                    .unwrap_or_default()
-                    .into_iter()
-                    .map(Into::into)
-                    .collect(),
-            )
-            .global,
+            exclude_newer: exclude_newer.global,
             link_mode: value.link_mode,
             compile_bytecode: value.compile_bytecode,
-            reinstall: Reinstall::from_args(
-                value.reinstall,
-                value.reinstall_package.unwrap_or_default(),
-            ),
-            build_isolation: BuildIsolation::from_args(
-                value.no_build_isolation,
-                value.no_build_isolation_package.unwrap_or_default(),
-            ),
+            reinstall,
+            build_isolation,
             no_build: value.no_build,
             no_build_package: value.no_build_package,
             no_binary: value.no_binary,
@@ -2744,6 +2756,42 @@ mod tests {
                 .unwrap()
                 .url()
                 .to_string()
+        );
+    }
+
+    #[test]
+    fn resolver_installer_schema_reuses_shared_option_normalization() {
+        let schema = ResolverInstallerSchema {
+            no_build_isolation: Some(true),
+            no_build_isolation_package: Some(vec![PackageName::from_str("build-only").unwrap()]),
+            upgrade: Some(true),
+            upgrade_package: Some(vec!["upgrade-only".parse().unwrap()]),
+            reinstall: Some(true),
+            reinstall_package: Some(vec![PackageName::from_str("reinstall-only").unwrap()]),
+            ..Default::default()
+        };
+
+        let resolver_options = ResolverOptions::from(schema.clone());
+        assert_eq!(resolver_options.build_isolation, schema.build_isolation());
+        assert!(
+            resolver_options
+                .upgrade
+                .as_ref()
+                .is_some_and(Upgrade::is_all)
+        );
+        assert_eq!(resolver_options.exclude_newer, schema.exclude_newer());
+
+        let installer_options = InstallerOptions::from(schema.clone());
+        assert_eq!(installer_options.build_isolation, schema.build_isolation());
+        assert!(
+            installer_options
+                .reinstall
+                .as_ref()
+                .is_some_and(Reinstall::is_all)
+        );
+        assert_eq!(
+            installer_options.exclude_newer,
+            schema.exclude_newer().global
         );
     }
 }
