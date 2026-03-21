@@ -258,6 +258,18 @@ impl LockedFile {
             }
         }
 
+        #[expect(clippy::disallowed_types)]
+        fn create_temporary_lockfile(path: &Path) -> Result<NamedTempFile, LockedFileError> {
+            let file = if let Some(parent) = path.parent() {
+                NamedTempFile::new_in(parent)
+            } else {
+                NamedTempFile::new()
+            }
+            .map_err(LockedFileError::CreateTemporary)?;
+            try_set_permissions(file.as_file(), file.path());
+            Ok(file)
+        }
+
         // If path already exists, return it.
         if let Ok(file) = open_rw_file(path.as_ref()) {
             return Ok(file);
@@ -265,13 +277,7 @@ impl LockedFile {
 
         // Otherwise, create a temporary file with 666 permissions. We must set
         // permissions _after_ creating the file, to override the `umask`.
-        let file = if let Some(parent) = path.as_ref().parent() {
-            NamedTempFile::new_in(parent)
-        } else {
-            NamedTempFile::new()
-        }
-        .map_err(LockedFileError::CreateTemporary)?;
-        try_set_permissions(file.as_file(), file.path());
+        let file = create_temporary_lockfile(path.as_ref())?;
 
         // Try to move the file to path, but if path exists now, just open path
         match file.persist_noclobber(path.as_ref()) {
@@ -393,5 +399,16 @@ mod tests {
         let file = LockedFile::create(&lock_path).expect("existing file should be reopened");
 
         assert_eq!(file.path(), lock_path.as_path());
+    }
+
+    #[test]
+    fn create_creates_missing_lockfile() {
+        let temp_dir = tempdir().unwrap();
+        let lock_path = temp_dir.path().join("lock");
+
+        let file = LockedFile::create(&lock_path).expect("missing file should be created");
+
+        assert_eq!(file.path(), lock_path.as_path());
+        assert!(lock_path.is_file());
     }
 }
