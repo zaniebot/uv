@@ -34,6 +34,32 @@ fn expand_home_path(path: PathBuf, home_dir: Option<&Path>) -> PathBuf {
     }
 }
 
+fn first_existing_path(home_dir: &Path, candidates: &[&str], fallback: &str) -> PathBuf {
+    candidates
+        .iter()
+        .map(|candidate| home_dir.join(candidate))
+        .find(|candidate| candidate.is_file())
+        .unwrap_or_else(|| home_dir.join(fallback))
+}
+
+fn zshenv_path(home_dir: &Path, zsh_dot_dir: Option<&Path>) -> PathBuf {
+    if let Some(zsh_dot_dir) = zsh_dot_dir {
+        let zshenv = zsh_dot_dir.join(".zshenv");
+        if zshenv.is_file() {
+            return zshenv;
+        }
+    }
+
+    let zshenv = home_dir.join(".zshenv");
+    if zshenv.is_file() {
+        return zshenv;
+    }
+
+    zsh_dot_dir
+        .map(|zsh_dot_dir| zsh_dot_dir.join(".zshenv"))
+        .unwrap_or_else(|| home_dir.join(".zshenv"))
+}
+
 /// Shells for which virtualenv activation scripts are available.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 #[expect(clippy::doc_markdown)]
@@ -186,11 +212,11 @@ impl Shell {
                 // In lieu of `.bash_profile`, shells will also respect `.bash_login` and
                 // `.profile`, if they exist. So we respect those too.
                 vec![
-                    [".bash_profile", ".bash_login", ".profile"]
-                        .iter()
-                        .map(|rc| home_dir.join(rc))
-                        .find(|rc| rc.is_file())
-                        .unwrap_or_else(|| home_dir.join(".bash_profile")),
+                    first_existing_path(
+                        &home_dir,
+                        &[".bash_profile", ".bash_login", ".profile"],
+                        ".bash_profile",
+                    ),
                     home_dir.join(".bashrc"),
                 ]
             }
@@ -205,28 +231,7 @@ impl Shell {
                 //
                 // See: https://github.com/rust-lang/rustup/blob/fede22fea7b160868cece632bd213e6d72f8912f/src/cli/self_update/shell.rs#L197
                 let zsh_dot_dir = non_empty_env_path(EnvVars::ZDOTDIR);
-
-                // Attempt to update an existing `.zshenv` file.
-                if let Some(zsh_dot_dir) = zsh_dot_dir.as_ref() {
-                    // If `ZDOTDIR` is set, and `ZDOTDIR/.zshenv` exists, then we update that file.
-                    let zshenv = zsh_dot_dir.join(".zshenv");
-                    if zshenv.is_file() {
-                        return vec![zshenv];
-                    }
-                }
-                // Whether `ZDOTDIR` is set or not, if `~/.zshenv` exists then we update that file.
-                let zshenv = home_dir.join(".zshenv");
-                if zshenv.is_file() {
-                    return vec![zshenv];
-                }
-
-                if let Some(zsh_dot_dir) = zsh_dot_dir.as_ref() {
-                    // If `ZDOTDIR` is set, then we create `ZDOTDIR/.zshenv`.
-                    vec![zsh_dot_dir.join(".zshenv")]
-                } else {
-                    // If `ZDOTDIR` is _not_ set, then we create `~/.zshenv`.
-                    vec![home_dir.join(".zshenv")]
-                }
+                vec![zshenv_path(&home_dir, zsh_dot_dir.as_deref())]
             }
             Self::Fish => {
                 // On Fish, we only need to update `config.fish`. This file is sourced for both
@@ -359,6 +364,22 @@ mod tests {
     } else {
         EnvVars::HOME
     };
+
+    #[test]
+    fn configuration_files_bash_prefers_existing_login_file() {
+        let tmp_home_dir = tempdir().unwrap();
+        File::create(tmp_home_dir.path().join(".bash_login")).unwrap();
+
+        with_vars([(HOME_DIR_ENV_VAR, tmp_home_dir.path().to_str())], || {
+            assert_eq!(
+                Shell::Bash.configuration_files(),
+                vec![
+                    tmp_home_dir.path().join(".bash_login"),
+                    tmp_home_dir.path().join(".bashrc")
+                ]
+            );
+        });
+    }
 
     #[test]
     fn configuration_files_zsh_no_existing_zshenv() {
