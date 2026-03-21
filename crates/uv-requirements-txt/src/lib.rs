@@ -707,6 +707,24 @@ fn parse_verbatim_url_option(
     Ok(url.with_given(given))
 }
 
+fn parse_package_name_specifier_option(
+    option: &'static str,
+    content: &str,
+    s: &mut Scanner,
+    start: usize,
+) -> Result<PackageNameSpecifier, RequirementsTxtParserError> {
+    let given = parse_maybe_quoted_value(option, content, s, |c: char| !is_terminal(c))?;
+    let end = s.cursor();
+    PackageNameSpecifier::from_str(given.as_ref()).map_err(|err| {
+        RequirementsTxtParserError::NoBinary {
+            source: err,
+            specifier: given.to_string(),
+            start,
+            end,
+        }
+    })
+}
+
 /// Parse a single entry, that is a requirement, an inclusion or a comment line.
 ///
 /// Consumes all preceding trivia (whitespace and comments). If it returns `None`, we've reached
@@ -805,27 +823,10 @@ fn parse_entry(
             start,
         )?)
     } else if s.eat_if("--no-binary") {
-        let given = parse_maybe_quoted_value("--no-binary", content, s, |c: char| !is_terminal(c))?;
-        let specifier = PackageNameSpecifier::from_str(given.as_ref()).map_err(|err| {
-            RequirementsTxtParserError::NoBinary {
-                source: err,
-                specifier: given.to_string(),
-                start,
-                end: s.cursor(),
-            }
-        })?;
+        let specifier = parse_package_name_specifier_option("--no-binary", content, s, start)?;
         RequirementsTxtStatement::NoBinary(NoBinary::from_pip_arg(specifier))
     } else if s.eat_if("--only-binary") {
-        let given =
-            parse_maybe_quoted_value("--only-binary", content, s, |c: char| !is_terminal(c))?;
-        let specifier = PackageNameSpecifier::from_str(given.as_ref()).map_err(|err| {
-            RequirementsTxtParserError::NoBinary {
-                source: err,
-                specifier: given.to_string(),
-                start,
-                end: s.cursor(),
-            }
-        })?;
+        let specifier = parse_package_name_specifier_option("--only-binary", content, s, start)?;
         RequirementsTxtStatement::OnlyBinary(NoBuild::from_pip_arg(specifier))
     } else if s.at(char::is_ascii_alphanumeric) || s.at(|char| matches!(char, '.' | '/' | '$')) {
         let source = if requirements_txt == Path::new("-") {
