@@ -57,6 +57,19 @@ pub enum Shell {
 }
 
 impl Shell {
+    fn from_known_shell_env() -> Option<Self> {
+        [
+            (EnvVars::NU_VERSION, Self::Nushell),
+            (EnvVars::FISH_VERSION, Self::Fish),
+            (EnvVars::BASH_VERSION, Self::Bash),
+            (EnvVars::ZSH_VERSION, Self::Zsh),
+            (EnvVars::KSH_VERSION, Self::Ksh),
+            (EnvVars::PS_MODULE_PATH, Self::Powershell),
+        ]
+        .into_iter()
+        .find_map(|(variable, shell)| std::env::var_os(variable).is_some().then_some(shell))
+    }
+
     /// Determine the user's current shell from the environment.
     ///
     /// First checks shell-specific environment variables (`NU_VERSION`, `FISH_VERSION`,
@@ -69,33 +82,24 @@ impl Shell {
     ///
     /// Returns `None` if the shell cannot be determined.
     pub fn from_env() -> Option<Self> {
-        if std::env::var_os(EnvVars::NU_VERSION).is_some() {
-            Some(Self::Nushell)
-        } else if std::env::var_os(EnvVars::FISH_VERSION).is_some() {
-            Some(Self::Fish)
-        } else if std::env::var_os(EnvVars::BASH_VERSION).is_some() {
-            Some(Self::Bash)
-        } else if std::env::var_os(EnvVars::ZSH_VERSION).is_some() {
-            Some(Self::Zsh)
-        } else if std::env::var_os(EnvVars::KSH_VERSION).is_some() {
-            Some(Self::Ksh)
-        } else if std::env::var_os(EnvVars::PS_MODULE_PATH).is_some() {
-            Some(Self::Powershell)
-        } else if let Some(env_shell) = std::env::var_os(EnvVars::SHELL) {
-            Self::from_shell_path(env_shell)
-        } else if cfg!(windows) {
-            // Command Prompt relies on PROMPT for its appearance whereas PowerShell does not.
-            // See: https://stackoverflow.com/a/66415037.
-            if std::env::var_os(EnvVars::PROMPT).is_some() {
-                Some(Self::Cmd)
-            } else {
-                // Fallback to PowerShell if the PROMPT environment variable is not set.
-                Some(Self::Powershell)
-            }
-        } else {
-            // Fallback to detecting the shell from the parent process
-            Self::from_parent_process()
-        }
+        Self::from_known_shell_env()
+            .or_else(|| std::env::var_os(EnvVars::SHELL).and_then(Self::from_shell_path))
+            .or_else(|| {
+                if cfg!(windows) {
+                    // Command Prompt relies on PROMPT for its appearance whereas PowerShell does not.
+                    // See: https://stackoverflow.com/a/66415037.
+                    if std::env::var_os(EnvVars::PROMPT).is_some() {
+                        Some(Self::Cmd)
+                    } else {
+                        // Fallback to PowerShell if the PROMPT environment variable is not set.
+                        Some(Self::Powershell)
+                    }
+                } else {
+                    None
+                }
+            })
+            // Fallback to detecting the shell from the parent process.
+            .or_else(Self::from_parent_process)
     }
 
     /// Attempt to determine the shell from the parent process.
@@ -441,6 +445,32 @@ mod tests {
                     Shell::Zsh.configuration_files(),
                     vec![tmp_zdotdir.path().join(".zshenv")]
                 );
+            },
+        );
+    }
+
+    #[test]
+    fn from_env_prefers_shell_specific_variables_over_shell_path() {
+        with_vars(
+            [
+                (EnvVars::BASH_VERSION, Some("5.2")),
+                (EnvVars::SHELL, Some("/bin/zsh")),
+            ],
+            || {
+                assert_eq!(Shell::from_env(), Some(Shell::Bash));
+            },
+        );
+    }
+
+    #[test]
+    fn from_env_uses_shell_path_when_no_shell_specific_variable_is_set() {
+        with_vars(
+            [
+                (EnvVars::BASH_VERSION, None),
+                (EnvVars::SHELL, Some("/bin/zsh")),
+            ],
+            || {
+                assert_eq!(Shell::from_env(), Some(Shell::Zsh));
             },
         );
     }
