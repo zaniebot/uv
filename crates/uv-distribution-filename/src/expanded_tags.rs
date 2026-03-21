@@ -111,19 +111,21 @@ fn split_expanded_tag(tag: &str) -> Result<(&str, &str, &str), ExpandedTagError>
 /// three segments separated by `-`: a language tag, an ABI tag, and a platform tag; however,
 /// empirically, some build backends do emit multipart tags (like `cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64`),
 /// so we allow those too.
+fn parse_small_tag(python_tag: &str, abi_tag: &str, platform_tag: &str) -> Option<WheelTagSmall> {
+    Some(WheelTagSmall {
+        python_tag: LanguageTag::from_str(python_tag).ok()?,
+        abi_tag: AbiTag::from_str(abi_tag).ok()?,
+        platform_tag: PlatformTag::from_str(platform_tag).ok()?,
+    })
+}
+
 fn parse_expanded_tag(tag: &str) -> Result<WheelTag, ExpandedTagError> {
     let (python_tag, abi_tag, platform_tag) = split_expanded_tag(tag)?;
 
     let is_small = memchr(b'.', tag.as_bytes()).is_none();
 
     if let Some(small) = is_small
-        .then(|| {
-            Some(WheelTagSmall {
-                python_tag: LanguageTag::from_str(python_tag).ok()?,
-                abi_tag: AbiTag::from_str(abi_tag).ok()?,
-                platform_tag: PlatformTag::from_str(platform_tag).ok()?,
-            })
-        })
+        .then(|| parse_small_tag(python_tag, abi_tag, platform_tag))
         .flatten()
     {
         Ok(WheelTag::Small { small })
