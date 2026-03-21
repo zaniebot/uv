@@ -281,22 +281,21 @@ impl PythonVersionFile {
         }
     }
 
+    fn serialized_versions(&self) -> String {
+        self.versions
+            .iter()
+            .map(PythonRequest::to_canonical_string)
+            .join("\n")
+            .add("\n")
+    }
+
     /// Update the version file on the file system.
     pub async fn write(&self) -> Result<(), std::io::Error> {
         debug!("Writing Python versions to `{}`", self.path.display());
         if let Some(parent) = self.path.parent() {
             fs_err::tokio::create_dir_all(parent).await?;
         }
-        fs::tokio::write(
-            &self.path,
-            self.versions
-                .iter()
-                .map(PythonRequest::to_canonical_string)
-                .join("\n")
-                .add("\n")
-                .as_bytes(),
-        )
-        .await
+        fs::tokio::write(&self.path, self.serialized_versions().as_bytes()).await
     }
 }
 
@@ -366,6 +365,23 @@ mod tests {
         assert_eq!(
             versions,
             vec![PythonRequest::parse("3.12"), PythonRequest::parse("3.11")]
+        );
+    }
+
+    #[tokio::test]
+    async fn write_serializes_versions_with_trailing_newline() {
+        let temp_dir = tempdir().unwrap();
+        let version_path = temp_dir.path().join(PYTHON_VERSION_FILENAME);
+        let version_file = PythonVersionFile::new(version_path.clone()).with_versions(vec![
+            PythonRequest::parse("3.12"),
+            PythonRequest::parse("3.11"),
+        ]);
+
+        version_file.write().await.unwrap();
+
+        assert_eq!(
+            fs_err::read_to_string(&version_path).unwrap(),
+            "3.12\n3.11\n"
         );
     }
 }
