@@ -87,21 +87,17 @@ pub enum PlatformTag {
 }
 
 impl PlatformTag {
-    /// Return a pretty string representation of the language tag.
-    pub fn pretty(&self) -> Option<&'static str> {
+    fn family_name(&self) -> Option<&'static str> {
         match self {
             Self::Any => None,
-            Self::Manylinux { .. } => Some("Linux"),
-            Self::Manylinux1 { .. } => Some("Linux"),
-            Self::Manylinux2010 { .. } => Some("Linux"),
-            Self::Manylinux2014 { .. } => Some("Linux"),
-            Self::Linux { .. } => Some("Linux"),
-            Self::Musllinux { .. } => Some("Linux"),
+            Self::Manylinux { .. }
+            | Self::Manylinux1 { .. }
+            | Self::Manylinux2010 { .. }
+            | Self::Manylinux2014 { .. }
+            | Self::Linux { .. }
+            | Self::Musllinux { .. } => Some("Linux"),
             Self::Macos { .. } => Some("macOS"),
-            Self::Win32 => Some("Windows"),
-            Self::WinAmd64 => Some("Windows"),
-            Self::WinArm64 => Some("Windows"),
-            Self::WinIa64 => Some("Windows"),
+            Self::Win32 | Self::WinAmd64 | Self::WinArm64 | Self::WinIa64 => Some("Windows"),
             Self::Android { .. } => Some("Android"),
             Self::FreeBsd { .. } => Some("FreeBSD"),
             Self::NetBsd { .. } => Some("NetBSD"),
@@ -113,6 +109,11 @@ impl PlatformTag {
             Self::Pyodide { .. } => Some("Pyodide"),
             Self::Ios { .. } => Some("iOS"),
         }
+    }
+
+    /// Return a pretty string representation of the language tag.
+    pub fn pretty(&self) -> Option<&'static str> {
+        self.family_name()
     }
 }
 
@@ -877,6 +878,16 @@ mod tests {
             Ok(PlatformTag::WinArm64)
         );
         assert_eq!(PlatformTag::WinArm64.to_string(), "win_arm64");
+    }
+
+    #[test]
+    fn pretty_returns_platform_families() {
+        assert_eq!(
+            PlatformTag::Linux { arch: Arch::X86_64 }.pretty(),
+            Some("Linux")
+        );
+        assert_eq!(PlatformTag::WinAmd64.pretty(), Some("Windows"));
+        assert_eq!(PlatformTag::Any.pretty(), None);
     }
 
     #[test]
