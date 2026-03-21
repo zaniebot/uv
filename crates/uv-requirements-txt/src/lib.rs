@@ -740,6 +740,28 @@ fn parse_include_option(
     Ok((filename, end))
 }
 
+fn consume_option_separator(
+    _option: &str,
+    content: &str,
+    s: &mut Scanner,
+) -> Result<(), RequirementsTxtParserError> {
+    if s.eat_if('=') {
+        // Explicit equals sign.
+    } else if s.eat_if(char::is_whitespace) {
+        // Key and value are separated by whitespace instead.
+        s.eat_whitespace();
+    } else {
+        let (line, column) = calculate_row_column(content, s.cursor());
+        return Err(RequirementsTxtParserError::Parser {
+            message: format!("Expected '=' or whitespace, found {:?}", s.peek()),
+            line,
+            column,
+        });
+    }
+
+    Ok(())
+}
+
 fn parse_requirement_statement(
     s: &mut Scanner,
     content: &str,
@@ -811,20 +833,7 @@ fn parse_entry(
             end,
         }
     } else if s.eat_if("-e") || s.eat_if("--editable") {
-        if s.eat_if('=') {
-            // Explicit equals sign.
-        } else if s.eat_if(char::is_whitespace) {
-            // Key and value are separated by whitespace instead.
-            s.eat_whitespace();
-        } else {
-            let (line, column) = calculate_row_column(content, s.cursor());
-            return Err(RequirementsTxtParserError::Parser {
-                message: format!("Expected '=' or whitespace, found {:?}", s.peek()),
-                line,
-                column,
-            });
-        }
-
+        consume_option_separator("--editable", content, s)?;
         parse_requirement_statement(s, content, requirements_txt, working_dir, start, true)?
     } else if s.eat_if("-i") || s.eat_if("--index-url") {
         RequirementsTxtStatement::IndexUrl(parse_verbatim_url_option(
@@ -1033,21 +1042,8 @@ fn parse_value<'a, T>(
     s: &mut Scanner<'a>,
     while_pattern: impl Pattern<T>,
 ) -> Result<&'a str, RequirementsTxtParserError> {
-    let value = if s.eat_if('=') {
-        // Explicit equals sign.
-        s.eat_while(while_pattern).trim_end()
-    } else if s.eat_if(char::is_whitespace) {
-        // Key and value are separated by whitespace instead.
-        s.eat_whitespace();
-        s.eat_while(while_pattern).trim_end()
-    } else {
-        let (line, column) = calculate_row_column(content, s.cursor());
-        return Err(RequirementsTxtParserError::Parser {
-            message: format!("Expected '=' or whitespace, found {:?}", s.peek()),
-            line,
-            column,
-        });
-    };
+    consume_option_separator(option, content, s)?;
+    let value = s.eat_while(while_pattern).trim_end();
 
     if value.is_empty() {
         let (line, column) = calculate_row_column(content, s.cursor());
