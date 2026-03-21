@@ -159,6 +159,33 @@ impl PythonVersionFile {
             .find(|path| path.is_file())
     }
 
+    fn parse_version_request(path: &Path, version: &str) -> Option<PythonRequest> {
+        let request = PythonRequest::parse(version);
+        if let PythonRequest::ExecutableName(name) = &request {
+            warn_user_once!(
+                "Ignoring unsupported Python request `{name}` in version file: {}",
+                path.display()
+            );
+            None
+        } else {
+            Some(request)
+        }
+    }
+
+    fn parse_versions(path: &Path, content: &str) -> Vec<PythonRequest> {
+        content
+            .lines()
+            .filter_map(|line| {
+                let trimmed = line.trim();
+                if trimmed.is_empty() || trimmed.starts_with('#') {
+                    None
+                } else {
+                    Self::parse_version_request(path, trimmed)
+                }
+            })
+            .collect()
+    }
+
     /// Try to read a Python version file at the given path.
     ///
     /// If the file does not exist, `Ok(None)` is returned.
@@ -169,27 +196,7 @@ impl PythonVersionFile {
                     "Reading Python requests from version file at `{}`",
                     path.display()
                 );
-                let versions = content
-                    .lines()
-                    .filter(|line| {
-                        // Skip comments and empty lines.
-                        let trimmed = line.trim();
-                        !(trimmed.is_empty() || trimmed.starts_with('#'))
-                    })
-                    .map(ToString::to_string)
-                    .map(|version| PythonRequest::parse(&version))
-                    .filter(|request| {
-                        if let PythonRequest::ExecutableName(name) = request {
-                            warn_user_once!(
-                                "Ignoring unsupported Python request `{name}` in version file: {}",
-                                path.display()
-                            );
-                            false
-                        } else {
-                            true
-                        }
-                    })
-                    .collect();
+                let versions = Self::parse_versions(&path, &content);
                 Ok(Some(Self { path, versions }))
             }
             Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(None),
@@ -297,6 +304,8 @@ impl PythonVersionFile {
 mod tests {
     use tempfile::tempdir;
 
+    use crate::PythonRequest;
+
     use super::{
         DiscoveryOptions, FilePreference, PYTHON_VERSION_FILENAME, PYTHON_VERSIONS_FILENAME,
         PythonVersionFile,
@@ -343,6 +352,20 @@ mod tests {
                 &DiscoveryOptions::default().with_stop_discovery_at(Some(&workspace_dir)),
             ),
             None
+        );
+    }
+
+    #[test]
+    fn parse_versions_skips_comments_and_executable_names() {
+        let temp_dir = tempdir().unwrap();
+        let version_path = temp_dir.path().join(PYTHON_VERSION_FILENAME);
+
+        let versions =
+            PythonVersionFile::parse_versions(&version_path, "\n# comment\n3.12\n  3.11\nfoobar\n");
+
+        assert_eq!(
+            versions,
+            vec![PythonRequest::parse("3.12"), PythonRequest::parse("3.11")]
         );
     }
 }
