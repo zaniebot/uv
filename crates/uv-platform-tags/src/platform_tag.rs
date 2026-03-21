@@ -441,6 +441,27 @@ fn parse_pyodide_tag(rest: &str, tag: &str) -> Result<(u16, u16), ParsePlatformT
     Ok((major, minor))
 }
 
+fn parse_solaris_tag(rest: &str, tag: &str) -> Result<SmallString, ParsePlatformTagError> {
+    // Ex) solaris_11_4_x86_64_64bit
+    if rest.is_empty() {
+        return Err(ParsePlatformTagError::InvalidFormat {
+            platform: "solaris",
+            tag: tag.to_string(),
+        });
+    }
+
+    if let Some(release_arch) = rest.strip_suffix("_64bit")
+        && !release_arch.is_empty()
+    {
+        return Ok(SmallString::from(release_arch));
+    }
+
+    Err(ParsePlatformTagError::InvalidArch {
+        platform: "solaris",
+        tag: tag.to_string(),
+    })
+}
+
 impl std::fmt::Display for PlatformTag {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -611,25 +632,8 @@ impl FromStr for PlatformTag {
         }
 
         if let Some(rest) = s.strip_prefix("solaris_") {
-            // Ex) solaris_11_4_x86_64_64bit
-            if rest.is_empty() {
-                return Err(ParsePlatformTagError::InvalidFormat {
-                    platform: "solaris",
-                    tag: s.to_string(),
-                });
-            }
-
-            if let Some(release_arch) = rest.strip_suffix("_64bit") {
-                if !release_arch.is_empty() {
-                    return Ok(Self::Solaris {
-                        release_arch: SmallString::from(release_arch),
-                    });
-                }
-            }
-
-            return Err(ParsePlatformTagError::InvalidArch {
-                platform: "solaris",
-                tag: s.to_string(),
+            return Ok(Self::Solaris {
+                release_arch: parse_solaris_tag(rest, s)?,
             });
         }
 
