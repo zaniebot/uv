@@ -61,10 +61,9 @@ fn read_head_commit(git_dir: &Path, git_head_contents: String) -> Result<String,
         GitInfoError::InvalidRef(git_dir.to_path_buf(), git_head_contents.clone())
     })?;
     if let Some(git_ref) = git_ref_parts.next() {
-        let git_ref_path = git_dir.join(git_ref);
-        Ok(fs_err::read_to_string(git_ref_path)?.trim().to_string())
+        read_tag_commit(&git_dir.join(git_ref))
     } else {
-        Ok(commit_or_ref.to_string())
+        parse_commit(commit_or_ref.to_string())
     }
 }
 
@@ -77,9 +76,7 @@ impl Commit {
             git_head(&git_dir).ok_or_else(|| GitInfoError::MissingHead(git_dir.clone()))?;
         let git_head_contents = fs_err::read_to_string(git_head_path)?;
 
-        let commit = read_head_commit(&git_dir, git_head_contents)?;
-
-        Ok(Self(parse_commit(commit)?))
+        Ok(Self(read_head_commit(&git_dir, git_head_contents)?))
     }
 }
 
