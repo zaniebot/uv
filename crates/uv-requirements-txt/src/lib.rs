@@ -725,6 +725,10 @@ fn parse_package_name_specifier_option(
     })
 }
 
+fn parse_hash_option(content: &str, s: &mut Scanner) -> Result<String, RequirementsTxtParserError> {
+    parse_value("--hash", content, s, |c: char| !c.is_whitespace()).map(ToString::to_string)
+}
+
 fn parse_include_option(
     option: &'static str,
     content: &str,
@@ -1004,15 +1008,13 @@ fn parse_hashes(content: &str, s: &mut Scanner) -> Result<Vec<String>, Requireme
             column,
         });
     }
-    let hash = parse_value("--hash", content, s, |c: char| !c.is_whitespace())?;
-    hashes.push(hash.to_string());
+    hashes.push(parse_hash_option(content, s)?);
     loop {
         eat_wrappable_whitespace(s);
         if !s.eat_if("--hash") {
             break;
         }
-        let hash = parse_value("--hash", content, s, |c: char| !c.is_whitespace())?;
-        hashes.push(hash.to_string());
+        hashes.push(parse_hash_option(content, s)?);
     }
     Ok(hashes)
 }
