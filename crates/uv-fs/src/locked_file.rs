@@ -88,6 +88,14 @@ impl LockedFileError {
     }
 }
 
+#[cfg(feature = "tokio")]
+fn log_try_lock_error(mode: LockedFileMode, err: &std::fs::TryLockError) {
+    // Log error code and enum kind to help debugging more exotic failures.
+    if !is_known_already_locked_error(err) {
+        debug!("Try lock {mode} error: {err:?}");
+    }
+}
+
 /// Whether to acquire a shared (read) lock or exclusive (write) lock.
 #[derive(Debug, Clone, Copy)]
 pub enum LockedFileMode {
@@ -151,10 +159,7 @@ impl LockedFile {
                 return Ok(Self(file));
             }
             (Err(err), file) => {
-                // Log error code and enum kind to help debugging more exotic failures.
-                if !is_known_already_locked_error(&err) {
-                    debug!("Try lock {mode} error: {err:?}");
-                }
+                log_try_lock_error(mode, &err);
                 file
             }
         };
@@ -196,10 +201,7 @@ impl LockedFile {
                 Some(Self(file))
             }
             Err(err) => {
-                // Log error code and enum kind to help debugging more exotic failures.
-                if !is_known_already_locked_error(&err) {
-                    debug!("Try lock error: {err:?}");
-                }
+                log_try_lock_error(mode, &err);
                 debug!("Lock is busy for `{resource}`");
                 None
             }
@@ -349,5 +351,40 @@ impl Drop for LockedFile {
         } else {
             trace!("Released lock at `{}`", self.0.path().display());
         }
+    }
+}
+
+#[cfg(all(test, feature = "tokio"))]
+mod tests {
+    use tempfile::tempdir;
+
+    use super::{LockedFile, LockedFileMode};
+
+    #[test]
+    fn acquire_no_wait_returns_none_when_lock_is_held() {
+        let temp_dir = tempdir().unwrap();
+        let lock_path = temp_dir.path().join("lock");
+        let _lock = LockedFile::acquire_no_wait(&lock_path, LockedFileMode::Exclusive, "cache")
+            .expect("initial lock should succeed");
+
+        let second_lock =
+            LockedFile::acquire_no_wait(&lock_path, LockedFileMode::Exclusive, "cache");
+
+        assert!(second_lock.is_none());
+    }
+
+    #[test]
+    fn acquire_no_wait_succeeds_after_lock_is_released() {
+        let temp_dir = tempdir().unwrap();
+        let lock_path = temp_dir.path().join("lock");
+        let first_lock =
+            LockedFile::acquire_no_wait(&lock_path, LockedFileMode::Exclusive, "cache")
+                .expect("initial lock should succeed");
+        drop(first_lock);
+
+        let second_lock =
+            LockedFile::acquire_no_wait(&lock_path, LockedFileMode::Exclusive, "cache");
+
+        assert!(second_lock.is_some());
     }
 }
