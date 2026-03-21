@@ -46,6 +46,24 @@ fn parse_commit(commit: String) -> Result<String, GitInfoError> {
     Ok(commit)
 }
 
+fn read_head_commit(git_dir: &Path, git_head_contents: String) -> Result<String, GitInfoError> {
+    // The contents are either a commit or a reference in the following formats:
+    // - "<commit>" when the head is detached
+    // - "ref <ref>" when working on a branch
+    // If a commit, checking if the HEAD file has changed is sufficient.
+    // If a ref, we need to add the head file for that ref to rebuild on commit.
+    let mut git_ref_parts = git_head_contents.split_whitespace();
+    let commit_or_ref = git_ref_parts.next().ok_or_else(|| {
+        GitInfoError::InvalidRef(git_dir.to_path_buf(), git_head_contents.clone())
+    })?;
+    if let Some(git_ref) = git_ref_parts.next() {
+        let git_ref_path = git_dir.join(git_ref);
+        Ok(fs_err::read_to_string(git_ref_path)?.trim().to_string())
+    } else {
+        Ok(commit_or_ref.to_string())
+    }
+}
+
 impl Commit {
     /// Return the [`Commit`] for the repository at the given path.
     pub(crate) fn from_repository(path: &Path) -> Result<Self, GitInfoError> {
@@ -55,22 +73,7 @@ impl Commit {
             git_head(&git_dir).ok_or_else(|| GitInfoError::MissingHead(git_dir.clone()))?;
         let git_head_contents = fs_err::read_to_string(git_head_path)?;
 
-        // The contents are either a commit or a reference in the following formats
-        // - "<commit>" when the head is detached
-        // - "ref <ref>" when working on a branch
-        // If a commit, checking if the HEAD file has changed is sufficient
-        // If a ref, we need to add the head file for that ref to rebuild on commit
-        let mut git_ref_parts = git_head_contents.split_whitespace();
-        let commit_or_ref = git_ref_parts
-            .next()
-            .ok_or_else(|| GitInfoError::InvalidRef(git_dir.clone(), git_head_contents.clone()))?;
-        let commit = if let Some(git_ref) = git_ref_parts.next() {
-            let git_ref_path = git_dir.join(git_ref);
-            let commit = fs_err::read_to_string(git_ref_path)?;
-            commit.trim().to_string()
-        } else {
-            commit_or_ref.to_string()
-        };
+        let commit = read_head_commit(&git_dir, git_head_contents)?;
 
         Ok(Self(parse_commit(commit)?))
     }
