@@ -117,6 +117,16 @@ impl PlatformTag {
 }
 
 impl PlatformTag {
+    fn generic_linux_arch(&self) -> Option<Arch> {
+        match self {
+            Self::Manylinux { arch, .. }
+            | Self::Manylinux2014 { arch }
+            | Self::Linux { arch }
+            | Self::Musllinux { arch, .. } => Some(*arch),
+            _ => None,
+        }
+    }
+
     /// Returns `true` if the platform is "any" (i.e., not specific to a platform).
     pub fn is_any(&self) -> bool {
         matches!(self, Self::Any)
@@ -263,136 +273,37 @@ impl PlatformTag {
 
     /// Returns `true` if the tag is only applicable on ppc64le platforms.
     pub fn is_ppc64le(&self) -> bool {
-        matches!(
-            self,
-            Self::Manylinux {
-                arch: Arch::Powerpc64Le,
-                ..
-            } | Self::Manylinux2014 {
-                arch: Arch::Powerpc64Le,
-                ..
-            } | Self::Linux {
-                arch: Arch::Powerpc64Le,
-                ..
-            } | Self::Musllinux {
-                arch: Arch::Powerpc64Le,
-                ..
-            }
-        )
+        self.generic_linux_arch() == Some(Arch::Powerpc64Le)
     }
 
     /// Returns `true` if the tag is only applicable on ppc64 platforms.
     pub fn is_ppc64(&self) -> bool {
-        matches!(
-            self,
-            Self::Manylinux {
-                arch: Arch::Powerpc64,
-                ..
-            } | Self::Manylinux2014 {
-                arch: Arch::Powerpc64,
-                ..
-            } | Self::Linux {
-                arch: Arch::Powerpc64,
-                ..
-            } | Self::Musllinux {
-                arch: Arch::Powerpc64,
-                ..
-            }
-        )
+        self.generic_linux_arch() == Some(Arch::Powerpc64)
     }
 
     /// Returns `true` if the tag is only applicable on s390x platforms.
     pub fn is_s390x(&self) -> bool {
-        matches!(
-            self,
-            Self::Manylinux {
-                arch: Arch::S390X,
-                ..
-            } | Self::Manylinux2014 {
-                arch: Arch::S390X,
-                ..
-            } | Self::Linux {
-                arch: Arch::S390X,
-                ..
-            } | Self::Musllinux {
-                arch: Arch::S390X,
-                ..
-            }
-        )
+        self.generic_linux_arch() == Some(Arch::S390X)
     }
 
     /// Returns `true` if the tag is only applicable on riscv64 platforms.
     pub fn is_riscv64(&self) -> bool {
-        matches!(
-            self,
-            Self::Manylinux {
-                arch: Arch::Riscv64,
-                ..
-            } | Self::Linux {
-                arch: Arch::Riscv64,
-                ..
-            } | Self::Musllinux {
-                arch: Arch::Riscv64,
-                ..
-            }
-        )
+        self.generic_linux_arch() == Some(Arch::Riscv64)
     }
 
     /// Returns `true` if the tag is only applicable on loongarch64 platforms.
     pub fn is_loongarch64(&self) -> bool {
-        matches!(
-            self,
-            Self::Manylinux {
-                arch: Arch::LoongArch64,
-                ..
-            } | Self::Linux {
-                arch: Arch::LoongArch64,
-                ..
-            } | Self::Musllinux {
-                arch: Arch::LoongArch64,
-                ..
-            }
-        )
+        self.generic_linux_arch() == Some(Arch::LoongArch64)
     }
 
     /// Returns `true` if the tag is only applicable on armv7l platforms.
     pub fn is_armv7l(&self) -> bool {
-        matches!(
-            self,
-            Self::Manylinux {
-                arch: Arch::Armv7L,
-                ..
-            } | Self::Manylinux2014 {
-                arch: Arch::Armv7L,
-                ..
-            } | Self::Linux {
-                arch: Arch::Armv7L,
-                ..
-            } | Self::Musllinux {
-                arch: Arch::Armv7L,
-                ..
-            }
-        )
+        self.generic_linux_arch() == Some(Arch::Armv7L)
     }
 
     /// Returns `true` if the tag is only applicable on armv6l platforms.
     pub fn is_armv6l(&self) -> bool {
-        matches!(
-            self,
-            Self::Manylinux {
-                arch: Arch::Armv6L,
-                ..
-            } | Self::Manylinux2014 {
-                arch: Arch::Armv6L,
-                ..
-            } | Self::Linux {
-                arch: Arch::Armv6L,
-                ..
-            } | Self::Musllinux {
-                arch: Arch::Armv6L,
-                ..
-            }
-        )
+        self.generic_linux_arch() == Some(Arch::Armv6L)
     }
 }
 
@@ -1108,6 +1019,54 @@ mod tests {
             Ok(PlatformTag::WinArm64)
         );
         assert_eq!(PlatformTag::WinArm64.to_string(), "win_arm64");
+    }
+
+    #[test]
+    fn generic_linux_arch_predicates_cover_non_x86_platforms() {
+        assert!(
+            PlatformTag::Linux {
+                arch: Arch::Powerpc64Le
+            }
+            .is_ppc64le()
+        );
+        assert!(
+            PlatformTag::Musllinux {
+                major: 1,
+                minor: 2,
+                arch: Arch::Powerpc64
+            }
+            .is_ppc64()
+        );
+        assert!(
+            PlatformTag::Manylinux {
+                major: 2,
+                minor: 17,
+                arch: Arch::S390X
+            }
+            .is_s390x()
+        );
+        assert!(
+            PlatformTag::Linux {
+                arch: Arch::Riscv64
+            }
+            .is_riscv64()
+        );
+        assert!(
+            PlatformTag::Linux {
+                arch: Arch::LoongArch64
+            }
+            .is_loongarch64()
+        );
+        assert!(PlatformTag::Manylinux2014 { arch: Arch::Armv7L }.is_armv7l());
+        assert!(
+            PlatformTag::Musllinux {
+                major: 1,
+                minor: 2,
+                arch: Arch::Armv6L
+            }
+            .is_armv6l()
+        );
+        assert!(!PlatformTag::WinArm64.is_ppc64le());
     }
 
     #[test]
