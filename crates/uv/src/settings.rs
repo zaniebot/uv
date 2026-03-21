@@ -65,6 +65,7 @@ use crate::commands::ToolRunCommand;
 use crate::commands::{InitKind, InitProjectKind, pip::operations::Modifications};
 
 mod commands;
+mod shared;
 pub(crate) use commands::*;
 
 /// The default publish URL.

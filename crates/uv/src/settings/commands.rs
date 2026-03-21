@@ -1,3 +1,4 @@
+use super::shared::{build_options_from_args, index_locations_from_components, sources_from_args};
 use super::*;
 
 /// The resolved settings to use for a `init` invocation.
@@ -3242,20 +3243,14 @@ impl ResolverSettings {
 
 impl From<ResolverOptions> for ResolverSettings {
     fn from(value: ResolverOptions) -> Self {
-        let index_locations = IndexLocations::new(
+        let index_locations = index_locations_from_components(
             value
                 .index
                 .into_iter()
                 .flatten()
                 .chain(value.extra_index_url.into_iter().flatten().map(Index::from))
-                .chain(value.index_url.into_iter().map(Index::from))
-                .collect(),
-            value
-                .find_links
-                .into_iter()
-                .flatten()
-                .map(Index::from)
-                .collect(),
+                .chain(value.index_url.into_iter().map(Index::from)),
+            value.find_links.into_iter().flatten().map(Index::from),
             value.no_index.unwrap_or_default(),
         );
         Self {
@@ -3276,14 +3271,16 @@ impl From<ResolverOptions> for ResolverSettings {
             exclude_newer: value.exclude_newer,
             link_mode: value.link_mode.unwrap_or_default(),
             torch_backend: value.torch_backend,
-            sources: NoSources::from_args(
+            sources: sources_from_args(
                 value.no_sources,
                 value.no_sources_package.unwrap_or_default(),
             ),
             upgrade: value.upgrade.unwrap_or_default(),
-            build_options: BuildOptions::new(
-                NoBinary::from_args(value.no_binary, value.no_binary_package.unwrap_or_default()),
-                NoBuild::from_args(value.no_build, value.no_build_package.unwrap_or_default()),
+            build_options: build_options_from_args(
+                value.no_binary,
+                value.no_binary_package.unwrap_or_default(),
+                value.no_build,
+                value.no_build_package.unwrap_or_default(),
             ),
         }
     }
@@ -3320,30 +3317,23 @@ impl ResolverInstallerSettings {
 
 impl From<ResolverInstallerOptions> for ResolverInstallerSettings {
     fn from(value: ResolverInstallerOptions) -> Self {
-        let index_locations = IndexLocations::new(
+        let index_locations = index_locations_from_components(
             value
                 .index
                 .into_iter()
                 .flatten()
                 .chain(value.extra_index_url.into_iter().flatten().map(Index::from))
-                .chain(value.index_url.into_iter().map(Index::from))
-                .collect(),
-            value
-                .find_links
-                .into_iter()
-                .flatten()
-                .map(Index::from)
-                .collect(),
+                .chain(value.index_url.into_iter().map(Index::from)),
+            value.find_links.into_iter().flatten().map(Index::from),
             value.no_index.unwrap_or_default(),
         );
         Self {
             resolver: ResolverSettings {
-                build_options: BuildOptions::new(
-                    NoBinary::from_args(
-                        value.no_binary,
-                        value.no_binary_package.unwrap_or_default(),
-                    ),
-                    NoBuild::from_args(value.no_build, value.no_build_package.unwrap_or_default()),
+                build_options: build_options_from_args(
+                    value.no_binary,
+                    value.no_binary_package.unwrap_or_default(),
+                    value.no_build,
+                    value.no_build_package.unwrap_or_default(),
                 ),
                 config_setting: value.config_settings.unwrap_or_default(),
                 config_settings_package: value.config_settings_package.unwrap_or_default(),
@@ -3369,7 +3359,7 @@ impl From<ResolverInstallerOptions> for ResolverInstallerSettings {
                 extra_build_variables: value.extra_build_variables.unwrap_or_default(),
                 prerelease: value.prerelease.unwrap_or_default(),
                 resolution: value.resolution.unwrap_or_default(),
-                sources: NoSources::from_args(
+                sources: sources_from_args(
                     value.no_sources,
                     value.no_sources_package.unwrap_or_default(),
                 ),
@@ -3599,7 +3589,7 @@ impl PipSettings {
         let torch_backend = torch_backend.combine(top_level_torch_backend);
 
         Self {
-            index_locations: IndexLocations::new(
+            index_locations: index_locations_from_components(
                 args.index
                     .into_iter()
                     .flatten()
@@ -3607,14 +3597,12 @@ impl PipSettings {
                     .chain(args.index_url.into_iter().map(Index::from))
                     .chain(index.into_iter().flatten())
                     .chain(extra_index_url.into_iter().flatten().map(Index::from))
-                    .chain(index_url.into_iter().map(Index::from))
-                    .collect(),
+                    .chain(index_url.into_iter().map(Index::from)),
                 args.find_links
                     .combine(find_links)
                     .into_iter()
                     .flatten()
-                    .map(Index::from)
-                    .collect(),
+                    .map(Index::from),
                 args.no_index.combine(no_index).unwrap_or_default(),
             ),
             extras: ExtrasSpecification::from_args(
@@ -3750,7 +3738,7 @@ impl PipSettings {
                 .compile_bytecode
                 .combine(compile_bytecode)
                 .unwrap_or_default(),
-            sources: NoSources::from_args(
+            sources: sources_from_args(
                 args.no_sources.combine(no_sources),
                 args.no_sources_package
                     .combine(no_sources_package)
@@ -3898,13 +3886,12 @@ impl PublishSettings {
                 .unwrap_or_default(),
             check_url: args.check_url.combine(check_url),
             index: args.index,
-            index_locations: IndexLocations::new(
+            index_locations: index_locations_from_components(
                 index
                     .into_iter()
                     .flatten()
                     .chain(extra_index_url.into_iter().flatten().map(Index::from))
-                    .chain(index_url.into_iter().map(Index::from))
-                    .collect(),
+                    .chain(index_url.into_iter().map(Index::from)),
                 Vec::new(),
                 false,
             ),
