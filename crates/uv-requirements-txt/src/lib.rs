@@ -903,18 +903,22 @@ fn eat_wrappable_whitespace<'a>(s: &mut Scanner<'a>) -> &'a str {
     s.from(start)
 }
 
+fn consume_optional_lf_after_cr(s: &mut Scanner) {
+    s.eat_if('\n');
+}
+
 /// Eats the end of line or a potential trailing comma
 fn eat_trailing_line(content: &str, s: &mut Scanner) -> Result<(), RequirementsTxtParserError> {
     s.eat_while([' ', '\t']);
     match s.eat() {
         None | Some('\n') => {} // End of file or end of line, nothing to do
         Some('\r') => {
-            s.eat_if('\n'); // `\r\n`, but just `\r` is also accepted
+            consume_optional_lf_after_cr(s); // `\r\n`, but just `\r` is also accepted
         }
         Some('#') => {
             s.eat_until(['\r', '\n']);
             if s.at('\r') {
-                s.eat_if('\n'); // `\r\n`, but just `\r` is also accepted
+                consume_optional_lf_after_cr(s); // `\r\n`, but just `\r` is also accepted
             }
         }
         Some(other) => {
@@ -939,7 +943,7 @@ fn scan_requirement_end(s: &mut Scanner) -> (usize, bool) {
             return (end, false);
         }
         if s.eat_if('\r') {
-            s.eat_if('\n'); // Support `\r\n` but also accept stray `\r`
+            consume_optional_lf_after_cr(s); // Support `\r\n` but also accept stray `\r`
             return (end, false);
         }
         // ... or `--hash`, an escaped newline or a comment separated by whitespace ...
@@ -950,7 +954,7 @@ fn scan_requirement_end(s: &mut Scanner) -> (usize, bool) {
             if s.eat_if('#') {
                 s.eat_until(['\r', '\n']);
                 if s.at('\r') {
-                    s.eat_if('\n'); // `\r\n`, but just `\r` is also accepted
+                    consume_optional_lf_after_cr(s); // `\r\n`, but just `\r` is also accepted
                 }
                 return (end, false);
             }
