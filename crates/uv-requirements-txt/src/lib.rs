@@ -762,6 +762,15 @@ fn consume_option_separator(
     Ok(())
 }
 
+fn consume_entry_trivia(s: &mut Scanner, content: &str) -> Result<(), RequirementsTxtParserError> {
+    eat_wrappable_whitespace(s);
+    while s.at(['\n', '\r', '#']) {
+        eat_trailing_line(content, s)?;
+        eat_wrappable_whitespace(s);
+    }
+    Ok(())
+}
+
 fn parse_requirement_statement(
     s: &mut Scanner,
     content: &str,
@@ -809,13 +818,8 @@ fn parse_entry(
     working_dir: &Path,
     requirements_txt: &Path,
 ) -> Result<Option<RequirementsTxtStatement>, RequirementsTxtParserError> {
-    // Eat all preceding whitespace, this may run us to the end of file
-    eat_wrappable_whitespace(s);
-    while s.at(['\n', '\r', '#']) {
-        // skip comments
-        eat_trailing_line(content, s)?;
-        eat_wrappable_whitespace(s);
-    }
+    // Eat all preceding whitespace and comment-only lines.
+    consume_entry_trivia(s, content)?;
 
     let start = s.cursor();
     Ok(Some(if s.eat_if("-r") || s.eat_if("--requirement") {
