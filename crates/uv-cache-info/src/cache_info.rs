@@ -41,6 +41,11 @@ pub struct CacheInfo {
     directories: BTreeMap<Cow<'static, str>, Option<DirectoryTimestamp>>,
 }
 
+enum PathMetadata {
+    Found(std::fs::Metadata),
+    Missing,
+}
+
 fn default_cache_keys() -> Vec<CacheKey> {
     vec![
         CacheKey::Path(Cow::Borrowed("pyproject.toml")),
@@ -50,6 +55,17 @@ fn default_cache_keys() -> Vec<CacheKey> {
             dir: Cow::Borrowed("src"),
         },
     ]
+}
+
+fn read_path_metadata(path: &Path, kind: &str) -> Option<PathMetadata> {
+    match path.metadata() {
+        Ok(metadata) => Some(PathMetadata::Found(metadata)),
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => Some(PathMetadata::Missing),
+        Err(err) => {
+            warn!("Failed to read metadata for {kind}: {err}");
+            None
+        }
+    }
 }
 
 fn load_cache_keys(pyproject_path: &Path) -> Option<Vec<CacheKey>> {
@@ -169,15 +185,9 @@ impl CacheInfo {
 
                     // Treat the path as a file.
                     let path = directory.join(file.as_ref());
-                    let metadata = match path.metadata() {
-                        Ok(metadata) => metadata,
-                        Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
-                            continue;
-                        }
-                        Err(err) => {
-                            warn!("Failed to read metadata for file: {err}");
-                            continue;
-                        }
+                    let Some(PathMetadata::Found(metadata)) = read_path_metadata(&path, "file")
+                    else {
+                        continue;
                     };
                     if !metadata.is_file() {
                         warn!(
@@ -191,16 +201,13 @@ impl CacheInfo {
                 CacheKey::Directory { dir } => {
                     // Treat the path as a directory.
                     let path = directory.join(dir.as_ref());
-                    let metadata = match path.metadata() {
-                        Ok(metadata) => metadata,
-                        Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
+                    let metadata = match read_path_metadata(&path, "directory") {
+                        Some(PathMetadata::Found(metadata)) => metadata,
+                        Some(PathMetadata::Missing) => {
                             directories.insert(dir, None);
                             continue;
                         }
-                        Err(err) => {
-                            warn!("Failed to read metadata for directory: {err}");
-                            continue;
-                        }
+                        None => continue,
                     };
                     if !metadata.is_dir() {
                         warn!(
