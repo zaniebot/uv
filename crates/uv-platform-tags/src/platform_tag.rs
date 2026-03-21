@@ -307,6 +307,60 @@ impl PlatformTag {
     }
 }
 
+fn parse_versioned_suffix<T>(
+    rest: &str,
+    platform: &'static str,
+    tag: &str,
+) -> Result<(u16, u16, T), ParsePlatformTagError>
+where
+    T: FromStr,
+{
+    let first_underscore = memchr::memchr(b'_', rest.as_bytes()).ok_or_else(|| {
+        ParsePlatformTagError::InvalidFormat {
+            platform,
+            tag: tag.to_string(),
+        }
+    })?;
+
+    let second_underscore = memchr::memchr(b'_', &rest.as_bytes()[first_underscore + 1..])
+        .map(|index| index + first_underscore + 1)
+        .ok_or_else(|| ParsePlatformTagError::InvalidFormat {
+            platform,
+            tag: tag.to_string(),
+        })?;
+
+    let major = rest[..first_underscore].parse().map_err(|_| {
+        ParsePlatformTagError::InvalidMajorVersion {
+            platform,
+            tag: tag.to_string(),
+        }
+    })?;
+
+    let minor = rest[first_underscore + 1..second_underscore]
+        .parse()
+        .map_err(|_| ParsePlatformTagError::InvalidMinorVersion {
+            platform,
+            tag: tag.to_string(),
+        })?;
+
+    let target = &rest[second_underscore + 1..];
+    if target.is_empty() {
+        return Err(ParsePlatformTagError::InvalidFormat {
+            platform,
+            tag: tag.to_string(),
+        });
+    }
+
+    let target = target
+        .parse()
+        .map_err(|_| ParsePlatformTagError::InvalidArch {
+            platform,
+            tag: tag.to_string(),
+        })?;
+
+    Ok((major, minor, target))
+}
+
 impl std::fmt::Display for PlatformTag {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -365,49 +419,7 @@ impl FromStr for PlatformTag {
 
         if let Some(rest) = s.strip_prefix("manylinux_") {
             // Ex) manylinux_2_17_x86_64
-            let first_underscore = memchr::memchr(b'_', rest.as_bytes()).ok_or_else(|| {
-                ParsePlatformTagError::InvalidFormat {
-                    platform: "manylinux",
-                    tag: s.to_string(),
-                }
-            })?;
-
-            let second_underscore = memchr::memchr(b'_', &rest.as_bytes()[first_underscore + 1..])
-                .map(|i| i + first_underscore + 1)
-                .ok_or_else(|| ParsePlatformTagError::InvalidFormat {
-                    platform: "manylinux",
-                    tag: s.to_string(),
-                })?;
-
-            let major = rest[..first_underscore].parse().map_err(|_| {
-                ParsePlatformTagError::InvalidMajorVersion {
-                    platform: "manylinux",
-                    tag: s.to_string(),
-                }
-            })?;
-
-            let minor = rest[first_underscore + 1..second_underscore]
-                .parse()
-                .map_err(|_| ParsePlatformTagError::InvalidMinorVersion {
-                    platform: "manylinux",
-                    tag: s.to_string(),
-                })?;
-
-            let arch_str = &rest[second_underscore + 1..];
-            if arch_str.is_empty() {
-                return Err(ParsePlatformTagError::InvalidFormat {
-                    platform: "manylinux",
-                    tag: s.to_string(),
-                });
-            }
-
-            let arch = arch_str
-                .parse()
-                .map_err(|_| ParsePlatformTagError::InvalidArch {
-                    platform: "manylinux",
-                    tag: s.to_string(),
-                })?;
-
+            let (major, minor, arch) = parse_versioned_suffix(rest, "manylinux", s)?;
             return Ok(Self::Manylinux { major, minor, arch });
         }
 
@@ -457,98 +469,13 @@ impl FromStr for PlatformTag {
 
         if let Some(rest) = s.strip_prefix("musllinux_") {
             // Ex) musllinux_1_1_x86_64
-            let first_underscore = memchr::memchr(b'_', rest.as_bytes()).ok_or_else(|| {
-                ParsePlatformTagError::InvalidFormat {
-                    platform: "musllinux",
-                    tag: s.to_string(),
-                }
-            })?;
-
-            let second_underscore = memchr::memchr(b'_', &rest.as_bytes()[first_underscore + 1..])
-                .map(|i| i + first_underscore + 1)
-                .ok_or_else(|| ParsePlatformTagError::InvalidFormat {
-                    platform: "musllinux",
-                    tag: s.to_string(),
-                })?;
-
-            let major = rest[..first_underscore].parse().map_err(|_| {
-                ParsePlatformTagError::InvalidMajorVersion {
-                    platform: "musllinux",
-                    tag: s.to_string(),
-                }
-            })?;
-
-            let minor = rest[first_underscore + 1..second_underscore]
-                .parse()
-                .map_err(|_| ParsePlatformTagError::InvalidMinorVersion {
-                    platform: "musllinux",
-                    tag: s.to_string(),
-                })?;
-
-            let arch_str = &rest[second_underscore + 1..];
-            if arch_str.is_empty() {
-                return Err(ParsePlatformTagError::InvalidFormat {
-                    platform: "musllinux",
-                    tag: s.to_string(),
-                });
-            }
-
-            let arch = arch_str
-                .parse()
-                .map_err(|_| ParsePlatformTagError::InvalidArch {
-                    platform: "musllinux",
-                    tag: s.to_string(),
-                })?;
-
+            let (major, minor, arch) = parse_versioned_suffix(rest, "musllinux", s)?;
             return Ok(Self::Musllinux { major, minor, arch });
         }
 
         if let Some(rest) = s.strip_prefix("macosx_") {
             // Ex) macosx_11_0_arm64
-            let first_underscore = memchr::memchr(b'_', rest.as_bytes()).ok_or_else(|| {
-                ParsePlatformTagError::InvalidFormat {
-                    platform: "macosx",
-                    tag: s.to_string(),
-                }
-            })?;
-
-            let second_underscore = memchr::memchr(b'_', &rest.as_bytes()[first_underscore + 1..])
-                .map(|i| i + first_underscore + 1)
-                .ok_or_else(|| ParsePlatformTagError::InvalidFormat {
-                    platform: "macosx",
-                    tag: s.to_string(),
-                })?;
-
-            let major = rest[..first_underscore].parse().map_err(|_| {
-                ParsePlatformTagError::InvalidMajorVersion {
-                    platform: "macosx",
-                    tag: s.to_string(),
-                }
-            })?;
-
-            let minor = rest[first_underscore + 1..second_underscore]
-                .parse()
-                .map_err(|_| ParsePlatformTagError::InvalidMinorVersion {
-                    platform: "macosx",
-                    tag: s.to_string(),
-                })?;
-
-            let binary_format_str = &rest[second_underscore + 1..];
-            if binary_format_str.is_empty() {
-                return Err(ParsePlatformTagError::InvalidFormat {
-                    platform: "macosx",
-                    tag: s.to_string(),
-                });
-            }
-
-            let binary_format =
-                binary_format_str
-                    .parse()
-                    .map_err(|_| ParsePlatformTagError::InvalidArch {
-                        platform: "macosx",
-                        tag: s.to_string(),
-                    })?;
-
+            let (major, minor, binary_format) = parse_versioned_suffix(rest, "macosx", s)?;
             return Ok(Self::Macos {
                 major,
                 minor,
