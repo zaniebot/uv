@@ -151,6 +151,16 @@ fn parse_python_version(
     Ok((major, minor))
 }
 
+fn parse_versioned_language_tag(
+    version_str: &str,
+    implementation: &'static str,
+    full_tag: &str,
+    build: impl FnOnce((u8, u8)) -> LanguageTag,
+) -> Result<LanguageTag, ParseLanguageTagError> {
+    let python_version = parse_python_version(version_str, implementation, full_tag)?;
+    Ok(build(python_version))
+}
+
 impl FromStr for LanguageTag {
     type Err = ParseLanguageTagError;
 
@@ -180,9 +190,8 @@ impl FromStr for LanguageTag {
                 _ => {
                     if let Some(pyston) = py.strip_prefix("ston") {
                         // Ex) `pyston38`
-                        let (major, minor) = parse_python_version(pyston, "Pyston", s)?;
-                        Ok(Self::Pyston {
-                            python_version: (major, minor),
+                        parse_versioned_language_tag(pyston, "Pyston", s, |python_version| {
+                            Self::Pyston { python_version }
                         })
                     } else {
                         Err(ParseLanguageTagError::UnknownFormat(s.to_string()))
@@ -211,15 +220,13 @@ impl FromStr for LanguageTag {
             }
         } else if let Some(pp) = s.strip_prefix("pp") {
             // Ex) `pp39`
-            let (major, minor) = parse_python_version(pp, "PyPy", s)?;
-            Ok(Self::PyPy {
-                python_version: (major, minor),
+            parse_versioned_language_tag(pp, "PyPy", s, |python_version| Self::PyPy {
+                python_version,
             })
         } else if let Some(graalpy) = s.strip_prefix("graalpy") {
             // Ex) `graalpy310`
-            let (major, minor) = parse_python_version(graalpy, "GraalPy", s)?;
-            Ok(Self::GraalPy {
-                python_version: (major, minor),
+            parse_versioned_language_tag(graalpy, "GraalPy", s, |python_version| Self::GraalPy {
+                python_version,
             })
         } else {
             Err(ParseLanguageTagError::UnknownFormat(s.to_string()))
