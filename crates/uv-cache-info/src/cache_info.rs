@@ -41,6 +41,28 @@ pub struct CacheInfo {
     directories: BTreeMap<Cow<'static, str>, Option<DirectoryTimestamp>>,
 }
 
+fn default_cache_keys() -> Vec<CacheKey> {
+    vec![
+        CacheKey::Path(Cow::Borrowed("pyproject.toml")),
+        CacheKey::Path(Cow::Borrowed("setup.py")),
+        CacheKey::Path(Cow::Borrowed("setup.cfg")),
+        CacheKey::Directory {
+            dir: Cow::Borrowed("src"),
+        },
+    ]
+}
+
+fn load_cache_keys(pyproject_path: &Path) -> Option<Vec<CacheKey>> {
+    let contents = fs_err::read_to_string(pyproject_path).ok()?;
+    let result = info_span!("toml::from_str cache keys", path = %pyproject_path.display())
+        .in_scope(|| toml::from_str::<PyProjectToml>(&contents));
+    result
+        .ok()?
+        .tool
+        .and_then(|tool| tool.uv)
+        .and_then(|tool_uv| tool_uv.cache_keys)
+}
+
 fn read_repository_commit(directory: &Path) -> Option<Commit> {
     match Commit::from_repository(directory) {
         Ok(commit_info) => Some(commit_info),
@@ -128,32 +150,7 @@ impl CacheInfo {
 
         // Read the cache keys.
         let pyproject_path = directory.join("pyproject.toml");
-        let cache_keys = if let Ok(contents) = fs_err::read_to_string(&pyproject_path) {
-            let result = info_span!("toml::from_str cache keys", path = %pyproject_path.display())
-                .in_scope(|| toml::from_str::<PyProjectToml>(&contents));
-            if let Ok(pyproject_toml) = result {
-                pyproject_toml
-                    .tool
-                    .and_then(|tool| tool.uv)
-                    .and_then(|tool_uv| tool_uv.cache_keys)
-            } else {
-                None
-            }
-        } else {
-            None
-        };
-
-        // If no cache keys were defined, use the defaults.
-        let cache_keys = cache_keys.unwrap_or_else(|| {
-            vec![
-                CacheKey::Path(Cow::Borrowed("pyproject.toml")),
-                CacheKey::Path(Cow::Borrowed("setup.py")),
-                CacheKey::Path(Cow::Borrowed("setup.cfg")),
-                CacheKey::Directory {
-                    dir: Cow::Borrowed("src"),
-                },
-            ]
-        });
+        let cache_keys = load_cache_keys(&pyproject_path).unwrap_or_else(default_cache_keys);
 
         // Incorporate timestamps from any direct filepaths.
         let mut globs = vec![];
