@@ -83,13 +83,7 @@ pub enum ExpandedTagError {
     InvalidPlatformTag(String, #[source] ParsePlatformTagError),
 }
 
-/// Parse an expanded (i.e., simplified) wheel tag, e.g. `py3-none-any`.
-///
-/// Unlike parsing tags in a wheel filename, each tag in this case is expected to contain exactly
-/// three segments separated by `-`: a language tag, an ABI tag, and a platform tag; however,
-/// empirically, some build backends do emit multipart tags (like `cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64`),
-/// so we allow those too.
-fn parse_expanded_tag(tag: &str) -> Result<WheelTag, ExpandedTagError> {
+fn split_expanded_tag(tag: &str) -> Result<(&str, &str, &str), ExpandedTagError> {
     let mut splitter = memchr::Memchr::new(b'-', tag.as_bytes());
     if tag.is_empty() {
         return Err(ExpandedTagError::MissingLanguageTag(tag.to_string()));
@@ -104,9 +98,21 @@ fn parse_expanded_tag(tag: &str) -> Result<WheelTag, ExpandedTagError> {
         return Err(ExpandedTagError::ExtraSegment(tag.to_string()));
     }
 
-    let python_tag = &tag[..python_tag_index];
-    let abi_tag = &tag[python_tag_index + 1..abi_tag_index];
-    let platform_tag = &tag[abi_tag_index + 1..];
+    Ok((
+        &tag[..python_tag_index],
+        &tag[python_tag_index + 1..abi_tag_index],
+        &tag[abi_tag_index + 1..],
+    ))
+}
+
+/// Parse an expanded (i.e., simplified) wheel tag, e.g. `py3-none-any`.
+///
+/// Unlike parsing tags in a wheel filename, each tag in this case is expected to contain exactly
+/// three segments separated by `-`: a language tag, an ABI tag, and a platform tag; however,
+/// empirically, some build backends do emit multipart tags (like `cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64`),
+/// so we allow those too.
+fn parse_expanded_tag(tag: &str) -> Result<WheelTag, ExpandedTagError> {
+    let (python_tag, abi_tag, platform_tag) = split_expanded_tag(tag)?;
 
     let is_small = memchr(b'.', tag.as_bytes()).is_none();
 
