@@ -127,6 +127,10 @@ pub enum AbiTag {
     Pyston { implementation_version: (u8, u8) },
 }
 
+fn format_implementation_version(implementation: &str, version: (u8, u8)) -> String {
+    format!("{implementation} {}.{}", version.0, version.1)
+}
+
 impl AbiTag {
     /// Return a pretty string representation of the ABI tag.
     pub fn pretty(self) -> Option<String> {
@@ -156,16 +160,16 @@ impl AbiTag {
             Self::PyPy {
                 implementation_version,
                 ..
-            } => Some(format!(
-                "PyPy {}.{}",
-                implementation_version.0, implementation_version.1
+            } => Some(format_implementation_version(
+                "PyPy",
+                implementation_version,
             )),
             Self::GraalPy {
                 implementation_version,
                 ..
-            } => Some(format!(
-                "GraalPy {}.{}",
-                implementation_version.0, implementation_version.1
+            } => Some(format_implementation_version(
+                "GraalPy",
+                implementation_version,
             )),
             Self::Pyston { .. } => Some("Pyston".to_string()),
         }
@@ -616,6 +620,26 @@ mod tests {
                 implementation: "Pyston",
                 tag: "pyston_XY_x86_64_linux_gnu".to_string()
             })
+        );
+    }
+
+    #[test]
+    fn pretty_formats_implementation_versions() {
+        assert_eq!(
+            AbiTag::PyPy {
+                python_version: Some((3, 9)),
+                implementation_version: (7, 3),
+            }
+            .pretty(),
+            Some("PyPy 7.3".to_string())
+        );
+        assert_eq!(
+            AbiTag::GraalPy {
+                python_version: (3, 10),
+                implementation_version: (2, 4),
+            }
+            .pretty(),
+            Some("GraalPy 2.4".to_string())
         );
     }
 
