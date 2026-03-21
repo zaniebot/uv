@@ -41,6 +41,26 @@ pub struct CacheInfo {
     directories: BTreeMap<Cow<'static, str>, Option<DirectoryTimestamp>>,
 }
 
+fn read_repository_commit(directory: &Path) -> Option<Commit> {
+    match Commit::from_repository(directory) {
+        Ok(commit_info) => Some(commit_info),
+        Err(err) => {
+            debug!("Failed to read the current commit: {err}");
+            None
+        }
+    }
+}
+
+fn read_repository_tags(directory: &Path) -> Option<Tags> {
+    match Tags::from_repository(directory) {
+        Ok(tags_info) => Some(tags_info),
+        Err(err) => {
+            debug!("Failed to read the current tags: {err}");
+            None
+        }
+    }
+}
+
 impl CacheInfo {
     /// Return the [`CacheInfo`] for a given timestamp.
     pub fn from_timestamp(timestamp: Timestamp) -> Self {
@@ -185,30 +205,15 @@ impl CacheInfo {
                 }
                 CacheKey::Git {
                     git: GitPattern::Bool(true),
-                } => match Commit::from_repository(directory) {
-                    Ok(commit_info) => commit = Some(commit_info),
-                    Err(err) => {
-                        debug!("Failed to read the current commit: {err}");
-                    }
-                },
+                } => commit = read_repository_commit(directory),
                 CacheKey::Git {
                     git: GitPattern::Set(set),
                 } => {
                     if set.commit.unwrap_or(false) {
-                        match Commit::from_repository(directory) {
-                            Ok(commit_info) => commit = Some(commit_info),
-                            Err(err) => {
-                                debug!("Failed to read the current commit: {err}");
-                            }
-                        }
+                        commit = read_repository_commit(directory);
                     }
                     if set.tags.unwrap_or(false) {
-                        match Tags::from_repository(directory) {
-                            Ok(tags_info) => tags = Some(tags_info),
-                            Err(err) => {
-                                debug!("Failed to read the current tags: {err}");
-                            }
-                        }
+                        tags = read_repository_tags(directory);
                     }
                 }
                 CacheKey::Git {
@@ -443,6 +448,38 @@ mod tests_unix {
         // symlink pointing to a directory
         write_manifest("x/*b*")?;
         assert_eq!(cache_timestamp()?, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_cache_info_git_keys() -> Result<()> {
+        let dir = tempfile::tempdir()?;
+        let dir = dir.path().join("repo");
+        let git_dir = dir.join(".git");
+
+        fs_err::create_dir_all(git_dir.join("refs/heads"))?;
+        fs_err::create_dir_all(git_dir.join("refs/tags"))?;
+        fs_err::write(
+            dir.join("pyproject.toml"),
+            r#"
+            [tool.uv]
+            cache-keys = [{ git = { commit = true, tags = true } }]
+            "#,
+        )?;
+        fs_err::write(git_dir.join("HEAD"), "ref: refs/heads/main\n")?;
+        fs_err::write(
+            git_dir.join("refs/heads/main"),
+            "0123456789abcdef0123456789abcdef01234567\n",
+        )?;
+        fs_err::write(
+            git_dir.join("refs/tags/v1.0.0"),
+            "0123456789abcdef0123456789abcdef01234567\n",
+        )?;
+
+        let cache_info = CacheInfo::from_directory(&dir)?;
+        assert!(cache_info.commit.is_some());
+        assert!(cache_info.tags.is_some());
 
         Ok(())
     }
