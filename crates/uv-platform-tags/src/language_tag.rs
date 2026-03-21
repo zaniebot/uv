@@ -36,31 +36,37 @@ pub enum LanguageTag {
     CPythonMajor { major: u8 },
 }
 
+fn format_implementation_version(implementation: &str, major: u8, minor: Option<u8>) -> String {
+    if let Some(minor) = minor {
+        format!("{implementation} {major}.{minor}")
+    } else {
+        format!("{implementation} {major}")
+    }
+}
+
 impl LanguageTag {
     /// Return a pretty string representation of the language tag.
     pub fn pretty(self) -> Option<String> {
         match self {
             Self::None => None,
             Self::Python { major, minor } => {
-                if let Some(minor) = minor {
-                    Some(format!("Python {major}.{minor}"))
-                } else {
-                    Some(format!("Python {major}"))
-                }
+                Some(format_implementation_version("Python", major, minor))
             }
             Self::CPython {
                 python_version: (major, minor),
-            } => Some(format!("CPython {major}.{minor}")),
+            } => Some(format_implementation_version("CPython", major, Some(minor))),
             Self::PyPy {
                 python_version: (major, minor),
-            } => Some(format!("PyPy {major}.{minor}")),
+            } => Some(format_implementation_version("PyPy", major, Some(minor))),
             Self::GraalPy {
                 python_version: (major, minor),
-            } => Some(format!("GraalPy {major}.{minor}")),
+            } => Some(format_implementation_version("GraalPy", major, Some(minor))),
             Self::Pyston {
                 python_version: (major, minor),
-            } => Some(format!("Pyston {major}.{minor}")),
-            Self::CPythonMajor { major } => Some(format!("CPython {major}")),
+            } => Some(format_implementation_version("Pyston", major, Some(minor))),
+            Self::CPythonMajor { major } => {
+                Some(format_implementation_version("CPython", major, None))
+            }
         }
     }
 }
@@ -424,6 +430,22 @@ mod tests {
                 implementation: "Pyston",
                 tag: "pyston3X".to_string()
             })
+        );
+    }
+
+    #[test]
+    fn pretty_formats_versions() {
+        assert_eq!(
+            LanguageTag::Python {
+                major: 3,
+                minor: Some(12)
+            }
+            .pretty(),
+            Some("Python 3.12".to_string())
+        );
+        assert_eq!(
+            LanguageTag::CPythonMajor { major: 3 }.pretty(),
+            Some("CPython 3".to_string())
         );
     }
 
