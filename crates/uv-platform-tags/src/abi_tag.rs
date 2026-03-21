@@ -376,6 +376,26 @@ fn parse_graalpy_abi_tag(rest: &str, tag: &str) -> Result<AbiTag, ParseAbiTagErr
     })
 }
 
+fn parse_pyston_abi_tag(rest: &str, tag: &str) -> Result<AbiTag, ParseAbiTagError> {
+    // Ex) `pyston_23_x86_64_linux_gnu`
+    let rest = rest
+        .strip_prefix('_')
+        .ok_or_else(|| ParseAbiTagError::InvalidFormat {
+            implementation: "Pyston",
+            tag: tag.to_string(),
+        })?;
+    let rest =
+        rest.strip_suffix("_x86_64_linux_gnu")
+            .ok_or_else(|| ParseAbiTagError::InvalidFormat {
+                implementation: "Pyston",
+                tag: tag.to_string(),
+            })?;
+    let implementation_version = parse_impl_version(rest, "Pyston", tag)?;
+    Ok(AbiTag::Pyston {
+        implementation_version,
+    })
+}
+
 impl FromStr for AbiTag {
     type Err = ParseAbiTagError;
 
@@ -400,23 +420,7 @@ impl FromStr for AbiTag {
         } else if let Some(rest) = s.strip_prefix("graalpy") {
             parse_graalpy_abi_tag(rest, s)
         } else if let Some(rest) = s.strip_prefix("pyston") {
-            // Ex) `pyston_23_x86_64_linux_gnu`
-            let rest = rest
-                .strip_prefix("_")
-                .ok_or_else(|| ParseAbiTagError::InvalidFormat {
-                    implementation: "Pyston",
-                    tag: s.to_string(),
-                })?;
-            let rest = rest.strip_suffix("_x86_64_linux_gnu").ok_or_else(|| {
-                ParseAbiTagError::InvalidFormat {
-                    implementation: "Pyston",
-                    tag: s.to_string(),
-                }
-            })?;
-            let (impl_major, impl_minor) = parse_impl_version(rest, "Pyston", s)?;
-            Ok(Self::Pyston {
-                implementation_version: (impl_major, impl_minor),
-            })
+            parse_pyston_abi_tag(rest, s)
         } else {
             Err(ParseAbiTagError::UnknownFormat(s.to_string()))
         }
