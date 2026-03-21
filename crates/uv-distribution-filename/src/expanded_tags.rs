@@ -119,6 +119,30 @@ fn parse_small_tag(python_tag: &str, abi_tag: &str, platform_tag: &str) -> Optio
     })
 }
 
+fn parse_large_tag(
+    tag: &str,
+    python_tag: &str,
+    abi_tag: &str,
+    platform_tag: &str,
+) -> WheelTagLarge {
+    WheelTagLarge {
+        build_tag: None,
+        python_tag: MemchrSplitter::split(python_tag, b'.')
+            .map(LanguageTag::from_str)
+            .filter_map(Result::ok)
+            .collect(),
+        abi_tag: MemchrSplitter::split(abi_tag, b'.')
+            .map(AbiTag::from_str)
+            .filter_map(Result::ok)
+            .collect(),
+        platform_tag: MemchrSplitter::split(platform_tag, b'.')
+            .map(PlatformTag::from_str)
+            .filter_map(Result::ok)
+            .collect(),
+        repr: tag.into(),
+    }
+}
+
 fn parse_expanded_tag(tag: &str) -> Result<WheelTag, ExpandedTagError> {
     let (python_tag, abi_tag, platform_tag) = split_expanded_tag(tag)?;
 
@@ -131,22 +155,7 @@ fn parse_expanded_tag(tag: &str) -> Result<WheelTag, ExpandedTagError> {
         Ok(WheelTag::Small { small })
     } else {
         Ok(WheelTag::Large {
-            large: Box::new(WheelTagLarge {
-                build_tag: None,
-                python_tag: MemchrSplitter::split(python_tag, b'.')
-                    .map(LanguageTag::from_str)
-                    .filter_map(Result::ok)
-                    .collect(),
-                abi_tag: MemchrSplitter::split(abi_tag, b'.')
-                    .map(AbiTag::from_str)
-                    .filter_map(Result::ok)
-                    .collect(),
-                platform_tag: MemchrSplitter::split(platform_tag, b'.')
-                    .map(PlatformTag::from_str)
-                    .filter_map(Result::ok)
-                    .collect(),
-                repr: tag.into(),
-            }),
+            large: Box::new(parse_large_tag(tag, python_tag, abi_tag, platform_tag)),
         })
     }
 }
