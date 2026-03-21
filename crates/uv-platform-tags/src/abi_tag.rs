@@ -214,77 +214,91 @@ impl std::fmt::Display for AbiTag {
     }
 }
 
+fn parse_version_digit(
+    version_str: &str,
+    implementation: &'static str,
+    full_tag: &str,
+    missing: impl FnOnce(&'static str, String) -> ParseAbiTagError,
+    invalid: impl FnOnce(&'static str, String) -> ParseAbiTagError,
+) -> Result<u8, ParseAbiTagError> {
+    version_str
+        .as_bytes()
+        .first()
+        .ok_or_else(|| missing(implementation, full_tag.to_string()))?
+        .checked_sub(b'0')
+        .and_then(|digit| (digit < 10).then_some(digit))
+        .ok_or_else(|| invalid(implementation, full_tag.to_string()))
+}
+
+fn parse_python_version(
+    version_str: &str,
+    implementation: &'static str,
+    full_tag: &str,
+) -> Result<(u8, u8), ParseAbiTagError> {
+    let major = parse_version_digit(
+        version_str,
+        implementation,
+        full_tag,
+        |implementation, tag| ParseAbiTagError::MissingMajorVersion {
+            implementation,
+            tag,
+        },
+        |implementation, tag| ParseAbiTagError::InvalidMajorVersion {
+            implementation,
+            tag,
+        },
+    )?;
+    let minor = version_str
+        .get(1..)
+        .ok_or_else(|| ParseAbiTagError::MissingMinorVersion {
+            implementation,
+            tag: full_tag.to_string(),
+        })?
+        .parse::<u8>()
+        .map_err(|_| ParseAbiTagError::InvalidMinorVersion {
+            implementation,
+            tag: full_tag.to_string(),
+        })?;
+    Ok((major, minor))
+}
+
+fn parse_impl_version(
+    version_str: &str,
+    implementation: &'static str,
+    full_tag: &str,
+) -> Result<(u8, u8), ParseAbiTagError> {
+    let major = parse_version_digit(
+        version_str,
+        implementation,
+        full_tag,
+        |implementation, tag| ParseAbiTagError::MissingImplMajorVersion {
+            implementation,
+            tag,
+        },
+        |implementation, tag| ParseAbiTagError::InvalidImplMajorVersion {
+            implementation,
+            tag,
+        },
+    )?;
+    let minor = version_str
+        .get(1..)
+        .ok_or_else(|| ParseAbiTagError::MissingImplMinorVersion {
+            implementation,
+            tag: full_tag.to_string(),
+        })?
+        .parse::<u8>()
+        .map_err(|_| ParseAbiTagError::InvalidImplMinorVersion {
+            implementation,
+            tag: full_tag.to_string(),
+        })?;
+    Ok((major, minor))
+}
+
 impl FromStr for AbiTag {
     type Err = ParseAbiTagError;
 
     /// Parse an [`AbiTag`] from a string.
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        /// Parse a Python version from a string (e.g., convert `39` into `(3, 9)`).
-        fn parse_python_version(
-            version_str: &str,
-            implementation: &'static str,
-            full_tag: &str,
-        ) -> Result<(u8, u8), ParseAbiTagError> {
-            let major = version_str
-                .as_bytes()
-                .first()
-                .ok_or_else(|| ParseAbiTagError::MissingMajorVersion {
-                    implementation,
-                    tag: full_tag.to_string(),
-                })?
-                .checked_sub(b'0')
-                .and_then(|d| if d < 10 { Some(d) } else { None })
-                .ok_or_else(|| ParseAbiTagError::InvalidMajorVersion {
-                    implementation,
-                    tag: full_tag.to_string(),
-                })?;
-            let minor = version_str
-                .get(1..)
-                .ok_or_else(|| ParseAbiTagError::MissingMinorVersion {
-                    implementation,
-                    tag: full_tag.to_string(),
-                })?
-                .parse::<u8>()
-                .map_err(|_| ParseAbiTagError::InvalidMinorVersion {
-                    implementation,
-                    tag: full_tag.to_string(),
-                })?;
-            Ok((major, minor))
-        }
-
-        /// Parse an implementation version from a string (e.g., convert `37` into `(3, 7)`).
-        fn parse_impl_version(
-            version_str: &str,
-            implementation: &'static str,
-            full_tag: &str,
-        ) -> Result<(u8, u8), ParseAbiTagError> {
-            let major = version_str
-                .as_bytes()
-                .first()
-                .ok_or_else(|| ParseAbiTagError::MissingImplMajorVersion {
-                    implementation,
-                    tag: full_tag.to_string(),
-                })?
-                .checked_sub(b'0')
-                .and_then(|d| if d < 10 { Some(d) } else { None })
-                .ok_or_else(|| ParseAbiTagError::InvalidImplMajorVersion {
-                    implementation,
-                    tag: full_tag.to_string(),
-                })?;
-            let minor = version_str
-                .get(1..)
-                .ok_or_else(|| ParseAbiTagError::MissingImplMinorVersion {
-                    implementation,
-                    tag: full_tag.to_string(),
-                })?
-                .parse::<u8>()
-                .map_err(|_| ParseAbiTagError::InvalidImplMinorVersion {
-                    implementation,
-                    tag: full_tag.to_string(),
-                })?;
-            Ok((major, minor))
-        }
-
         if s == "none" {
             Ok(Self::None)
         } else if s == "abi3" {
