@@ -73,6 +73,16 @@ impl<'a> DiscoveryOptions<'a> {
 }
 
 impl PythonVersionFile {
+    fn candidate_paths(path: &Path, preference: FilePreference) -> [PathBuf; 2] {
+        let version_path = path.join(PYTHON_VERSION_FILENAME);
+        let versions_path = path.join(PYTHON_VERSIONS_FILENAME);
+
+        match preference {
+            FilePreference::Versions => [versions_path, version_path],
+            FilePreference::Version => [version_path, versions_path],
+        }
+    }
+
     /// Find a Python version file in the given directory or any of its parents.
     pub async fn discover(
         working_directory: impl AsRef<Path>,
@@ -144,15 +154,9 @@ impl PythonVersionFile {
     }
 
     fn find_in_directory(path: &Path, options: &DiscoveryOptions<'_>) -> Option<PathBuf> {
-        let version_path = path.join(PYTHON_VERSION_FILENAME);
-        let versions_path = path.join(PYTHON_VERSIONS_FILENAME);
-
-        let paths = match options.preference {
-            FilePreference::Versions => [versions_path, version_path],
-            FilePreference::Version => [version_path, versions_path],
-        };
-
-        paths.into_iter().find(|path| path.is_file())
+        Self::candidate_paths(path, options.preference)
+            .into_iter()
+            .find(|path| path.is_file())
     }
 
     /// Try to read a Python version file at the given path.
@@ -286,5 +290,59 @@ impl PythonVersionFile {
                 .as_bytes(),
         )
         .await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use tempfile::tempdir;
+
+    use super::{
+        DiscoveryOptions, FilePreference, PYTHON_VERSION_FILENAME, PYTHON_VERSIONS_FILENAME,
+        PythonVersionFile,
+    };
+
+    #[test]
+    fn find_in_directory_prefers_requested_filename() {
+        let temp_dir = tempdir().unwrap();
+        let version_path = temp_dir.path().join(PYTHON_VERSION_FILENAME);
+        let versions_path = temp_dir.path().join(PYTHON_VERSIONS_FILENAME);
+
+        fs_err::write(&version_path, "3.12\n").unwrap();
+        fs_err::write(&versions_path, "3.11\n3.12\n").unwrap();
+
+        assert_eq!(
+            PythonVersionFile::find_in_directory(temp_dir.path(), &DiscoveryOptions::default()),
+            Some(version_path)
+        );
+        assert_eq!(
+            PythonVersionFile::find_in_directory(
+                temp_dir.path(),
+                &DiscoveryOptions::default().with_preference(FilePreference::Versions),
+            ),
+            Some(versions_path)
+        );
+    }
+
+    #[test]
+    fn find_nearest_respects_stop_discovery_at() {
+        let temp_dir = tempdir().unwrap();
+        let workspace_dir = temp_dir.path().join("workspace");
+        let project_dir = workspace_dir.join("project");
+        fs_err::create_dir_all(&project_dir).unwrap();
+        let version_path = temp_dir.path().join(PYTHON_VERSION_FILENAME);
+        fs_err::write(&version_path, "3.12\n").unwrap();
+
+        assert_eq!(
+            PythonVersionFile::find_nearest(&project_dir, &DiscoveryOptions::default()),
+            Some(version_path.clone())
+        );
+        assert_eq!(
+            PythonVersionFile::find_nearest(
+                &project_dir,
+                &DiscoveryOptions::default().with_stop_discovery_at(Some(&workspace_dir)),
+            ),
+            None
+        );
     }
 }
