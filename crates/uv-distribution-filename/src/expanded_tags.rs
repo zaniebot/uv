@@ -24,6 +24,14 @@ use crate::wheel_tag::{TagSet, WheelTag, WheelTagLarge, WheelTagSmall};
 pub struct ExpandedTags(smallvec::SmallVec<[WheelTag; 1]>);
 
 impl ExpandedTags {
+    fn compatibility_components(&self) -> (Vec<LanguageTag>, Vec<AbiTag>, Vec<PlatformTag>) {
+        (
+            self.python_tags().copied().collect(),
+            self.abi_tags().copied().collect(),
+            self.platform_tags().cloned().collect(),
+        )
+    }
+
     /// Parse a list of expanded wheel tags (e.g., `py3-none-any`).
     pub fn parse<'a>(tags: impl IntoIterator<Item = &'a str>) -> Result<Self, ExpandedTagError> {
         let tags = tags
@@ -57,11 +65,8 @@ impl ExpandedTags {
 
     /// Return the [`TagCompatibility`] of the wheel with the given tags
     pub fn compatibility(&self, compatible_tags: &Tags) -> TagCompatibility {
-        compatible_tags.compatibility(
-            self.python_tags().copied().collect::<Vec<_>>().as_slice(),
-            self.abi_tags().copied().collect::<Vec<_>>().as_slice(),
-            self.platform_tags().cloned().collect::<Vec<_>>().as_slice(),
-        )
+        let (python_tags, abi_tags, platform_tags) = self.compatibility_components();
+        compatible_tags.compatibility(&python_tags, &abi_tags, &platform_tags)
     }
 }
 
@@ -163,6 +168,7 @@ fn parse_expanded_tag(tag: &str) -> Result<WheelTag, ExpandedTagError> {
 
 #[cfg(test)]
 mod tests {
+    use uv_platform_tags::{Arch, Os, Platform};
 
     use super::*;
 
@@ -523,6 +529,29 @@ mod tests {
             "py3-none-any-extra",
         )
         "#);
+    }
+
+    #[test]
+    fn test_compatibility_uses_expanded_components() {
+        let expanded = ExpandedTags::parse(vec!["py3-none-any"]).unwrap();
+        let compatible_tags = Tags::from_env(
+            &Platform::new(
+                Os::Manylinux {
+                    major: 2,
+                    minor: 28,
+                },
+                Arch::X86_64,
+            ),
+            (3, 12),
+            "cpython",
+            (3, 12),
+            true,
+            false,
+            false,
+        )
+        .unwrap();
+
+        assert!(expanded.compatibility(&compatible_tags).is_compatible());
     }
 
     #[test]
