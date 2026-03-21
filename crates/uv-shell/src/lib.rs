@@ -263,30 +263,28 @@ impl Shell {
             .any(|entry| same_file::is_same_file(path, entry).unwrap_or(false))
     }
 
+    fn escaped_path(self, path: &Path) -> String {
+        let path = path.simplified_display().to_string();
+        match self {
+            Self::Powershell => backtick_escape(&path),
+            _ => backslash_escape(&path),
+        }
+    }
+
     /// Returns the command necessary to prepend a directory to the `PATH` in this shell.
     pub fn prepend_path(self, path: &Path) -> Option<String> {
         match self {
             Self::Nushell => None,
-            Self::Bash | Self::Zsh | Self::Ksh => Some(format!(
-                "export PATH=\"{}:$PATH\"",
-                backslash_escape(&path.simplified_display().to_string()),
-            )),
-            Self::Fish => Some(format!(
-                "fish_add_path \"{}\"",
-                backslash_escape(&path.simplified_display().to_string()),
-            )),
-            Self::Csh => Some(format!(
-                "setenv PATH \"{}:$PATH\"",
-                backslash_escape(&path.simplified_display().to_string()),
-            )),
+            Self::Bash | Self::Zsh | Self::Ksh => {
+                Some(format!("export PATH=\"{}:$PATH\"", self.escaped_path(path)))
+            }
+            Self::Fish => Some(format!("fish_add_path \"{}\"", self.escaped_path(path))),
+            Self::Csh => Some(format!("setenv PATH \"{}:$PATH\"", self.escaped_path(path))),
             Self::Powershell => Some(format!(
                 "$env:PATH = \"{};$env:PATH\"",
-                backtick_escape(&path.simplified_display().to_string()),
+                self.escaped_path(path)
             )),
-            Self::Cmd => Some(format!(
-                "set PATH=\"{};%PATH%\"",
-                backslash_escape(&path.simplified_display().to_string()),
-            )),
+            Self::Cmd => Some(format!("set PATH=\"{};%PATH%\"", self.escaped_path(path))),
         }
     }
 }
@@ -510,6 +508,20 @@ mod tests {
             || {
                 assert!(Shell::contains_path(&bin_dir));
             },
+        );
+    }
+
+    #[test]
+    fn prepend_path_uses_shell_specific_escaping() {
+        let path = Path::new("/tmp/path with \"quotes\" and $dollars");
+
+        assert_eq!(
+            Shell::Bash.prepend_path(path),
+            Some("export PATH=\"/tmp/path with \\\"quotes\\\" and $dollars:$PATH\"".to_string())
+        );
+        assert_eq!(
+            Shell::Powershell.prepend_path(path),
+            Some("$env:PATH = \"/tmp/path with `\"quotes`\" and `$dollars;$env:PATH\"".to_string())
         );
     }
 }
