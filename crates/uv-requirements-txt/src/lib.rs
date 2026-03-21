@@ -725,6 +725,17 @@ fn parse_package_name_specifier_option(
     })
 }
 
+fn parse_include_option(
+    option: &'static str,
+    content: &str,
+    s: &mut Scanner,
+) -> Result<(String, usize), RequirementsTxtParserError> {
+    let filename =
+        parse_maybe_quoted_value(option, content, s, |c: char| !is_terminal(c))?.into_owned();
+    let end = s.cursor();
+    Ok((filename, end))
+}
+
 /// Parse a single entry, that is a requirement, an inclusion or a comment line.
 ///
 /// Consumes all preceding trivia (whitespace and comments). If it returns `None`, we've reached
@@ -745,20 +756,14 @@ fn parse_entry(
 
     let start = s.cursor();
     Ok(Some(if s.eat_if("-r") || s.eat_if("--requirement") {
-        let filename =
-            parse_maybe_quoted_value("--requirement", content, s, |c: char| !is_terminal(c))?
-                .into_owned();
-        let end = s.cursor();
+        let (filename, end) = parse_include_option("--requirement", content, s)?;
         RequirementsTxtStatement::Requirements {
             filename,
             start,
             end,
         }
     } else if s.eat_if("-c") || s.eat_if("--constraint") {
-        let filename =
-            parse_maybe_quoted_value("--constraint", content, s, |c: char| !is_terminal(c))?
-                .into_owned();
-        let end = s.cursor();
+        let (filename, end) = parse_include_option("--constraint", content, s)?;
         RequirementsTxtStatement::Constraint {
             filename,
             start,
