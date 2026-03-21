@@ -79,24 +79,26 @@ fn load_cache_keys(pyproject_path: &Path) -> Option<Vec<CacheKey>> {
         .and_then(|tool_uv| tool_uv.cache_keys)
 }
 
-fn read_repository_commit(directory: &Path) -> Option<Commit> {
-    match Commit::from_repository(directory) {
-        Ok(commit_info) => Some(commit_info),
+fn read_repository_info<T>(
+    directory: &Path,
+    kind: &str,
+    read: impl FnOnce(&Path) -> Result<T, crate::git_info::GitInfoError>,
+) -> Option<T> {
+    match read(directory) {
+        Ok(info) => Some(info),
         Err(err) => {
-            debug!("Failed to read the current commit: {err}");
+            debug!("Failed to read the current {kind}: {err}");
             None
         }
     }
 }
 
+fn read_repository_commit(directory: &Path) -> Option<Commit> {
+    read_repository_info(directory, "commit", Commit::from_repository)
+}
+
 fn read_repository_tags(directory: &Path) -> Option<Tags> {
-    match Tags::from_repository(directory) {
-        Ok(tags_info) => Some(tags_info),
-        Err(err) => {
-            debug!("Failed to read the current tags: {err}");
-            None
-        }
-    }
+    read_repository_info(directory, "tags", Tags::from_repository)
 }
 
 fn update_last_changed(
