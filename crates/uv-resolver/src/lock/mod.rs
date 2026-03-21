@@ -5,7 +5,7 @@ use std::fmt::{Debug, Display, Formatter};
 use std::io;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
-use std::sync::{Arc, LazyLock};
+use std::sync::Arc;
 
 use itertools::Itertools;
 use jiff::Timestamp;
@@ -69,6 +69,7 @@ use crate::{
 mod export;
 mod installable;
 mod map;
+mod markers;
 mod tree;
 
 /// The current version of the lockfile format.
@@ -76,167 +77,6 @@ pub const VERSION: u32 = 1;
 
 /// The current revision of the lockfile format.
 const REVISION: u32 = 3;
-
-static LINUX_MARKERS: LazyLock<UniversalMarker> = LazyLock::new(|| {
-    let pep508 = MarkerTree::from_str("os_name == 'posix' and sys_platform == 'linux'").unwrap();
-    UniversalMarker::new(pep508, ConflictMarker::TRUE)
-});
-static WINDOWS_MARKERS: LazyLock<UniversalMarker> = LazyLock::new(|| {
-    let pep508 = MarkerTree::from_str("os_name == 'nt' and sys_platform == 'win32'").unwrap();
-    UniversalMarker::new(pep508, ConflictMarker::TRUE)
-});
-static MAC_MARKERS: LazyLock<UniversalMarker> = LazyLock::new(|| {
-    let pep508 = MarkerTree::from_str("os_name == 'posix' and sys_platform == 'darwin'").unwrap();
-    UniversalMarker::new(pep508, ConflictMarker::TRUE)
-});
-static ANDROID_MARKERS: LazyLock<UniversalMarker> = LazyLock::new(|| {
-    let pep508 = MarkerTree::from_str("sys_platform == 'android'").unwrap();
-    UniversalMarker::new(pep508, ConflictMarker::TRUE)
-});
-static ARM_MARKERS: LazyLock<UniversalMarker> = LazyLock::new(|| {
-    let pep508 =
-        MarkerTree::from_str("platform_machine == 'aarch64' or platform_machine == 'arm64' or platform_machine == 'ARM64'")
-            .unwrap();
-    UniversalMarker::new(pep508, ConflictMarker::TRUE)
-});
-static X86_64_MARKERS: LazyLock<UniversalMarker> = LazyLock::new(|| {
-    let pep508 =
-        MarkerTree::from_str("platform_machine == 'x86_64' or platform_machine == 'amd64' or platform_machine == 'AMD64'")
-            .unwrap();
-    UniversalMarker::new(pep508, ConflictMarker::TRUE)
-});
-static X86_MARKERS: LazyLock<UniversalMarker> = LazyLock::new(|| {
-    let pep508 = MarkerTree::from_str(
-        "platform_machine == 'i686' or platform_machine == 'i386' or platform_machine == 'win32' or platform_machine == 'x86'",
-    )
-    .unwrap();
-    UniversalMarker::new(pep508, ConflictMarker::TRUE)
-});
-static PPC64LE_MARKERS: LazyLock<UniversalMarker> = LazyLock::new(|| {
-    let pep508 = MarkerTree::from_str("platform_machine == 'ppc64le'").unwrap();
-    UniversalMarker::new(pep508, ConflictMarker::TRUE)
-});
-static PPC64_MARKERS: LazyLock<UniversalMarker> = LazyLock::new(|| {
-    let pep508 = MarkerTree::from_str("platform_machine == 'ppc64'").unwrap();
-    UniversalMarker::new(pep508, ConflictMarker::TRUE)
-});
-static S390X_MARKERS: LazyLock<UniversalMarker> = LazyLock::new(|| {
-    let pep508 = MarkerTree::from_str("platform_machine == 's390x'").unwrap();
-    UniversalMarker::new(pep508, ConflictMarker::TRUE)
-});
-static RISCV64_MARKERS: LazyLock<UniversalMarker> = LazyLock::new(|| {
-    let pep508 = MarkerTree::from_str("platform_machine == 'riscv64'").unwrap();
-    UniversalMarker::new(pep508, ConflictMarker::TRUE)
-});
-static LOONGARCH64_MARKERS: LazyLock<UniversalMarker> = LazyLock::new(|| {
-    let pep508 = MarkerTree::from_str("platform_machine == 'loongarch64'").unwrap();
-    UniversalMarker::new(pep508, ConflictMarker::TRUE)
-});
-static ARMV7L_MARKERS: LazyLock<UniversalMarker> = LazyLock::new(|| {
-    let pep508 =
-        MarkerTree::from_str("platform_machine == 'armv7l' or platform_machine == 'armv8l'")
-            .unwrap();
-    UniversalMarker::new(pep508, ConflictMarker::TRUE)
-});
-static ARMV6L_MARKERS: LazyLock<UniversalMarker> = LazyLock::new(|| {
-    let pep508 = MarkerTree::from_str("platform_machine == 'armv6l'").unwrap();
-    UniversalMarker::new(pep508, ConflictMarker::TRUE)
-});
-static LINUX_ARM_MARKERS: LazyLock<UniversalMarker> = LazyLock::new(|| {
-    let mut marker = *LINUX_MARKERS;
-    marker.and(*ARM_MARKERS);
-    marker
-});
-static LINUX_X86_64_MARKERS: LazyLock<UniversalMarker> = LazyLock::new(|| {
-    let mut marker = *LINUX_MARKERS;
-    marker.and(*X86_64_MARKERS);
-    marker
-});
-static LINUX_X86_MARKERS: LazyLock<UniversalMarker> = LazyLock::new(|| {
-    let mut marker = *LINUX_MARKERS;
-    marker.and(*X86_MARKERS);
-    marker
-});
-static LINUX_PPC64LE_MARKERS: LazyLock<UniversalMarker> = LazyLock::new(|| {
-    let mut marker = *LINUX_MARKERS;
-    marker.and(*PPC64LE_MARKERS);
-    marker
-});
-static LINUX_PPC64_MARKERS: LazyLock<UniversalMarker> = LazyLock::new(|| {
-    let mut marker = *LINUX_MARKERS;
-    marker.and(*PPC64_MARKERS);
-    marker
-});
-static LINUX_S390X_MARKERS: LazyLock<UniversalMarker> = LazyLock::new(|| {
-    let mut marker = *LINUX_MARKERS;
-    marker.and(*S390X_MARKERS);
-    marker
-});
-static LINUX_RISCV64_MARKERS: LazyLock<UniversalMarker> = LazyLock::new(|| {
-    let mut marker = *LINUX_MARKERS;
-    marker.and(*RISCV64_MARKERS);
-    marker
-});
-static LINUX_LOONGARCH64_MARKERS: LazyLock<UniversalMarker> = LazyLock::new(|| {
-    let mut marker = *LINUX_MARKERS;
-    marker.and(*LOONGARCH64_MARKERS);
-    marker
-});
-static LINUX_ARMV7L_MARKERS: LazyLock<UniversalMarker> = LazyLock::new(|| {
-    let mut marker = *LINUX_MARKERS;
-    marker.and(*ARMV7L_MARKERS);
-    marker
-});
-static LINUX_ARMV6L_MARKERS: LazyLock<UniversalMarker> = LazyLock::new(|| {
-    let mut marker = *LINUX_MARKERS;
-    marker.and(*ARMV6L_MARKERS);
-    marker
-});
-static WINDOWS_ARM_MARKERS: LazyLock<UniversalMarker> = LazyLock::new(|| {
-    let mut marker = *WINDOWS_MARKERS;
-    marker.and(*ARM_MARKERS);
-    marker
-});
-static WINDOWS_X86_64_MARKERS: LazyLock<UniversalMarker> = LazyLock::new(|| {
-    let mut marker = *WINDOWS_MARKERS;
-    marker.and(*X86_64_MARKERS);
-    marker
-});
-static WINDOWS_X86_MARKERS: LazyLock<UniversalMarker> = LazyLock::new(|| {
-    let mut marker = *WINDOWS_MARKERS;
-    marker.and(*X86_MARKERS);
-    marker
-});
-static MAC_ARM_MARKERS: LazyLock<UniversalMarker> = LazyLock::new(|| {
-    let mut marker = *MAC_MARKERS;
-    marker.and(*ARM_MARKERS);
-    marker
-});
-static MAC_X86_64_MARKERS: LazyLock<UniversalMarker> = LazyLock::new(|| {
-    let mut marker = *MAC_MARKERS;
-    marker.and(*X86_64_MARKERS);
-    marker
-});
-static MAC_X86_MARKERS: LazyLock<UniversalMarker> = LazyLock::new(|| {
-    let mut marker = *MAC_MARKERS;
-    marker.and(*X86_MARKERS);
-    marker
-});
-static ANDROID_ARM_MARKERS: LazyLock<UniversalMarker> = LazyLock::new(|| {
-    let mut marker = *ANDROID_MARKERS;
-    marker.and(*ARM_MARKERS);
-    marker
-});
-static ANDROID_X86_64_MARKERS: LazyLock<UniversalMarker> = LazyLock::new(|| {
-    let mut marker = *ANDROID_MARKERS;
-    marker.and(*X86_64_MARKERS);
-    marker
-});
-static ANDROID_X86_MARKERS: LazyLock<UniversalMarker> = LazyLock::new(|| {
-    let mut marker = *ANDROID_MARKERS;
-    marker.and(*X86_MARKERS);
-    marker
-});
 
 /// A distribution with its associated hash.
 ///
@@ -370,7 +210,7 @@ impl Lock {
             }
             let wheels = &mut package.wheels;
             wheels.retain(|wheel| {
-                !is_wheel_unreachable_for_marker(
+                !markers::is_wheel_unreachable_for_marker(
                     &wheel.filename,
                     &requires_python,
                     &wheel_marker,
@@ -6219,199 +6059,6 @@ fn simplified_universal_markers(
 ///
 /// Returns `true` if the wheel is definitely unreachable, and `false` if it may be reachable,
 /// including if the wheel tag isn't recognized.
-fn is_wheel_unreachable_for_marker(
-    filename: &WheelFilename,
-    requires_python: &RequiresPython,
-    marker: &UniversalMarker,
-    tags: Option<&Tags>,
-) -> bool {
-    if let Some(tags) = tags
-        && !filename.compatibility(tags).is_compatible()
-    {
-        return true;
-    }
-    // Remove wheels that don't match `requires-python` and can't be selected for installation.
-    if !requires_python.matches_wheel_tag(filename) {
-        return true;
-    }
-
-    // Filter by platform tags.
-
-    // Naively, we'd check whether `platform_system == 'Linux'` is disjoint, or
-    // `os_name == 'posix'` is disjoint, or `sys_platform == 'linux'` is disjoint (each on its
-    // own sufficient to exclude linux wheels), but due to
-    // `(A ∩ (B ∩ C) = ∅) => ((A ∩ B = ∅) or (A ∩ C = ∅))`
-    // a single disjointness check with the intersection is sufficient, so we have one
-    // constant per platform.
-    let platform_tags = filename.platform_tags();
-
-    if platform_tags.iter().all(PlatformTag::is_any) {
-        return false;
-    }
-
-    if platform_tags.iter().all(PlatformTag::is_linux) {
-        if platform_tags.iter().all(PlatformTag::is_arm) {
-            if marker.is_disjoint(*LINUX_ARM_MARKERS) {
-                return true;
-            }
-        } else if platform_tags.iter().all(PlatformTag::is_x86_64) {
-            if marker.is_disjoint(*LINUX_X86_64_MARKERS) {
-                return true;
-            }
-        } else if platform_tags.iter().all(PlatformTag::is_x86) {
-            if marker.is_disjoint(*LINUX_X86_MARKERS) {
-                return true;
-            }
-        } else if platform_tags.iter().all(PlatformTag::is_ppc64le) {
-            if marker.is_disjoint(*LINUX_PPC64LE_MARKERS) {
-                return true;
-            }
-        } else if platform_tags.iter().all(PlatformTag::is_ppc64) {
-            if marker.is_disjoint(*LINUX_PPC64_MARKERS) {
-                return true;
-            }
-        } else if platform_tags.iter().all(PlatformTag::is_s390x) {
-            if marker.is_disjoint(*LINUX_S390X_MARKERS) {
-                return true;
-            }
-        } else if platform_tags.iter().all(PlatformTag::is_riscv64) {
-            if marker.is_disjoint(*LINUX_RISCV64_MARKERS) {
-                return true;
-            }
-        } else if platform_tags.iter().all(PlatformTag::is_loongarch64) {
-            if marker.is_disjoint(*LINUX_LOONGARCH64_MARKERS) {
-                return true;
-            }
-        } else if platform_tags.iter().all(PlatformTag::is_armv7l) {
-            if marker.is_disjoint(*LINUX_ARMV7L_MARKERS) {
-                return true;
-            }
-        } else if platform_tags.iter().all(PlatformTag::is_armv6l) {
-            if marker.is_disjoint(*LINUX_ARMV6L_MARKERS) {
-                return true;
-            }
-        } else if marker.is_disjoint(*LINUX_MARKERS) {
-            return true;
-        }
-    }
-
-    if platform_tags.iter().all(PlatformTag::is_windows) {
-        if platform_tags.iter().all(PlatformTag::is_arm) {
-            if marker.is_disjoint(*WINDOWS_ARM_MARKERS) {
-                return true;
-            }
-        } else if platform_tags.iter().all(PlatformTag::is_x86_64) {
-            if marker.is_disjoint(*WINDOWS_X86_64_MARKERS) {
-                return true;
-            }
-        } else if platform_tags.iter().all(PlatformTag::is_x86) {
-            if marker.is_disjoint(*WINDOWS_X86_MARKERS) {
-                return true;
-            }
-        } else if marker.is_disjoint(*WINDOWS_MARKERS) {
-            return true;
-        }
-    }
-
-    if platform_tags.iter().all(PlatformTag::is_macos) {
-        if platform_tags.iter().all(PlatformTag::is_arm) {
-            if marker.is_disjoint(*MAC_ARM_MARKERS) {
-                return true;
-            }
-        } else if platform_tags.iter().all(PlatformTag::is_x86_64) {
-            if marker.is_disjoint(*MAC_X86_64_MARKERS) {
-                return true;
-            }
-        } else if platform_tags.iter().all(PlatformTag::is_x86) {
-            if marker.is_disjoint(*MAC_X86_MARKERS) {
-                return true;
-            }
-        } else if marker.is_disjoint(*MAC_MARKERS) {
-            return true;
-        }
-    }
-
-    if platform_tags.iter().all(PlatformTag::is_android) {
-        if platform_tags.iter().all(PlatformTag::is_arm) {
-            if marker.is_disjoint(*ANDROID_ARM_MARKERS) {
-                return true;
-            }
-        } else if platform_tags.iter().all(PlatformTag::is_x86_64) {
-            if marker.is_disjoint(*ANDROID_X86_64_MARKERS) {
-                return true;
-            }
-        } else if platform_tags.iter().all(PlatformTag::is_x86) {
-            if marker.is_disjoint(*ANDROID_X86_MARKERS) {
-                return true;
-            }
-        } else if marker.is_disjoint(*ANDROID_MARKERS) {
-            return true;
-        }
-    }
-
-    if platform_tags.iter().all(PlatformTag::is_arm) {
-        if marker.is_disjoint(*ARM_MARKERS) {
-            return true;
-        }
-    }
-
-    if platform_tags.iter().all(PlatformTag::is_x86_64) {
-        if marker.is_disjoint(*X86_64_MARKERS) {
-            return true;
-        }
-    }
-
-    if platform_tags.iter().all(PlatformTag::is_x86) {
-        if marker.is_disjoint(*X86_MARKERS) {
-            return true;
-        }
-    }
-
-    if platform_tags.iter().all(PlatformTag::is_ppc64le) {
-        if marker.is_disjoint(*PPC64LE_MARKERS) {
-            return true;
-        }
-    }
-
-    if platform_tags.iter().all(PlatformTag::is_ppc64) {
-        if marker.is_disjoint(*PPC64_MARKERS) {
-            return true;
-        }
-    }
-
-    if platform_tags.iter().all(PlatformTag::is_s390x) {
-        if marker.is_disjoint(*S390X_MARKERS) {
-            return true;
-        }
-    }
-
-    if platform_tags.iter().all(PlatformTag::is_riscv64) {
-        if marker.is_disjoint(*RISCV64_MARKERS) {
-            return true;
-        }
-    }
-
-    if platform_tags.iter().all(PlatformTag::is_loongarch64) {
-        if marker.is_disjoint(*LOONGARCH64_MARKERS) {
-            return true;
-        }
-    }
-
-    if platform_tags.iter().all(PlatformTag::is_armv7l) {
-        if marker.is_disjoint(*ARMV7L_MARKERS) {
-            return true;
-        }
-    }
-
-    if platform_tags.iter().all(PlatformTag::is_armv6l) {
-        if marker.is_disjoint(*ARMV6L_MARKERS) {
-            return true;
-        }
-    }
-
-    false
-}
-
 pub(crate) fn is_wheel_unreachable(
     filename: &WheelFilename,
     graph: &ResolverOutput,
@@ -6419,7 +6066,7 @@ pub(crate) fn is_wheel_unreachable(
     node_index: NodeIndex,
     tags: Option<&Tags>,
 ) -> bool {
-    is_wheel_unreachable_for_marker(
+    markers::is_wheel_unreachable_for_marker(
         filename,
         requires_python,
         graph.graph[node_index].marker(),
