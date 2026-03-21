@@ -104,44 +104,52 @@ impl std::fmt::Display for LanguageTag {
     }
 }
 
+#[expect(clippy::cast_possible_truncation)]
+fn parse_major_version(
+    version_str: &str,
+    implementation: &'static str,
+    full_tag: &str,
+) -> Result<u8, ParseLanguageTagError> {
+    version_str
+        .chars()
+        .next()
+        .ok_or_else(|| ParseLanguageTagError::MissingMajorVersion {
+            implementation,
+            tag: full_tag.to_string(),
+        })?
+        .to_digit(10)
+        .ok_or_else(|| ParseLanguageTagError::InvalidMajorVersion {
+            implementation,
+            tag: full_tag.to_string(),
+        })
+        .map(|major| major as u8)
+}
+
+fn parse_python_version(
+    version_str: &str,
+    implementation: &'static str,
+    full_tag: &str,
+) -> Result<(u8, u8), ParseLanguageTagError> {
+    let major = parse_major_version(version_str, implementation, full_tag)?;
+    let minor = version_str
+        .get(1..)
+        .ok_or_else(|| ParseLanguageTagError::MissingMinorVersion {
+            implementation,
+            tag: full_tag.to_string(),
+        })?
+        .parse::<u8>()
+        .map_err(|_| ParseLanguageTagError::InvalidMinorVersion {
+            implementation,
+            tag: full_tag.to_string(),
+        })?;
+    Ok((major, minor))
+}
+
 impl FromStr for LanguageTag {
     type Err = ParseLanguageTagError;
 
     /// Parse a [`LanguageTag`] from a string.
-    #[expect(clippy::cast_possible_truncation)]
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        /// Parse a Python version from a string (e.g., convert `39` into `(3, 9)`).
-        fn parse_python_version(
-            version_str: &str,
-            implementation: &'static str,
-            full_tag: &str,
-        ) -> Result<(u8, u8), ParseLanguageTagError> {
-            let major = version_str
-                .chars()
-                .next()
-                .ok_or_else(|| ParseLanguageTagError::MissingMajorVersion {
-                    implementation,
-                    tag: full_tag.to_string(),
-                })?
-                .to_digit(10)
-                .ok_or_else(|| ParseLanguageTagError::InvalidMajorVersion {
-                    implementation,
-                    tag: full_tag.to_string(),
-                })? as u8;
-            let minor = version_str
-                .get(1..)
-                .ok_or_else(|| ParseLanguageTagError::MissingMinorVersion {
-                    implementation,
-                    tag: full_tag.to_string(),
-                })?
-                .parse::<u8>()
-                .map_err(|_| ParseLanguageTagError::InvalidMinorVersion {
-                    implementation,
-                    tag: full_tag.to_string(),
-                })?;
-            Ok((major, minor))
-        }
-
         if s == "none" {
             Ok(Self::None)
         } else if let Some(py) = s.strip_prefix("py") {
@@ -152,18 +160,7 @@ impl FromStr for LanguageTag {
                 }),
                 1 => {
                     // Ex) `py3`
-                    let major = py
-                        .chars()
-                        .next()
-                        .ok_or_else(|| ParseLanguageTagError::MissingMajorVersion {
-                            implementation: "Python",
-                            tag: s.to_string(),
-                        })?
-                        .to_digit(10)
-                        .ok_or_else(|| ParseLanguageTagError::InvalidMajorVersion {
-                            implementation: "Python",
-                            tag: s.to_string(),
-                        })? as u8;
+                    let major = parse_major_version(py, "Python", s)?;
                     Ok(Self::Python { major, minor: None })
                 }
                 2 | 3 => {
@@ -194,18 +191,7 @@ impl FromStr for LanguageTag {
                 }),
                 1 => {
                     // Ex) `cp3`
-                    let major = cp
-                        .chars()
-                        .next()
-                        .ok_or_else(|| ParseLanguageTagError::MissingMajorVersion {
-                            implementation: "CPython",
-                            tag: s.to_string(),
-                        })?
-                        .to_digit(10)
-                        .ok_or_else(|| ParseLanguageTagError::InvalidMajorVersion {
-                            implementation: "CPython",
-                            tag: s.to_string(),
-                        })? as u8;
+                    let major = parse_major_version(cp, "CPython", s)?;
                     Ok(Self::CPythonMajor { major })
                 }
                 2 | 3 => {
