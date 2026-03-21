@@ -46,6 +46,10 @@ fn parse_commit(commit: String) -> Result<String, GitInfoError> {
     Ok(commit)
 }
 
+fn read_tag_commit(path: &Path) -> Result<String, GitInfoError> {
+    parse_commit(fs_err::read_to_string(path)?.trim().to_string())
+}
+
 fn read_head_commit(git_dir: &Path, git_head_contents: String) -> Result<String, GitInfoError> {
     // The contents are either a commit or a reference in the following formats:
     // - "<commit>" when the head is detached
@@ -108,7 +112,7 @@ impl Tags {
                 continue;
             }
             if let Ok(Some(tag)) = path.strip_prefix(&git_tags_path).map(|name| name.to_str()) {
-                let commit = parse_commit(fs_err::read_to_string(path)?.trim().to_string())?;
+                let commit = read_tag_commit(path)?;
                 tags.insert(tag.to_string(), commit);
             }
         }
