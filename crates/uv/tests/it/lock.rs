@@ -2747,6 +2747,28 @@ fn lock_workspace_member_unused_transitive_source() -> Result<()> {
         "source = { url = \"https://files.pythonhosted.org/packages/04/a2/d918dcd22354d8958fe113e1a3630137e0fc8b44859ade3063982eacd2a4/idna-3.3-py3-none-any.whl\" }"
     ));
 
+    member.child("pyproject.toml").write_str(
+        r#"
+        [project]
+        name = "member"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        dependencies = ["sniffio==1.3.1"]
+
+        [tool.uv.sources]
+        idna = { url = "https://files.pythonhosted.org/packages/fc/34/45a4ef5c7a7508b2f7f0d7c297476cbdd5c0ac8d25e7e6a4de8e96d3b7cb/idna-3.4-py3-none-any.whl" }
+        "#,
+    )?;
+
+    uv_snapshot!(context.filters(), context.lock().arg("--locked"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Resolved 5 packages in [TIME]
+    ");
+
     Ok(())
 }
 
@@ -2930,6 +2952,131 @@ async fn lock_project_with_transitive_source_index() -> Result<()> {
         "source = {{ registry = \"{}/simple\" }}",
         proxy.uri()
     )));
+
+    Ok(())
+}
+
+/// Lock a project with a transitive explicit index source, then disable sources and verify the
+/// existing lock is rejected because the locked package source is no longer justified.
+#[tokio::test]
+async fn lock_project_with_transitive_source_index_no_sources_locked() -> Result<()> {
+    let context = uv_test::test_context!("3.12");
+    let proxy = crate::pypi_proxy::start().await;
+
+    context
+        .temp_dir
+        .child("pyproject.toml")
+        .write_str(&format!(
+            r#"
+        [project]
+        name = "project"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        dependencies = ["anyio==3.7.0"]
+
+        [tool.uv.sources]
+        idna = {{ index = "proxy" }}
+
+        [[tool.uv.index]]
+        name = "proxy"
+        url = "{proxy_uri}/simple"
+        explicit = true
+        "#,
+            proxy_uri = proxy.uri(),
+        ))?;
+
+    context.lock().assert().success();
+
+    let lock = context.read("uv.lock");
+    assert!(lock.contains("name = \"idna\""));
+    assert!(lock.contains(&format!(
+        "source = {{ registry = \"{}/simple\" }}",
+        proxy.uri()
+    )));
+
+    uv_snapshot!(context.filters(), context.lock().arg("--no-sources").arg("--locked"), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+
+    ----- stderr -----
+    Resolved 4 packages in [TIME]
+    The lockfile at `uv.lock` needs to be updated, but `--locked` was provided. To update the lockfile, run `uv lock`.
+    ");
+
+    Ok(())
+}
+
+/// Lock a project with a transitive non-explicit index source, then disable sources and verify
+/// the existing lock is rejected because the current index order would source the locked version
+/// from a different non-explicit index.
+#[tokio::test]
+async fn lock_project_with_transitive_non_explicit_index_no_sources_locked() -> Result<()> {
+    let context = uv_test::test_context!("3.12");
+    let first = crate::pypi_proxy::start().await;
+    let second = crate::pypi_proxy::start().await;
+
+    let pkg_a = context.temp_dir.child("pkg_a");
+    fs_err::create_dir_all(&pkg_a)?;
+    pkg_a.child("pyproject.toml").write_str(
+        r#"
+        [project]
+        name = "pkg-a"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        dependencies = ["iniconfig==2.0.0"]
+
+        [build-system]
+        requires = ["uv_build>=0.7,<10000"]
+        build-backend = "uv_build"
+        "#,
+    )?;
+
+    context
+        .temp_dir
+        .child("pyproject.toml")
+        .write_str(&format!(
+            r#"
+        [project]
+        name = "project"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        dependencies = ["pkg-a @ file://{pkg_a_path}"]
+
+        [tool.uv.sources]
+        iniconfig = {{ index = "second" }}
+
+        [[tool.uv.index]]
+        name = "first"
+        url = "{first_uri}/simple"
+
+        [[tool.uv.index]]
+        name = "second"
+        url = "{second_uri}/simple"
+        "#,
+            pkg_a_path = pkg_a.path().display(),
+            first_uri = first.uri(),
+            second_uri = second.uri(),
+        ))?;
+
+    context.lock().assert().success();
+
+    let lock = context.read("uv.lock");
+    assert!(lock.contains("name = \"iniconfig\""));
+    assert!(lock.contains(&format!(
+        "source = {{ registry = \"{}/simple\" }}",
+        second.uri()
+    )));
+
+    uv_snapshot!(context.filters(), context.lock().arg("--no-sources").arg("--locked"), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+
+    ----- stderr -----
+    Resolved 3 packages in [TIME]
+    The lockfile at `uv.lock` needs to be updated, but `--locked` was provided. To update the lockfile, run `uv lock`.
+    ");
 
     Ok(())
 }
@@ -19964,7 +20111,6 @@ fn lock_non_project_sources() -> Result<()> {
         exclude-newer = "2024-03-25T00:00:00Z"
 
         [manifest]
-        transitive-sources = [{ name = "idna", url = "https://files.pythonhosted.org/packages/d7/77/ff688d1504cdc4db2a938e2b7b9adee5dd52e34efbd2431051efc9984de9/idna-3.2-py3-none-any.whl" }]
 
         [manifest.dependency-groups]
         dev = [{ name = "idna", url = "https://files.pythonhosted.org/packages/d7/77/ff688d1504cdc4db2a938e2b7b9adee5dd52e34efbd2431051efc9984de9/idna-3.2-py3-none-any.whl" }]

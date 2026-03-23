@@ -19,6 +19,7 @@ use tracing::{debug, instrument};
 use url::Url;
 
 use uv_cache_key::RepositoryUrl;
+use uv_client::MetadataFormat as RegistryMetadataFormat;
 use uv_configuration::{BuildOptions, Constraints, InstallTarget};
 use uv_distribution::{DistributionDatabase, FlatRequiresDist};
 use uv_distribution_filename::{
@@ -35,16 +36,17 @@ use uv_fs::{PortablePath, PortablePathBuf, Simplified, try_relative_to_if};
 use uv_git::{RepositoryReference, ResolvedRepositoryReference};
 use uv_git_types::{GitLfs, GitOid, GitReference, GitUrl, GitUrlParseError};
 use uv_normalize::{ExtraName, GroupName, PackageName};
-use uv_pep440::Version;
+use uv_pep440::{Version, VersionSpecifiers};
 use uv_pep508::{
-    MarkerEnvironment, MarkerTree, Scheme, VerbatimUrl, VerbatimUrlError, split_scheme,
+    MarkerEnvironment, MarkerTree, RequirementOrigin, Scheme, VerbatimUrl, VerbatimUrlError,
+    split_scheme,
 };
 use uv_platform_tags::{
     AbiTag, IncompatibleTag, LanguageTag, PlatformTag, TagCompatibility, TagPriority, Tags,
 };
 use uv_pypi_types::{
-    ConflictKind, Conflicts, HashAlgorithm, HashDigest, HashDigests, Hashes, ParsedArchiveUrl,
-    ParsedGitUrl, PyProjectToml,
+    ConflictItem, ConflictKind, Conflicts, HashAlgorithm, HashDigest, HashDigests, Hashes,
+    ParsedArchiveUrl, ParsedGitUrl, PyProjectToml,
 };
 use uv_redacted::{DisplaySafeUrl, DisplaySafeUrlError};
 use uv_small_str::SmallString;
@@ -62,8 +64,9 @@ pub use crate::lock::tree::TreeDisplay;
 use crate::resolution::{AnnotatedDist, ResolutionGraphNode};
 use crate::universal_marker::{ConflictMarker, UniversalMarker};
 use crate::{
-    ExcludeNewer, ExcludeNewerPackage, ExcludeNewerValue, InMemoryIndex, MetadataResponse,
-    PackageExcludeNewer, PrereleaseMode, ResolutionMode, ResolverOutput,
+    AllowedYanks, ExcludeNewer, ExcludeNewerPackage, ExcludeNewerValue, InMemoryIndex,
+    MetadataResponse, PackageExcludeNewer, PrereleaseMode, ResolutionMode, ResolverOutput,
+    VersionMap, VersionsResponse,
 };
 
 mod export;
@@ -76,6 +79,17 @@ pub const VERSION: u32 = 1;
 
 /// The current revision of the lockfile format.
 const REVISION: u32 = 3;
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+enum SourceValidationOrigin {
+    Project(PackageName),
+    ProjectExtra(PackageName, ExtraName),
+    ProjectGroup(PackageName, GroupName),
+    Workspace,
+    File,
+    TopLevelExtra(ExtraName),
+    TopLevelGroup(GroupName),
+}
 
 static LINUX_MARKERS: LazyLock<UniversalMarker> = LazyLock::new(|| {
     let pep508 = MarkerTree::from_str("os_name == 'posix' and sys_platform == 'linux'").unwrap();
@@ -894,6 +908,1413 @@ impl Lock {
         reachable
     }
 
+    fn package_marker(&self, package: &Package) -> MarkerTree {
+        if package.fork_markers.is_empty() {
+            MarkerTree::TRUE
+        } else {
+            let mut marker = MarkerTree::FALSE;
+            for fork_marker in &package.fork_markers {
+                marker.or(fork_marker.combined());
+            }
+            marker
+        }
+    }
+
+    fn conflict_marker_for_item(item: &ConflictItem) -> ConflictMarker {
+        match item.kind() {
+            ConflictKind::Project => ConflictMarker::project(item.package()),
+            ConflictKind::Extra(extra) => ConflictMarker::extra(item.package(), extra),
+            ConflictKind::Group(group) => ConflictMarker::group(item.package(), group),
+        }
+    }
+
+    fn origin_marker(&self, origin: &RequirementOrigin) -> MarkerTree {
+        let item = match origin {
+            RequirementOrigin::Project(_, project_name) => {
+                Some(ConflictItem::from(project_name.clone()))
+            }
+            RequirementOrigin::Extra(_, Some(project_name), extra) => {
+                Some(ConflictItem::from((project_name.clone(), extra.clone())))
+            }
+            RequirementOrigin::Group(_, Some(project_name), group) => {
+                Some(ConflictItem::from((project_name.clone(), group.clone())))
+            }
+            RequirementOrigin::File(_)
+            | RequirementOrigin::Workspace
+            | RequirementOrigin::Extra(_, None, _)
+            | RequirementOrigin::Group(_, None, _) => None,
+        };
+
+        let Some(item) = item else {
+            return MarkerTree::TRUE;
+        };
+
+        let mut marker = Self::conflict_marker_for_item(&item).combined();
+        for set in self.conflicts.iter() {
+            if !set.iter().any(|other| other == &item) {
+                continue;
+            }
+            for other in set.iter().filter(|other| *other != &item) {
+                marker.and(Self::conflict_marker_for_item(other).negate().combined());
+            }
+        }
+        marker
+    }
+
+    fn source_validation_origin(origin: &RequirementOrigin) -> SourceValidationOrigin {
+        match origin {
+            RequirementOrigin::Project(_, project_name) => {
+                SourceValidationOrigin::Project(project_name.clone())
+            }
+            RequirementOrigin::Extra(_, Some(project_name), extra) => {
+                SourceValidationOrigin::ProjectExtra(project_name.clone(), extra.clone())
+            }
+            RequirementOrigin::Group(_, Some(project_name), group) => {
+                SourceValidationOrigin::ProjectGroup(project_name.clone(), group.clone())
+            }
+            RequirementOrigin::Workspace => SourceValidationOrigin::Workspace,
+            RequirementOrigin::File(_) => SourceValidationOrigin::File,
+            RequirementOrigin::Extra(_, None, extra) => {
+                SourceValidationOrigin::TopLevelExtra(extra.clone())
+            }
+            RequirementOrigin::Group(_, None, group) => {
+                SourceValidationOrigin::TopLevelGroup(group.clone())
+            }
+        }
+    }
+
+    fn origin_marker_for_source_validation(&self, origin: &SourceValidationOrigin) -> MarkerTree {
+        match origin {
+            SourceValidationOrigin::Project(project_name) => self.origin_marker(
+                &RequirementOrigin::Project(PathBuf::new(), project_name.clone()),
+            ),
+            SourceValidationOrigin::ProjectExtra(project_name, extra) => {
+                self.origin_marker(&RequirementOrigin::Extra(
+                    PathBuf::new(),
+                    Some(project_name.clone()),
+                    extra.clone(),
+                ))
+            }
+            SourceValidationOrigin::ProjectGroup(project_name, group) => {
+                self.origin_marker(&RequirementOrigin::Group(
+                    PathBuf::new(),
+                    Some(project_name.clone()),
+                    group.clone(),
+                ))
+            }
+            SourceValidationOrigin::Workspace
+            | SourceValidationOrigin::File
+            | SourceValidationOrigin::TopLevelExtra(_)
+            | SourceValidationOrigin::TopLevelGroup(_) => MarkerTree::TRUE,
+        }
+    }
+
+    fn collect_reachable_packages_with_markers<'a>(
+        &'a self,
+        initial: impl IntoIterator<Item = (&'a Package, MarkerTree)>,
+        workspace_members: &BTreeSet<PackageName>,
+        stop_at_workspace_members: bool,
+    ) -> FxHashMap<&'a PackageId, MarkerTree> {
+        let mut reachable: FxHashMap<&PackageId, MarkerTree> = FxHashMap::default();
+        let mut queue: VecDeque<(&Package, MarkerTree)> = VecDeque::new();
+
+        for (package, marker) in initial {
+            if marker.is_false() {
+                continue;
+            }
+
+            match reachable.entry(&package.id) {
+                std::collections::hash_map::Entry::Occupied(mut entry) => {
+                    let mut combined = entry.get().clone();
+                    combined.or(marker);
+                    if combined != *entry.get() {
+                        let delta = combined.clone();
+                        entry.insert(combined);
+                        queue.push_back((package, delta));
+                    }
+                }
+                std::collections::hash_map::Entry::Vacant(entry) => {
+                    entry.insert(marker.clone());
+                    queue.push_back((package, marker));
+                }
+            }
+        }
+
+        while let Some((package, package_marker)) = queue.pop_front() {
+            let is_workspace_member = workspace_members.contains(package.name());
+            if is_workspace_member && stop_at_workspace_members {
+                continue;
+            }
+
+            for dependency in package
+                .dependencies()
+                .iter()
+                .chain(package.optional_dependencies().values().flatten())
+                .chain(package.resolved_dependency_groups().values().flatten())
+            {
+                let dependency_package = self.find_by_id(&dependency.package_id);
+                let mut dependency_marker = package_marker.clone();
+                dependency_marker.and(dependency.complexified_marker.combined());
+                dependency_marker.and(self.package_marker(dependency_package));
+                if dependency_marker.is_false() {
+                    continue;
+                }
+
+                match reachable.entry(&dependency_package.id) {
+                    std::collections::hash_map::Entry::Occupied(mut entry) => {
+                        let mut combined = entry.get().clone();
+                        combined.or(dependency_marker.clone());
+                        if combined != *entry.get() {
+                            entry.insert(combined);
+                            queue.push_back((dependency_package, dependency_marker));
+                        }
+                    }
+                    std::collections::hash_map::Entry::Vacant(entry) => {
+                        entry.insert(dependency_marker.clone());
+                        queue.push_back((dependency_package, dependency_marker));
+                    }
+                }
+            }
+        }
+
+        reachable
+    }
+
+    fn requirement_sources_match(expected: &RequirementSource, actual: &RequirementSource) -> bool {
+        match (expected, actual) {
+            (
+                RequirementSource::Registry {
+                    index: expected_index,
+                    ..
+                },
+                RequirementSource::Registry {
+                    index: actual_index,
+                    ..
+                },
+            ) => match expected_index {
+                Some(expected_index) => actual_index.as_ref() == Some(expected_index),
+                None => true,
+            },
+            _ => expected == actual,
+        }
+    }
+
+    fn is_current_explicit_index(index: &IndexMetadata, indexes: Option<&IndexLocations>) -> bool {
+        indexes.is_some_and(|indexes| {
+            indexes
+                .known_indexes()
+                .any(|configured| configured.explicit && configured.url() == index.url())
+        })
+    }
+
+    fn validation_requirement_sources_match(
+        expected: &RequirementSource,
+        actual: &RequirementSource,
+        indexes: Option<&IndexLocations>,
+    ) -> bool {
+        match (expected, actual) {
+            (
+                RequirementSource::Registry { index: None, .. },
+                RequirementSource::Registry {
+                    index: Some(actual_index),
+                    ..
+                },
+            ) => !Self::is_current_explicit_index(actual_index, indexes),
+            _ => Self::requirement_sources_match(expected, actual),
+        }
+    }
+
+    fn package_matches_requirement_source(
+        &self,
+        package: &Package,
+        requirement: &Requirement,
+        root: &Path,
+    ) -> Result<bool, LockError> {
+        let actual = self.requirement_from_package_source(
+            package,
+            root,
+            requirement.marker,
+            requirement.origin.clone(),
+        )?;
+        Ok(Self::requirement_sources_match(
+            &requirement.source,
+            &actual.source,
+        ))
+    }
+
+    fn collect_reachable_packages_from_requirements_with_markers<'a>(
+        &'a self,
+        requirements: impl IntoIterator<Item = &'a Requirement>,
+        root: &Path,
+        workspace_members: &BTreeSet<PackageName>,
+        stop_at_workspace_members: bool,
+    ) -> Result<FxHashMap<&'a PackageId, MarkerTree>, LockError> {
+        let mut initial = Vec::new();
+
+        for requirement in requirements {
+            for package in self
+                .packages
+                .iter()
+                .filter(|package| package.name() == &requirement.name)
+            {
+                if !self.package_matches_requirement_source(package, requirement, root)? {
+                    continue;
+                }
+
+                let mut marker = requirement.marker;
+                marker.and(self.package_marker(package));
+                if marker.is_false() {
+                    continue;
+                }
+                initial.push((package, marker));
+            }
+        }
+
+        Ok(self.collect_reachable_packages_with_markers(
+            initial,
+            workspace_members,
+            stop_at_workspace_members,
+        ))
+    }
+
+    fn collect_reachable_packages_for_origin<'a>(
+        &'a self,
+        root: &Path,
+        origin: &RequirementOrigin,
+        workspace_members: &BTreeSet<PackageName>,
+    ) -> Result<FxHashMap<&'a PackageId, MarkerTree>, LockError> {
+        match origin {
+            RequirementOrigin::Project(_, project_name) => {
+                let stop_at_workspace_members = self
+                    .root()
+                    .is_some_and(|package| package.name() == project_name);
+                let package = if stop_at_workspace_members {
+                    self.root().filter(|package| package.name() == project_name)
+                } else {
+                    self.packages
+                        .iter()
+                        .find(|package| package.name() == project_name)
+                };
+                let Some(package) = package else {
+                    return Ok(FxHashMap::default());
+                };
+                let origin_marker = self.origin_marker(origin);
+
+                Ok(self.collect_reachable_packages_with_markers(
+                    package
+                        .dependencies()
+                        .iter()
+                        .chain(package.optional_dependencies().values().flatten())
+                        .chain(package.resolved_dependency_groups().values().flatten())
+                        .map(|dependency| {
+                            let dependency_package = self.find_by_id(&dependency.package_id);
+                            let mut marker = origin_marker.clone();
+                            marker.and(dependency.complexified_marker.combined());
+                            marker.and(self.package_marker(dependency_package));
+                            (dependency_package, marker)
+                        }),
+                    workspace_members,
+                    stop_at_workspace_members,
+                ))
+            }
+            RequirementOrigin::Extra(_, Some(project_name), extra) => {
+                let stop_at_workspace_members = self
+                    .root()
+                    .is_some_and(|package| package.name() == project_name);
+                let package = if stop_at_workspace_members {
+                    self.root().filter(|package| package.name() == project_name)
+                } else {
+                    self.packages
+                        .iter()
+                        .find(|package| package.name() == project_name)
+                };
+                let Some(package) = package else {
+                    return Ok(FxHashMap::default());
+                };
+                let origin_marker = self.origin_marker(origin);
+
+                Ok(self.collect_reachable_packages_with_markers(
+                    package
+                        .optional_dependencies()
+                        .get(extra)
+                        .into_iter()
+                        .flatten()
+                        .map(|dependency| {
+                            let dependency_package = self.find_by_id(&dependency.package_id);
+                            let mut marker = origin_marker.clone();
+                            marker.and(dependency.complexified_marker.combined());
+                            marker.and(self.package_marker(dependency_package));
+                            (dependency_package, marker)
+                        }),
+                    workspace_members,
+                    stop_at_workspace_members,
+                ))
+            }
+            RequirementOrigin::Group(_, Some(project_name), group) => {
+                let stop_at_workspace_members = self
+                    .root()
+                    .is_some_and(|package| package.name() == project_name);
+                let package = if stop_at_workspace_members {
+                    self.root().filter(|package| package.name() == project_name)
+                } else {
+                    self.packages
+                        .iter()
+                        .find(|package| package.name() == project_name)
+                };
+                let Some(package) = package else {
+                    return Ok(FxHashMap::default());
+                };
+                let origin_marker = self.origin_marker(origin);
+
+                Ok(self.collect_reachable_packages_with_markers(
+                    package
+                        .resolved_dependency_groups()
+                        .get(group)
+                        .into_iter()
+                        .flatten()
+                        .map(|dependency| {
+                            let dependency_package = self.find_by_id(&dependency.package_id);
+                            let mut marker = origin_marker.clone();
+                            marker.and(dependency.complexified_marker.combined());
+                            marker.and(self.package_marker(dependency_package));
+                            (dependency_package, marker)
+                        }),
+                    workspace_members,
+                    stop_at_workspace_members,
+                ))
+            }
+            RequirementOrigin::Workspace => {
+                let requirements = self
+                    .requirements()
+                    .iter()
+                    .chain(self.dependency_groups().values().flatten());
+                self.collect_reachable_packages_from_requirements_with_markers(
+                    requirements,
+                    root,
+                    workspace_members,
+                    true,
+                )
+            }
+            RequirementOrigin::Group(_, None, group) => {
+                let Some(requirements) = self.dependency_groups().get(group) else {
+                    return Ok(FxHashMap::default());
+                };
+                self.collect_reachable_packages_from_requirements_with_markers(
+                    requirements.iter(),
+                    root,
+                    workspace_members,
+                    true,
+                )
+            }
+            RequirementOrigin::File(_) => self
+                .collect_reachable_packages_from_requirements_with_markers(
+                    self.requirements().iter(),
+                    root,
+                    &BTreeSet::default(),
+                    false,
+                ),
+            RequirementOrigin::Extra(_, None, extra) => {
+                let requirements = self.requirements().iter().filter(|requirement| {
+                    requirement
+                        .marker
+                        .top_level_extra_name()
+                        .is_some_and(|requirement_extra| requirement_extra.as_ref() == extra)
+                });
+                self.collect_reachable_packages_from_requirements_with_markers(
+                    requirements,
+                    root,
+                    &BTreeSet::default(),
+                    false,
+                )
+            }
+        }
+    }
+
+    fn normalize_transitive_source_requirement(
+        &self,
+        requirement: Requirement,
+        root: &Path,
+    ) -> Result<Requirement, LockError> {
+        let origin = requirement.origin.clone();
+        let mut requirement = normalize_requirement(requirement, root, &self.requires_python)?;
+        requirement.origin = origin;
+        Ok(requirement)
+    }
+
+    fn requirement_from_locked_source(
+        &self,
+        package_id: &PackageId,
+        root: &Path,
+        marker: MarkerTree,
+        origin: Option<RequirementOrigin>,
+    ) -> Result<Requirement, LockError> {
+        let source = match &package_id.source {
+            Source::Registry(RegistrySource::Url(url)) => {
+                let index = IndexUrl::from(VerbatimUrl::from_url(
+                    url.to_url().map_err(LockErrorKind::InvalidUrl)?,
+                ));
+                RequirementSource::Registry {
+                    specifier: VersionSpecifiers::empty(),
+                    index: Some(IndexMetadata::from(index)),
+                    conflict: None,
+                }
+            }
+            Source::Registry(RegistrySource::Path(path)) => {
+                let index = IndexUrl::from(
+                    VerbatimUrl::from_absolute_path(root.join(path))
+                        .map_err(LockErrorKind::RegistryVerbatimUrl)?,
+                );
+                RequirementSource::Registry {
+                    specifier: VersionSpecifiers::empty(),
+                    index: Some(IndexMetadata::from(index)),
+                    conflict: None,
+                }
+            }
+            Source::Git(url, git) => {
+                let mut repository = url.to_url().map_err(LockErrorKind::InvalidUrl)?;
+                repository.remove_credentials();
+                repository.set_fragment(None);
+                repository.set_query(None);
+                let git_url = GitUrl::from_fields(
+                    DisplaySafeUrl::from(repository.clone()),
+                    GitReference::from(git.kind.clone()),
+                    None,
+                    git.lfs,
+                )?;
+
+                let given = format!("git+{}", repository);
+                let mut verbatim = DisplaySafeUrl::parse(&given)
+                    .map_err(|err| SourceParseError::InvalidUrl { given, err })
+                    .map_err(LockErrorKind::InvalidGitSourceUrl)?;
+                if let Some(reference) = git_url.reference().as_str() {
+                    let path = format!("{}@{}", verbatim.path(), reference);
+                    verbatim.set_path(&path);
+                }
+                let mut fragments = Vec::new();
+                if let Some(subdirectory) = git.subdirectory.as_deref() {
+                    let subdirectory = subdirectory.to_str().ok_or_else(|| {
+                        LockErrorKind::RequirementRelativePath(io::Error::new(
+                            io::ErrorKind::InvalidData,
+                            "non-utf8 git subdirectory",
+                        ))
+                    })?;
+                    fragments.push(format!("subdirectory={subdirectory}"));
+                }
+                if git.lfs.enabled() {
+                    fragments.push("lfs=true".to_string());
+                }
+                if !fragments.is_empty() {
+                    verbatim.set_fragment(Some(&fragments.join("&")));
+                }
+
+                RequirementSource::Git {
+                    url: VerbatimUrl::from_url(verbatim),
+                    git: git_url,
+                    subdirectory: git.subdirectory.clone(),
+                }
+            }
+            Source::Direct(url, direct) => {
+                let location = url.to_url().map_err(LockErrorKind::InvalidUrl)?;
+                let ext = DistExtension::from_path(url.as_ref()).map_err(|err| {
+                    LockErrorKind::MissingExtension {
+                        id: package_id.clone(),
+                        err,
+                    }
+                })?;
+                let url = DisplaySafeUrl::from(ParsedArchiveUrl {
+                    url: location.clone(),
+                    subdirectory: direct.subdirectory.clone(),
+                    ext,
+                });
+                RequirementSource::Url {
+                    location,
+                    subdirectory: direct.subdirectory.clone(),
+                    ext,
+                    url: VerbatimUrl::from_url(url),
+                }
+            }
+            Source::Path(path) => {
+                let install_path = path.to_path_buf().into_boxed_path();
+                let ext = DistExtension::from_path(path).map_err(|err| {
+                    LockErrorKind::MissingExtension {
+                        id: package_id.clone(),
+                        err,
+                    }
+                })?;
+                RequirementSource::Path {
+                    install_path,
+                    ext,
+                    url: VerbatimUrl::from_absolute_path(root.join(path))
+                        .map_err(LockErrorKind::RequirementVerbatimUrl)?,
+                }
+            }
+            Source::Directory(path) | Source::Editable(path) | Source::Virtual(path) => {
+                let install_path = path.to_path_buf().into_boxed_path();
+                RequirementSource::Directory {
+                    install_path,
+                    editable: Some(matches!(&package_id.source, Source::Editable(_))),
+                    r#virtual: Some(matches!(&package_id.source, Source::Virtual(_))),
+                    url: VerbatimUrl::from_absolute_path(root.join(path))
+                        .map_err(LockErrorKind::RequirementVerbatimUrl)?,
+                }
+            }
+        };
+
+        self.normalize_transitive_source_requirement(
+            Requirement {
+                name: package_id.name.clone(),
+                extras: Box::default(),
+                groups: Box::default(),
+                marker,
+                source,
+                origin,
+            },
+            root,
+        )
+    }
+
+    fn requirement_from_package_source(
+        &self,
+        package: &Package,
+        root: &Path,
+        marker: MarkerTree,
+        origin: Option<RequirementOrigin>,
+    ) -> Result<Requirement, LockError> {
+        self.requirement_from_locked_source(&package.id, root, marker, origin)
+    }
+
+    fn serialize_requirement(requirement: &Requirement) -> Result<String, LockError> {
+        Ok(
+            serde::Serialize::serialize(requirement, toml_edit::ser::ValueSerializer::new())?
+                .to_string(),
+        )
+    }
+
+    fn registry_requirement_source(index: Option<IndexMetadata>) -> RequirementSource {
+        RequirementSource::Registry {
+            specifier: VersionSpecifiers::empty(),
+            index,
+            conflict: None,
+        }
+    }
+
+    fn registry_requirement_source_for_index(index: &IndexUrl) -> RequirementSource {
+        Self::registry_requirement_source(Some(IndexMetadata::from(index.clone())))
+    }
+
+    async fn current_registry_sources<Context: BuildContext>(
+        &self,
+        validation_indexes: &IndexLocations,
+        tags: &Tags,
+        hasher: &HashStrategy,
+        index: &InMemoryIndex,
+        database: &DistributionDatabase<'_, Context>,
+    ) -> FxHashMap<PackageId, RequirementSource> {
+        let current_indexes = validation_indexes.indexes().collect::<Vec<_>>();
+        if current_indexes.is_empty() {
+            return FxHashMap::default();
+        }
+
+        if let [index] = current_indexes.as_slice() {
+            let source = Self::registry_requirement_source_for_index(&index.url);
+            return self
+                .packages
+                .iter()
+                .filter(|package| matches!(package.id.source, Source::Registry(..)))
+                .map(|package| (package.id.clone(), source.clone()))
+                .collect();
+        }
+
+        let mut version_maps_cache: FxHashMap<PackageName, Option<Vec<VersionMap>>> =
+            FxHashMap::default();
+        let capabilities = uv_distribution_types::IndexCapabilities::default();
+        let exclude_newer = ExcludeNewer::from(self.options.exclude_newer.clone());
+        let mut registry_sources = FxHashMap::default();
+
+        for package in self
+            .packages
+            .iter()
+            .filter(|package| matches!(package.id.source, Source::Registry(..)))
+        {
+            let Some(version) = package.id.version.as_ref() else {
+                continue;
+            };
+
+            if !version_maps_cache.contains_key(package.name())
+                && index.implicit().get(package.name()).is_none()
+            {
+                let result = database
+                    .client()
+                    .manual(|client, semaphore| {
+                        client.simple_detail(package.name(), None, &capabilities, semaphore)
+                    })
+                    .await;
+                let version_maps = match result {
+                    Ok(results) => Some(
+                        results
+                            .into_iter()
+                            .map(|(index, metadata)| match metadata {
+                                RegistryMetadataFormat::Simple(metadata) => {
+                                    VersionMap::from_simple_metadata(
+                                        metadata,
+                                        package.name(),
+                                        index,
+                                        Some(tags),
+                                        &self.requires_python,
+                                        &AllowedYanks::default(),
+                                        hasher,
+                                        Some(&exclude_newer),
+                                        None,
+                                        &BuildOptions::default(),
+                                    )
+                                }
+                                RegistryMetadataFormat::Flat(metadata) => {
+                                    VersionMap::from_flat_metadata(
+                                        metadata,
+                                        Some(tags),
+                                        hasher,
+                                        &BuildOptions::default(),
+                                    )
+                                }
+                            })
+                            .collect(),
+                    ),
+                    Err(err) => {
+                        debug!(
+                            "Failed to determine current registry source for `{}` during lock validation: {}",
+                            package.name(),
+                            err
+                        );
+                        None
+                    }
+                };
+                version_maps_cache.insert(package.name().clone(), version_maps);
+            }
+
+            if let Some(response) = index.implicit().get(package.name()) {
+                if let VersionsResponse::Found(version_maps) = response.as_ref() {
+                    let source = version_maps
+                        .iter()
+                        .find(|version_map| version_map.get(version).is_some())
+                        .and_then(VersionMap::index)
+                        .map(Self::registry_requirement_source_for_index)
+                        .or_else(|| {
+                            version_maps
+                                .first()
+                                .and_then(VersionMap::index)
+                                .map(Self::registry_requirement_source_for_index)
+                        })
+                        .unwrap_or_else(|| {
+                            Self::registry_requirement_source_for_index(&current_indexes[0].url)
+                        });
+                    registry_sources.insert(package.id.clone(), source);
+                    continue;
+                }
+            }
+
+            let Some(Some(version_maps)) = version_maps_cache.get(package.name()) else {
+                continue;
+            };
+            let source = version_maps
+                .iter()
+                .find(|version_map| version_map.get(version).is_some())
+                .and_then(VersionMap::index)
+                .map(Self::registry_requirement_source_for_index)
+                .or_else(|| {
+                    version_maps
+                        .first()
+                        .and_then(VersionMap::index)
+                        .map(Self::registry_requirement_source_for_index)
+                })
+                .unwrap_or_else(|| {
+                    Self::registry_requirement_source_for_index(&current_indexes[0].url)
+                });
+            registry_sources.insert(package.id.clone(), source);
+        }
+
+        registry_sources
+    }
+
+    fn record_source_mismatch(
+        &self,
+        root: &Path,
+        package: &Package,
+        marker: MarkerTree,
+        source: RequirementSource,
+        expected: &mut BTreeSet<String>,
+        actual: &mut BTreeSet<String>,
+    ) -> Result<(), LockError> {
+        let expected_requirement = self.normalize_transitive_source_requirement(
+            Requirement {
+                name: package.id.name.clone(),
+                extras: Box::default(),
+                groups: Box::default(),
+                marker: marker.clone(),
+                source,
+                origin: None,
+            },
+            root,
+        )?;
+        let actual_requirement =
+            self.requirement_from_package_source(package, root, marker, None)?;
+        expected.insert(Self::serialize_requirement(&expected_requirement)?);
+        actual.insert(Self::serialize_requirement(&actual_requirement)?);
+        Ok(())
+    }
+
+    fn validate_child_sources<'a>(
+        &'a self,
+        root: &Path,
+        origin: &SourceValidationOrigin,
+        parent_marker: &MarkerTree,
+        actual_dependencies: impl IntoIterator<Item = &'a Dependency>,
+        current_requirements: impl IntoIterator<Item = &'a Requirement>,
+        overlays_by_origin: &FxHashMap<SourceValidationOrigin, Vec<Requirement>>,
+        indexes: Option<&IndexLocations>,
+        current_registry_sources: &FxHashMap<PackageId, RequirementSource>,
+        reachable: &mut FxHashMap<&'a PackageId, MarkerTree>,
+        queue: &mut VecDeque<(&'a Package, MarkerTree)>,
+        expected: &mut BTreeSet<String>,
+        actual: &mut BTreeSet<String>,
+    ) -> Result<(), LockError> {
+        let current_requirements = current_requirements.into_iter().collect::<Vec<_>>();
+        let overlays = overlays_by_origin.get(origin);
+
+        for dependency in actual_dependencies {
+            let dependency_package = self.find_by_id(&dependency.package_id);
+            let mut dependency_marker = parent_marker.clone();
+            dependency_marker.and(dependency.complexified_marker.combined());
+            dependency_marker.and(self.package_marker(dependency_package));
+            if dependency_marker.is_false() {
+                continue;
+            }
+
+            if current_requirements.is_empty() {
+                let mut overlay_covered = MarkerTree::FALSE;
+                if let Some(overlays) = overlays {
+                    for overlay in overlays
+                        .iter()
+                        .filter(|overlay| overlay.name == dependency_package.id.name)
+                    {
+                        let mut overlay_marker = dependency_marker.clone();
+                        overlay_marker.and(overlay.marker);
+                        if overlay_marker.is_false() {
+                            continue;
+                        }
+
+                        overlay_covered.or(overlay_marker.clone());
+
+                        let actual_requirement = self.requirement_from_package_source(
+                            dependency_package,
+                            root,
+                            overlay_marker.clone(),
+                            None,
+                        )?;
+                        if !Self::requirement_sources_match(
+                            &overlay.source,
+                            &actual_requirement.source,
+                        ) {
+                            self.record_source_mismatch(
+                                root,
+                                dependency_package,
+                                overlay_marker,
+                                overlay.source.clone(),
+                                expected,
+                                actual,
+                            )?;
+                        }
+                    }
+                }
+
+                let mut uncovered = dependency_marker.clone();
+                uncovered.and(overlay_covered.negate());
+                if !uncovered.is_false() {
+                    let actual_requirement = self.requirement_from_package_source(
+                        dependency_package,
+                        root,
+                        uncovered.clone(),
+                        None,
+                    )?;
+                    if let Some(expected_source) =
+                        current_registry_sources.get(&dependency_package.id)
+                    {
+                        if !Self::requirement_sources_match(
+                            expected_source,
+                            &actual_requirement.source,
+                        ) {
+                            self.record_source_mismatch(
+                                root,
+                                dependency_package,
+                                uncovered,
+                                expected_source.clone(),
+                                expected,
+                                actual,
+                            )?;
+                        }
+                    } else {
+                        let expected_source = RequirementSource::Registry {
+                            specifier: VersionSpecifiers::empty(),
+                            index: None,
+                            conflict: None,
+                        };
+                        if !Self::validation_requirement_sources_match(
+                            &expected_source,
+                            &actual_requirement.source,
+                            indexes,
+                        ) {
+                            self.record_source_mismatch(
+                                root,
+                                dependency_package,
+                                uncovered,
+                                expected_source,
+                                expected,
+                                actual,
+                            )?;
+                        }
+                    }
+                }
+            }
+
+            for requirement in current_requirements
+                .iter()
+                .copied()
+                .filter(|requirement| requirement.name == dependency_package.id.name)
+            {
+                let mut requirement_marker = dependency_marker.clone();
+                requirement_marker.and(requirement.marker);
+                if requirement_marker.is_false() {
+                    continue;
+                }
+
+                let mut overlay_covered = MarkerTree::FALSE;
+                if let Some(overlays) = overlays {
+                    for overlay in overlays
+                        .iter()
+                        .filter(|overlay| overlay.name == dependency_package.id.name)
+                    {
+                        let mut overlay_marker = requirement_marker.clone();
+                        overlay_marker.and(overlay.marker);
+                        if overlay_marker.is_false() {
+                            continue;
+                        }
+
+                        overlay_covered.or(overlay_marker.clone());
+
+                        let actual_requirement = self.requirement_from_package_source(
+                            dependency_package,
+                            root,
+                            overlay_marker.clone(),
+                            None,
+                        )?;
+                        if !Self::requirement_sources_match(
+                            &overlay.source,
+                            &actual_requirement.source,
+                        ) {
+                            self.record_source_mismatch(
+                                root,
+                                dependency_package,
+                                overlay_marker,
+                                overlay.source.clone(),
+                                expected,
+                                actual,
+                            )?;
+                        }
+                    }
+                }
+
+                let mut uncovered = requirement_marker;
+                uncovered.and(overlay_covered.negate());
+                if !uncovered.is_false() {
+                    let actual_requirement = self.requirement_from_package_source(
+                        dependency_package,
+                        root,
+                        uncovered.clone(),
+                        None,
+                    )?;
+                    let expected_source = match &requirement.source {
+                        RequirementSource::Registry { index: None, .. } => current_registry_sources
+                            .get(&dependency_package.id)
+                            .unwrap_or(&requirement.source),
+                        _ => &requirement.source,
+                    };
+                    let matches = if std::ptr::eq(expected_source, &requirement.source) {
+                        Self::validation_requirement_sources_match(
+                            expected_source,
+                            &actual_requirement.source,
+                            indexes,
+                        )
+                    } else {
+                        Self::requirement_sources_match(expected_source, &actual_requirement.source)
+                    };
+                    if !matches {
+                        self.record_source_mismatch(
+                            root,
+                            dependency_package,
+                            uncovered,
+                            expected_source.clone(),
+                            expected,
+                            actual,
+                        )?;
+                    }
+                }
+            }
+
+            match reachable.entry(&dependency_package.id) {
+                std::collections::hash_map::Entry::Occupied(mut entry) => {
+                    let mut combined = entry.get().clone();
+                    combined.or(dependency_marker.clone());
+                    if combined != *entry.get() {
+                        entry.insert(combined);
+                        queue.push_back((dependency_package, dependency_marker));
+                    }
+                }
+                std::collections::hash_map::Entry::Vacant(entry) => {
+                    entry.insert(dependency_marker.clone());
+                    queue.push_back((dependency_package, dependency_marker));
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    fn enqueue_reachable_package<'a>(
+        reachable: &mut FxHashMap<&'a PackageId, MarkerTree>,
+        queue: &mut VecDeque<(&'a Package, MarkerTree)>,
+        package: &'a Package,
+        marker: MarkerTree,
+    ) {
+        match reachable.entry(&package.id) {
+            std::collections::hash_map::Entry::Occupied(mut entry) => {
+                let mut combined = entry.get().clone();
+                combined.or(marker.clone());
+                if combined != *entry.get() {
+                    entry.insert(combined);
+                    queue.push_back((package, marker));
+                }
+            }
+            std::collections::hash_map::Entry::Vacant(entry) => {
+                entry.insert(marker.clone());
+                queue.push_back((package, marker));
+            }
+        }
+    }
+
+    async fn transitive_source_mismatches<Context: BuildContext>(
+        &self,
+        root: &Path,
+        packages: &BTreeMap<PackageName, WorkspaceMember>,
+        requirements: &[Requirement],
+        dependency_groups: &BTreeMap<GroupName, Vec<Requirement>>,
+        transitive_sources: &[Requirement],
+        indexes: Option<&IndexLocations>,
+        validation_indexes: &IndexLocations,
+        tags: &Tags,
+        hasher: &HashStrategy,
+        index: &InMemoryIndex,
+        database: &DistributionDatabase<'_, Context>,
+    ) -> Result<Option<(BTreeSet<String>, BTreeSet<String>)>, LockError> {
+        let mut expected = BTreeSet::new();
+        let mut actual = BTreeSet::new();
+        let workspace_members = packages.keys().cloned().collect::<BTreeSet<_>>();
+        let current_registry_sources = self
+            .current_registry_sources(validation_indexes, tags, hasher, index, database)
+            .await;
+
+        let normalized_transitive_sources = transitive_sources
+            .iter()
+            .cloned()
+            .map(|requirement| self.normalize_transitive_source_requirement(requirement, root))
+            .collect::<Result<Vec<_>, _>>()?;
+
+        for requirement in &normalized_transitive_sources {
+            let Some(origin) = requirement.origin.as_ref() else {
+                continue;
+            };
+            let reachable =
+                self.collect_reachable_packages_for_origin(root, origin, &workspace_members)?;
+            for (package_id, package_marker) in reachable {
+                let package = self.find_by_id(package_id);
+                if package.name() != &requirement.name {
+                    continue;
+                }
+
+                let mut overlap = package_marker.clone();
+                overlap.and(requirement.marker);
+                if overlap.is_false() {
+                    continue;
+                }
+
+                let actual_requirement =
+                    self.requirement_from_package_source(package, root, overlap.clone(), None)?;
+                if !Self::requirement_sources_match(&requirement.source, &actual_requirement.source)
+                {
+                    self.record_source_mismatch(
+                        root,
+                        package,
+                        overlap,
+                        requirement.source.clone(),
+                        &mut expected,
+                        &mut actual,
+                    )?;
+                }
+            }
+        }
+
+        let overlays_by_origin = normalized_transitive_sources
+            .into_iter()
+            .filter_map(|requirement| {
+                requirement
+                    .origin
+                    .clone()
+                    .map(|origin| (Self::source_validation_origin(&origin), requirement))
+            })
+            .fold(
+                FxHashMap::<SourceValidationOrigin, Vec<Requirement>>::default(),
+                |mut overlays_by_origin, (origin, requirement)| {
+                    overlays_by_origin
+                        .entry(origin)
+                        .or_default()
+                        .push(requirement);
+                    overlays_by_origin
+                },
+            );
+
+        let mut origins = FxHashSet::default();
+        for package_name in packages.keys() {
+            origins.insert(SourceValidationOrigin::Project(package_name.clone()));
+            let package = self
+                .find_by_name(package_name)
+                .expect("found too many packages matching root");
+            let Some(package) = package else {
+                continue;
+            };
+            for extra in package.optional_dependencies.keys() {
+                origins.insert(SourceValidationOrigin::ProjectExtra(
+                    package_name.clone(),
+                    extra.clone(),
+                ));
+            }
+            for group in package.resolved_dependency_groups().keys() {
+                origins.insert(SourceValidationOrigin::ProjectGroup(
+                    package_name.clone(),
+                    group.clone(),
+                ));
+            }
+        }
+
+        let has_file_origins = overlays_by_origin.keys().any(|origin| {
+            matches!(
+                origin,
+                SourceValidationOrigin::File | SourceValidationOrigin::TopLevelExtra(_)
+            )
+        });
+        let has_workspace_origins = overlays_by_origin.keys().any(|origin| {
+            matches!(
+                origin,
+                SourceValidationOrigin::Workspace | SourceValidationOrigin::TopLevelGroup(_)
+            )
+        });
+        if has_file_origins || (transitive_sources.is_empty() && !requirements.is_empty()) {
+            origins.insert(SourceValidationOrigin::File);
+            for extra in requirements.iter().filter_map(|requirement| {
+                requirement
+                    .marker
+                    .top_level_extra_name()
+                    .map(|extra| extra.into_owned())
+            }) {
+                origins.insert(SourceValidationOrigin::TopLevelExtra(extra));
+            }
+        }
+        if has_workspace_origins || (transitive_sources.is_empty() && !dependency_groups.is_empty())
+        {
+            origins.insert(SourceValidationOrigin::Workspace);
+            for group in dependency_groups.keys() {
+                origins.insert(SourceValidationOrigin::TopLevelGroup(group.clone()));
+            }
+        }
+
+        for origin in origins {
+            let mut reachable = FxHashMap::default();
+            let mut queue = VecDeque::new();
+
+            match &origin {
+                SourceValidationOrigin::Project(project_name) => {
+                    let package = if self
+                        .root()
+                        .is_some_and(|package| package.name() == project_name)
+                    {
+                        self.root().filter(|package| package.name() == project_name)
+                    } else {
+                        self.packages
+                            .iter()
+                            .find(|package| package.name() == project_name)
+                    };
+                    let Some(package) = package else {
+                        continue;
+                    };
+                    let parent_marker = self.origin_marker_for_source_validation(&origin);
+                    self.validate_child_sources(
+                        root,
+                        &origin,
+                        &parent_marker,
+                        package.dependencies().iter(),
+                        package.metadata.requires_dist.iter(),
+                        &overlays_by_origin,
+                        indexes,
+                        &current_registry_sources,
+                        &mut reachable,
+                        &mut queue,
+                        &mut expected,
+                        &mut actual,
+                    )?;
+                }
+                SourceValidationOrigin::ProjectExtra(project_name, extra) => {
+                    let package = if self
+                        .root()
+                        .is_some_and(|package| package.name() == project_name)
+                    {
+                        self.root().filter(|package| package.name() == project_name)
+                    } else {
+                        self.packages
+                            .iter()
+                            .find(|package| package.name() == project_name)
+                    };
+                    let Some(package) = package else {
+                        continue;
+                    };
+                    let parent_marker = self.origin_marker_for_source_validation(&origin);
+                    self.validate_child_sources(
+                        root,
+                        &origin,
+                        &parent_marker,
+                        package
+                            .optional_dependencies()
+                            .get(extra)
+                            .into_iter()
+                            .flatten(),
+                        package.metadata.requires_dist.iter(),
+                        &overlays_by_origin,
+                        indexes,
+                        &current_registry_sources,
+                        &mut reachable,
+                        &mut queue,
+                        &mut expected,
+                        &mut actual,
+                    )?;
+                }
+                SourceValidationOrigin::ProjectGroup(project_name, group) => {
+                    let package = if self
+                        .root()
+                        .is_some_and(|package| package.name() == project_name)
+                    {
+                        self.root().filter(|package| package.name() == project_name)
+                    } else {
+                        self.packages
+                            .iter()
+                            .find(|package| package.name() == project_name)
+                    };
+                    let Some(package) = package else {
+                        continue;
+                    };
+                    let parent_marker = self.origin_marker_for_source_validation(&origin);
+                    self.validate_child_sources(
+                        root,
+                        &origin,
+                        &parent_marker,
+                        package
+                            .resolved_dependency_groups()
+                            .get(group)
+                            .into_iter()
+                            .flatten(),
+                        package
+                            .metadata
+                            .dependency_groups
+                            .get(group)
+                            .into_iter()
+                            .flatten(),
+                        &overlays_by_origin,
+                        indexes,
+                        &current_registry_sources,
+                        &mut reachable,
+                        &mut queue,
+                        &mut expected,
+                        &mut actual,
+                    )?;
+                }
+                SourceValidationOrigin::File => {
+                    for requirement in requirements {
+                        for package in self
+                            .packages
+                            .iter()
+                            .filter(|package| package.name() == &requirement.name)
+                        {
+                            if !self.package_matches_requirement_source(
+                                package,
+                                requirement,
+                                root,
+                            )? {
+                                continue;
+                            }
+                            let mut marker = requirement.marker;
+                            marker.and(self.package_marker(package));
+                            if marker.is_false() {
+                                continue;
+                            }
+                            Self::enqueue_reachable_package(
+                                &mut reachable,
+                                &mut queue,
+                                package,
+                                marker,
+                            );
+                        }
+                    }
+                }
+                SourceValidationOrigin::TopLevelExtra(extra) => {
+                    for requirement in requirements.iter().filter(|requirement| {
+                        requirement
+                            .marker
+                            .top_level_extra_name()
+                            .is_some_and(|requirement_extra| requirement_extra.as_ref() == extra)
+                    }) {
+                        for package in self
+                            .packages
+                            .iter()
+                            .filter(|package| package.name() == &requirement.name)
+                        {
+                            if !self.package_matches_requirement_source(
+                                package,
+                                requirement,
+                                root,
+                            )? {
+                                continue;
+                            }
+                            let mut marker = requirement.marker;
+                            marker.and(self.package_marker(package));
+                            if marker.is_false() {
+                                continue;
+                            }
+                            Self::enqueue_reachable_package(
+                                &mut reachable,
+                                &mut queue,
+                                package,
+                                marker,
+                            );
+                        }
+                    }
+                }
+                SourceValidationOrigin::Workspace => {
+                    for requirement in requirements
+                        .iter()
+                        .chain(dependency_groups.values().flatten())
+                    {
+                        for package in self
+                            .packages
+                            .iter()
+                            .filter(|package| package.name() == &requirement.name)
+                        {
+                            if !self.package_matches_requirement_source(
+                                package,
+                                requirement,
+                                root,
+                            )? {
+                                continue;
+                            }
+                            let mut marker = requirement.marker;
+                            marker.and(self.package_marker(package));
+                            if marker.is_false() {
+                                continue;
+                            }
+                            Self::enqueue_reachable_package(
+                                &mut reachable,
+                                &mut queue,
+                                package,
+                                marker,
+                            );
+                        }
+                    }
+                }
+                SourceValidationOrigin::TopLevelGroup(group) => {
+                    let Some(group_requirements) = dependency_groups.get(group) else {
+                        continue;
+                    };
+                    for requirement in group_requirements {
+                        for package in self
+                            .packages
+                            .iter()
+                            .filter(|package| package.name() == &requirement.name)
+                        {
+                            if !self.package_matches_requirement_source(
+                                package,
+                                requirement,
+                                root,
+                            )? {
+                                continue;
+                            }
+                            let mut marker = requirement.marker;
+                            marker.and(self.package_marker(package));
+                            if marker.is_false() {
+                                continue;
+                            }
+                            Self::enqueue_reachable_package(
+                                &mut reachable,
+                                &mut queue,
+                                package,
+                                marker,
+                            );
+                        }
+                    }
+                }
+            }
+
+            let stop_at_workspace_members = match &origin {
+                SourceValidationOrigin::Project(project_name)
+                | SourceValidationOrigin::ProjectExtra(project_name, _)
+                | SourceValidationOrigin::ProjectGroup(project_name, _) => self
+                    .root()
+                    .is_some_and(|package| package.name() == project_name),
+                SourceValidationOrigin::Workspace | SourceValidationOrigin::TopLevelGroup(_) => {
+                    true
+                }
+                SourceValidationOrigin::File | SourceValidationOrigin::TopLevelExtra(_) => false,
+            };
+
+            while let Some((package, package_marker)) = queue.pop_front() {
+                if workspace_members.contains(package.name()) && stop_at_workspace_members {
+                    continue;
+                }
+                self.validate_child_sources(
+                    root,
+                    &origin,
+                    &package_marker,
+                    package
+                        .dependencies()
+                        .iter()
+                        .chain(package.optional_dependencies().values().flatten())
+                        .chain(package.resolved_dependency_groups().values().flatten()),
+                    package
+                        .metadata
+                        .requires_dist
+                        .iter()
+                        .chain(package.metadata.dependency_groups.values().flatten()),
+                    &overlays_by_origin,
+                    indexes,
+                    &current_registry_sources,
+                    &mut reachable,
+                    &mut queue,
+                    &mut expected,
+                    &mut actual,
+                )?;
+            }
+        }
+
+        if expected.is_empty() {
+            Ok(None)
+        } else {
+            Ok(Some((expected, actual)))
+        }
+    }
+
     /// Returns the supported environments that were used to generate this
     /// lock.
     ///
@@ -1211,26 +2632,6 @@ impl Lock {
                 manifest_table.insert("overrides", value(overrides));
             }
 
-            if !self.manifest.transitive_sources.is_empty() {
-                let transitive_sources = self
-                    .manifest
-                    .transitive_sources
-                    .iter()
-                    .map(|requirement| {
-                        serde::Serialize::serialize(
-                            &requirement,
-                            toml_edit::ser::ValueSerializer::new(),
-                        )
-                    })
-                    .collect::<Result<Vec<_>, _>>()?;
-                let transitive_sources = match transitive_sources.as_slice() {
-                    [] => Array::new(),
-                    [requirement] => Array::from_iter([requirement]),
-                    transitive_sources => each_element_on_its_line_array(transitive_sources.iter()),
-                };
-                manifest_table.insert("transitive-sources", value(transitive_sources));
-            }
-
             if !self.manifest.excludes.is_empty() {
                 let excludes = self
                     .manifest
@@ -1538,6 +2939,7 @@ impl Lock {
         dependency_groups: &BTreeMap<GroupName, Vec<Requirement>>,
         dependency_metadata: &DependencyMetadata,
         indexes: Option<&IndexLocations>,
+        validation_indexes: &IndexLocations,
         tags: &Tags,
         markers: &MarkerEnvironment,
         hasher: &HashStrategy,
@@ -1647,27 +3049,6 @@ impl Lock {
                 .collect::<Result<_, _>>()?;
             if expected != actual {
                 return Ok(SatisfiesResult::MismatchedOverrides(expected, actual));
-            }
-        }
-
-        // Validate that the lockfile was generated with the same transitive source overlays.
-        {
-            let expected: BTreeSet<_> = transitive_sources
-                .iter()
-                .cloned()
-                .map(|requirement| normalize_requirement(requirement, root, &self.requires_python))
-                .collect::<Result<_, _>>()?;
-            let actual: BTreeSet<_> = self
-                .manifest
-                .transitive_sources
-                .iter()
-                .cloned()
-                .map(|requirement| normalize_requirement(requirement, root, &self.requires_python))
-                .collect::<Result<_, _>>()?;
-            if expected != actual {
-                return Ok(SatisfiesResult::MismatchedTransitiveSources(
-                    expected, actual,
-                ));
             }
         }
 
@@ -2206,6 +3587,29 @@ impl Lock {
             }
         }
 
+        // Validate that current transitive source overlays would still produce the locked package
+        // sources when we walk the existing lock graph.
+        if let Some((expected, actual)) = self
+            .transitive_source_mismatches(
+                root,
+                packages,
+                requirements,
+                dependency_groups,
+                transitive_sources,
+                indexes,
+                validation_indexes,
+                tags,
+                hasher,
+                index,
+                database,
+            )
+            .await?
+        {
+            return Ok(SatisfiesResult::MismatchedTransitiveSources(
+                expected, actual,
+            ));
+        }
+
         Ok(SatisfiesResult::Satisfied)
     }
 }
@@ -2249,8 +3653,8 @@ pub enum SatisfiesResult<'lock> {
     MismatchedConstraints(BTreeSet<Requirement>, BTreeSet<Requirement>),
     /// The lockfile uses a different set of overrides.
     MismatchedOverrides(BTreeSet<Requirement>, BTreeSet<Requirement>),
-    /// The lockfile uses a different set of transitive source overlays.
-    MismatchedTransitiveSources(BTreeSet<Requirement>, BTreeSet<Requirement>),
+    /// The current transitive source overlays disagree with the locked package sources.
+    MismatchedTransitiveSources(BTreeSet<String>, BTreeSet<String>),
     /// The lockfile uses a different set of excludes.
     MismatchedExcludes(BTreeSet<PackageName>, BTreeSet<PackageName>),
     /// The lockfile uses a different set of build constraints.
@@ -2371,9 +3775,6 @@ pub struct ResolverManifest {
     /// The overrides provided to the resolver.
     #[serde(default)]
     overrides: BTreeSet<Requirement>,
-    /// The transitive source overlays provided to the resolver.
-    #[serde(default)]
-    transitive_sources: BTreeSet<Requirement>,
     /// The excludes provided to the resolver.
     #[serde(default)]
     excludes: BTreeSet<PackageName>,
@@ -2393,7 +3794,6 @@ impl ResolverManifest {
         requirements: impl IntoIterator<Item = Requirement>,
         constraints: impl IntoIterator<Item = Requirement>,
         overrides: impl IntoIterator<Item = Requirement>,
-        transitive_sources: impl IntoIterator<Item = Requirement>,
         excludes: impl IntoIterator<Item = PackageName>,
         build_constraints: impl IntoIterator<Item = Requirement>,
         dependency_groups: impl IntoIterator<Item = (GroupName, Vec<Requirement>)>,
@@ -2404,7 +3804,6 @@ impl ResolverManifest {
             requirements: requirements.into_iter().collect(),
             constraints: constraints.into_iter().collect(),
             overrides: overrides.into_iter().collect(),
-            transitive_sources: transitive_sources.into_iter().collect(),
             excludes: excludes.into_iter().collect(),
             build_constraints: build_constraints.into_iter().collect(),
             dependency_groups: dependency_groups
@@ -2431,11 +3830,6 @@ impl ResolverManifest {
                 .collect::<Result<BTreeSet<_>, _>>()?,
             overrides: self
                 .overrides
-                .into_iter()
-                .map(|requirement| requirement.relative_to(root))
-                .collect::<Result<BTreeSet<_>, _>>()?,
-            transitive_sources: self
-                .transitive_sources
                 .into_iter()
                 .map(|requirement| requirement.relative_to(root))
                 .collect::<Result<BTreeSet<_>, _>>()?,
@@ -5961,6 +7355,9 @@ enum LockErrorKind {
         #[from]
         ToUrlError,
     ),
+    /// An error that occurs when serializing lockfile data for validation.
+    #[error(transparent)]
+    Serialize(#[from] toml_edit::ser::Error),
     /// An error that occurs when the extension can't be determined
     /// for a given wheel or source distribution.
     #[error("Failed to parse file extension for `{id}`; expected one of: {err}", id = id.cyan())]

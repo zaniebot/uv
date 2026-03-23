@@ -1006,12 +1006,15 @@ async fn do_lock(
             // Notify the user of any resolution diagnostics.
             pip::operations::diagnose_resolution(resolution.diagnostics(), printer)?;
 
+            let lock = lock
+                .with_conflicts(conflicts.clone())
+                .with_required_environments(lock_required_environments.into_markers());
+
             let manifest = ResolverManifest::new(
                 members,
                 requirements,
                 constraints,
                 overrides,
-                transitive_source_overlays,
                 excludes.clone(),
                 build_constraints,
                 dependency_groups,
@@ -1020,10 +1023,7 @@ async fn do_lock(
             .relative_to(target.install_path())?;
 
             let previous = validated_existing_lock.map(ValidatedLock::into_lock);
-            let lock = lock
-                .with_manifest(manifest)
-                .with_conflicts(conflicts)
-                .with_required_environments(lock_required_environments.into_markers());
+            let lock = lock.with_manifest(manifest);
 
             if previous.as_ref().is_some_and(|previous| *previous == lock) {
                 Ok(LockResult::Unchanged(lock))
@@ -1269,6 +1269,7 @@ impl ValidatedLock {
                 dependency_groups,
                 dependency_metadata,
                 indexes,
+                index_locations,
                 interpreter.tags()?,
                 interpreter.markers(),
                 hasher,
