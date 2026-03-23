@@ -44,7 +44,7 @@ use uv_distribution_types::{
 use uv_install_wheel::LinkMode;
 use uv_normalize::{ExtraName, PackageName, PipGroupName};
 use uv_pep508::{MarkerTree, RequirementOrigin};
-use uv_preview::Preview;
+use uv_preview::{Preview, PreviewFeature};
 use uv_pypi_types::SupportedEnvironments;
 use uv_python::{Prefix, PythonDownloads, PythonPreference, PythonVersion, Target};
 use uv_redacted::DisplaySafeUrl;
@@ -92,7 +92,12 @@ impl GlobalSettings {
         workspace: Option<&FilesystemOptions>,
         environment: &EnvironmentOptions,
     ) -> Self {
-        let network_settings = NetworkSettings::resolve(args, workspace, environment);
+        let preview = Preview::from_args(
+            resolve_preview(args, workspace, environment),
+            args.no_preview,
+            &args.preview_features,
+        );
+        let network_settings = NetworkSettings::resolve(args, workspace, environment, preview);
         let python_preference = resolve_python_preference(args, workspace, environment);
         Self {
             required_version: workspace
@@ -145,11 +150,7 @@ impl GlobalSettings {
                     .unwrap_or_else(Concurrency::threads),
             ),
             show_settings: args.show_settings,
-            preview: Preview::from_args(
-                resolve_preview(args, workspace, environment),
-                args.no_preview,
-                &args.preview_features,
-            ),
+            preview,
             python_preference,
             python_downloads: flag(
                 args.allow_python_downloads,
@@ -257,6 +258,7 @@ impl NetworkSettings {
         args: &GlobalArgs,
         workspace: Option<&FilesystemOptions>,
         environment: &EnvironmentOptions,
+        preview: Preview,
     ) -> Self {
         // Resolve offline flag from CLI, environment variable, and workspace config.
         // Precedence: CLI > Env var > Workspace config > default (false).
@@ -309,7 +311,7 @@ impl NetworkSettings {
                             .system_certs
                             .or(workspace.globals.native_tls)
                     })
-                    .unwrap_or(false)
+                    .unwrap_or(preview.is_enabled(PreviewFeature::SystemCertsDefault))
             };
 
         let allow_insecure_host = args
