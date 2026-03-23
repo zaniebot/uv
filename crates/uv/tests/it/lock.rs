@@ -34263,3 +34263,135 @@ fn lock_frozen_warning() -> Result<()> {
 
     Ok(())
 }
+
+/// Regression test for <https://github.com/astral-sh/uv/issues/18671>.
+///
+/// When a non-explicit private index is configured (without `explicit = true`), it acts as a
+/// PyPI mirror/proxy: it serves package metadata but file URLs point to `files.pythonhosted.org`.
+/// The `source.registry` in the lockfile should reflect which index actually provided the package
+/// metadata:
+///
+/// - Packages found on the private index get `source = { registry = "<private>" }` (since the
+///   private index has higher priority and serves the metadata).
+/// - Packages NOT found on the private index (404) fall through to PyPI and should get
+///   `source = { registry = "https://pypi.org/simple" }`.
+///
+/// The bug in #18671 reports that public PyPI packages get the private index URL in
+/// `source.registry` even when they weren't served by it, creating an internally inconsistent
+/// lockfile where artifacts point to `files.pythonhosted.org` but the registry says otherwise.
+#[tokio::test]
+async fn lock_registry_source_fallback_to_pypi_with_private_index() -> Result<()> {
+    let context = uv_test::test_context!("3.12");
+    let proxy = crate::pypi_proxy::start().await;
+
+    // The proxy database does NOT contain "tqdm" (nor "colorama"), so those will 404 and uv
+    // should fall back to PyPI. "iniconfig" IS in the proxy database, so it should come from
+    // the private index (which has higher priority).
+    let pyproject_toml = context.temp_dir.child("pyproject.toml");
+    pyproject_toml.write_str(&format!(
+        r#"
+        [project]
+        name = "project"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        dependencies = ["iniconfig>=2", "tqdm>=4,<5"]
+
+        [[tool.uv.index]]
+        name = "private"
+        url = "{proxy_uri}/simple"
+        "#,
+        proxy_uri = proxy.uri()
+    ))?;
+
+    uv_snapshot!(context.filters(), context.lock(), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Resolved 4 packages in [TIME]
+    ");
+
+    let lock = context.read("uv.lock");
+
+    insta::with_settings!({
+        filters => context.filters(),
+    }, {
+        assert_snapshot!(
+            lock, @r#"
+        version = 1
+        revision = 3
+        requires-python = ">=3.12"
+
+        [options]
+        exclude-newer = "2024-03-25T00:00:00Z"
+
+        [[package]]
+        name = "colorama"
+        version = "0.4.6"
+        source = { registry = "https://pypi.org/simple" }
+        sdist = { url = "https://files.pythonhosted.org/packages/d8/53/6f443c9a4a8358a93a6792e2acffb9d9d5cb0a5cfd8802644b7b1c9a02e4/colorama-0.4.6.tar.gz", hash = "sha256:08695f5cb7ed6e0531a20572697297273c47b8cae5a63ffc6d6ed5c201be6e44", size = 27697, upload-time = "2022-10-25T02:36:22.414Z" }
+        wheels = [
+            { url = "https://files.pythonhosted.org/packages/d1/d6/3965ed04c63042e047cb6a3e6ed1a63a35087b6a609aa3a15ed8ac56c221/colorama-0.4.6-py2.py3-none-any.whl", hash = "sha256:4f1d9991f5acc0ca119f9d443620b77f9d6b33703e51011c16baf57afb285fc6", size = 25335, upload-time = "2022-10-25T02:36:20.889Z" },
+        ]
+
+        [[package]]
+        name = "iniconfig"
+        version = "2.0.0"
+        source = { registry = "http://[LOCALHOST]/simple" }
+        sdist = { url = "https://files.pythonhosted.org/packages/d7/4b/cbd8e699e64a6f16ca3a8220661b5f83792b3017d0f79807cb8708d33913/iniconfig-2.0.0.tar.gz", hash = "sha256:2d91e135bf72d31a410b17c16da610a82cb55f6b0477d1a902134b24a455b8b3", size = 4646, upload-time = "2023-01-07T11:08:11.254Z" }
+        wheels = [
+            { url = "https://files.pythonhosted.org/packages/ef/a6/62565a6e1cf69e10f5727360368e451d4b7f58beeac6173dc9db836a5b46/iniconfig-2.0.0-py3-none-any.whl", hash = "sha256:b6a85871a79d2e3b22d2d1b94ac2824226a63c6b741c88f7ae975f18b6778374", size = 5892, upload-time = "2023-01-07T11:08:09.864Z" },
+        ]
+
+        [[package]]
+        name = "project"
+        version = "0.1.0"
+        source = { virtual = "." }
+        dependencies = [
+            { name = "iniconfig" },
+            { name = "tqdm" },
+        ]
+
+        [package.metadata]
+        requires-dist = [
+            { name = "iniconfig", specifier = ">=2" },
+            { name = "tqdm", specifier = ">=4,<5" },
+        ]
+
+        [[package]]
+        name = "tqdm"
+        version = "4.66.2"
+        source = { registry = "https://pypi.org/simple" }
+        dependencies = [
+            { name = "colorama", marker = "sys_platform == 'win32'" },
+        ]
+        sdist = { url = "https://files.pythonhosted.org/packages/ea/85/3ce0f9f7d3f596e7ea57f4e5ce8c18cb44e4a9daa58ddb46ee0d13d6bff8/tqdm-4.66.2.tar.gz", hash = "sha256:6cd52cdf0fef0e0f543299cfc96fec90d7b8a7e88745f411ec33eb44d5ed3531", size = 169462, upload-time = "2024-02-10T18:19:57.214Z" }
+        wheels = [
+            { url = "https://files.pythonhosted.org/packages/2a/14/e75e52d521442e2fcc9f1df3c5e456aead034203d4797867980de558ab34/tqdm-4.66.2-py3-none-any.whl", hash = "sha256:1ee4f8a893eb9bef51c6e35730cebf234d5d0b6bd112b0271e10ed7c24a02bd9", size = 78296, upload-time = "2024-02-10T18:19:53.524Z" },
+        ]
+        "#
+        );
+    });
+
+    // Key observations for #18671:
+    //
+    // 1. `iniconfig` has `source = { registry = "http://[LOCALHOST]/simple" }` (private index)
+    //    but its artifact URLs point to `files.pythonhosted.org`. This is the inconsistency
+    //    described in #18671: the registry says private index, but files come from PyPI.
+    //    This happens because the private index has higher priority and *does* serve iniconfig's
+    //    metadata, even though the actual files are hosted on PyPI.
+    //
+    // 2. `tqdm` correctly shows `source = { registry = "https://pypi.org/simple" }` because the
+    //    private index returned 404 for it, so resolution fell through to PyPI.
+    //
+    // The inconsistency in (1) is the core of #18671: when a private index acts as a
+    // mirror/proxy (serving metadata but pointing files to PyPI), the lockfile's
+    // `source.registry` and artifact URLs disagree about the package's origin.
+    assert!(
+        lock.contains(r#"source = { registry = "https://pypi.org/simple" }"#),
+        "Expected tqdm/colorama to have PyPI as source registry"
+    );
+
+    Ok(())
+}
