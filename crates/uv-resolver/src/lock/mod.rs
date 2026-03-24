@@ -19,7 +19,6 @@ use tracing::{debug, instrument};
 use url::Url;
 
 use uv_cache_key::RepositoryUrl;
-use uv_client::MetadataFormat as RegistryMetadataFormat;
 use uv_configuration::{BuildOptions, Constraints, InstallTarget};
 use uv_distribution::{DistributionDatabase, FlatRequiresDist};
 use uv_distribution_filename::{
@@ -64,9 +63,8 @@ pub use crate::lock::tree::TreeDisplay;
 use crate::resolution::{AnnotatedDist, ResolutionGraphNode};
 use crate::universal_marker::{ConflictMarker, UniversalMarker};
 use crate::{
-    AllowedYanks, ExcludeNewer, ExcludeNewerPackage, ExcludeNewerValue, InMemoryIndex,
-    MetadataResponse, PackageExcludeNewer, PrereleaseMode, ResolutionMode, ResolverOutput,
-    VersionMap, VersionsResponse,
+    ExcludeNewer, ExcludeNewerPackage, ExcludeNewerValue, InMemoryIndex, MetadataResponse,
+    PackageExcludeNewer, PrereleaseMode, ResolutionMode, ResolverOutput,
 };
 
 mod export;
@@ -1502,137 +1500,19 @@ impl Lock {
         Self::registry_requirement_source(Some(IndexMetadata::from(index.clone())))
     }
 
-    async fn current_registry_sources<Context: BuildContext>(
+    fn current_registry_sources(
         &self,
         validation_indexes: &IndexLocations,
-        tags: &Tags,
-        hasher: &HashStrategy,
-        index: &InMemoryIndex,
-        database: &DistributionDatabase<'_, Context>,
     ) -> FxHashMap<PackageId, RequirementSource> {
-        let current_indexes = validation_indexes.indexes().collect::<Vec<_>>();
-        if current_indexes.is_empty() {
+        let Some(index) = validation_indexes.indexes().next() else {
             return FxHashMap::default();
-        }
-
-        if let [index] = current_indexes.as_slice() {
-            let source = Self::registry_requirement_source_for_index(&index.url);
-            return self
-                .packages
-                .iter()
-                .filter(|package| matches!(package.id.source, Source::Registry(..)))
-                .map(|package| (package.id.clone(), source.clone()))
-                .collect();
-        }
-
-        let mut version_maps_cache: FxHashMap<PackageName, Option<Vec<VersionMap>>> =
-            FxHashMap::default();
-        let capabilities = uv_distribution_types::IndexCapabilities::default();
-        let exclude_newer = ExcludeNewer::from(self.options.exclude_newer.clone());
-        let mut registry_sources = FxHashMap::default();
-
-        for package in self
-            .packages
+        };
+        let source = Self::registry_requirement_source_for_index(&index.url);
+        self.packages
             .iter()
             .filter(|package| matches!(package.id.source, Source::Registry(..)))
-        {
-            let Some(version) = package.id.version.as_ref() else {
-                continue;
-            };
-
-            if !version_maps_cache.contains_key(package.name())
-                && index.implicit().get(package.name()).is_none()
-            {
-                let result = database
-                    .client()
-                    .manual(|client, semaphore| {
-                        client.simple_detail(package.name(), None, &capabilities, semaphore)
-                    })
-                    .await;
-                let version_maps = match result {
-                    Ok(results) => Some(
-                        results
-                            .into_iter()
-                            .map(|(index, metadata)| match metadata {
-                                RegistryMetadataFormat::Simple(metadata) => {
-                                    VersionMap::from_simple_metadata(
-                                        metadata,
-                                        package.name(),
-                                        index,
-                                        Some(tags),
-                                        &self.requires_python,
-                                        &AllowedYanks::default(),
-                                        hasher,
-                                        Some(&exclude_newer),
-                                        None,
-                                        &BuildOptions::default(),
-                                    )
-                                }
-                                RegistryMetadataFormat::Flat(metadata) => {
-                                    VersionMap::from_flat_metadata(
-                                        metadata,
-                                        Some(tags),
-                                        hasher,
-                                        &BuildOptions::default(),
-                                    )
-                                }
-                            })
-                            .collect(),
-                    ),
-                    Err(err) => {
-                        debug!(
-                            "Failed to determine current registry source for `{}` during lock validation: {}",
-                            package.name(),
-                            err
-                        );
-                        None
-                    }
-                };
-                version_maps_cache.insert(package.name().clone(), version_maps);
-            }
-
-            if let Some(response) = index.implicit().get(package.name()) {
-                if let VersionsResponse::Found(version_maps) = response.as_ref() {
-                    let source = version_maps
-                        .iter()
-                        .find(|version_map| version_map.get(version).is_some())
-                        .and_then(VersionMap::index)
-                        .map(Self::registry_requirement_source_for_index)
-                        .or_else(|| {
-                            version_maps
-                                .first()
-                                .and_then(VersionMap::index)
-                                .map(Self::registry_requirement_source_for_index)
-                        })
-                        .unwrap_or_else(|| {
-                            Self::registry_requirement_source_for_index(&current_indexes[0].url)
-                        });
-                    registry_sources.insert(package.id.clone(), source);
-                    continue;
-                }
-            }
-
-            let Some(Some(version_maps)) = version_maps_cache.get(package.name()) else {
-                continue;
-            };
-            let source = version_maps
-                .iter()
-                .find(|version_map| version_map.get(version).is_some())
-                .and_then(VersionMap::index)
-                .map(Self::registry_requirement_source_for_index)
-                .or_else(|| {
-                    version_maps
-                        .first()
-                        .and_then(VersionMap::index)
-                        .map(Self::registry_requirement_source_for_index)
-                })
-                .unwrap_or_else(|| {
-                    Self::registry_requirement_source_for_index(&current_indexes[0].url)
-                });
-            registry_sources.insert(package.id.clone(), source);
-        }
-
-        registry_sources
+            .map(|package| (package.id.clone(), source.clone()))
+            .collect()
     }
 
     fn record_source_mismatch(
@@ -1900,7 +1780,7 @@ impl Lock {
         }
     }
 
-    async fn transitive_source_mismatches<Context: BuildContext>(
+    fn transitive_source_mismatches(
         &self,
         root: &Path,
         packages: &BTreeMap<PackageName, WorkspaceMember>,
@@ -1909,17 +1789,11 @@ impl Lock {
         transitive_sources: &[Requirement],
         indexes: Option<&IndexLocations>,
         validation_indexes: &IndexLocations,
-        tags: &Tags,
-        hasher: &HashStrategy,
-        index: &InMemoryIndex,
-        database: &DistributionDatabase<'_, Context>,
     ) -> Result<Option<(BTreeSet<String>, BTreeSet<String>)>, LockError> {
         let mut expected = BTreeSet::new();
         let mut actual = BTreeSet::new();
         let workspace_members = packages.keys().cloned().collect::<BTreeSet<_>>();
-        let current_registry_sources = self
-            .current_registry_sources(validation_indexes, tags, hasher, index, database)
-            .await;
+        let current_registry_sources = self.current_registry_sources(validation_indexes);
 
         let normalized_transitive_sources = transitive_sources
             .iter()
@@ -3589,22 +3463,15 @@ impl Lock {
 
         // Validate that current transitive source overlays would still produce the locked package
         // sources when we walk the existing lock graph.
-        if let Some((expected, actual)) = self
-            .transitive_source_mismatches(
-                root,
-                packages,
-                requirements,
-                dependency_groups,
-                transitive_sources,
-                indexes,
-                validation_indexes,
-                tags,
-                hasher,
-                index,
-                database,
-            )
-            .await?
-        {
+        if let Some((expected, actual)) = self.transitive_source_mismatches(
+            root,
+            packages,
+            requirements,
+            dependency_groups,
+            transitive_sources,
+            indexes,
+            validation_indexes,
+        )? {
             return Ok(SatisfiesResult::MismatchedTransitiveSources(
                 expected, actual,
             ));
