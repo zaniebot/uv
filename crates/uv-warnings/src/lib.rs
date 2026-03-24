@@ -24,6 +24,32 @@ pub fn disable() {
     ENABLED.store(false, std::sync::atomic::Ordering::Relaxed);
 }
 
+/// The type of callback used to override warning output.
+type WarnPrinter = Box<dyn Fn(&str) + Send>;
+
+/// A global callback that, when set, wraps warning output so it doesn't conflict
+/// with indicatif progress bars. Typically set to a closure that calls
+/// `MultiProgress::suspend(|| eprintln!(...))`.
+pub static WARN_PRINTER: LazyLock<Mutex<Option<WarnPrinter>>> = LazyLock::new(|| Mutex::new(None));
+
+/// Register a printer callback for warning output.
+///
+/// When set, `warn_user!` and `warn_user_once!` will call this callback instead of
+/// writing directly to stderr. This allows the caller to wrap the write in
+/// `MultiProgress::suspend()` to avoid truncating warnings when progress bars are active.
+pub fn set_warn_printer(printer: Box<dyn Fn(&str) + Send>) {
+    if let Ok(mut guard) = WARN_PRINTER.lock() {
+        *guard = Some(printer);
+    }
+}
+
+/// Remove the printer callback, reverting to direct stderr writes.
+pub fn unset_warn_printer() {
+    if let Ok(mut guard) = WARN_PRINTER.lock() {
+        *guard = None;
+    }
+}
+
 /// Warn a user, if warnings are enabled.
 #[macro_export]
 macro_rules! warn_user {
@@ -33,8 +59,16 @@ macro_rules! warn_user {
 
         if $crate::ENABLED.load(std::sync::atomic::Ordering::Relaxed) {
             let message = format!("{}", format_args!($($arg)*));
-            let formatted = message.bold();
-            eprintln!("{}{} {formatted}", "warning".yellow().bold(), ":".bold());
+            let formatted = format!("{}{} {}", "warning".yellow().bold(), ":".bold(), message.bold());
+            if let Ok(guard) = $crate::WARN_PRINTER.lock() {
+                if let Some(ref printer) = *guard {
+                    printer(&formatted);
+                } else {
+                    eprintln!("{formatted}");
+                }
+            } else {
+                eprintln!("{formatted}");
+            }
         }
     }};
 }
@@ -53,7 +87,16 @@ macro_rules! warn_user_once {
             if let Ok(mut states) = $crate::WARNINGS.lock() {
                 let message = format!("{}", format_args!($($arg)*));
                 if states.insert(message.clone()) {
-                    eprintln!("{}{} {}", "warning".yellow().bold(), ":".bold(), message.bold());
+                    let formatted = format!("{}{} {}", "warning".yellow().bold(), ":".bold(), message.bold());
+                    if let Ok(guard) = $crate::WARN_PRINTER.lock() {
+                        if let Some(ref printer) = *guard {
+                            printer(&formatted);
+                        } else {
+                            eprintln!("{formatted}");
+                        }
+                    } else {
+                        eprintln!("{formatted}");
+                    }
                 }
             }
         }
