@@ -2486,6 +2486,53 @@ fn lock_project_with_transitive_group_sources_shared_indirect_dep() -> Result<()
     Ok(())
 }
 
+/// Lock a project where widened source contexts introduce marker-disjoint transitive source
+/// overlays, and verify the existing selected package is correctly re-forked instead of failing.
+#[test]
+fn lock_project_with_transitive_group_sources_shared_indirect_dep_marker_forks() -> Result<()> {
+    let context = uv_test::test_context!("3.12");
+
+    let pyproject_toml = context.temp_dir.child("pyproject.toml");
+    pyproject_toml.write_str(
+        r#"
+        [project]
+        name = "project"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        dependencies = ["anyio==3.7.0"]
+
+        [dependency-groups]
+        dev = ["anyio==3.7.0"]
+
+        [tool.uv.sources]
+        idna = [
+            { url = "https://files.pythonhosted.org/packages/d7/77/ff688d1504cdc4db2a938e2b7b9adee5dd52e34efbd2431051efc9984de9/idna-3.2-py3-none-any.whl", marker = "sys_platform == 'win32'", group = "dev" },
+            { url = "https://files.pythonhosted.org/packages/04/a2/d918dcd22354d8958fe113e1a3630137e0fc8b44859ade3063982eacd2a4/idna-3.3-py3-none-any.whl", marker = "sys_platform != 'win32'", group = "dev" },
+        ]
+        "#,
+    )?;
+
+    uv_snapshot!(context.filters(), context.lock(), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Resolved 5 packages in [TIME]
+    ");
+
+    let lock = context.read("uv.lock");
+    assert!(lock.matches("name = \"idna\"").count() >= 2);
+    assert!(lock.contains(
+        "source = { url = \"https://files.pythonhosted.org/packages/d7/77/ff688d1504cdc4db2a938e2b7b9adee5dd52e34efbd2431051efc9984de9/idna-3.2-py3-none-any.whl\" }"
+    ));
+    assert!(lock.contains(
+        "source = { url = \"https://files.pythonhosted.org/packages/04/a2/d918dcd22354d8958fe113e1a3630137e0fc8b44859ade3063982eacd2a4/idna-3.3-py3-none-any.whl\" }"
+    ));
+
+    Ok(())
+}
+
 /// Lock a project where two conflicting groups each have a group-scoped transitive source override
 /// for the same package, targeting different URLs.
 #[test]

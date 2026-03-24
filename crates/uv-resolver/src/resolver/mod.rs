@@ -684,14 +684,17 @@ impl<InstalledPackages: InstalledPackagesProvider> ResolverState<InstalledPackag
                             ));
                     }
                     ForkedDependencies::Unforked(dependencies) => {
-                        self.add_selected_package_dependencies(
+                        if let Some(new_fork_states) = self.add_selected_package_dependencies(
                             &mut state,
                             next_id,
                             &version,
                             &current_source_contexts,
                             dependencies,
                             request_sink,
-                        )?;
+                        )? {
+                            forked_states.extend(new_fork_states);
+                            continue 'FORK;
+                        }
                     }
                     ForkedDependencies::Forked {
                         mut forks,
@@ -703,37 +706,16 @@ impl<InstalledPackages: InstalledPackagesProvider> ResolverState<InstalledPackag
                             start.elapsed().as_secs_f32()
                         );
 
-                        // Prioritize the forks.
-                        match (self.options.fork_strategy, self.options.resolution_mode) {
-                            (ForkStrategy::Fewest, _) | (_, ResolutionMode::Lowest) => {
-                                // Prefer solving forks with lower Python bounds, since they're more
-                                // likely to produce solutions that work for forks with higher
-                                // Python bounds (whereas the inverse is not true).
-                                forks.sort_by(|a, b| {
-                                    a.cmp_requires_python(b)
-                                        .reverse()
-                                        .then_with(|| a.cmp_upper_bounds(b))
-                                });
-                            }
-                            (ForkStrategy::RequiresPython, _) => {
-                                // Otherwise, prefer solving forks with higher Python bounds, since
-                                // we want to prioritize choosing the latest-compatible package
-                                // version for each Python version.
-                                forks.sort_by(|a, b| {
-                                    a.cmp_requires_python(b).then_with(|| a.cmp_upper_bounds(b))
-                                });
-                            }
-                        }
+                        self.prioritize_forks(&mut forks);
 
-                        for new_fork_state in self.forks_to_fork_states(
+                        forked_states.extend(self.forks_to_fork_states(
                             state,
+                            next_id,
                             &version,
                             forks,
                             request_sink,
                             &diverging_packages,
-                        ) {
-                            forked_states.push(new_fork_state?);
-                        }
+                        )?);
                         continue 'FORK;
                     }
                 }
@@ -874,18 +856,40 @@ impl<InstalledPackages: InstalledPackagesProvider> ResolverState<InstalledPackag
         }
     }
 
+    fn prioritize_forks(&self, forks: &mut [Fork]) {
+        match (self.options.fork_strategy, self.options.resolution_mode) {
+            (ForkStrategy::Fewest, _) | (_, ResolutionMode::Lowest) => {
+                // Prefer solving forks with lower Python bounds, since they're more likely to
+                // produce solutions that work for forks with higher Python bounds (whereas the
+                // inverse is not true).
+                forks.sort_by(|a, b| {
+                    a.cmp_requires_python(b)
+                        .reverse()
+                        .then_with(|| a.cmp_upper_bounds(b))
+                });
+            }
+            (ForkStrategy::RequiresPython, _) => {
+                // Otherwise, prefer solving forks with higher Python bounds, since we want to
+                // prioritize choosing the latest-compatible package version for each Python
+                // version.
+                forks.sort_by(|a, b| a.cmp_requires_python(b).then_with(|| a.cmp_upper_bounds(b)));
+            }
+        }
+    }
+
     /// Convert the dependency [`Fork`]s into [`ForkState`]s.
-    fn forks_to_fork_states<'a>(
-        &'a self,
+    fn forks_to_fork_states(
+        &self,
         current_state: ForkState,
-        version: &'a Version,
+        package: Id<PubGrubPackage>,
+        version: &Version,
         forks: Vec<Fork>,
-        request_sink: &'a Sender<Request>,
-        diverging_packages: &'a [PackageName],
-    ) -> impl Iterator<Item = Result<ForkState, ResolveError>> + 'a {
+        request_sink: &Sender<Request>,
+        diverging_packages: &[PackageName],
+    ) -> Result<Vec<ForkState>, ResolveError> {
         debug!(
             "Splitting resolution on {}=={} over {} into {} resolution{} with separate markers",
-            current_state.pubgrub.package_store[current_state.next],
+            current_state.pubgrub.package_store[package],
             version,
             diverging_packages
                 .iter()
@@ -900,39 +904,37 @@ impl<InstalledPackages: InstalledPackagesProvider> ResolverState<InstalledPackag
         // as it needs to be. We basically move the state
         // into `forked_states`, and then only clone it if
         // there is at least one more fork to visit.
-        let package = current_state.next;
         let mut cur_state = Some(current_state);
         let forks_len = forks.len();
-        forks
-            .into_iter()
-            .enumerate()
-            .map(move |(i, fork)| {
-                let is_last = i == forks_len - 1;
-                let forked_state = cur_state.take().unwrap();
-                if !is_last {
-                    cur_state = Some(forked_state.clone());
-                }
+        let mut forked_states = Vec::with_capacity(forks_len);
+        for (index, fork) in forks.into_iter().enumerate() {
+            let is_last = index == forks_len - 1;
+            let forked_state = cur_state.take().expect("fork state available");
+            if !is_last {
+                cur_state = Some(forked_state.clone());
+            }
 
-                let env = fork.env.clone();
-                (fork, forked_state.with_env(env))
-            })
-            .map(move |(fork, mut forked_state)| {
-                let full_source_contexts = forked_state
-                    .package_contexts
-                    .get(&package)
-                    .cloned()
-                    .unwrap_or_default();
-                self.add_selected_package_dependencies(
-                    &mut forked_state,
-                    package,
-                    version,
-                    &full_source_contexts,
-                    fork.dependencies,
-                    request_sink,
-                )?;
-
-                Ok(forked_state)
-            })
+            let env = fork.env.clone();
+            let mut forked_state = forked_state.with_env(env);
+            let full_source_contexts = forked_state
+                .package_contexts
+                .get(&package)
+                .cloned()
+                .unwrap_or_default();
+            if let Some(nested_fork_states) = self.add_selected_package_dependencies(
+                &mut forked_state,
+                package,
+                version,
+                &full_source_contexts,
+                fork.dependencies,
+                request_sink,
+            )? {
+                forked_states.extend(nested_fork_states);
+            } else {
+                forked_states.push(forked_state);
+            }
+        }
+        Ok(forked_states)
     }
 
     /// Convert the dependency [`Fork`]s into [`ForkState`]s.
@@ -991,7 +993,7 @@ impl<InstalledPackages: InstalledPackagesProvider> ResolverState<InstalledPackag
         full_source_contexts: &BTreeSet<RequirementOrigin>,
         dependencies: Vec<PubGrubDependency>,
         request_sink: &Sender<Request>,
-    ) -> Result<(), ResolveError> {
+    ) -> Result<Option<Vec<ForkState>>, ResolveError> {
         let widened_packages = state
             .visit_package_version_dependencies(
                 package,
@@ -1019,7 +1021,7 @@ impl<InstalledPackages: InstalledPackagesProvider> ResolverState<InstalledPackag
         state: &mut ForkState,
         widened_packages: FxHashSet<Id<PubGrubPackage>>,
         request_sink: &Sender<Request>,
-    ) -> Result<(), ResolveError> {
+    ) -> Result<Option<Vec<ForkState>>, ResolveError> {
         let mut pending = widened_packages.into_iter().collect::<VecDeque<_>>();
 
         while let Some(package_id) = pending.pop_front() {
@@ -1085,16 +1087,32 @@ impl<InstalledPackages: InstalledPackagesProvider> ResolverState<InstalledPackag
                     continue;
                 }
                 ForkedDependencies::Unforked(dependencies) => dependencies,
-                ForkedDependencies::Forked { .. } => {
-                    debug_assert!(
-                        false,
-                        "widened source contexts unexpectedly introduced forks for {package}"
-                    );
-                    return Err(ResolveError::UnregisteredTask(format!(
-                        "widened source contexts for {package}=={version} unexpectedly required forking"
-                    )));
+                ForkedDependencies::Forked {
+                    mut forks,
+                    diverging_packages,
+                } => {
+                    self.prioritize_forks(&mut forks);
+                    return Ok(Some(self.forks_to_fork_states(
+                        state.clone(),
+                        package_id,
+                        &version,
+                        forks,
+                        request_sink,
+                        &diverging_packages,
+                    )?));
                 }
             };
+
+            let overlay_dependencies = dependencies
+                .iter()
+                .filter(|dependency| {
+                    matches!(
+                        dependency.source,
+                        DependencySource::AllowedUrl(_) | DependencySource::ExplicitIndex(_)
+                    )
+                })
+                .cloned()
+                .collect::<Vec<_>>();
 
             let widened_packages = state
                 .visit_package_version_dependencies(
@@ -1116,28 +1134,34 @@ impl<InstalledPackages: InstalledPackagesProvider> ResolverState<InstalledPackag
                     enrich_dependency_error(err, package_id, &version, &state.pubgrub)
                 })?;
 
-            state.extend_package_version_dependencies(package_id, &version, dependencies);
-            state.record_expanded_source_contexts(package_id, &version, &full_source_contexts);
+            if !overlay_dependencies.is_empty() {
+                state.extend_package_version_dependencies(
+                    package_id,
+                    &version,
+                    overlay_dependencies,
+                );
 
-            let conflicts = state.pubgrub.unit_propagation(package_id).map_err(|err| {
-                self.convert_no_solution_err(
-                    err,
-                    state.fork_urls.clone(),
-                    state.fork_indexes.clone(),
-                    state.env.clone(),
-                    self.current_environment.clone(),
-                    Some(&self.options.exclude_newer),
-                    &FxHashSet::default(),
-                )
-            })?;
-            for (affected, incompatibility) in conflicts {
-                state.record_conflict(affected, None, incompatibility);
+                let conflicts = state.pubgrub.unit_propagation(package_id).map_err(|err| {
+                    self.convert_no_solution_err(
+                        err,
+                        state.fork_urls.clone(),
+                        state.fork_indexes.clone(),
+                        state.env.clone(),
+                        self.current_environment.clone(),
+                        Some(&self.options.exclude_newer),
+                        &FxHashSet::default(),
+                    )
+                })?;
+                for (affected, incompatibility) in conflicts {
+                    state.record_conflict(affected, None, incompatibility);
+                }
             }
 
+            state.record_expanded_source_contexts(package_id, &version, &full_source_contexts);
             pending.extend(widened_packages);
         }
 
-        Ok(())
+        Ok(None)
     }
 
     /// Visit a [`PubGrubPackage`] prior to selection. This should be called on a [`PubGrubPackage`]
@@ -1920,22 +1944,13 @@ impl<InstalledPackages: InstalledPackagesProvider> ResolverState<InstalledPackag
         first_visit: bool,
     ) -> Vec<PubGrubDependency> {
         let mut dependencies = Vec::new();
-
-        if first_visit {
-            dependencies.extend(
-                PubGrubDependency::from_requirement(
-                    &self.conflicts,
-                    Cow::Borrowed(requirement),
-                    group_name,
-                    Some(parent_package),
-                    false,
-                )
-                .map(|mut dependency| {
-                    dependency.source_contexts = full_source_contexts.clone();
-                    dependency
-                }),
-            );
-        }
+        let propagated_source_contexts = if first_visit {
+            full_source_contexts.clone()
+        } else {
+            new_source_contexts.clone()
+        };
+        let mut overlay_dependencies = Vec::new();
+        let mut has_overlay = false;
 
         for source_context in new_source_contexts {
             let Some(overlays) = self
@@ -1959,6 +1974,7 @@ impl<InstalledPackages: InstalledPackagesProvider> ResolverState<InstalledPackag
                     continue;
                 }
 
+                has_overlay = true;
                 let overlay_requirement = Requirement {
                     name: requirement.name.clone(),
                     extras: requirement.extras.clone(),
@@ -1968,7 +1984,7 @@ impl<InstalledPackages: InstalledPackagesProvider> ResolverState<InstalledPackag
                     origin: overlay.origin.clone(),
                 };
 
-                dependencies.extend(
+                overlay_dependencies.extend(
                     PubGrubDependency::from_requirement(
                         &self.conflicts,
                         Cow::Owned(overlay_requirement),
@@ -1977,13 +1993,30 @@ impl<InstalledPackages: InstalledPackagesProvider> ResolverState<InstalledPackag
                         true,
                     )
                     .map(|mut dependency| {
-                        dependency.source_contexts = full_source_contexts.clone();
+                        dependency.source_contexts = propagated_source_contexts.clone();
                         dependency
                     }),
                 );
             }
         }
 
+        if first_visit || (!new_source_contexts.is_empty() && !has_overlay) {
+            dependencies.extend(
+                PubGrubDependency::from_requirement(
+                    &self.conflicts,
+                    Cow::Borrowed(requirement),
+                    group_name,
+                    Some(parent_package),
+                    false,
+                )
+                .map(|mut dependency| {
+                    dependency.source_contexts = propagated_source_contexts.clone();
+                    dependency
+                }),
+            );
+        }
+
+        dependencies.extend(overlay_dependencies);
         dependencies
     }
 
@@ -3321,17 +3354,33 @@ impl ForkState {
             } = dependency;
 
             let package_id = self.pubgrub.package_store.alloc(package.clone());
-            let contexts = self.package_contexts.entry(package_id).or_default();
-            let previous_context_count = contexts.len();
-            for source_context in source_contexts {
-                contexts.insert(source_context.clone());
-            }
-            if contexts.len() > previous_context_count {
-                widened_packages.insert(package_id);
-            }
 
             let mut has_url = false;
             if let Some(name) = package.name() {
+                let propagate_source_contexts = !workspace_members.contains(name)
+                    || source_contexts
+                        .iter()
+                        .any(|source_context| match source_context {
+                            RequirementOrigin::Project(_, project_name)
+                            | RequirementOrigin::Extra(_, Some(project_name), _)
+                            | RequirementOrigin::Group(_, Some(project_name), _) => {
+                                project_name == name
+                            }
+                            RequirementOrigin::File(_)
+                            | RequirementOrigin::Workspace
+                            | RequirementOrigin::Extra(_, None, _)
+                            | RequirementOrigin::Group(_, None, _) => false,
+                        });
+                if propagate_source_contexts {
+                    let contexts = self.package_contexts.entry(package_id).or_default();
+                    let previous_context_count = contexts.len();
+                    for source_context in source_contexts {
+                        contexts.insert(source_context.clone());
+                    }
+                    if contexts.len() > previous_context_count {
+                        widened_packages.insert(package_id);
+                    }
+                }
                 if let Some(url) = source.allowed_url() {
                     self.fork_urls.insert(name, url, &self.env)?;
                     has_url = true;
