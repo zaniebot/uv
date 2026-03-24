@@ -1672,6 +1672,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_redirect_to_server_with_credentials() -> Result<(), Error> {
+        let _preview = uv_preview::test::with_features(&[]);
         let username = "user";
         let password = "password";
 
@@ -1727,6 +1728,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_redirect_root_relative_url() -> Result<(), Error> {
+        let _preview = uv_preview::test::with_features(&[]);
         let username = "user";
         let password = "password";
 
@@ -1776,6 +1778,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_redirect_relative_url() -> Result<(), Error> {
+        let _preview = uv_preview::test::with_features(&[]);
         let username = "user";
         let password = "password";
 
