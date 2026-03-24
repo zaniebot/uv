@@ -325,9 +325,13 @@ impl<InstalledPackages: InstalledPackagesProvider> ResolverState<InstalledPackag
                     continue;
                 }
 
-                for dependency in
-                    PubGrubDependency::from_requirement(&self.conflicts, requirement, None, None)
-                {
+                for dependency in PubGrubDependency::from_requirement(
+                    &self.conflicts,
+                    requirement,
+                    None,
+                    None,
+                    false,
+                ) {
                     let package_id = state
                         .pubgrub
                         .package_store
@@ -680,30 +684,14 @@ impl<InstalledPackages: InstalledPackagesProvider> ResolverState<InstalledPackag
                             ));
                     }
                     ForkedDependencies::Unforked(dependencies) => {
-                        // Enrich the state with any URLs, etc.
-                        state
-                            .visit_package_version_dependencies(
-                                next_id,
-                                &version,
-                                &self.urls,
-                                &self.indexes,
-                                &dependencies,
-                                &self.git,
-                                &self.workspace_members,
-                                self.selector.resolution_strategy(),
-                            )
-                            .map_err(|err| {
-                                enrich_dependency_error(err, next_id, &version, &state.pubgrub)
-                            })?;
-
-                        // Emit a request to fetch the metadata for each registry package.
-                        self.visit_dependencies(&dependencies, &state, request_sink)
-                            .map_err(|err| {
-                                enrich_dependency_error(err, next_id, &version, &state.pubgrub)
-                            })?;
-
-                        // Add the dependencies to the state.
-                        state.add_package_version_dependencies(next_id, &version, dependencies);
+                        self.add_selected_package_dependencies(
+                            &mut state,
+                            next_id,
+                            &version,
+                            &current_source_contexts,
+                            dependencies,
+                            request_sink,
+                        )?;
                     }
                     ForkedDependencies::Forked {
                         mut forks,
@@ -929,30 +917,19 @@ impl<InstalledPackages: InstalledPackagesProvider> ResolverState<InstalledPackag
                 (fork, forked_state.with_env(env))
             })
             .map(move |(fork, mut forked_state)| {
-                // Enrich the state with any URLs, etc.
-                forked_state
-                    .visit_package_version_dependencies(
-                        package,
-                        version,
-                        &self.urls,
-                        &self.indexes,
-                        &fork.dependencies,
-                        &self.git,
-                        &self.workspace_members,
-                        self.selector.resolution_strategy(),
-                    )
-                    .map_err(|err| {
-                        enrich_dependency_error(err, package, version, &forked_state.pubgrub)
-                    })?;
-
-                // Emit a request to fetch the metadata for each registry package.
-                self.visit_dependencies(&fork.dependencies, &forked_state, request_sink)
-                    .map_err(|err| {
-                        enrich_dependency_error(err, package, version, &forked_state.pubgrub)
-                    })?;
-
-                // Add the dependencies to the state.
-                forked_state.add_package_version_dependencies(package, version, fork.dependencies);
+                let full_source_contexts = forked_state
+                    .package_contexts
+                    .get(&package)
+                    .cloned()
+                    .unwrap_or_default();
+                self.add_selected_package_dependencies(
+                    &mut forked_state,
+                    package,
+                    version,
+                    &full_source_contexts,
+                    fork.dependencies,
+                    request_sink,
+                )?;
 
                 Ok(forked_state)
             })
@@ -1003,6 +980,163 @@ impl<InstalledPackages: InstalledPackagesProvider> ResolverState<InstalledPackag
             let index = package.name().and_then(|name| state.fork_indexes.get(name));
             self.visit_package(package, url, index, request_sink)?;
         }
+        Ok(())
+    }
+
+    fn add_selected_package_dependencies(
+        &self,
+        state: &mut ForkState,
+        package: Id<PubGrubPackage>,
+        version: &Version,
+        full_source_contexts: &BTreeSet<RequirementOrigin>,
+        dependencies: Vec<PubGrubDependency>,
+        request_sink: &Sender<Request>,
+    ) -> Result<(), ResolveError> {
+        let widened_packages = state
+            .visit_package_version_dependencies(
+                package,
+                version,
+                &self.urls,
+                &self.indexes,
+                &dependencies,
+                &self.git,
+                &self.workspace_members,
+                self.selector.resolution_strategy(),
+            )
+            .map_err(|err| enrich_dependency_error(err, package, version, &state.pubgrub))?;
+
+        self.visit_dependencies(&dependencies, state, request_sink)
+            .map_err(|err| enrich_dependency_error(err, package, version, &state.pubgrub))?;
+
+        state.add_package_version_dependencies(package, version, dependencies);
+        state.record_expanded_source_contexts(package, version, full_source_contexts);
+
+        self.revisit_selected_packages_for_new_contexts(state, widened_packages, request_sink)
+    }
+
+    fn revisit_selected_packages_for_new_contexts(
+        &self,
+        state: &mut ForkState,
+        widened_packages: FxHashSet<Id<PubGrubPackage>>,
+        request_sink: &Sender<Request>,
+    ) -> Result<(), ResolveError> {
+        let mut pending = widened_packages.into_iter().collect::<VecDeque<_>>();
+
+        while let Some(package_id) = pending.pop_front() {
+            let Some(version) = state.selected_version(package_id) else {
+                continue;
+            };
+
+            let new_source_contexts = state.source_context_delta(package_id, &version);
+            if new_source_contexts.is_empty() {
+                continue;
+            }
+            let full_source_contexts = state
+                .package_contexts
+                .get(&package_id)
+                .cloned()
+                .unwrap_or_default();
+            let package = state.pubgrub.package_store[package_id].clone();
+
+            let dependencies = match self
+                .get_dependencies_forking(
+                    package_id,
+                    &package,
+                    &version,
+                    &state.pins,
+                    &state.fork_urls,
+                    &state.env,
+                    &state.python_requirement,
+                    &state.pubgrub,
+                    &full_source_contexts,
+                    &new_source_contexts,
+                    false,
+                )
+                .map_err(|err| enrich_dependency_error(err, package_id, &version, &state.pubgrub))?
+            {
+                ForkedDependencies::Unavailable(reason) => {
+                    state
+                        .pubgrub
+                        .add_incompatibility(Incompatibility::custom_version(
+                            package_id,
+                            version.clone(),
+                            UnavailableReason::Version(reason),
+                        ));
+                    state.record_expanded_source_contexts(
+                        package_id,
+                        &version,
+                        &full_source_contexts,
+                    );
+
+                    let conflicts = state.pubgrub.unit_propagation(package_id).map_err(|err| {
+                        self.convert_no_solution_err(
+                            err,
+                            state.fork_urls.clone(),
+                            state.fork_indexes.clone(),
+                            state.env.clone(),
+                            self.current_environment.clone(),
+                            Some(&self.options.exclude_newer),
+                            &FxHashSet::default(),
+                        )
+                    })?;
+                    for (affected, incompatibility) in conflicts {
+                        state.record_conflict(affected, None, incompatibility);
+                    }
+                    continue;
+                }
+                ForkedDependencies::Unforked(dependencies) => dependencies,
+                ForkedDependencies::Forked { .. } => {
+                    debug_assert!(
+                        false,
+                        "widened source contexts unexpectedly introduced forks for {package}"
+                    );
+                    return Err(ResolveError::UnregisteredTask(format!(
+                        "widened source contexts for {package}=={version} unexpectedly required forking"
+                    )));
+                }
+            };
+
+            let widened_packages = state
+                .visit_package_version_dependencies(
+                    package_id,
+                    &version,
+                    &self.urls,
+                    &self.indexes,
+                    &dependencies,
+                    &self.git,
+                    &self.workspace_members,
+                    self.selector.resolution_strategy(),
+                )
+                .map_err(|err| {
+                    enrich_dependency_error(err, package_id, &version, &state.pubgrub)
+                })?;
+
+            self.visit_dependencies(&dependencies, state, request_sink)
+                .map_err(|err| {
+                    enrich_dependency_error(err, package_id, &version, &state.pubgrub)
+                })?;
+
+            state.extend_package_version_dependencies(package_id, &version, dependencies);
+            state.record_expanded_source_contexts(package_id, &version, &full_source_contexts);
+
+            let conflicts = state.pubgrub.unit_propagation(package_id).map_err(|err| {
+                self.convert_no_solution_err(
+                    err,
+                    state.fork_urls.clone(),
+                    state.fork_indexes.clone(),
+                    state.env.clone(),
+                    self.current_environment.clone(),
+                    Some(&self.options.exclude_newer),
+                    &FxHashSet::default(),
+                )
+            })?;
+            for (affected, incompatibility) in conflicts {
+                state.record_conflict(affected, None, incompatibility);
+            }
+
+            pending.extend(widened_packages);
+        }
+
         Ok(())
     }
 
@@ -1794,6 +1928,7 @@ impl<InstalledPackages: InstalledPackagesProvider> ResolverState<InstalledPackag
                     Cow::Borrowed(requirement),
                     group_name,
                     Some(parent_package),
+                    false,
                 )
                 .map(|mut dependency| {
                     dependency.source_contexts = full_source_contexts.clone();
@@ -1839,6 +1974,7 @@ impl<InstalledPackages: InstalledPackagesProvider> ResolverState<InstalledPackag
                         Cow::Owned(overlay_requirement),
                         group_name,
                         Some(parent_package),
+                        true,
                     )
                     .map(|mut dependency| {
                         dependency.source_contexts = full_source_contexts.clone();
@@ -1928,6 +2064,7 @@ impl<InstalledPackages: InstalledPackagesProvider> ResolverState<InstalledPackag
                             requirement,
                             None,
                             Some(package),
+                            false,
                         )
                     })
                     .collect()
@@ -3054,6 +3191,8 @@ pub(crate) struct ForkState {
     priorities: PubGrubPriorities,
     /// The local-package source contexts currently associated with each package in this fork.
     package_contexts: FxHashMap<Id<PubGrubPackage>, BTreeSet<RequirementOrigin>>,
+    /// The source contexts that have already been expanded for a selected package version.
+    expanded_source_contexts: FxHashMap<(Id<PubGrubPackage>, Version), BTreeSet<RequirementOrigin>>,
     /// This keeps track of the set of versions for each package that we've
     /// already visited during resolution. This avoids doing redundant work.
     added_dependencies: FxHashMap<Id<PubGrubPackage>, FxHashSet<Version>>,
@@ -3109,12 +3248,52 @@ impl ForkState {
             fork_indexes: ForkIndexes::default(),
             priorities: PubGrubPriorities::default(),
             package_contexts: FxHashMap::default(),
+            expanded_source_contexts: FxHashMap::default(),
             added_dependencies: FxHashMap::default(),
             env,
             python_requirement,
             conflict_tracker: ConflictTracker::default(),
             prefetcher,
         }
+    }
+
+    fn selected_version(&self, package: Id<PubGrubPackage>) -> Option<Version> {
+        self.pubgrub
+            .partial_solution
+            .extract_solution()
+            .find_map(|(selected_package, version)| {
+                (selected_package == package).then_some(version)
+            })
+    }
+
+    fn source_context_delta(
+        &self,
+        package: Id<PubGrubPackage>,
+        version: &Version,
+    ) -> BTreeSet<RequirementOrigin> {
+        let Some(full_source_contexts) = self.package_contexts.get(&package) else {
+            return BTreeSet::default();
+        };
+        let Some(expanded_source_contexts) = self
+            .expanded_source_contexts
+            .get(&(package, version.clone()))
+        else {
+            return full_source_contexts.clone();
+        };
+        full_source_contexts
+            .difference(expanded_source_contexts)
+            .cloned()
+            .collect()
+    }
+
+    fn record_expanded_source_contexts(
+        &mut self,
+        package: Id<PubGrubPackage>,
+        version: &Version,
+        contexts: &BTreeSet<RequirementOrigin>,
+    ) {
+        self.expanded_source_contexts
+            .insert((package, version.clone()), contexts.clone());
     }
 
     /// Visit the dependencies for the selected version of the current package, incorporating any
@@ -3129,7 +3308,9 @@ impl ForkState {
         git: &GitResolver,
         workspace_members: &BTreeSet<PackageName>,
         resolution_strategy: &ResolutionStrategy,
-    ) -> Result<(), ResolveError> {
+    ) -> Result<FxHashSet<Id<PubGrubPackage>>, ResolveError> {
+        let mut widened_packages = FxHashSet::default();
+
         for dependency in dependencies {
             let PubGrubDependency {
                 package,
@@ -3141,8 +3322,12 @@ impl ForkState {
 
             let package_id = self.pubgrub.package_store.alloc(package.clone());
             let contexts = self.package_contexts.entry(package_id).or_default();
+            let previous_context_count = contexts.len();
             for source_context in source_contexts {
                 contexts.insert(source_context.clone());
+            }
+            if contexts.len() > previous_context_count {
+                widened_packages.insert(package_id);
             }
 
             let mut has_url = false;
@@ -3229,7 +3414,7 @@ impl ForkState {
             }
         }
 
-        Ok(())
+        Ok(widened_packages)
     }
 
     /// Add the dependencies for the selected version of the current package.
@@ -3277,6 +3462,50 @@ impl ForkState {
         // and affected.
         if let Some(incompatibility) = conflict {
             self.record_conflict(for_package, Some(for_version), incompatibility);
+        }
+    }
+
+    /// Add additional dependencies for an already-selected package version.
+    fn extend_package_version_dependencies(
+        &mut self,
+        for_package: Id<PubGrubPackage>,
+        for_version: &Version,
+        dependencies: Vec<PubGrubDependency>,
+    ) {
+        for dependency in &dependencies {
+            let PubGrubDependency {
+                package,
+                version,
+                parent: _,
+                source: _,
+                source_contexts: _,
+            } = dependency;
+
+            let Some(base_package) = package.base_package() else {
+                continue;
+            };
+
+            let proxy_package = self.pubgrub.package_store.alloc(package.clone());
+            let base_package_id = self.pubgrub.package_store.alloc(base_package.clone());
+            self.pubgrub
+                .add_proxy_package(proxy_package, base_package_id, version.clone());
+        }
+
+        for dependency in dependencies {
+            let PubGrubDependency {
+                package,
+                version,
+                parent: _,
+                source: _,
+                source_contexts: _,
+            } = dependency;
+            let dependency_package = self.pubgrub.package_store.alloc(package);
+            self.pubgrub
+                .add_incompatibility(Incompatibility::from_dependency(
+                    for_package,
+                    Range::singleton(for_version.clone()),
+                    (dependency_package, version),
+                ));
         }
     }
 

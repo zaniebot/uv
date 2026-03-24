@@ -2383,6 +2383,109 @@ fn lock_project_with_transitive_group_sources_shared_dep() -> Result<()> {
     Ok(())
 }
 
+/// Lock a project where a shared transitive package is first reached from the base dependencies,
+/// then later widened by a dependency group, and verify the newly-discovered group context still
+/// applies its transitive source overlay to the shared package's children.
+#[test]
+fn lock_project_with_transitive_group_sources_shared_indirect_dep() -> Result<()> {
+    let context = uv_test::test_context!("3.12");
+
+    let pkg_shared = context.temp_dir.child("pkg_shared");
+    fs_err::create_dir_all(&pkg_shared)?;
+    pkg_shared.child("pyproject.toml").write_str(
+        r#"
+        [project]
+        name = "pkg-shared"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        dependencies = ["iniconfig==2.0.0"]
+
+        [build-system]
+        requires = ["uv_build>=0.7,<10000"]
+        build-backend = "uv_build"
+        "#,
+    )?;
+
+    let pkg_a = context.temp_dir.child("pkg_a");
+    fs_err::create_dir_all(&pkg_a)?;
+    pkg_a.child("pyproject.toml").write_str(&format!(
+        r#"
+        [project]
+        name = "pkg-a"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        dependencies = ["pkg-shared @ file://{pkg_shared_path}"]
+
+        [build-system]
+        requires = ["uv_build>=0.7,<10000"]
+        build-backend = "uv_build"
+        "#,
+        pkg_shared_path = pkg_shared.path().display(),
+    ))?;
+
+    let pkg_b = context.temp_dir.child("pkg_b");
+    fs_err::create_dir_all(&pkg_b)?;
+    pkg_b.child("pyproject.toml").write_str(&format!(
+        r#"
+        [project]
+        name = "pkg-b"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        dependencies = ["pkg-shared @ file://{pkg_shared_path}"]
+
+        [build-system]
+        requires = ["uv_build>=0.7,<10000"]
+        build-backend = "uv_build"
+        "#,
+        pkg_shared_path = pkg_shared.path().display(),
+    ))?;
+
+    let pkg_c = context.temp_dir.child("pkg_c");
+    fs_err::create_dir_all(&pkg_c)?;
+    pkg_c.child("pyproject.toml").write_str(&format!(
+        r#"
+        [project]
+        name = "pkg-c"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        dependencies = ["pkg-b @ file://{pkg_b_path}"]
+
+        [build-system]
+        requires = ["uv_build>=0.7,<10000"]
+        build-backend = "uv_build"
+        "#,
+        pkg_b_path = pkg_b.path().display(),
+    ))?;
+
+    context.temp_dir.child("pyproject.toml").write_str(&format!(
+        r#"
+        [project]
+        name = "project"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        dependencies = ["pkg-a @ file://{pkg_a_path}"]
+
+        [dependency-groups]
+        dev = ["pkg-c @ file://{pkg_c_path}"]
+
+        [tool.uv.sources]
+        iniconfig = {{ url = "https://files.pythonhosted.org/packages/ef/a6/62565a6e1cf69e10f5727360368e451d4b7f58beeac6173dc9db836a5b46/iniconfig-2.0.0-py3-none-any.whl", group = "dev" }}
+        "#,
+        pkg_a_path = pkg_a.path().display(),
+        pkg_c_path = pkg_c.path().display(),
+    ))?;
+
+    context.lock().assert().success();
+
+    let lock = context.read("uv.lock");
+    assert!(lock.contains("name = \"iniconfig\""));
+    assert!(lock.contains(
+        "source = { url = \"https://files.pythonhosted.org/packages/ef/a6/62565a6e1cf69e10f5727360368e451d4b7f58beeac6173dc9db836a5b46/iniconfig-2.0.0-py3-none-any.whl\" }"
+    ));
+
+    Ok(())
+}
+
 /// Lock a project where two conflicting groups each have a group-scoped transitive source override
 /// for the same package, targeting different URLs.
 #[test]
@@ -31147,6 +31250,43 @@ fn lock_script_with_transitive_sources() -> Result<()> {
     assert!(lock.contains("source = { registry = \"https://pypi.org/simple\" }"));
     assert!(!lock.contains(
         "source = { url = \"https://files.pythonhosted.org/packages/d7/77/ff688d1504cdc4db2a938e2b7b9adee5dd52e34efbd2431051efc9984de9/idna-3.2-py3-none-any.whl\" }"
+    ));
+
+    Ok(())
+}
+
+#[test]
+fn lock_script_with_direct_url_override() -> Result<()> {
+    let context = uv_test::test_context!("3.12");
+
+    let script = context.temp_dir.child("script.py");
+    script.write_str(indoc! { r#"
+        # /// script
+        # requires-python = ">=3.12"
+        # dependencies = [
+        #   "idna @ https://files.pythonhosted.org/packages/d7/77/ff688d1504cdc4db2a938e2b7b9adee5dd52e34efbd2431051efc9984de9/idna-3.2-py3-none-any.whl",
+        # ]
+        #
+        # [tool.uv]
+        # override-dependencies = ["idna @ https://files.pythonhosted.org/packages/04/a2/d918dcd22354d8958fe113e1a3630137e0fc8b44859ade3063982eacd2a4/idna-3.3-py3-none-any.whl"]
+        # ///
+
+        import idna
+       "#
+    })?;
+
+    context
+        .lock()
+        .arg("--script")
+        .arg("script.py")
+        .assert()
+        .success();
+
+    let lock = context.read("script.py.lock");
+    assert!(lock.contains("name = \"idna\""));
+    assert!(lock.contains("version = \"3.3\""));
+    assert!(lock.contains(
+        "source = { url = \"https://files.pythonhosted.org/packages/04/a2/d918dcd22354d8958fe113e1a3630137e0fc8b44859ade3063982eacd2a4/idna-3.3-py3-none-any.whl\" }"
     ));
 
     Ok(())

@@ -36,8 +36,9 @@ impl DependencySource {
     ///
     /// Registry requirements only carry a source here when they are tied to a local context
     /// (`project`, `extra`, `group`, `workspace`, or script file) with an explicit index. Direct
-    /// URL-like requirements always preserve their verbatim URL.
-    pub(crate) fn from_requirement(requirement: &Requirement) -> Self {
+    /// URL-like requirements always preserve their verbatim URL, unless they came from a
+    /// transitive source overlay and should bypass the global `Urls` machinery.
+    pub(crate) fn from_requirement(requirement: &Requirement, transitive_overlay: bool) -> Self {
         match &requirement.source {
             RequirementSource::Registry {
                 index: Some(index), ..
@@ -51,7 +52,7 @@ impl DependencySource {
                 .to_verbatim_parsed_url()
                 .map(Box::new)
                 .map(|url| {
-                    if requirement.origin.is_some() {
+                    if transitive_overlay {
                         Self::AllowedUrl(url)
                     } else {
                         Self::Url(url)
@@ -198,6 +199,7 @@ impl PubGrubDependency {
         requirement: Cow<'a, Requirement>,
         group_name: Option<&'a GroupName>,
         parent_package: Option<&'a PubGrubPackage>,
+        transitive_overlay: bool,
     ) -> impl Iterator<Item = Self> + 'a {
         let parent_name = parent_package.and_then(|package| package.name_no_root());
         let is_normal_parent = parent_package
@@ -256,8 +258,12 @@ impl PubGrubDependency {
                 extra.as_ref(),
                 group.as_ref(),
             );
-            let pubgrub_requirement =
-                PubGrubRequirement::from_requirement(&requirement, extra, group);
+            let pubgrub_requirement = PubGrubRequirement::from_requirement(
+                &requirement,
+                extra,
+                group,
+                transitive_overlay,
+            );
             let PubGrubRequirement {
                 package,
                 version,
@@ -357,9 +363,10 @@ impl PubGrubRequirement {
         requirement: &Requirement,
         extra: Option<ExtraName>,
         group: Option<GroupName>,
+        transitive_overlay: bool,
     ) -> Self {
         let RequirementSource::Registry { specifier, .. } = &requirement.source else {
-            let source = DependencySource::from_requirement(requirement);
+            let source = DependencySource::from_requirement(requirement, transitive_overlay);
             debug_assert!(matches!(
                 source,
                 DependencySource::Url(_) | DependencySource::AllowedUrl(_)
@@ -383,7 +390,7 @@ impl PubGrubRequirement {
     ) -> Self {
         Self {
             package: Self::package_for_requirement(requirement, extra, group),
-            source: DependencySource::from_requirement(requirement),
+            source: DependencySource::from_requirement(requirement, false),
             version: Ranges::from(specifier.clone()),
         }
     }
