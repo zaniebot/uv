@@ -887,3 +887,143 @@ impl uv_bin_install::Reporter for BinaryDownloadReporter {
         self.reporter.on_request_complete(Direction::Download, id);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use indicatif::{
+        InMemoryTerm, MultiProgress, ProgressBar, ProgressDrawTarget, ProgressStyle, TermLike,
+    };
+
+    /// Collapse whitespace/newlines so we can compare text regardless of terminal line wrapping.
+    fn normalize_whitespace(s: &str) -> String {
+        s.split_whitespace().collect::<Vec<_>>().join(" ")
+    }
+
+    /// Reproduce warning truncation when progress bars are active.
+    ///
+    /// When `warn_user!` writes directly to stderr (via `anstream::eprintln!`) while
+    /// indicatif's `MultiProgress` is managing the same terminal, the next progress bar
+    /// redraw moves the cursor up by the wrong amount (it doesn't account for the extra
+    /// line(s) the warning added), overwriting the warning text.
+    ///
+    /// See: <https://github.com/astral-sh/uv/issues/18626>
+    #[test]
+    fn warning_truncated_by_progress_bar_redraw() {
+        // Use a terminal width of 105, matching the reported truncation width.
+        // The warning text is longer than 105 chars, so it wraps to multiple lines.
+        // indicatif doesn't know about these extra lines, so it overwrites them on redraw.
+        let term = InMemoryTerm::new(10, 105);
+        let draw_target = ProgressDrawTarget::term_like(Box::new(term.clone()));
+
+        let mp = MultiProgress::with_draw_target(draw_target);
+        let pb = mp.add(ProgressBar::new(100));
+        pb.set_style(ProgressStyle::with_template("{msg} [{bar:40}] {pos}/{len}").unwrap());
+        pb.set_message("Resolving");
+
+        // Initial draw of the progress bar.
+        pb.tick();
+        let after_tick = term.contents();
+        assert!(
+            after_tick.contains("Resolving"),
+            "progress bar should be visible: {after_tick:?}"
+        );
+
+        // Simulate what `warn_user!` does: write directly to the terminal, bypassing
+        // MultiProgress. This is the root cause of the bug — the warning is written
+        // outside indicatif's control.
+        let warning_text = "warning: Skipping installation of entry points \
+                            (`project.scripts`) for package `foo` because this project \
+                            is not packaged; to install entry points, set \
+                            `tool.uv.package = true` or define a `build-system`";
+        term.write_line(warning_text).unwrap();
+
+        // The warning wraps at 105 columns but all content is present before redraw.
+        let before_redraw = term.contents();
+        let normalized_before = normalize_whitespace(&before_redraw);
+        let normalized_warning = normalize_whitespace(warning_text);
+        assert!(
+            normalized_before.contains(&normalized_warning),
+            "warning should be fully visible before redraw: {before_redraw:?}"
+        );
+
+        // Now advance the progress bar, triggering indicatif to redraw. It will move
+        // the cursor up by the number of lines IT thinks it drew (1), but the cursor
+        // is actually further down because of the wrapped warning lines. This causes
+        // indicatif to overwrite part of the warning.
+        pb.set_position(50);
+        pb.tick();
+
+        let after_redraw = term.contents();
+
+        // The bug: indicatif moved cursor up 1 line (for the 1 line it drew) but the
+        // cursor was 3 lines down (1 progress bar + 2 wrapped warning lines). So it
+        // only moved to line 2 instead of line 0, and drew the progress bar there —
+        // duplicating it instead of updating in-place. On a real terminal, this
+        // manifests as truncation/overwriting of the warning text. The stale progress
+        // bar line at the top (0/100) should not be present after a redraw.
+        let has_stale_progress_bar = after_redraw.contains("0/100");
+        let has_updated_progress_bar = after_redraw.contains("50/100");
+        assert!(
+            has_stale_progress_bar && has_updated_progress_bar,
+            "BUG REPRODUCED: indicatif failed to clear the old progress bar because the \
+             warning written outside its control shifted the cursor. The stale progress bar \
+             (0/100) should have been replaced by the updated one (50/100), but both are \
+             present. On a real terminal this manifests as warning text being overwritten.\n\
+             Terminal contents:\n{after_redraw}"
+        );
+    }
+
+    /// Demonstrate that `MultiProgress::suspend()` prevents the truncation.
+    ///
+    /// This is the fix for <https://github.com/astral-sh/uv/issues/18626>: routing
+    /// warning output through `MultiProgress::suspend()` pauses indicatif's line
+    /// management so the warning prints cleanly without being overwritten.
+    #[test]
+    fn warning_preserved_with_suspend() {
+        let term = InMemoryTerm::new(10, 105);
+        let draw_target = ProgressDrawTarget::term_like(Box::new(term.clone()));
+
+        let mp = MultiProgress::with_draw_target(draw_target);
+        let pb = mp.add(ProgressBar::new(100));
+        pb.set_style(ProgressStyle::with_template("{msg} [{bar:40}] {pos}/{len}").unwrap());
+        pb.set_message("Resolving");
+
+        // Initial draw.
+        pb.tick();
+
+        // Write warning through suspend() — this is the correct approach.
+        let warning_text = "warning: Skipping installation of entry points \
+                            (`project.scripts`) for package `foo` because this project \
+                            is not packaged; to install entry points, set \
+                            `tool.uv.package = true` or define a `build-system`";
+        mp.suspend(|| {
+            term.write_line(warning_text).unwrap();
+        });
+
+        // Advance progress bar, triggering redraw.
+        pb.set_position(50);
+        pb.tick();
+
+        let after_redraw = term.contents();
+        let normalized_after = normalize_whitespace(&after_redraw);
+        let normalized_warning = normalize_whitespace(warning_text);
+        assert!(
+            normalized_after.contains(&normalized_warning),
+            "warning should be fully preserved when using suspend(). \
+             Terminal contents:\n{after_redraw}"
+        );
+
+        // With suspend(), the old progress bar (0/100) should be properly cleared and
+        // only the updated one (50/100) should remain. This contrasts with the
+        // non-suspend case where both stale and new progress bars coexist.
+        let progress_bar_count = after_redraw
+            .lines()
+            .filter(|l| l.contains("Resolving"))
+            .count();
+        assert_eq!(
+            progress_bar_count, 1,
+            "only one progress bar should be present when using suspend() (stale bar \
+             should be cleared). Terminal contents:\n{after_redraw}"
+        );
+    }
+}
