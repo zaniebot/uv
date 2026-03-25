@@ -265,6 +265,26 @@ impl ExcludeNewerValue {
     pub fn new(timestamp: Timestamp, span: Option<ExcludeNewerSpan>) -> Self {
         Self { timestamp, span }
     }
+
+    /// Create a new [`ExcludeNewerValue`] from a span by computing the timestamp
+    /// relative to the current time.
+    pub fn from_span(span: ExcludeNewerSpan) -> Self {
+        let now = if let Ok(test_time) = std::env::var("UV_TEST_CURRENT_TIMESTAMP") {
+            test_time
+                .parse::<Timestamp>()
+                .expect("invalid UV_TEST_CURRENT_TIMESTAMP")
+                .to_zoned(TimeZone::UTC)
+        } else {
+            Timestamp::now().to_zoned(TimeZone::UTC)
+        };
+        let cutoff = now
+            .checked_sub(span.0.abs())
+            .expect("span subtraction from current time should not overflow");
+        Self {
+            timestamp: cutoff.into(),
+            span: Some(span),
+        }
+    }
 }
 
 impl From<Timestamp> for ExcludeNewerValue {
