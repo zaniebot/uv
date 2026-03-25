@@ -23,8 +23,9 @@ uv init C:\test-project
 if ($LASTEXITCODE -ne 0) { throw "uv init failed" }
 
 # Install a package that has console_scripts entry points.
-# `docxcompose` is the package from the original bug report.
-uv --directory C:\test-project add docxcompose
-if ($LASTEXITCODE -ne 0) { throw "uv add docxcompose failed" }
+# `pytest` is a pure-Python package that registers a `pytest` console script,
+# which exercises the trampoline creation code path.
+uv --directory C:\test-project add pytest
+if ($LASTEXITCODE -ne 0) { throw "uv add pytest failed" }
 
 Write-Host "Successfully installed package with entrypoints on Windows NanoServer"
