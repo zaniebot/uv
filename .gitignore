@@ -51,10 +51,3 @@ profile.json.gz
 # IDE
 .idea
 .vscode
-
-# Bazel outputs / symlinks
-/bazel-bin
-/bazel-out
-/bazel-testlogs
-/bazel-*
-
