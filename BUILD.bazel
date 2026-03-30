@@ -1,0 +1,26 @@
+alias(
+    name = "uv_lib",
+    actual = "//crates/uv:uv",
+)
+
+alias(
+    name = "uv",
+    actual = "//crates/uv:uv__bin",
+)
+
+alias(
+    name = "uvx",
+    actual = "//crates/uv:uvx__bin",
+)
+
+alias(
+    name = "uvw",
+    actual = "//crates/uv:uvw__bin",
+)
+
+genrule(
+    name = "uv_smoke_test",
+    srcs = [":uv"],
+    outs = ["uv_smoke_test.txt"],
+    cmd = "$(location :uv) --version > \"$@\"",
+)

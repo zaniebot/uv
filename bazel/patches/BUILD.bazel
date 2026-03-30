@@ -1,0 +1,3 @@
+exports_files([
+    "aws-lc-sys-symlink.patch",
+])

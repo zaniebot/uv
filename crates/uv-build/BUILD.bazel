@@ -1,0 +1,54 @@
+load(
+    "@rules_rust//cargo:defs.bzl",
+    "cargo_toml_env_vars",
+)
+
+load(
+    "@rules_rust//rust:defs.bzl",
+    "rust_binary",
+)
+
+load("@workspace_index//:defs.bzl", "all_crate_deps")
+
+package(default_visibility = ["//visibility:public"])
+
+cargo_toml_env_vars(
+    name = "cargo_toml_env_vars",
+    src = "Cargo.toml",
+)
+
+rust_binary(
+    name = "uv-build__bin",
+    deps = all_crate_deps(
+        normal = True,
+        proc_macro = True,
+    ) + [
+        "//crates/uv-build-backend:uv_build_backend",
+        "//crates/uv-logging:uv_logging",
+        "//crates/uv-preview:uv_preview",
+        "//crates/uv-static:uv_static",
+        "//crates/uv-version:uv_version",
+    ],
+    crate_features = [
+        "default",
+    ],
+    crate_name = "uv_build",
+    crate_root = "src/main.rs",
+    edition = "2024",
+    rustc_env_files = [":cargo_toml_env_vars"],
+    rustc_flags = [
+        "--cap-lints=allow",
+    ],
+    srcs = glob(
+        allow_empty = True,
+        include = ["**/*.rs"],
+    ),
+    tags = [
+        "cargo-bazel",
+        "crate-name=uv-build",
+        "manual",
+        "noclippy",
+        "norustfmt",
+    ],
+    version = "0.11.1",
+)
