@@ -18,17 +18,40 @@ docker buildx build -t uv-trampoline-builder --load \
     -f "$TRAMPOLINE_DIR/Dockerfile" "$TRAMPOLINE_DIR" \
     "$@"
 
-# Build trampolines inside the container with the workspace bind-mounted.
-# The working directory must be the trampoline crate so cargo picks up
-# .cargo/config.toml (which enables build-std).
+# Prepare a version-normalized copy of the workspace for the build.
+#
+# Crate versions are normalized to 0.0.0 because Rust embeds them in
+# -Cmetadata hashes that feed into symbol mangling.  Even with strip = true
+# the different hashes change linker layout, so a version-only bump
+# (e.g. 0.0.35 -> 0.0.36) would produce a different binary.  Pinning to a
+# fixed value keeps the build output stable across release version bumps.
+BUILD_WORKSPACE="$(mktemp -d)"
+trap 'rm -rf "$BUILD_WORKSPACE"' EXIT
+
+mkdir -p "$BUILD_WORKSPACE/crates"
+# Root manifest (needed for workspace = true resolution in path deps)
+cp "$REPO_ROOT/Cargo.toml" "$BUILD_WORKSPACE/Cargo.toml"
+for crate in uv-trampoline uv-static uv-windows uv-macros; do
+    cp -a "$REPO_ROOT/crates/$crate" "$BUILD_WORKSPACE/crates/$crate"
+done
+rm -rf "$BUILD_WORKSPACE"/crates/*/target
+
+python3 "$SCRIPT_DIR/normalize-trampoline-versions.py" "$BUILD_WORKSPACE"
+
+# Build trampolines inside the container with the normalized workspace
+# bind-mounted.  The working directory must be the trampoline crate so cargo
+# picks up .cargo/config.toml (which enables build-std).
 docker run --rm \
-    -v "$REPO_ROOT:/workspace:ro" \
+    -v "$BUILD_WORKSPACE:/workspace" \
     -v "$OUTPUT_DIR:/output" \
     -w /workspace/crates/uv-trampoline \
     uv-trampoline-builder \
     bash -c '
         set -euo pipefail
         export CARGO_TARGET_DIR=/tmp/target
+
+        # Regenerate lockfile with the pinned versions
+        cargo +"'"$TOOLCHAIN"'" generate-lockfile
 
         cargo +"'"$TOOLCHAIN"'" xwin build --xwin-arch x86 --release --target i686-pc-windows-msvc
         cargo +"'"$TOOLCHAIN"'" xwin build --release --target x86_64-pc-windows-msvc
