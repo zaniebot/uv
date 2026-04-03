@@ -959,6 +959,7 @@ async fn do_lock(
                 conflicts.clone(),
                 &client,
                 &flat_index,
+                index_locations,
                 state.index(),
                 &build_dispatch,
                 concurrency,

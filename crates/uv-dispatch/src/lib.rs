@@ -260,6 +260,7 @@ impl BuildContext for BuildDispatch<'_> {
             Conflicts::empty(),
             Some(tags),
             self.flat_index,
+            self.index_locations,
             &self.shared_state.index,
             self.hasher,
             self,

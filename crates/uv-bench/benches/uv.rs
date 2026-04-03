@@ -255,6 +255,7 @@ mod resolver {
             conflicts,
             Some(&TAGS),
             &flat_index,
+            &index_locations,
             &index,
             &hashes,
             &build_context,

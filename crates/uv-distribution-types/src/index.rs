@@ -7,6 +7,7 @@ use thiserror::Error;
 use url::Url;
 
 use uv_auth::{AuthPolicy, Credentials};
+use uv_pypi_types::ExcludeNewerValue;
 use uv_redacted::DisplaySafeUrl;
 use uv_small_str::SmallString;
 
@@ -123,6 +124,105 @@ impl<'de> Deserialize<'de> for IndexCacheControl {
     }
 }
 
+/// Per-index exclude-newer setting.
+///
+/// This enum represents whether exclude-newer should be disabled for an index,
+/// or if a specific cutoff (absolute or relative) should be used.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum IndexExcludeNewer {
+    /// Disable exclude-newer for this index (allow all versions regardless of upload date).
+    Disabled,
+    /// Enable exclude-newer with this cutoff for this index.
+    Enabled(Box<ExcludeNewerValue>),
+}
+
+#[cfg(feature = "schemars")]
+impl schemars::JsonSchema for IndexExcludeNewer {
+    fn schema_name() -> std::borrow::Cow<'static, str> {
+        std::borrow::Cow::Borrowed("IndexExcludeNewer")
+    }
+
+    fn json_schema(generator: &mut schemars::generate::SchemaGenerator) -> schemars::Schema {
+        schemars::json_schema!({
+            "oneOf": [
+                {
+                    "type": "boolean",
+                    "const": false,
+                    "description": "Disable exclude-newer for this index."
+                },
+                generator.subschema_for::<ExcludeNewerValue>(),
+            ]
+        })
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for IndexExcludeNewer {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        struct Visitor;
+
+        impl<'de> serde::de::Visitor<'de> for Visitor {
+            type Value = IndexExcludeNewer;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str(
+                    "a date/timestamp/duration string, false to disable exclude-newer, or a table \
+                     with timestamp/span",
+                )
+            }
+
+            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                ExcludeNewerValue::from_str(v)
+                    .map(|ts| IndexExcludeNewer::Enabled(Box::new(ts)))
+                    .map_err(|e| E::custom(format!("failed to parse exclude-newer value: {e}")))
+            }
+
+            fn visit_bool<E>(self, v: bool) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                if v {
+                    Err(E::custom(
+                        "expected false to disable exclude-newer, got true",
+                    ))
+                } else {
+                    Ok(IndexExcludeNewer::Disabled)
+                }
+            }
+
+            fn visit_map<A>(self, map: A) -> Result<Self::Value, A::Error>
+            where
+                A: serde::de::MapAccess<'de>,
+            {
+                Ok(IndexExcludeNewer::Enabled(Box::new(
+                    ExcludeNewerValue::deserialize(serde::de::value::MapAccessDeserializer::new(
+                        map,
+                    ))?,
+                )))
+            }
+        }
+
+        deserializer.deserialize_any(Visitor)
+    }
+}
+
+impl serde::Serialize for IndexExcludeNewer {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            Self::Enabled(timestamp) => timestamp.to_string().serialize(serializer),
+            Self::Disabled => serializer.serialize_bool(false),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[serde(rename_all = "kebab-case")]
@@ -229,6 +329,20 @@ pub struct Index {
     /// ```
     #[serde(default)]
     pub cache_control: Option<IndexCacheControl>,
+    /// Exclude-newer configuration for this index.
+    ///
+    /// When set, overrides the global `exclude-newer` setting for packages resolved from this
+    /// index. Set to `false` to disable exclude-newer filtering for this index entirely (useful
+    /// for private registries that don't provide upload timestamps).
+    ///
+    /// ```toml
+    /// [[tool.uv.index]]
+    /// name = "internal"
+    /// url = "https://internal.example.com/simple"
+    /// exclude-newer = false
+    /// ```
+    #[serde(default)]
+    pub exclude_newer: Option<IndexExcludeNewer>,
 }
 
 impl PartialEq for Index {
@@ -244,6 +358,7 @@ impl PartialEq for Index {
             authenticate,
             ignore_error_codes,
             cache_control,
+            exclude_newer,
         } = self;
         *url == other.url
             && *name == other.name
@@ -254,6 +369,7 @@ impl PartialEq for Index {
             && *authenticate == other.authenticate
             && *ignore_error_codes == other.ignore_error_codes
             && *cache_control == other.cache_control
+            && *exclude_newer == other.exclude_newer
     }
 }
 
@@ -278,6 +394,7 @@ impl Ord for Index {
             authenticate,
             ignore_error_codes,
             cache_control,
+            exclude_newer,
         } = self;
         url.cmp(&other.url)
             .then_with(|| name.cmp(&other.name))
@@ -288,6 +405,7 @@ impl Ord for Index {
             .then_with(|| authenticate.cmp(&other.authenticate))
             .then_with(|| ignore_error_codes.cmp(&other.ignore_error_codes))
             .then_with(|| cache_control.cmp(&other.cache_control))
+            .then_with(|| exclude_newer.cmp(&other.exclude_newer))
     }
 }
 
@@ -304,6 +422,7 @@ impl std::hash::Hash for Index {
             authenticate,
             ignore_error_codes,
             cache_control,
+            exclude_newer,
         } = self;
         url.hash(state);
         name.hash(state);
@@ -314,6 +433,7 @@ impl std::hash::Hash for Index {
         authenticate.hash(state);
         ignore_error_codes.hash(state);
         cache_control.hash(state);
+        exclude_newer.hash(state);
     }
 }
 
@@ -354,6 +474,7 @@ impl Index {
             authenticate: AuthPolicy::default(),
             ignore_error_codes: None,
             cache_control: None,
+            exclude_newer: None,
         }
     }
 
@@ -370,6 +491,7 @@ impl Index {
             authenticate: AuthPolicy::default(),
             ignore_error_codes: None,
             cache_control: None,
+            exclude_newer: None,
         }
     }
 
@@ -386,6 +508,7 @@ impl Index {
             authenticate: AuthPolicy::default(),
             ignore_error_codes: None,
             cache_control: None,
+            exclude_newer: None,
         }
     }
 
@@ -493,6 +616,7 @@ impl From<IndexUrl> for Index {
             authenticate: AuthPolicy::default(),
             ignore_error_codes: None,
             cache_control: None,
+            exclude_newer: None,
         }
     }
 }
@@ -517,6 +641,7 @@ impl FromStr for Index {
                     authenticate: AuthPolicy::default(),
                     ignore_error_codes: None,
                     cache_control: None,
+                    exclude_newer: None,
                 });
             }
         }
@@ -534,6 +659,7 @@ impl FromStr for Index {
             authenticate: AuthPolicy::default(),
             ignore_error_codes: None,
             cache_control: None,
+            exclude_newer: None,
         })
     }
 }
@@ -638,6 +764,8 @@ struct IndexWire {
     ignore_error_codes: Option<Vec<SerializableStatusCode>>,
     #[serde(default)]
     cache_control: Option<IndexCacheControl>,
+    #[serde(default)]
+    exclude_newer: Option<IndexExcludeNewer>,
 }
 
 impl<'de> Deserialize<'de> for Index {
@@ -665,6 +793,7 @@ impl<'de> Deserialize<'de> for Index {
             authenticate: wire.authenticate,
             ignore_error_codes: wire.ignore_error_codes,
             cache_control: wire.cache_control,
+            exclude_newer: wire.exclude_newer,
         })
     }
 }
@@ -768,6 +897,68 @@ mod tests {
         assert!(
             err.to_string()
                 .contains("`cache-control.files` must be a valid HTTP header value")
+        );
+    }
+
+    #[test]
+    fn test_index_exclude_newer_false() {
+        // Test that exclude-newer = false disables exclude-newer for the index
+        let toml_str = r#"
+            name = "internal"
+            url = "https://internal.example.com/simple"
+            exclude-newer = false
+        "#;
+
+        let index: Index = toml::from_str(toml_str).unwrap();
+        assert_eq!(index.name.as_ref().unwrap().as_ref(), "internal");
+        assert!(matches!(
+            index.exclude_newer,
+            Some(IndexExcludeNewer::Disabled)
+        ));
+    }
+
+    #[test]
+    fn test_index_exclude_newer_timestamp() {
+        // Test that exclude-newer can be set to a timestamp for the index
+        let toml_str = r#"
+            name = "internal"
+            url = "https://internal.example.com/simple"
+            exclude-newer = "2024-01-01T00:00:00Z"
+        "#;
+
+        let index: Index = toml::from_str(toml_str).unwrap();
+        assert!(matches!(
+            index.exclude_newer,
+            Some(IndexExcludeNewer::Enabled(_))
+        ));
+    }
+
+    #[test]
+    fn test_index_without_exclude_newer() {
+        // Test that indexes work without exclude-newer
+        let toml_str = r#"
+            name = "test-index"
+            url = "https://test.example.com/simple"
+        "#;
+
+        let index: Index = toml::from_str(toml_str).unwrap();
+        assert_eq!(index.exclude_newer, None);
+    }
+
+    #[test]
+    fn test_index_exclude_newer_true_rejected() {
+        // Test that exclude-newer = true is rejected
+        let toml_str = r#"
+            name = "test-index"
+            url = "https://test.example.com/simple"
+            exclude-newer = true
+        "#;
+
+        let err = toml::from_str::<Index>(toml_str).unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("expected false to disable exclude-newer, got true"),
+            "Error was: {err}"
         );
     }
 }

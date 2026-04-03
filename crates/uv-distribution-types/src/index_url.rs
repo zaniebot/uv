@@ -15,7 +15,7 @@ use uv_pep508::{Scheme, VerbatimUrl, VerbatimUrlError, split_scheme};
 use uv_redacted::DisplaySafeUrl;
 use uv_warnings::warn_user;
 
-use crate::{Index, IndexStatusCodeStrategy, Verbatim};
+use crate::{Index, IndexExcludeNewer, IndexStatusCodeStrategy, Verbatim};
 
 static PYPI_URL: LazyLock<DisplaySafeUrl> =
     LazyLock::new(|| DisplaySafeUrl::parse("https://pypi.org/simple").unwrap());
@@ -458,6 +458,16 @@ impl<'a> IndexLocations {
         }
         None
     }
+
+    /// Return the per-index exclude-newer setting for an [`IndexUrl`], if configured.
+    pub fn exclude_newer_for(&self, url: &IndexUrl) -> Option<&IndexExcludeNewer> {
+        for index in &self.indexes {
+            if is_same_index(index.url(), url) {
+                return index.exclude_newer.as_ref();
+            }
+        }
+        None
+    }
 }
 
 impl From<&IndexLocations> for uv_auth::Indexes {
@@ -611,6 +621,16 @@ impl<'a> IndexUrls {
         }
         None
     }
+
+    /// Return the per-index exclude-newer setting for an [`IndexUrl`], if configured.
+    pub fn exclude_newer_for(&self, url: &IndexUrl) -> Option<&IndexExcludeNewer> {
+        for index in &self.indexes {
+            if is_same_index(index.url(), url) {
+                return index.exclude_newer.as_ref();
+            }
+        }
+        None
+    }
 }
 
 bitflags::bitflags! {
@@ -754,6 +774,7 @@ mod tests {
                 publish_url: None,
                 authenticate: uv_auth::AuthPolicy::default(),
                 ignore_error_codes: None,
+                exclude_newer: None,
             },
             Index {
                 name: Some(IndexName::from_str("index2").unwrap()),
@@ -766,6 +787,7 @@ mod tests {
                 publish_url: None,
                 authenticate: uv_auth::AuthPolicy::default(),
                 ignore_error_codes: None,
+                exclude_newer: None,
             },
         ];
 
@@ -804,6 +826,7 @@ mod tests {
             publish_url: None,
             authenticate: uv_auth::AuthPolicy::default(),
             ignore_error_codes: None,
+            exclude_newer: None,
         }];
 
         let index_urls = IndexUrls::from_indexes(indexes.clone());
@@ -850,6 +873,7 @@ mod tests {
             publish_url: None,
             authenticate: uv_auth::AuthPolicy::default(),
             ignore_error_codes: None,
+            exclude_newer: None,
         }];
 
         let index_urls = IndexUrls::from_indexes(indexes.clone());
@@ -892,6 +916,7 @@ mod tests {
             publish_url: None,
             authenticate: uv_auth::AuthPolicy::default(),
             ignore_error_codes: None,
+            exclude_newer: None,
         }];
 
         let index_urls = IndexUrls::from_indexes(indexes.clone());

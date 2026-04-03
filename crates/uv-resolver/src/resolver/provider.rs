@@ -4,8 +4,8 @@ use uv_client::MetadataFormat;
 use uv_configuration::BuildOptions;
 use uv_distribution::{ArchiveMetadata, DistributionDatabase, Reporter};
 use uv_distribution_types::{
-    Dist, IndexCapabilities, IndexMetadata, IndexMetadataRef, InstalledDist, RequestedDist,
-    RequiresPython,
+    Dist, IndexCapabilities, IndexLocations, IndexMetadata, IndexMetadataRef, InstalledDist,
+    RequestedDist, RequiresPython,
 };
 use uv_normalize::PackageName;
 use uv_pep440::{Version, VersionSpecifiers};
@@ -112,6 +112,8 @@ pub struct DefaultResolverProvider<'a, Context: BuildContext> {
     fetcher: DistributionDatabase<'a, Context>,
     /// These are the entries from `--find-links` that act as overrides for index responses.
     flat_index: FlatIndex,
+    /// The index locations, used to look up per-index settings (e.g., exclude-newer).
+    index_locations: IndexLocations,
     tags: Option<Tags>,
     requires_python: RequiresPython,
     allowed_yanks: AllowedYanks,
@@ -126,6 +128,7 @@ impl<'a, Context: BuildContext> DefaultResolverProvider<'a, Context> {
     pub fn new(
         fetcher: DistributionDatabase<'a, Context>,
         flat_index: &'a FlatIndex,
+        index_locations: &'a IndexLocations,
         tags: Option<&'a Tags>,
         requires_python: &'a RequiresPython,
         allowed_yanks: AllowedYanks,
@@ -137,6 +140,7 @@ impl<'a, Context: BuildContext> DefaultResolverProvider<'a, Context> {
         Self {
             fetcher,
             flat_index: flat_index.clone(),
+            index_locations: index_locations.clone(),
             tags: tags.cloned(),
             requires_python: requires_python.clone(),
             allowed_yanks,
@@ -176,20 +180,24 @@ impl<Context: BuildContext> ResolverProvider for DefaultResolverProvider<'_, Con
                 results
                     .into_iter()
                     .map(|(index, metadata)| match metadata {
-                        MetadataFormat::Simple(metadata) => VersionMap::from_simple_metadata(
-                            metadata,
-                            package_name,
-                            index,
-                            self.tags.as_ref(),
-                            &self.requires_python,
-                            &self.allowed_yanks,
-                            &self.hasher,
-                            Some(&self.exclude_newer),
-                            flat_index
-                                .and_then(|flat_index| flat_index.get(package_name))
-                                .cloned(),
-                            self.build_options,
-                        ),
+                        MetadataFormat::Simple(metadata) => {
+                            let index_exclude_newer = self.index_locations.exclude_newer_for(index);
+                            VersionMap::from_simple_metadata(
+                                metadata,
+                                package_name,
+                                index,
+                                self.tags.as_ref(),
+                                &self.requires_python,
+                                &self.allowed_yanks,
+                                &self.hasher,
+                                Some(&self.exclude_newer),
+                                index_exclude_newer,
+                                flat_index
+                                    .and_then(|flat_index| flat_index.get(package_name))
+                                    .cloned(),
+                                self.build_options,
+                            )
+                        }
                         MetadataFormat::Flat(metadata) => VersionMap::from_flat_metadata(
                             metadata,
                             self.tags.as_ref(),

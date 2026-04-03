@@ -171,6 +171,7 @@ impl<'a, Context: BuildContext, InstalledPackages: InstalledPackagesProvider>
         conflicts: Conflicts,
         tags: Option<&'a Tags>,
         flat_index: &'a FlatIndex,
+        index_locations: &'a IndexLocations,
         index: &'a InMemoryIndex,
         hasher: &'a HashStrategy,
         build_context: &'a Context,
@@ -180,6 +181,7 @@ impl<'a, Context: BuildContext, InstalledPackages: InstalledPackagesProvider>
         let provider = DefaultResolverProvider::new(
             database,
             flat_index,
+            index_locations,
             tags,
             python_requirement.target(),
             AllowedYanks::from_manifest(&manifest, &env, options.dependency_mode),

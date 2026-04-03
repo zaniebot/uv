@@ -487,6 +487,7 @@ pub(crate) async fn pip_sync(
             Conflicts::empty(),
             &client,
             &flat_index,
+            &index_locations,
             state.index(),
             &build_dispatch,
             &concurrency,

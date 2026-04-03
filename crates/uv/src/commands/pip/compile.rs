@@ -586,6 +586,7 @@ pub(crate) async fn pip_compile(
         Conflicts::empty(),
         &client,
         &flat_index,
+        &index_locations,
         &top_level_index,
         &build_dispatch,
         &concurrency,

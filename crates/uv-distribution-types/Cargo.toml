@@ -55,4 +55,4 @@ version-ranges = { workspace = true }
 toml = { workspace = true }
 
 [features]
-schemars = ["dep:schemars", "uv-redacted/schemars"]
+schemars = ["dep:schemars", "uv-pypi-types/schemars", "uv-redacted/schemars"]

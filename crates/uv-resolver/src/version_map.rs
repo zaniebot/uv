@@ -11,9 +11,9 @@ use uv_client::{FlatIndexEntry, OwnedArchive, SimpleDetailMetadata, VersionFiles
 use uv_configuration::BuildOptions;
 use uv_distribution_filename::{DistFilename, WheelFilename};
 use uv_distribution_types::{
-    HashComparison, IncompatibleSource, IncompatibleWheel, IndexUrl, PrioritizedDist,
-    RegistryBuiltWheel, RegistrySourceDist, RequiresPython, SourceDistCompatibility,
-    WheelCompatibility,
+    HashComparison, IncompatibleSource, IncompatibleWheel, IndexExcludeNewer, IndexUrl,
+    PrioritizedDist, RegistryBuiltWheel, RegistrySourceDist, RequiresPython,
+    SourceDistCompatibility, WheelCompatibility,
 };
 use uv_normalize::PackageName;
 use uv_pep440::Version;
@@ -52,6 +52,7 @@ impl VersionMap {
         allowed_yanks: &AllowedYanks,
         hasher: &HashStrategy,
         exclude_newer: Option<&ExcludeNewer>,
+        index_exclude_newer: Option<&IndexExcludeNewer>,
         flat_index: Option<FlatDistributions>,
         build_options: &BuildOptions,
     ) -> Self {
@@ -127,7 +128,9 @@ impl VersionMap {
                 allowed_yanks: allowed_yanks.clone(),
                 hasher: hasher.clone(),
                 requires_python: requires_python.clone(),
-                exclude_newer: exclude_newer.and_then(|en| en.exclude_newer_package(package_name)),
+                exclude_newer: exclude_newer.and_then(|en| {
+                    en.exclude_newer_for_index_package(index_exclude_newer, package_name)
+                }),
             }),
         }
     }

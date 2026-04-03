@@ -959,6 +959,18 @@
           "type": "boolean",
           "default": false
         },
+        "exclude-newer": {
+          "description": "Exclude-newer configuration for this index.\n\nWhen set, overrides the global `exclude-newer` setting for packages resolved from this\nindex. Set to `false` to disable exclude-newer filtering for this index entirely (useful\nfor private registries that don't provide upload timestamps).\n\n```toml\n[[tool.uv.index]]\nname = \"internal\"\nurl = \"https://internal.example.com/simple\"\nexclude-newer = false\n```",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/IndexExcludeNewer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "explicit": {
           "description": "Mark the index as explicit.\n\nExplicit indexes will _only_ be used when explicitly requested via a `[tool.uv.sources]`\ndefinition, as in:\n\n```toml\n[[tool.uv.index]]\nname = \"pytorch\"\nurl = \"https://download.pytorch.org/whl/cu121\"\nexplicit = true\n\n[tool.uv.sources]\ntorch = { index = \"pytorch\" }\n```",
           "type": "boolean",
@@ -1027,6 +1039,18 @@
           "type": ["string", "null"]
         }
       }
+    },
+    "IndexExcludeNewer": {
+      "oneOf": [
+        {
+          "description": "Disable exclude-newer for this index.",
+          "type": "boolean",
+          "const": false
+        },
+        {
+          "$ref": "#/definitions/ExcludeNewerValue"
+        }
+      ]
     },
     "IndexFormat": {
       "oneOf": [

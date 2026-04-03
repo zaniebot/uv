@@ -82,4 +82,5 @@ insta = { workspace = true }
 toml = { workspace = true }
 
 [features]
+schemars = ["dep:schemars", "uv-pypi-types/schemars"]
 tracing-durations-export = []
