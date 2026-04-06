@@ -166,9 +166,6 @@ impl PyProjectToml {
     /// Returns the set of conflicts for the project.
     pub fn conflicts(&self) -> Conflicts {
         let empty = Conflicts::empty();
-        let Some(project) = self.project.as_ref() else {
-            return empty;
-        };
         let Some(tool) = self.tool.as_ref() else {
             return empty;
         };
@@ -178,7 +175,14 @@ impl PyProjectToml {
         let Some(conflicting) = tooluv.conflicts.as_ref() else {
             return empty;
         };
-        conflicting.to_conflicts_with_package_name(&project.name)
+        if let Some(project) = self.project.as_ref() {
+            conflicting.to_conflicts_with_package_name(&project.name)
+        } else {
+            // For virtual workspaces (no `[project]` section), convert
+            // conflicts without a fallback package name. All conflict items
+            // must have explicit package names in this case.
+            conflicting.to_conflicts()
+        }
     }
 }
 

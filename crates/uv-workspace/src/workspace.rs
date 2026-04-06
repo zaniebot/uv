@@ -553,6 +553,13 @@ impl Workspace {
         for member in self.packages.values() {
             conflicting.append(&mut member.pyproject_toml.conflicts());
         }
+        // For virtual workspaces (non-project roots), conflicts defined in the
+        // root `[tool.uv]` are not covered by the member loop above, since the
+        // root is not a member. Read them directly from the workspace root's
+        // pyproject.toml.
+        if self.is_non_project() {
+            conflicting.append(&mut self.pyproject_toml.conflicts());
+        }
         conflicting
     }
 

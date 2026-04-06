@@ -608,6 +608,32 @@ impl SchemaConflicts {
         }
         conflicting
     }
+
+    /// Convert schema conflicts to internal [`Conflicts`] without a fallback
+    /// package name.
+    ///
+    /// This is used for virtual workspaces (no `[project]` section), where
+    /// every conflict item must have an explicit `package` field. Items without
+    /// an explicit package name are skipped, since there is no project name to
+    /// use as a fallback.
+    pub fn to_conflicts(&self) -> Conflicts {
+        let mut conflicting = Conflicts::empty();
+        for tool_uv_set in &self.0 {
+            let mut set = vec![];
+            for item in &tool_uv_set.0 {
+                if let Some(package) = item.package.clone() {
+                    set.push(ConflictItem {
+                        package,
+                        kind: item.kind.clone(),
+                    });
+                }
+            }
+            if let Ok(set) = ConflictSet::try_from(set) {
+                conflicting.push(set);
+            }
+        }
+        conflicting
+    }
 }
 
 /// Like [`ConflictSet`], but for deserialization in `pyproject.toml`.
