@@ -134,12 +134,29 @@ impl std::fmt::Display for ExcludeNewerPackageChange {
     }
 }
 /// A timestamp that excludes files newer than it.
-#[derive(Debug, Clone, PartialEq, Eq)]
+///
+/// When comparing two [`ExcludeNewerValue`]s for equality, the computed timestamp is ignored if
+/// both values have the same relative span. This avoids unnecessary lock file updates when only
+/// the computed timestamp changed (e.g., from running `uv lock --upgrade` at different times
+/// with the same relative `exclude-newer` span like `"2 weeks"`).
+#[derive(Debug, Clone, Eq)]
 pub struct ExcludeNewerValue {
     /// The resolved timestamp.
     timestamp: Timestamp,
     /// The span used to derive the [`Timestamp`], if any.
     span: Option<ExcludeNewerSpan>,
+}
+
+impl PartialEq for ExcludeNewerValue {
+    fn eq(&self, other: &Self) -> bool {
+        match (&self.span, &other.span) {
+            // Both have the same relative span: the timestamp is derived and may differ
+            // depending on when the resolution was run, so ignore it.
+            (Some(a), Some(b)) if a == b => true,
+            // Otherwise, compare both fields.
+            _ => self.timestamp == other.timestamp && self.span == other.span,
+        }
+    }
 }
 
 impl ExcludeNewerValue {

@@ -2338,13 +2338,31 @@ struct ResolverOptions {
 }
 
 #[expect(clippy::struct_field_names)]
-#[derive(Clone, Debug, Default, serde::Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, serde::Deserialize, Eq)]
 #[serde(rename_all = "kebab-case")]
 struct ExcludeNewerWire {
     exclude_newer: Option<Timestamp>,
     exclude_newer_span: Option<ExcludeNewerSpan>,
     #[serde(default, skip_serializing_if = "ExcludeNewerPackage::is_empty")]
     exclude_newer_package: ExcludeNewerPackage,
+}
+
+impl PartialEq for ExcludeNewerWire {
+    fn eq(&self, other: &Self) -> bool {
+        // For the global exclude-newer: if both have the same relative span, the computed
+        // timestamp is derived and may differ depending on when the resolution was run, so
+        // ignore it. This avoids unnecessary lock file rewrites.
+        let global_eq = match (&self.exclude_newer_span, &other.exclude_newer_span) {
+            (Some(a), Some(b)) if a == b => true,
+            _ => {
+                self.exclude_newer == other.exclude_newer
+                    && self.exclude_newer_span == other.exclude_newer_span
+            }
+        };
+        // Per-package equality uses ExcludeNewerValue's PartialEq, which already ignores
+        // the timestamp when spans match.
+        global_eq && self.exclude_newer_package == other.exclude_newer_package
+    }
 }
 
 impl From<ExcludeNewerWire> for ExcludeNewer {
