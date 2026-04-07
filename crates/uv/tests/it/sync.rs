@@ -6781,7 +6781,7 @@ fn sync_active_project_environment() -> Result<()> {
     ----- stdout -----
 
     ----- stderr -----
-    Using CPython 3.12.[X] interpreter at: [PYTHON-3.12]
+    Using CPython 3.12.[X] interpreter at: [PYTHON-3.12] requested with explicit request
     Removed virtual environment at: foo
     Creating virtual environment at: foo
     Resolved 2 packages in [TIME]
@@ -9177,7 +9177,7 @@ fn sync_python_version() -> Result<()> {
     ----- stdout -----
 
     ----- stderr -----
-    Using CPython 3.10.[X] interpreter at: [PYTHON-3.10]
+    Using CPython 3.10.[X] interpreter at: [PYTHON-3.10] requested with explicit request
     error: The requested interpreter resolved to Python 3.10.[X], which is incompatible with the project's Python requirement: `>=3.11` (from `project.requires-python`)
     ");
 
@@ -9197,7 +9197,7 @@ fn sync_python_version() -> Result<()> {
     ----- stdout -----
 
     ----- stderr -----
-    Using CPython 3.12.[X] interpreter at: [PYTHON-3.12]
+    Using CPython 3.12.[X] interpreter at: [PYTHON-3.12] requested with version file at `.python-version`
     Removed virtual environment at: .venv
     Creating virtual environment at: .venv
     Resolved 4 packages in [TIME]
@@ -9224,7 +9224,7 @@ fn sync_python_version() -> Result<()> {
     ----- stdout -----
 
     ----- stderr -----
-    Using CPython 3.10.[X] interpreter at: [PYTHON-3.10]
+    Using CPython 3.10.[X] interpreter at: [PYTHON-3.10] requested with version file at `.python-version`
     error: The Python request from `.python-version` resolved to Python 3.10.[X], which is incompatible with the project's Python requirement: `>=3.11` (from `project.requires-python`)
     Use `uv python pin` to update the `.python-version` file to a compatible version
     ");

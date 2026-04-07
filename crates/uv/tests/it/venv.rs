@@ -25,7 +25,7 @@ fn create_venv() {
     ----- stdout -----
 
     ----- stderr -----
-    Using CPython 3.12.[X] interpreter at: [PYTHON-3.12]
+    Using CPython 3.12.[X] interpreter at: [PYTHON-3.12] requested with explicit request
     Creating virtual environment at: .venv
     Activate with: source .venv/[BIN]/activate
     "
@@ -42,7 +42,7 @@ fn create_venv() {
     ----- stdout -----
 
     ----- stderr -----
-    Using CPython 3.12.[X] interpreter at: [PYTHON-3.12]
+    Using CPython 3.12.[X] interpreter at: [PYTHON-3.12] requested with explicit request
     Creating virtual environment at: .venv
     error: Failed to create virtual environment
       Caused by: A virtual environment already exists at `[VENV]/`. Use `--clear` to replace it
@@ -61,7 +61,7 @@ fn create_venv() {
     ----- stdout -----
 
     ----- stderr -----
-    Using CPython 3.12.[X] interpreter at: [PYTHON-3.12]
+    Using CPython 3.12.[X] interpreter at: [PYTHON-3.12] requested with explicit request
     Creating virtual environment at: .venv
     Activate with: source .venv/[BIN]/activate
     "
@@ -83,7 +83,7 @@ fn create_venv_313() {
     ----- stdout -----
 
     ----- stderr -----
-    Using CPython 3.13.[X] interpreter at: [PYTHON-3.13]
+    Using CPython 3.13.[X] interpreter at: [PYTHON-3.13] requested with explicit request
     Creating virtual environment at: .venv
     Activate with: source .venv/[BIN]/activate
     "
@@ -274,7 +274,7 @@ fn create_venv_defaults_to_cwd() {
     ----- stdout -----
 
     ----- stderr -----
-    Using CPython 3.12.[X] interpreter at: [PYTHON-3.12]
+    Using CPython 3.12.[X] interpreter at: [PYTHON-3.12] requested with explicit request
     Creating virtual environment at: .venv
     Activate with: source .venv/[BIN]/activate
     "
@@ -332,7 +332,7 @@ fn create_venv_reads_request_from_python_version_file() {
     ----- stdout -----
 
     ----- stderr -----
-    Using CPython 3.12.[X] interpreter at: [PYTHON-3.12]
+    Using CPython 3.12.[X] interpreter at: [PYTHON-3.12] requested with version file at `.python-version`
     Creating virtual environment at: .venv
     Activate with: source .venv/[BIN]/activate
     "
@@ -371,7 +371,7 @@ fn create_venv_reads_request_from_python_versions_file() {
     ----- stdout -----
 
     ----- stderr -----
-    Using CPython 3.12.[X] interpreter at: [PYTHON-3.12]
+    Using CPython 3.12.[X] interpreter at: [PYTHON-3.12] requested with version file at `.python-versions`
     Creating virtual environment at: .venv
     Activate with: source .venv/[BIN]/activate
     "
@@ -821,7 +821,7 @@ fn create_venv_explicit_request_takes_priority_over_python_version_file() {
     ----- stdout -----
 
     ----- stderr -----
-    Using CPython 3.11.[X] interpreter at: [PYTHON-3.11]
+    Using CPython 3.11.[X] interpreter at: [PYTHON-3.11] requested with explicit request
     Creating virtual environment at: .venv
     Activate with: source .venv/[BIN]/activate
     "
@@ -844,7 +844,7 @@ fn seed() {
     ----- stdout -----
 
     ----- stderr -----
-    Using CPython 3.12.[X] interpreter at: [PYTHON-3.12]
+    Using CPython 3.12.[X] interpreter at: [PYTHON-3.12] requested with explicit request
     Creating virtual environment with seed packages at: .venv
      + pip==24.0
     Activate with: source .venv/[BIN]/activate
@@ -868,7 +868,7 @@ fn seed_older_python_version() {
     ----- stdout -----
 
     ----- stderr -----
-    Using CPython 3.11.[X] interpreter at: [PYTHON-3.11]
+    Using CPython 3.11.[X] interpreter at: [PYTHON-3.11] requested with explicit request
     Creating virtual environment with seed packages at: .venv
      + pip==24.0
      + setuptools==69.2.0
@@ -1003,7 +1003,7 @@ fn file_exists() -> Result<()> {
     ----- stdout -----
 
     ----- stderr -----
-    Using CPython 3.12.[X] interpreter at: [PYTHON-3.12]
+    Using CPython 3.12.[X] interpreter at: [PYTHON-3.12] requested with explicit request
     Creating virtual environment at: .venv
     error: Failed to create virtual environment
       Caused by: File exists at `.venv`
@@ -1028,7 +1028,7 @@ fn empty_dir_exists() -> Result<()> {
     ----- stdout -----
 
     ----- stderr -----
-    Using CPython 3.12.[X] interpreter at: [PYTHON-3.12]
+    Using CPython 3.12.[X] interpreter at: [PYTHON-3.12] requested with explicit request
     Creating virtual environment at: .venv
     Activate with: source .venv/[BIN]/activate
     "
@@ -1057,7 +1057,7 @@ fn non_empty_dir_exists() -> Result<()> {
     ----- stdout -----
 
     ----- stderr -----
-    Using CPython 3.12.[X] interpreter at: [PYTHON-3.12]
+    Using CPython 3.12.[X] interpreter at: [PYTHON-3.12] requested with explicit request
     Creating virtual environment at: .venv
     error: Failed to create virtual environment
       Caused by: A directory already exists at: .venv
@@ -1075,7 +1075,7 @@ fn non_empty_dir_exists() -> Result<()> {
     ----- stdout -----
 
     ----- stderr -----
-    Using CPython 3.12.[X] interpreter at: [PYTHON-3.12]
+    Using CPython 3.12.[X] interpreter at: [PYTHON-3.12] requested with explicit request
     Creating virtual environment at: .venv
     Activate with: source .venv/[BIN]/activate
     "
@@ -1102,7 +1102,7 @@ fn non_empty_dir_exists_allow_existing() -> Result<()> {
     ----- stdout -----
 
     ----- stderr -----
-    Using CPython 3.12.[X] interpreter at: [PYTHON-3.12]
+    Using CPython 3.12.[X] interpreter at: [PYTHON-3.12] requested with explicit request
     Creating virtual environment at: .venv
     error: Failed to create virtual environment
       Caused by: A directory already exists at: .venv
@@ -1121,7 +1121,7 @@ fn non_empty_dir_exists_allow_existing() -> Result<()> {
     ----- stdout -----
 
     ----- stderr -----
-    Using CPython 3.12.[X] interpreter at: [PYTHON-3.12]
+    Using CPython 3.12.[X] interpreter at: [PYTHON-3.12] requested with explicit request
     Creating virtual environment at: .venv
     Activate with: source .venv/[BIN]/activate
     "
@@ -1139,7 +1139,7 @@ fn non_empty_dir_exists_allow_existing() -> Result<()> {
     ----- stdout -----
 
     ----- stderr -----
-    Using CPython 3.12.[X] interpreter at: [PYTHON-3.12]
+    Using CPython 3.12.[X] interpreter at: [PYTHON-3.12] requested with explicit request
     Creating virtual environment at: .venv
     Activate with: source .venv/[BIN]/activate
     "
@@ -1483,7 +1483,7 @@ fn create_venv_apostrophe() {
     ----- stdout -----
 
     ----- stderr -----
-    Using CPython 3.12.[X] interpreter at: [PYTHON-3.12]
+    Using CPython 3.12.[X] interpreter at: [PYTHON-3.12] requested with explicit request
     Creating virtual environment at: Testing's
     Activate with: source Testing's/[BIN]/activate
     "
@@ -1604,7 +1604,7 @@ fn create_venv_symlink_clear_preservation() -> Result<()> {
     ----- stdout -----
 
     ----- stderr -----
-    Using CPython 3.12.[X] interpreter at: [PYTHON-3.12]
+    Using CPython 3.12.[X] interpreter at: [PYTHON-3.12] requested with explicit request
     Creating virtual environment at: .venv
     Activate with: source .venv/[BIN]/activate
     "
@@ -1624,7 +1624,7 @@ fn create_venv_symlink_clear_preservation() -> Result<()> {
     ----- stdout -----
 
     ----- stderr -----
-    Using CPython 3.12.[X] interpreter at: [PYTHON-3.12]
+    Using CPython 3.12.[X] interpreter at: [PYTHON-3.12] requested with explicit request
     Creating virtual environment at: .venv
     Activate with: source .venv/[BIN]/activate
     "
@@ -1662,7 +1662,7 @@ fn create_venv_symlink_recreate_preservation() -> Result<()> {
     ----- stdout -----
 
     ----- stderr -----
-    Using CPython 3.12.[X] interpreter at: [PYTHON-3.12]
+    Using CPython 3.12.[X] interpreter at: [PYTHON-3.12] requested with explicit request
     Creating virtual environment at: .venv
     Activate with: source .venv/[BIN]/activate
     "
@@ -1682,7 +1682,7 @@ fn create_venv_symlink_recreate_preservation() -> Result<()> {
     ----- stdout -----
 
     ----- stderr -----
-    Using CPython 3.12.[X] interpreter at: [PYTHON-3.12]
+    Using CPython 3.12.[X] interpreter at: [PYTHON-3.12] requested with explicit request
     Creating virtual environment at: .venv
     Activate with: source .venv/[BIN]/activate
     "
@@ -1725,7 +1725,7 @@ fn create_venv_nested_symlink_preservation() -> Result<()> {
     ----- stdout -----
 
     ----- stderr -----
-    Using CPython 3.12.[X] interpreter at: [PYTHON-3.12]
+    Using CPython 3.12.[X] interpreter at: [PYTHON-3.12] requested with explicit request
     Creating virtual environment at: .venv
     Activate with: source .venv/[BIN]/activate
     "
@@ -1746,7 +1746,7 @@ fn create_venv_nested_symlink_preservation() -> Result<()> {
     ----- stdout -----
 
     ----- stderr -----
-    Using CPython 3.12.[X] interpreter at: [PYTHON-3.12]
+    Using CPython 3.12.[X] interpreter at: [PYTHON-3.12] requested with explicit request
     Creating virtual environment at: .venv
     Activate with: source .venv/[BIN]/activate
     "
@@ -1774,7 +1774,7 @@ fn create_venv_current_working_directory() {
     ----- stdout -----
 
     ----- stderr -----
-    Using CPython 3.12.[X] interpreter at: [PYTHON-3.12]
+    Using CPython 3.12.[X] interpreter at: [PYTHON-3.12] requested with explicit request
     Creating virtual environment at: .venv
     Activate with: source .venv/[BIN]/activate
     "
@@ -1791,7 +1791,7 @@ fn create_venv_current_working_directory() {
     ----- stdout -----
 
     ----- stderr -----
-    Using CPython 3.12.[X] interpreter at: [PYTHON-3.12]
+    Using CPython 3.12.[X] interpreter at: [PYTHON-3.12] requested with explicit request
     Creating virtual environment at: .
     Activate with: source [BIN]/activate
     "
@@ -1855,7 +1855,7 @@ fn no_clear_with_existing_directory() {
     ----- stdout -----
 
     ----- stderr -----
-    Using CPython 3.12.[X] interpreter at: [PYTHON-3.12]
+    Using CPython 3.12.[X] interpreter at: [PYTHON-3.12] requested with explicit request
     Creating virtual environment at: .venv
     Activate with: source .venv/[BIN]/activate
     "
@@ -1872,7 +1872,7 @@ fn no_clear_with_existing_directory() {
     ----- stdout -----
 
     ----- stderr -----
-    Using CPython 3.12.[X] interpreter at: [PYTHON-3.12]
+    Using CPython 3.12.[X] interpreter at: [PYTHON-3.12] requested with explicit request
     Creating virtual environment at: .venv
     error: Failed to create virtual environment
       Caused by: A virtual environment already exists at: .venv
@@ -1897,7 +1897,7 @@ fn no_clear_with_non_existent_directory() {
     ----- stdout -----
 
     ----- stderr -----
-    Using CPython 3.12.[X] interpreter at: [PYTHON-3.12]
+    Using CPython 3.12.[X] interpreter at: [PYTHON-3.12] requested with explicit request
     Creating virtual environment at: .venv
     Activate with: source .venv/[BIN]/activate
     "
@@ -1926,7 +1926,7 @@ fn no_clear_overrides_clear() {
     ----- stdout -----
 
     ----- stderr -----
-    Using CPython 3.12.[X] interpreter at: [PYTHON-3.12]
+    Using CPython 3.12.[X] interpreter at: [PYTHON-3.12] requested with explicit request
     Creating virtual environment at: .venv
     error: Failed to create virtual environment
       Caused by: A directory already exists at: .venv

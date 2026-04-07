@@ -2945,7 +2945,7 @@ fn install_managed_venv_allow_existing() {
     ----- stdout -----
 
     ----- stderr -----
-    Using CPython 3.13.[LATEST]
+    Using CPython 3.13.[LATEST] requested with explicit request
     Creating virtual environment at: .venv
     Activate with: source .venv/[BIN]/activate
     ");
@@ -2959,7 +2959,7 @@ fn install_managed_venv_allow_existing() {
     ----- stdout -----
 
     ----- stderr -----
-    Using CPython 3.13.[LATEST]
+    Using CPython 3.13.[LATEST] requested with explicit request
     Creating virtual environment at: .venv
     Activate with: source .venv/[BIN]/activate
     ");
@@ -2995,7 +2995,7 @@ fn install_transparent_patch_upgrade_uv_venv() {
     ----- stdout -----
 
     ----- stderr -----
-    Using CPython 3.12.9
+    Using CPython 3.12.9 requested with explicit request
     Creating virtual environment at: .venv
     Activate with: source .venv/[BIN]/activate
     "
@@ -3181,7 +3181,7 @@ fn uninstall_highest_patch() {
     ----- stdout -----
 
     ----- stderr -----
-    Using CPython 3.12.11
+    Using CPython 3.12.11 requested with explicit request
     Creating virtual environment at: .venv
     Activate with: source .venv/[BIN]/activate
     "
@@ -3469,7 +3469,7 @@ fn uninstall_last_patch() {
     ----- stdout -----
 
     ----- stderr -----
-    Using CPython 3.10.17
+    Using CPython 3.10.17 requested with explicit request
     Creating virtual environment at: .venv
     Activate with: source .venv/[BIN]/activate
     "
@@ -3594,7 +3594,7 @@ fn python_install_pyodide() {
     ----- stdout -----
 
     ----- stderr -----
-    Using CPython 3.13.2
+    Using CPython 3.13.2 requested with explicit request
     Creating virtual environment at: .venv
     Activate with: source .venv/[BIN]/activate
     ");

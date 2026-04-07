@@ -14077,7 +14077,7 @@ fn install_missing_python_version_with_target() {
     ----- stdout -----
 
     ----- stderr -----
-    Using CPython 3.12.[LATEST]
+    Using CPython 3.12.[LATEST] requested with explicit request
     Resolved 3 packages in [TIME]
     Prepared 3 packages in [TIME]
     Installed 3 packages in [TIME]

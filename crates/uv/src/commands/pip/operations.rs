@@ -49,6 +49,7 @@ use uv_warnings::warn_user;
 
 use crate::commands::compile_bytecode;
 use crate::commands::pip::loggers::{InstallLogger, ResolveLogger};
+use crate::commands::project::PythonRequestSource;
 use crate::commands::reporters::{InstallReporter, PrepareReporter, ResolverReporter};
 use crate::printer::Printer;
 
@@ -859,6 +860,7 @@ async fn execute_plan(
 /// Display a message about the interpreter that was selected for the operation.
 pub(crate) fn report_interpreter(
     python: &PythonInstallation,
+    source: Option<&PythonRequestSource>,
     dimmed: bool,
     printer: Printer,
 ) -> Result<(), Error> {
@@ -866,16 +868,23 @@ pub(crate) fn report_interpreter(
     let implementation = python.implementation();
     let interpreter = python.interpreter();
 
+    let requested = if let Some(source) = source {
+        format!(" requested with {source}")
+    } else {
+        String::new()
+    };
+
     if dimmed {
         if managed {
             writeln!(
                 printer.stderr(),
                 "{}",
                 format!(
-                    "Using {} {}{}",
+                    "Using {} {}{}{}",
                     implementation.pretty(),
                     interpreter.python_version(),
                     interpreter.variant().display_suffix(),
+                    requested,
                 )
                 .dimmed()
             )?;
@@ -884,11 +893,12 @@ pub(crate) fn report_interpreter(
                 printer.stderr(),
                 "{}",
                 format!(
-                    "Using {} {}{} interpreter at: {}",
+                    "Using {} {}{} interpreter at: {}{}",
                     implementation.pretty(),
                     interpreter.python_version(),
                     interpreter.variant().display_suffix(),
-                    interpreter.sys_executable().user_display()
+                    interpreter.sys_executable().user_display(),
+                    requested,
                 )
                 .dimmed()
             )?;
@@ -897,19 +907,21 @@ pub(crate) fn report_interpreter(
         if managed {
             writeln!(
                 printer.stderr(),
-                "Using {} {}{}",
+                "Using {} {}{}{}",
                 implementation.pretty(),
                 interpreter.python_version().cyan(),
-                interpreter.variant().display_suffix().cyan()
+                interpreter.variant().display_suffix().cyan(),
+                requested,
             )?;
         } else {
             writeln!(
                 printer.stderr(),
-                "Using {} {}{} interpreter at: {}",
+                "Using {} {}{} interpreter at: {}{}",
                 implementation.pretty(),
                 interpreter.python_version(),
                 interpreter.variant().display_suffix(),
-                interpreter.sys_executable().user_display().cyan()
+                interpreter.sys_executable().user_display().cyan(),
+                requested,
             )?;
         }
     }

@@ -44,6 +44,7 @@ use crate::commands::pip::loggers::{DefaultInstallLogger, DefaultResolveLogger};
 use crate::commands::pip::operations::Modifications;
 use crate::commands::pip::operations::{report_interpreter, report_target_environment};
 use crate::commands::pip::{operations, resolution_markers, resolution_tags};
+use crate::commands::project::PythonRequestSource;
 use crate::commands::reporters::PythonDownloadReporter;
 use crate::commands::{ExitStatus, diagnostics};
 use crate::printer::Printer;
@@ -177,7 +178,8 @@ pub(crate) async fn pip_sync(
             preview,
         )
         .await?;
-        report_interpreter(&installation, true, printer)?;
+        let source = python.as_ref().map(|_| PythonRequestSource::UserRequest);
+        report_interpreter(&installation, source.as_ref(), true, printer)?;
         PythonEnvironment::from_installation(installation)
     } else {
         let environment = PythonEnvironment::find(

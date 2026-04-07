@@ -163,7 +163,12 @@ pub(crate) async fn venv(
             preview,
         )
         .await?;
-        report_interpreter(&python, false, printer)?;
+        report_interpreter(
+            &python,
+            (python_request.is_some() && source.is_specific()).then_some(&source),
+            false,
+            printer,
+        )?;
         python.into_interpreter()
     };
 

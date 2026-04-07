@@ -177,7 +177,7 @@ Download Python versions as needed:
 
 ```console
 $ uv venv --python 3.12.0
-Using CPython 3.12.0
+Using CPython 3.12.0 requested with explicit request
 Creating virtual environment at: .venv
 Activate with: source .venv/bin/activate
 

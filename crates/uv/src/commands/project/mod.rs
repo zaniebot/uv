@@ -1078,22 +1078,30 @@ impl ProjectInterpreter {
         let implementation = python.implementation();
         let interpreter = python.into_interpreter();
 
+        let requested = if python_request.is_some() && source.is_specific() {
+            format!(" requested with {source}")
+        } else {
+            String::new()
+        };
+
         if managed {
             writeln!(
                 printer.stderr(),
-                "Using {} {}{}",
+                "Using {} {}{}{}",
                 implementation.pretty(),
                 interpreter.python_version().cyan(),
                 interpreter.variant().display_suffix().cyan(),
+                requested,
             )?;
         } else {
             writeln!(
                 printer.stderr(),
-                "Using {} {}{} interpreter at: {}",
+                "Using {} {}{} interpreter at: {}{}",
                 implementation.pretty(),
                 interpreter.python_version(),
                 interpreter.variant().display_suffix(),
-                interpreter.sys_executable().user_display().cyan()
+                interpreter.sys_executable().user_display().cyan(),
+                requested,
             )?;
         }
 
@@ -1149,6 +1157,14 @@ pub(crate) enum PythonRequestSource {
     DotPythonVersion(PythonVersionFile),
     /// The request was inferred from a `pyproject.toml` file.
     RequiresPython,
+}
+
+impl PythonRequestSource {
+    /// Returns `true` if the source represents a specific version request
+    /// (as opposed to a version constraint like `requires-python`).
+    pub(crate) fn is_specific(&self) -> bool {
+        matches!(self, Self::UserRequest | Self::DotPythonVersion(..))
+    }
 }
 
 impl std::fmt::Display for PythonRequestSource {

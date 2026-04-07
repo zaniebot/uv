@@ -3175,7 +3175,7 @@ fn run_from_directory() -> Result<()> {
 
     ----- stderr -----
     warning: `VIRTUAL_ENV=.venv` does not match the project environment path `[PROJECT_VENV]/` and will be ignored; use `--active` to target the active environment instead
-    Using CPython 3.12.[X] interpreter at: [PYTHON-3.12]
+    Using CPython 3.12.[X] interpreter at: [PYTHON-3.12] requested with version file at `project/.python-version`
     Creating virtual environment at: [PROJECT_VENV]/
     Resolved 1 package in [TIME]
     Prepared 1 package in [TIME]
@@ -3191,7 +3191,7 @@ fn run_from_directory() -> Result<()> {
 
     ----- stderr -----
     warning: `VIRTUAL_ENV=.venv` does not match the project environment path `[PROJECT_VENV]/` and will be ignored; use `--active` to target the active environment instead
-    Using CPython 3.12.[X] interpreter at: [PYTHON-3.12]
+    Using CPython 3.12.[X] interpreter at: [PYTHON-3.12] requested with version file at `project/.python-version`
     Creating virtual environment at: [PROJECT_VENV]/
     Resolved 1 package in [TIME]
     Installed 1 package in [TIME]
@@ -3208,7 +3208,7 @@ fn run_from_directory() -> Result<()> {
 
     ----- stderr -----
     warning: `VIRTUAL_ENV=[VENV]/` does not match the project environment path `.venv` and will be ignored; use `--active` to target the active environment instead
-    Using CPython 3.12.[X] interpreter at: [PYTHON-3.12]
+    Using CPython 3.12.[X] interpreter at: [PYTHON-3.12] requested with version file at `.python-version`
     Creating virtual environment at: .venv
     Resolved 1 package in [TIME]
     Installed 1 package in [TIME]
@@ -3223,7 +3223,7 @@ fn run_from_directory() -> Result<()> {
 
     ----- stderr -----
     warning: `VIRTUAL_ENV=[VENV]/` does not match the project environment path `.venv` and will be ignored; use `--active` to target the active environment instead
-    Using CPython 3.12.[X] interpreter at: [PYTHON-3.12]
+    Using CPython 3.12.[X] interpreter at: [PYTHON-3.12] requested with version file at `.python-version`
     Creating virtual environment at: .venv
     Resolved 1 package in [TIME]
     Installed 1 package in [TIME]
@@ -3238,7 +3238,7 @@ fn run_from_directory() -> Result<()> {
 
     ----- stderr -----
     warning: `VIRTUAL_ENV=[VENV]/` does not match the project environment path `.venv` and will be ignored; use `--active` to target the active environment instead
-    Using CPython 3.12.[X] interpreter at: [PYTHON-3.12]
+    Using CPython 3.12.[X] interpreter at: [PYTHON-3.12] requested with version file at `.python-version`
     Creating virtual environment at: .venv
     Resolved 1 package in [TIME]
     Installed 1 package in [TIME]
@@ -3267,7 +3267,7 @@ fn run_from_directory() -> Result<()> {
 
     ----- stderr -----
     warning: `VIRTUAL_ENV=.venv` does not match the project environment path `[PROJECT_VENV]/` and will be ignored; use `--active` to target the active environment instead
-    Using CPython 3.10.[X] interpreter at: [PYTHON-3.10]
+    Using CPython 3.10.[X] interpreter at: [PYTHON-3.10] requested with version file at `project/.python-version`
     Creating virtual environment at: [PROJECT_VENV]/
     Resolved 1 package in [TIME]
     Installed 1 package in [TIME]
@@ -3283,7 +3283,7 @@ fn run_from_directory() -> Result<()> {
 
     ----- stderr -----
     warning: `VIRTUAL_ENV=[VENV]/` does not match the project environment path `.venv` and will be ignored; use `--active` to target the active environment instead
-    Using CPython 3.10.[X] interpreter at: [PYTHON-3.10]
+    Using CPython 3.10.[X] interpreter at: [PYTHON-3.10] requested with version file at `.python-version`
     Creating virtual environment at: .venv
     Resolved 1 package in [TIME]
     Installed 1 package in [TIME]
@@ -4623,7 +4623,7 @@ fn run_active_project_environment() -> Result<()> {
     Python 3.12.[X]
 
     ----- stderr -----
-    Using CPython 3.12.[X] interpreter at: [PYTHON-3.12]
+    Using CPython 3.12.[X] interpreter at: [PYTHON-3.12] requested with explicit request
     Removed virtual environment at: foo
     Creating virtual environment at: foo
     Resolved 2 packages in [TIME]
@@ -5516,7 +5516,7 @@ fn run_groups_requires_python() -> Result<()> {
     ----- stdout -----
 
     ----- stderr -----
-    Using CPython 3.12.[X] interpreter at: [PYTHON-3.12]
+    Using CPython 3.12.[X] interpreter at: [PYTHON-3.12] requested with explicit request
     Removed virtual environment at: .venv
     Creating virtual environment at: .venv
     Resolved 6 packages in [TIME]
@@ -5534,7 +5534,7 @@ fn run_groups_requires_python() -> Result<()> {
     ----- stdout -----
 
     ----- stderr -----
-    Using CPython 3.11.[X] interpreter at: [PYTHON-3.11]
+    Using CPython 3.11.[X] interpreter at: [PYTHON-3.11] requested with explicit request
     error: The requested interpreter resolved to Python 3.11.[X], which is incompatible with the project's Python requirement: `>=3.12` (from `tool.uv.dependency-groups.dev.requires-python`).
     ");
 
@@ -5645,7 +5645,7 @@ fn run_groups_include_requires_python() -> Result<()> {
     ----- stdout -----
 
     ----- stderr -----
-    Using CPython 3.13.[X] interpreter at: [PYTHON-3.13]
+    Using CPython 3.13.[X] interpreter at: [PYTHON-3.13] requested with explicit request
     error: The requested interpreter resolved to Python 3.13.[X], which is incompatible with the project's Python requirement: `==3.12.*` (from `tool.uv.dependency-groups.dev.requires-python`).
     ");
     Ok(())
