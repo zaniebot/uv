@@ -12,10 +12,21 @@ use uv_pep508::RequirementOrigin;
 use uv_pypi_types::{Conflicts, SupportedEnvironments, VerbatimParsedUrl};
 use uv_resolver::{Lock, LockVersion, VERSION};
 use uv_scripts::Pep723Script;
+use uv_warnings::warn_user;
 use uv_workspace::dependency_groups::{DependencyGroupError, FlatDependencyGroup};
 use uv_workspace::{Editability, Workspace, WorkspaceMember};
 
 use crate::commands::project::{ProjectError, find_requires_python};
+
+/// The result of reading a lockfile from disk.
+pub(crate) struct ReadLock {
+    /// The parsed lock.
+    pub(crate) lock: Lock,
+    /// Whether the lockfile on disk contained git merge conflict markers that
+    /// were stripped before parsing. When `true`, the lockfile should be
+    /// rewritten even if the resolution is otherwise unchanged.
+    pub(crate) had_merge_conflicts: bool,
+}
 
 /// A target that can be resolved into a lockfile.
 #[derive(Debug, Copy, Clone)]
@@ -286,10 +297,28 @@ impl<'lock> LockTarget<'lock> {
     /// Read the lockfile from the workspace.
     ///
     /// Returns `Ok(None)` if the lockfile does not exist.
-    pub(crate) async fn read(self) -> Result<Option<Lock>, ProjectError> {
+    pub(crate) async fn read(self) -> Result<Option<ReadLock>, ProjectError> {
         let lock_path = self.lock_path();
         match fs_err::tokio::read_to_string(&lock_path).await {
             Ok(encoded) => {
+                // If the lockfile contains git merge conflict markers, strip them
+                // (keeping "ours" side) so we can parse it and use it as preferences
+                // for re-resolution.
+                let had_conflicts = has_conflict_markers(&encoded);
+                let encoded = if had_conflicts {
+                    warn_user!(
+                        "The lockfile at `{filename}` contains git merge conflict markers. \
+                         Removing conflict markers and re-resolving.",
+                        filename = lock_path
+                            .file_name()
+                            .and_then(|f| f.to_str())
+                            .unwrap_or("uv.lock")
+                    );
+                    strip_conflict_markers(&encoded)
+                } else {
+                    encoded
+                };
+
                 let result = info_span!("toml::from_str lock", path = %lock_path.display())
                     .in_scope(|| toml::from_str::<Lock>(&encoded));
                 match result {
@@ -301,7 +330,10 @@ impl<'lock> LockTarget<'lock> {
                                 lock.version(),
                             ));
                         }
-                        Ok(Some(lock))
+                        Ok(Some(ReadLock {
+                            lock,
+                            had_merge_conflicts: had_conflicts,
+                        }))
                     }
                     Err(err) => {
                         // If we failed to parse the lockfile, determine whether it's a supported
@@ -426,5 +458,179 @@ impl<'lock> LockTarget<'lock> {
                     .collect::<Result<_, _>>()?)
             }
         }
+    }
+}
+
+/// Returns `true` if the content contains git merge conflict markers.
+fn has_conflict_markers(content: &str) -> bool {
+    content.contains("\n<<<<<<<") || content.starts_with("<<<<<<<")
+}
+
+/// State machine for tracking position within git merge conflict markers.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ConflictState {
+    /// Outside any conflict block; lines are kept.
+    Normal,
+    /// Inside the "ours" section (between `<<<<<<<` and `=======`/`|||||||`).
+    Ours,
+    /// Inside the base or theirs section; lines are discarded.
+    Discard,
+}
+
+/// Strip git merge conflict markers from the content, keeping the "ours" side.
+///
+/// Handles both standard and diff3-style conflict markers:
+///
+/// Standard:
+/// ```text
+/// <<<<<<< HEAD
+/// ours content
+/// =======
+/// theirs content
+/// >>>>>>> branch
+/// ```
+///
+/// Diff3:
+/// ```text
+/// <<<<<<< HEAD
+/// ours content
+/// ||||||| base
+/// base content
+/// =======
+/// theirs content
+/// >>>>>>> branch
+/// ```
+///
+/// In both cases, only "ours" content (between `<<<<<<<` and `=======`/`|||||||`) is kept.
+fn strip_conflict_markers(content: &str) -> String {
+    let mut result = String::with_capacity(content.len());
+    let mut state = ConflictState::Normal;
+
+    for line in content.lines() {
+        let trimmed = line.trim_end();
+        match state {
+            ConflictState::Normal => {
+                if trimmed.starts_with("<<<<<<<") {
+                    state = ConflictState::Ours;
+                } else {
+                    result.push_str(line);
+                    result.push('\n');
+                }
+            }
+            ConflictState::Ours => {
+                if trimmed.starts_with("|||||||") || trimmed.starts_with("=======") {
+                    state = ConflictState::Discard;
+                } else if trimmed.starts_with(">>>>>>>") {
+                    // Malformed: closing marker without =======. Recover.
+                    state = ConflictState::Normal;
+                } else {
+                    result.push_str(line);
+                    result.push('\n');
+                }
+            }
+            ConflictState::Discard => {
+                if trimmed.starts_with(">>>>>>>") {
+                    state = ConflictState::Normal;
+                } else if trimmed.starts_with("=======") {
+                    // In diff3 format, we hit ======= after |||||||.
+                    // Stay in Discard.
+                }
+                // Otherwise, discard the line.
+            }
+        }
+    }
+
+    result
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_has_conflict_markers() {
+        assert!(!has_conflict_markers("normal content\nno conflicts here\n"));
+        assert!(!has_conflict_markers(""));
+        assert!(has_conflict_markers(
+            "before\n<<<<<<< HEAD\nours\n=======\ntheirs\n>>>>>>> branch\nafter\n"
+        ));
+        assert!(has_conflict_markers(
+            "<<<<<<< HEAD\nours\n=======\ntheirs\n>>>>>>> branch\n"
+        ));
+    }
+
+    #[test]
+    fn test_strip_conflict_markers_standard() {
+        let input = "\
+before\n\
+<<<<<<< HEAD\n\
+ours line 1\n\
+ours line 2\n\
+=======\n\
+theirs line 1\n\
+>>>>>>> other-branch\n\
+after\n";
+
+        let expected = "\
+before\n\
+ours line 1\n\
+ours line 2\n\
+after\n";
+
+        assert_eq!(strip_conflict_markers(input), expected);
+    }
+
+    #[test]
+    fn test_strip_conflict_markers_diff3() {
+        let input = "\
+before\n\
+<<<<<<< HEAD\n\
+ours content\n\
+||||||| merged common ancestors\n\
+base content\n\
+=======\n\
+theirs content\n\
+>>>>>>> other-branch\n\
+after\n";
+
+        let expected = "\
+before\n\
+ours content\n\
+after\n";
+
+        assert_eq!(strip_conflict_markers(input), expected);
+    }
+
+    #[test]
+    fn test_strip_conflict_markers_multiple() {
+        let input = "\
+header\n\
+<<<<<<< HEAD\n\
+ours 1\n\
+=======\n\
+theirs 1\n\
+>>>>>>> branch\n\
+middle\n\
+<<<<<<< HEAD\n\
+ours 2\n\
+=======\n\
+theirs 2\n\
+>>>>>>> branch\n\
+footer\n";
+
+        let expected = "\
+header\n\
+ours 1\n\
+middle\n\
+ours 2\n\
+footer\n";
+
+        assert_eq!(strip_conflict_markers(input), expected);
+    }
+
+    #[test]
+    fn test_strip_conflict_markers_no_conflicts() {
+        let input = "normal content\nno conflicts\n";
+        assert_eq!(strip_conflict_markers(input), input);
     }
 }

@@ -34538,3 +34538,131 @@ fn lock_frozen_warning() -> Result<()> {
 
     Ok(())
 }
+
+/// Test that `uv lock` detects and resolves git merge conflict markers in `uv.lock`
+/// using diff3-style markers.
+#[test]
+fn lock_git_merge_conflict_markers() -> Result<()> {
+    let context = uv_test::test_context!("3.12");
+
+    let pyproject_toml = context.temp_dir.child("pyproject.toml");
+    pyproject_toml.write_str(
+        r#"
+        [project]
+        name = "project"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        dependencies = ["anyio==3.7.0"]
+        "#,
+    )?;
+
+    // Generate a valid lockfile first.
+    uv_snapshot!(context.filters(), context.lock(), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Resolved 4 packages in [TIME]
+    ");
+
+    // Read the valid lockfile and inject diff3-style merge conflict markers around
+    // the `exclude-newer` option. The "ours" side keeps the original value; the
+    // "theirs" side has a different value. After stripping, "ours" is kept and the
+    // lockfile remains valid TOML.
+    let lock_path = context.temp_dir.child("uv.lock");
+    let lock_content = context.read("uv.lock");
+
+    let conflicted = lock_content.replacen(
+        "[options]\nexclude-newer = \"2024-03-25T00:00:00Z\"",
+        "<<<<<<< HEAD\n[options]\nexclude-newer = \"2024-03-25T00:00:00Z\"\n||||||| merged common ancestors\n[options]\nexclude-newer = \"2024-03-25T00:00:00Z\"\n=======\n[options]\nexclude-newer = \"2024-01-01T00:00:00Z\"\n>>>>>>> other-branch",
+        1,
+    );
+    lock_path.write_str(&conflicted)?;
+
+    // Run `uv lock` again. It should detect the conflict markers, strip them,
+    // warn the user, and re-resolve successfully.
+    uv_snapshot!(context.filters(), context.lock(), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    warning: The lockfile at `uv.lock` contains git merge conflict markers. Removing conflict markers and re-resolving.
+    Resolved 4 packages in [TIME]
+    ");
+
+    // The resulting lockfile should be valid and conflict-free.
+    let lock = context.read("uv.lock");
+    assert!(!lock.contains("<<<<<<<"));
+    assert!(!lock.contains(">>>>>>>"));
+    assert!(!lock.contains("======="));
+
+    // Re-run with `--locked` to verify the lockfile is valid.
+    uv_snapshot!(context.filters(), context.lock().arg("--locked"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Resolved 4 packages in [TIME]
+    ");
+
+    Ok(())
+}
+
+/// Test that `uv lock` handles standard (non-diff3) merge conflict markers.
+#[test]
+fn lock_git_merge_conflict_markers_standard() -> Result<()> {
+    let context = uv_test::test_context!("3.12");
+
+    let pyproject_toml = context.temp_dir.child("pyproject.toml");
+    pyproject_toml.write_str(
+        r#"
+        [project]
+        name = "project"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        dependencies = ["anyio==3.7.0"]
+        "#,
+    )?;
+
+    // Generate a valid lockfile first.
+    uv_snapshot!(context.filters(), context.lock(), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Resolved 4 packages in [TIME]
+    ");
+
+    // Inject standard-format conflict markers (no diff3 base section) around
+    // the `exclude-newer` option.
+    let lock_path = context.temp_dir.child("uv.lock");
+    let lock_content = context.read("uv.lock");
+
+    let conflicted = lock_content.replacen(
+        "[options]\nexclude-newer = \"2024-03-25T00:00:00Z\"",
+        "<<<<<<< HEAD\n[options]\nexclude-newer = \"2024-03-25T00:00:00Z\"\n=======\n[options]\nexclude-newer = \"2024-01-01T00:00:00Z\"\n>>>>>>> other-branch",
+        1,
+    );
+    lock_path.write_str(&conflicted)?;
+
+    // Run `uv lock` again.
+    uv_snapshot!(context.filters(), context.lock(), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    warning: The lockfile at `uv.lock` contains git merge conflict markers. Removing conflict markers and re-resolving.
+    Resolved 4 packages in [TIME]
+    ");
+
+    // The resulting lockfile should be valid.
+    let lock = context.read("uv.lock");
+    assert!(!lock.contains("<<<<<<<"));
+
+    Ok(())
+}

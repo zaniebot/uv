@@ -738,7 +738,12 @@ hint: If you are running a script with `{}` in the shebang, you may need to incl
                         .await
                         .ok()
                         .flatten()
-                        .map(|lock| (lock, project.workspace().install_path().to_owned()));
+                        .map(|read_lock| {
+                            (
+                                read_lock.lock,
+                                project.workspace().install_path().to_owned(),
+                            )
+                        });
                 }
             } else {
                 let _lock = venv

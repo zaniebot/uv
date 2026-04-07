@@ -351,7 +351,8 @@ impl<'env> LockOperation<'env> {
                 let existing = target
                     .read()
                     .await?
-                    .ok_or(ProjectError::MissingLockfile(source))?;
+                    .ok_or(ProjectError::MissingLockfile(source))?
+                    .lock;
 
                 // Check if the discovered workspace members match the locked workspace members.
                 if let LockTarget::Workspace(workspace) = target {
@@ -371,7 +372,8 @@ impl<'env> LockOperation<'env> {
                 let existing = target
                     .read()
                     .await?
-                    .ok_or(ProjectError::MissingLockfile(lock_source.into()))?;
+                    .ok_or(ProjectError::MissingLockfile(lock_source.into()))?
+                    .lock;
 
                 // Perform the lock operation, but don't write the lockfile to disk.
                 let result = Box::pin(do_lock(
@@ -405,14 +407,14 @@ impl<'env> LockOperation<'env> {
             }
             LockMode::Write(interpreter) | LockMode::DryRun(interpreter) => {
                 // Read the existing lockfile.
-                let existing = match target.read().await {
-                    Ok(Some(existing)) => Some(existing),
-                    Ok(None) => None,
+                let (existing, had_merge_conflicts) = match target.read().await {
+                    Ok(Some(read_lock)) => (Some(read_lock.lock), read_lock.had_merge_conflicts),
+                    Ok(None) => (None, false),
                     Err(ProjectError::Lock(err)) => {
                         warn_user!(
                             "Failed to read existing lockfile; ignoring locked requirements: {err}"
                         );
-                        None
+                        (None, false)
                     }
                     Err(err) => return Err(err),
                 };
@@ -436,10 +438,17 @@ impl<'env> LockOperation<'env> {
                 ))
                 .await?;
 
-                // If the lockfile changed, write it to disk.
+                // If the lockfile changed, or had merge conflicts that need to be
+                // cleaned up, write it to disk.
                 if !matches!(self.mode, LockMode::DryRun(_)) {
-                    if let LockResult::Changed(_, lock) = &result {
-                        target.commit(lock).await?;
+                    match &result {
+                        LockResult::Changed(_, lock) => {
+                            target.commit(lock).await?;
+                        }
+                        LockResult::Unchanged(lock) if had_merge_conflicts => {
+                            target.commit(lock).await?;
+                        }
+                        LockResult::Unchanged(_) => {}
                     }
                 }
 
