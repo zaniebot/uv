@@ -1485,7 +1485,7 @@ impl ParsedRunCommand {
                 Ok((script, run_command))
             }
             Self::PendingRemote(remote_command) => {
-                let settings = GlobalSettings::resolve(global_args, filesystem, environment);
+                let settings = GlobalSettings::resolve(global_args, filesystem, environment)?;
                 let client_builder = BaseClientBuilder::new(
                     settings.network_settings.connectivity,
                     settings.network_settings.system_certs,
