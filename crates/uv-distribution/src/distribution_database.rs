@@ -669,72 +669,86 @@ impl<'a, Context: BuildContext> DistributionDatabase<'a, Context> {
                     .as_ref()
                     .map(|reporter| (reporter, reporter.on_download_start(dist.name(), size)));
 
-                let reader = response
-                    .bytes_stream()
-                    .map_err(|err| self.handle_response_errors(err))
-                    .into_async_read();
+                let result = async {
+                    let reader = response
+                        .bytes_stream()
+                        .map_err(|err| self.handle_response_errors(err))
+                        .into_async_read();
 
-                // Create a hasher for each hash algorithm.
-                let algorithms = hashes.algorithms();
-                let mut hashers = algorithms.into_iter().map(Hasher::from).collect::<Vec<_>>();
-                let mut hasher = uv_extract::hash::HashReader::new(reader.compat(), &mut hashers);
+                    // Create a hasher for each hash algorithm.
+                    let algorithms = hashes.algorithms();
+                    let mut hashers = algorithms.into_iter().map(Hasher::from).collect::<Vec<_>>();
+                    let mut hasher =
+                        uv_extract::hash::HashReader::new(reader.compat(), &mut hashers);
 
-                // Download and unzip the wheel to a temporary directory.
-                let temp_dir = tempfile::tempdir_in(self.build_context.cache().root())
-                    .map_err(Error::CacheWrite)?;
+                    // Download and unzip the wheel to a temporary directory.
+                    let temp_dir = tempfile::tempdir_in(self.build_context.cache().root())
+                        .map_err(Error::CacheWrite)?;
 
-                match progress {
-                    Some((reporter, progress)) => {
-                        let mut reader = ProgressReader::new(&mut hasher, progress, &**reporter);
-                        match extension {
+                    match &progress {
+                        Some((reporter, progress)) => {
+                            let mut reader =
+                                ProgressReader::new(&mut hasher, *progress, &***reporter);
+                            match extension {
+                                WheelExtension::Whl => {
+                                    uv_extract::stream::unzip(
+                                        query_url,
+                                        &mut reader,
+                                        temp_dir.path(),
+                                    )
+                                    .await
+                                    .map_err(|err| Error::Extract(filename.to_string(), err))?;
+                                }
+                                WheelExtension::WhlZst => {
+                                    uv_extract::stream::untar_zst(&mut reader, temp_dir.path())
+                                        .await
+                                        .map_err(|err| Error::Extract(filename.to_string(), err))?;
+                                }
+                            }
+                        }
+                        None => match extension {
                             WheelExtension::Whl => {
-                                uv_extract::stream::unzip(query_url, &mut reader, temp_dir.path())
+                                uv_extract::stream::unzip(query_url, &mut hasher, temp_dir.path())
                                     .await
                                     .map_err(|err| Error::Extract(filename.to_string(), err))?;
                             }
                             WheelExtension::WhlZst => {
-                                uv_extract::stream::untar_zst(&mut reader, temp_dir.path())
+                                uv_extract::stream::untar_zst(&mut hasher, temp_dir.path())
                                     .await
                                     .map_err(|err| Error::Extract(filename.to_string(), err))?;
                             }
-                        }
+                        },
                     }
-                    None => match extension {
-                        WheelExtension::Whl => {
-                            uv_extract::stream::unzip(query_url, &mut hasher, temp_dir.path())
-                                .await
-                                .map_err(|err| Error::Extract(filename.to_string(), err))?;
-                        }
-                        WheelExtension::WhlZst => {
-                            uv_extract::stream::untar_zst(&mut hasher, temp_dir.path())
-                                .await
-                                .map_err(|err| Error::Extract(filename.to_string(), err))?;
-                        }
-                    },
+
+                    // If necessary, exhaust the reader to compute the hash.
+                    if !hashes.is_none() {
+                        hasher.finish().await.map_err(Error::HashExhaustion)?;
+                    }
+
+                    // Persist the temporary directory to the directory store.
+                    let id = self
+                        .build_context
+                        .cache()
+                        .persist(temp_dir.keep(), wheel_entry.path())
+                        .await
+                        .map_err(Error::CacheRead)?;
+
+                    Ok(Archive::new(
+                        id,
+                        hashers.into_iter().map(HashDigest::from).collect(),
+                        filename.clone(),
+                    ))
+                }
+                .await;
+
+                // Always complete the progress bar, even on failure, to avoid
+                // leaving a stale progress bar when falling back from streaming
+                // to downloading.
+                if let Some((reporter, id)) = progress {
+                    reporter.on_download_complete(dist.name(), id);
                 }
 
-                // If necessary, exhaust the reader to compute the hash.
-                if !hashes.is_none() {
-                    hasher.finish().await.map_err(Error::HashExhaustion)?;
-                }
-
-                // Persist the temporary directory to the directory store.
-                let id = self
-                    .build_context
-                    .cache()
-                    .persist(temp_dir.keep(), wheel_entry.path())
-                    .await
-                    .map_err(Error::CacheRead)?;
-
-                if let Some((reporter, progress)) = progress {
-                    reporter.on_download_complete(dist.name(), progress);
-                }
-
-                Ok(Archive::new(
-                    id,
-                    hashers.into_iter().map(HashDigest::from).collect(),
-                    filename.clone(),
-                ))
+                result
             }
             .instrument(info_span!("wheel", wheel = %dist))
         };
@@ -842,106 +856,114 @@ impl<'a, Context: BuildContext> DistributionDatabase<'a, Context> {
                     .as_ref()
                     .map(|reporter| (reporter, reporter.on_download_start(dist.name(), size)));
 
-                let reader = response
-                    .bytes_stream()
-                    .map_err(|err| self.handle_response_errors(err))
-                    .into_async_read();
+                let result = async {
+                    let reader = response
+                        .bytes_stream()
+                        .map_err(|err| self.handle_response_errors(err))
+                        .into_async_read();
 
-                // Download the wheel to a temporary file.
-                let temp_file = tempfile::tempfile_in(self.build_context.cache().root())
-                    .map_err(Error::CacheWrite)?;
-                let mut writer = tokio::io::BufWriter::new(fs_err::tokio::File::from_std(
-                    // It's an unnamed file on Linux so that's the best approximation.
-                    fs_err::File::from_parts(temp_file, self.build_context.cache().root()),
-                ));
+                    // Download the wheel to a temporary file.
+                    let temp_file = tempfile::tempfile_in(self.build_context.cache().root())
+                        .map_err(Error::CacheWrite)?;
+                    let mut writer = tokio::io::BufWriter::new(fs_err::tokio::File::from_std(
+                        // It's an unnamed file on Linux so that's the best approximation.
+                        fs_err::File::from_parts(temp_file, self.build_context.cache().root()),
+                    ));
 
-                match progress {
-                    Some((reporter, progress)) => {
-                        // Wrap the reader in a progress reporter. This will report 100% progress
-                        // after the download is complete, even if we still have to unzip and hash
-                        // part of the file.
-                        let mut reader =
-                            ProgressReader::new(reader.compat(), progress, &**reporter);
+                    match &progress {
+                        Some((reporter, progress)) => {
+                            // Wrap the reader in a progress reporter. This will report 100%
+                            // progress after the download is complete, even if we still have to
+                            // unzip and hash part of the file.
+                            let mut reader =
+                                ProgressReader::new(reader.compat(), *progress, &***reporter);
 
-                        tokio::io::copy(&mut reader, &mut writer)
-                            .await
-                            .map_err(Error::CacheWrite)?;
+                            tokio::io::copy(&mut reader, &mut writer)
+                                .await
+                                .map_err(Error::CacheWrite)?;
+                        }
+                        None => {
+                            tokio::io::copy(&mut reader.compat(), &mut writer)
+                                .await
+                                .map_err(Error::CacheWrite)?;
+                        }
                     }
-                    None => {
-                        tokio::io::copy(&mut reader.compat(), &mut writer)
-                            .await
-                            .map_err(Error::CacheWrite)?;
-                    }
-                }
 
-                // Unzip the wheel to a temporary directory.
-                let temp_dir = tempfile::tempdir_in(self.build_context.cache().root())
-                    .map_err(Error::CacheWrite)?;
-                let mut file = writer.into_inner();
-                file.seek(io::SeekFrom::Start(0))
-                    .await
-                    .map_err(Error::CacheWrite)?;
+                    // Unzip the wheel to a temporary directory.
+                    let temp_dir = tempfile::tempdir_in(self.build_context.cache().root())
+                        .map_err(Error::CacheWrite)?;
+                    let mut file = writer.into_inner();
+                    file.seek(io::SeekFrom::Start(0))
+                        .await
+                        .map_err(Error::CacheWrite)?;
 
-                // If no hashes are required, parallelize the unzip operation.
-                let hashes = if hashes.is_none() {
-                    let file = file.into_std().await;
-                    tokio::task::spawn_blocking({
-                        let target = temp_dir.path().to_owned();
-                        move || -> Result<(), uv_extract::Error> {
-                            // Unzip the wheel into a temporary directory.
-                            match extension {
-                                WheelExtension::Whl => {
-                                    uv_extract::unzip(file, &target)?;
+                    // If no hashes are required, parallelize the unzip operation.
+                    let hashes = if hashes.is_none() {
+                        let file = file.into_std().await;
+                        tokio::task::spawn_blocking({
+                            let target = temp_dir.path().to_owned();
+                            move || -> Result<(), uv_extract::Error> {
+                                // Unzip the wheel into a temporary directory.
+                                match extension {
+                                    WheelExtension::Whl => {
+                                        uv_extract::unzip(file, &target)?;
+                                    }
+                                    WheelExtension::WhlZst => {
+                                        uv_extract::stream::untar_zst_file(file, &target)?;
+                                    }
                                 }
-                                WheelExtension::WhlZst => {
-                                    uv_extract::stream::untar_zst_file(file, &target)?;
-                                }
+                                Ok(())
                             }
-                            Ok(())
+                        })
+                        .await?
+                        .map_err(|err| Error::Extract(filename.to_string(), err))?;
+
+                        HashDigests::empty()
+                    } else {
+                        // Create a hasher for each hash algorithm.
+                        let algorithms = hashes.algorithms();
+                        let mut hashers =
+                            algorithms.into_iter().map(Hasher::from).collect::<Vec<_>>();
+                        let mut hasher = uv_extract::hash::HashReader::new(file, &mut hashers);
+
+                        match extension {
+                            WheelExtension::Whl => {
+                                uv_extract::stream::unzip(query_url, &mut hasher, temp_dir.path())
+                                    .await
+                                    .map_err(|err| Error::Extract(filename.to_string(), err))?;
+                            }
+                            WheelExtension::WhlZst => {
+                                uv_extract::stream::untar_zst(&mut hasher, temp_dir.path())
+                                    .await
+                                    .map_err(|err| Error::Extract(filename.to_string(), err))?;
+                            }
                         }
-                    })
-                    .await?
-                    .map_err(|err| Error::Extract(filename.to_string(), err))?;
 
-                    HashDigests::empty()
-                } else {
-                    // Create a hasher for each hash algorithm.
-                    let algorithms = hashes.algorithms();
-                    let mut hashers = algorithms.into_iter().map(Hasher::from).collect::<Vec<_>>();
-                    let mut hasher = uv_extract::hash::HashReader::new(file, &mut hashers);
+                        // If necessary, exhaust the reader to compute the hash.
+                        hasher.finish().await.map_err(Error::HashExhaustion)?;
 
-                    match extension {
-                        WheelExtension::Whl => {
-                            uv_extract::stream::unzip(query_url, &mut hasher, temp_dir.path())
-                                .await
-                                .map_err(|err| Error::Extract(filename.to_string(), err))?;
-                        }
-                        WheelExtension::WhlZst => {
-                            uv_extract::stream::untar_zst(&mut hasher, temp_dir.path())
-                                .await
-                                .map_err(|err| Error::Extract(filename.to_string(), err))?;
-                        }
-                    }
+                        hashers.into_iter().map(HashDigest::from).collect()
+                    };
 
-                    // If necessary, exhaust the reader to compute the hash.
-                    hasher.finish().await.map_err(Error::HashExhaustion)?;
+                    // Persist the temporary directory to the directory store.
+                    let id = self
+                        .build_context
+                        .cache()
+                        .persist(temp_dir.keep(), wheel_entry.path())
+                        .await
+                        .map_err(Error::CacheRead)?;
 
-                    hashers.into_iter().map(HashDigest::from).collect()
-                };
+                    Ok(Archive::new(id, hashes, filename.clone()))
+                }
+                .await;
 
-                // Persist the temporary directory to the directory store.
-                let id = self
-                    .build_context
-                    .cache()
-                    .persist(temp_dir.keep(), wheel_entry.path())
-                    .await
-                    .map_err(Error::CacheRead)?;
-
-                if let Some((reporter, progress)) = progress {
-                    reporter.on_download_complete(dist.name(), progress);
+                // Always complete the progress bar, even on failure, to avoid
+                // leaving a stale progress bar.
+                if let Some((reporter, id)) = progress {
+                    reporter.on_download_complete(dist.name(), id);
                 }
 
-                Ok(Archive::new(id, hashes, filename.clone()))
+                result
             }
             .instrument(info_span!("wheel", wheel = %dist))
         };
