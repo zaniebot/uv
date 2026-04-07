@@ -54,7 +54,7 @@ use uv_small_str::SmallString;
 use uv_types::{BuildContext, HashStrategy};
 use uv_workspace::{Editability, WorkspaceMember};
 
-use crate::exclude_newer::ExcludeNewerSpan;
+use crate::exclude_newer::{ExcludeNewerPackageEntry, ExcludeNewerSpan};
 use crate::fork_strategy::ForkStrategy;
 pub(crate) use crate::lock::export::PylockTomlPackage;
 pub use crate::lock::export::RequirementsTxtExport;
@@ -770,6 +770,26 @@ impl Lock {
         // TODO(zanieb): It'd be nice not to hide this clone here, but I am hesitant to introduce
         // a whole new `ExcludeNewerRef` type just for this
         self.options.exclude_newer.clone().into()
+    }
+
+    /// Returns `true` if this lock is equivalent to `other`, treating relative `exclude-newer`
+    /// timestamps with the same span as equal.
+    ///
+    /// When using a relative span (e.g., `"2 weeks"`), the computed timestamp changes each time
+    /// resolution runs. If the resolved packages are identical, we don't want to rewrite the lock
+    /// file just because the timestamp drifted. This method normalizes relative timestamps before
+    /// comparing so that only meaningful changes are detected.
+    pub fn is_equivalent(&self, other: &Self) -> bool {
+        if *self == *other {
+            return true;
+        }
+        // Check if normalizing relative timestamps makes the locks equal.
+        let mut normalized = self.clone();
+        normalized.options.exclude_newer = normalized
+            .options
+            .exclude_newer
+            .preserve_relative_timestamps(&other.options.exclude_newer);
+        normalized == *other
     }
 
     /// Returns the conflicting groups that were used to generate this lock.
@@ -2338,7 +2358,7 @@ struct ResolverOptions {
 }
 
 #[expect(clippy::struct_field_names)]
-#[derive(Clone, Debug, Default, serde::Deserialize, Eq)]
+#[derive(Clone, Debug, Default, serde::Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
 struct ExcludeNewerWire {
     exclude_newer: Option<Timestamp>,
@@ -2347,21 +2367,46 @@ struct ExcludeNewerWire {
     exclude_newer_package: ExcludeNewerPackage,
 }
 
-impl PartialEq for ExcludeNewerWire {
-    fn eq(&self, other: &Self) -> bool {
-        // For the global exclude-newer: if both have the same relative span, the computed
-        // timestamp is derived and may differ depending on when the resolution was run, so
-        // ignore it. This avoids unnecessary lock file rewrites.
-        let global_eq = match (&self.exclude_newer_span, &other.exclude_newer_span) {
-            (Some(a), Some(b)) if a == b => true,
-            _ => {
-                self.exclude_newer == other.exclude_newer
-                    && self.exclude_newer_span == other.exclude_newer_span
-            }
-        };
-        // Per-package equality uses ExcludeNewerValue's PartialEq, which already ignores
-        // the timestamp when spans match.
-        global_eq && self.exclude_newer_package == other.exclude_newer_package
+impl ExcludeNewerWire {
+    /// Return a copy of `self` where computed timestamps from relative spans are replaced with
+    /// those from `previous` when the span is unchanged. This allows comparing two
+    /// [`ExcludeNewerWire`] values that differ only in timestamp drift from a relative span.
+    fn preserve_relative_timestamps(&self, previous: &Self) -> Self {
+        // Global: preserve previous timestamp if the span matches.
+        let (exclude_newer, exclude_newer_span) =
+            match (&self.exclude_newer_span, &previous.exclude_newer_span) {
+                (Some(a), Some(b)) if a == b => {
+                    (previous.exclude_newer, previous.exclude_newer_span)
+                }
+                _ => (self.exclude_newer, self.exclude_newer_span),
+            };
+
+        // Per-package: preserve previous timestamps where spans match.
+        let exclude_newer_package = self
+            .exclude_newer_package
+            .iter()
+            .map(|(name, setting)| {
+                let preserved = match (setting, previous.exclude_newer_package.get(name)) {
+                    (
+                        PackageExcludeNewer::Enabled(current),
+                        Some(PackageExcludeNewer::Enabled(prev)),
+                    ) if current.span().is_some() && current.span() == prev.span() => {
+                        PackageExcludeNewer::Enabled(prev.clone())
+                    }
+                    _ => setting.clone(),
+                };
+                ExcludeNewerPackageEntry {
+                    package: name.clone(),
+                    setting: preserved,
+                }
+            })
+            .collect::<ExcludeNewerPackage>();
+
+        Self {
+            exclude_newer,
+            exclude_newer_span,
+            exclude_newer_package,
+        }
     }
 }
 

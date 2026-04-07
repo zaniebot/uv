@@ -996,7 +996,10 @@ async fn do_lock(
             .with_conflicts(conflicts)
             .with_required_environments(lock_required_environments.into_markers());
 
-            if previous.as_ref().is_some_and(|previous| *previous == lock) {
+            if previous
+                .as_ref()
+                .is_some_and(|previous| lock.is_equivalent(previous))
+            {
                 Ok(LockResult::Unchanged(lock))
             } else {
                 Ok(LockResult::Changed(previous, lock))
