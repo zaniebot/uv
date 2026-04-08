@@ -9,7 +9,7 @@ use rustls_native_certs::{CertificateResult, load_certs_from_paths};
 use rustls_pki_types::CertificateDer;
 use tracing::debug;
 use webpki::{Error as WebPkiError, anchor_from_trusted_cert};
-use x509_parser::prelude::{FromDer, X509Certificate};
+use x509_parser::prelude::{FromDer, ParsedExtension, X509Certificate};
 
 use uv_fs::Simplified;
 use uv_static::EnvVars;
@@ -41,22 +41,103 @@ pub(crate) struct DiagnosticCertificate(CertificateDer<'static>);
 
 impl DiagnosticCertificate {
     fn parse(&self) -> Option<X509Certificate<'_>> {
-        let (_, certificate) = X509Certificate::from_der(self.0.as_ref()).ok()?;
-        Some(certificate)
+        match X509Certificate::from_der(self.0.as_ref()) {
+            Ok((_, certificate)) => Some(certificate),
+            Err(err) => {
+                debug!("Failed to parse certificate for TLS diagnostics: {err:?}");
+                None
+            }
+        }
     }
+}
+
+fn duplicate_extension_oids(certificate: &X509Certificate<'_>) -> Vec<String> {
+    let mut seen = std::collections::BTreeSet::new();
+    let mut duplicate_oids = std::collections::BTreeSet::new();
+
+    for extension in certificate.iter_extensions() {
+        let oid = extension.oid.to_string();
+        if !seen.insert(oid.clone()) {
+            duplicate_oids.insert(oid);
+        }
+    }
+
+    duplicate_oids.into_iter().collect()
+}
+
+fn malformed_extension_diagnostics(certificate: &X509Certificate<'_>) -> Vec<String> {
+    certificate
+        .iter_extensions()
+        .filter_map(|extension| match extension.parsed_extension() {
+            ParsedExtension::UnsupportedExtension { oid } => {
+                Some(format!("unsupported extension `{oid}`"))
+            }
+            ParsedExtension::ParseError { error } => Some(format!(
+                "failed to parse extension `{}`: {error:?}",
+                extension.oid
+            )),
+            _ => None,
+        })
+        .collect()
 }
 
 #[derive(Debug)]
 pub(crate) enum TlsConfigurationError {
-    UnsupportedCriticalExtension {
-        source: CertificateSource,
-        certificate: DiagnosticCertificate,
-    },
     InvalidTrustAnchor {
         source: CertificateSource,
         certificate: DiagnosticCertificate,
-        error: WebPkiError,
+        reason: TrustAnchorReason,
     },
+}
+
+#[derive(Debug)]
+pub(crate) enum TrustAnchorReason {
+    UnsupportedCriticalExtension,
+    BadDer,
+    BadDerTime,
+    EmptyEkuExtension,
+    ExtensionValueInvalid,
+    MalformedExtensions,
+    TrailingData,
+    UnsupportedCertVersion,
+    Other(WebPkiError),
+}
+
+impl TrustAnchorReason {
+    fn from_webpki_error(error: WebPkiError) -> Self {
+        match error {
+            WebPkiError::UnsupportedCriticalExtension => Self::UnsupportedCriticalExtension,
+            WebPkiError::BadDer => Self::BadDer,
+            WebPkiError::BadDerTime => Self::BadDerTime,
+            WebPkiError::EmptyEkuExtension => Self::EmptyEkuExtension,
+            WebPkiError::ExtensionValueInvalid => Self::ExtensionValueInvalid,
+            WebPkiError::MalformedExtensions => Self::MalformedExtensions,
+            WebPkiError::TrailingData(_) => Self::TrailingData,
+            WebPkiError::UnsupportedCertVersion => Self::UnsupportedCertVersion,
+            error => Self::Other(error),
+        }
+    }
+
+    fn message(&self) -> Option<&'static str> {
+        match self {
+            Self::UnsupportedCriticalExtension => None,
+            Self::BadDer => Some("malformed DER certificate"),
+            Self::BadDerTime => Some("malformed certificate time"),
+            Self::EmptyEkuExtension => Some("empty extended key usage extension"),
+            Self::ExtensionValueInvalid => Some("invalid certificate extension value"),
+            Self::MalformedExtensions => Some("malformed certificate extensions"),
+            Self::TrailingData => Some("trailing data in DER certificate"),
+            Self::UnsupportedCertVersion => Some("unsupported certificate version"),
+            Self::Other(_) => None,
+        }
+    }
+
+    fn error(&self) -> Option<&WebPkiError> {
+        match self {
+            Self::Other(error) => Some(error),
+            _ => None,
+        }
+    }
 }
 
 impl TlsConfigurationError {
@@ -65,17 +146,10 @@ impl TlsConfigurationError {
         error: WebPkiError,
         cert: &CertificateDer<'_>,
     ) -> Self {
-        let certificate = DiagnosticCertificate(cert.clone().into_owned());
-        match error {
-            WebPkiError::UnsupportedCriticalExtension => Self::UnsupportedCriticalExtension {
-                source,
-                certificate,
-            },
-            error => Self::InvalidTrustAnchor {
-                source,
-                certificate,
-                error,
-            },
+        Self::InvalidTrustAnchor {
+            source,
+            certificate: DiagnosticCertificate(cert.clone().into_owned()),
+            reason: TrustAnchorReason::from_webpki_error(error),
         }
     }
 }
@@ -83,57 +157,110 @@ impl TlsConfigurationError {
 impl Display for TlsConfigurationError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::UnsupportedCriticalExtension {
-                source,
-                certificate,
-            } => {
-                write!(
-                    f,
-                    "certificate in `{}` (from `{}`) uses an unsupported critical extension",
-                    source.path().simplified_display(),
-                    source.env_var()
-                )?;
-                if let Some(certificate) = certificate.parse() {
-                    let subject = certificate.subject();
-                    if subject.iter_attributes().next().is_some() {
-                        write!(f, " on certificate `{subject}`")?;
-                    }
-                    let critical_extensions = certificate
-                        .iter_extensions()
-                        .filter(|extension| extension.critical)
-                        .map(|extension| extension.oid.to_owned())
-                        .collect::<Vec<_>>();
-                    if let [critical_extension] = critical_extensions.as_slice() {
-                        write!(f, "; critical extension: `{critical_extension}`")?;
-                    } else if !critical_extensions.is_empty() {
-                        write!(
-                            f,
-                            "; critical extensions: {}",
-                            critical_extensions
-                                .iter()
-                                .map(|oid| format!("`{oid}`"))
-                                .join(", ")
-                        )?;
-                    }
-                }
-                Ok(())
-            }
             Self::InvalidTrustAnchor {
                 source,
                 certificate,
-                ..
+                reason,
             } => {
                 write!(
                     f,
-                    "certificate in `{}` (from `{}`) could not be used as a trust anchor",
+                    "certificate in `{}` (from `{}`) ",
                     source.path().simplified_display(),
                     source.env_var()
                 )?;
-                if let Some(certificate) = certificate.parse() {
+                match reason {
+                    TrustAnchorReason::UnsupportedCriticalExtension => {
+                        write!(f, "uses an unsupported critical extension")?;
+                    }
+                    _ => {
+                        write!(f, "could not be used as a trust anchor")?;
+                    }
+                }
+                let parsed_certificate = certificate.parse();
+                if let Some(certificate) = parsed_certificate.as_ref() {
                     let subject = certificate.subject();
+                    // Avoid rendering empty subjects.
                     if subject.iter_attributes().next().is_some() {
                         write!(f, " on certificate `{subject}`")?;
                     }
+                    if let TrustAnchorReason::UnsupportedCriticalExtension = reason {
+                        let critical_extensions = certificate
+                            .iter_extensions()
+                            .filter(|extension| extension.critical)
+                            .map(|extension| extension.oid.to_owned())
+                            .collect::<Vec<_>>();
+                        if let [critical_extension] = critical_extensions.as_slice() {
+                            write!(f, "; critical extension: `{critical_extension}`")?;
+                        } else if !critical_extensions.is_empty() {
+                            write!(
+                                f,
+                                "; critical extensions: {}",
+                                critical_extensions
+                                    .iter()
+                                    .map(|oid| format!("`{oid}`"))
+                                    .join(", ")
+                            )?;
+                        }
+                    }
+                }
+
+                let wrote_detailed_reason = match reason {
+                    TrustAnchorReason::UnsupportedCertVersion => {
+                        if let Some(certificate) = parsed_certificate.as_ref() {
+                            write!(
+                                f,
+                                ": unsupported certificate version `{}`",
+                                certificate.version()
+                            )?;
+                            true
+                        } else {
+                            false
+                        }
+                    }
+                    TrustAnchorReason::ExtensionValueInvalid => {
+                        if let Some(certificate) = parsed_certificate.as_ref() {
+                            let duplicate_oids = duplicate_extension_oids(certificate);
+                            if !duplicate_oids.is_empty() {
+                                write!(
+                                    f,
+                                    ": invalid certificate extension value; duplicate extensions: {}",
+                                    duplicate_oids
+                                        .iter()
+                                        .map(|oid| format!("`{oid}`"))
+                                        .join(", ")
+                                )?;
+                                true
+                            } else {
+                                false
+                            }
+                        } else {
+                            false
+                        }
+                    }
+                    TrustAnchorReason::MalformedExtensions => {
+                        if let Some(certificate) = parsed_certificate.as_ref() {
+                            let diagnostics = malformed_extension_diagnostics(certificate);
+                            if !diagnostics.is_empty() {
+                                write!(
+                                    f,
+                                    ": malformed certificate extensions; {}",
+                                    diagnostics.join(", ")
+                                )?;
+                                true
+                            } else {
+                                false
+                            }
+                        } else {
+                            false
+                        }
+                    }
+                    _ => false,
+                };
+                if !wrote_detailed_reason && let Some(message) = reason.message() {
+                    write!(f, ": {message}")?;
+                }
+                if let Some(error) = reason.error() {
+                    write!(f, ": {error:?}")?;
                 }
                 Ok(())
             }
@@ -141,14 +268,7 @@ impl Display for TlsConfigurationError {
     }
 }
 
-impl std::error::Error for TlsConfigurationError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self {
-            Self::UnsupportedCriticalExtension { .. } => None,
-            Self::InvalidTrustAnchor { error, .. } => Some(error),
-        }
-    }
-}
+impl std::error::Error for TlsConfigurationError {}
 
 /// A collection of TLS certificates in DER form.
 #[derive(Debug, Clone, Default)]
@@ -507,5 +627,44 @@ mod tests {
     fn test_webpki_roots_not_empty() {
         let certs = Certificates::webpki_roots();
         assert!(certs.iter().count() > 0);
+    }
+
+    #[test]
+    fn test_trust_anchor_reason() {
+        assert!(matches!(
+            TrustAnchorReason::from_webpki_error(WebPkiError::UnsupportedCriticalExtension),
+            TrustAnchorReason::UnsupportedCriticalExtension
+        ));
+        assert_eq!(
+            TrustAnchorReason::from_webpki_error(WebPkiError::ExtensionValueInvalid).message(),
+            Some("invalid certificate extension value")
+        );
+        assert_eq!(
+            TrustAnchorReason::from_webpki_error(WebPkiError::MalformedExtensions).message(),
+            Some("malformed certificate extensions")
+        );
+        assert_eq!(
+            TrustAnchorReason::from_webpki_error(WebPkiError::UnsupportedCertVersion).message(),
+            Some("unsupported certificate version")
+        );
+        assert!(
+            TrustAnchorReason::from_webpki_error(WebPkiError::UnknownIssuer)
+                .error()
+                .is_some()
+        );
+    }
+
+    #[test]
+    fn test_duplicate_extension_oids_empty_for_simple_cert() {
+        let cert = rcgen::generate_simple_self_signed(vec!["localhost".to_string()]).unwrap();
+        let (_, certificate) = X509Certificate::from_der(cert.cert.der()).unwrap();
+        assert!(duplicate_extension_oids(&certificate).is_empty());
+    }
+
+    #[test]
+    fn test_malformed_extension_diagnostics_empty_for_simple_cert() {
+        let cert = rcgen::generate_simple_self_signed(vec!["localhost".to_string()]).unwrap();
+        let (_, certificate) = X509Certificate::from_der(cert.cert.der()).unwrap();
+        assert!(malformed_extension_diagnostics(&certificate).is_empty());
     }
 }
