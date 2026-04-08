@@ -182,22 +182,17 @@ fn invalid_pyproject_toml_option_schema() -> Result<()> {
 
     uv_snapshot!(context.pip_install()
         .arg("iniconfig"), @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    warning: Failed to parse `pyproject.toml` during settings discovery:
-      TOML parse error at line 2, column 13
-        |
-      2 | index-url = true
-        |             ^^^^
-      invalid type: boolean `true`, expected a string
-
-    Resolved 1 package in [TIME]
-    Prepared 1 package in [TIME]
-    Installed 1 package in [TIME]
-     + iniconfig==2.0.0
+    error: Failed to parse: `pyproject.toml`
+      Caused by: TOML parse error at line 2, column 13
+      |
+    2 | index-url = true
+      |             ^^^^
+    invalid type: boolean `true`, expected a string
     "
     );
 
@@ -218,27 +213,24 @@ fn invalid_pyproject_toml_option_unknown_field() -> Result<()> {
     "#})?;
 
     let context = context.with_filter((
-        "expected one of `required-version`, `native-tls`, .*",
-        "expected one of `required-version`, `native-tls`, [...]",
+        "expected one of `required-version`, .*",
+        "expected one of `required-version`, [...]",
     ));
 
     uv_snapshot!(context.filters(), context.pip_install()
         .arg("-r")
         .arg("pyproject.toml"), @r#"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    warning: Failed to parse `pyproject.toml` during settings discovery:
-      TOML parse error at line 2, column 1
-        |
-      2 | unknown = "field"
-        | ^^^^^^^
-      unknown field `unknown`, expected one of `required-version`, `system-certs`, `native-tls`, `offline`, `no-cache`, `cache-dir`, `preview`, `python-preference`, `python-downloads`, `concurrent-downloads`, `concurrent-builds`, `concurrent-installs`, `index`, `index-url`, `extra-index-url`, `no-index`, `find-links`, `index-strategy`, `keyring-provider`, `http-proxy`, `https-proxy`, `no-proxy`, `allow-insecure-host`, `resolution`, `prerelease`, `fork-strategy`, `dependency-metadata`, `config-settings`, `config-settings-package`, `no-build-isolation`, `no-build-isolation-package`, `extra-build-dependencies`, `extra-build-variables`, `exclude-newer`, `exclude-newer-package`, `link-mode`, `compile-bytecode`, `no-sources`, `no-sources-package`, `upgrade`, `upgrade-package`, `reinstall`, `reinstall-package`, `no-build`, `no-build-package`, `no-binary`, `no-binary-package`, `torch-backend`, `python-install-mirror`, `pypy-install-mirror`, `python-downloads-json-url`, `publish-url`, `trusted-publishing`, `check-url`, `add-bounds`, `audit`, `pip`, `cache-keys`, `override-dependencies`, `exclude-dependencies`, `constraint-dependencies`, `build-constraint-dependencies`, `environments`, `required-environments`, `conflicts`, `workspace`, `sources`, `managed`, `package`, `default-groups`, `dependency-groups`, `dev-dependencies`, `build-backend`
-
-    Resolved in [TIME]
-    Checked in [TIME]
+    error: Failed to parse: `pyproject.toml`
+      Caused by: TOML parse error at line 2, column 1
+      |
+    2 | unknown = "field"
+      | ^^^^^^^
+    unknown field `unknown`, expected one of `required-version`, [...]
     "#
     );
 

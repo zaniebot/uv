@@ -97,7 +97,9 @@ impl FilesystemOptions {
                     // Continue traversing the directory tree.
                 }
                 Err(Error::PyprojectToml(path, err)) => {
-                    // If we see an invalid `pyproject.toml`, warn but continue.
+                    // If we see a TOML syntax error in a `pyproject.toml`, warn
+                    // but continue — it may be an unrelated file in a parent
+                    // directory.
                     warn_user!(
                         "Failed to parse `{}` during settings discovery:\n{}",
                         path.user_display().cyan(),
@@ -105,7 +107,8 @@ impl FilesystemOptions {
                     );
                 }
                 Err(err) => {
-                    // Otherwise, warn and stop.
+                    // All other errors are fatal, including invalid values in a
+                    // `[tool.uv]` section (`PyprojectTomlToolUv`).
                     return Err(err);
                 }
             }
@@ -151,11 +154,34 @@ impl FilesystemOptions {
         let path = dir.join("pyproject.toml");
         match fs_err::read_to_string(&path) {
             Ok(content) => {
-                // Parse, but skip any `pyproject.toml` that doesn't have a `[tool.uv]` section.
+                // First, validate TOML syntax and check for a `[tool.uv]` section.
+                let has_tool_uv = match toml::from_str::<toml::Table>(&content) {
+                    Ok(table) => table
+                        .get("tool")
+                        .and_then(|v| v.as_table())
+                        .and_then(|tool| tool.get("uv"))
+                        .is_some(),
+                    Err(err) => {
+                        // TOML syntax error; return as a non-fatal error so that
+                        // `find()` can warn and continue traversing.
+                        return Err(Error::PyprojectToml(path, Box::new(err)));
+                    }
+                };
+
+                if !has_tool_uv {
+                    tracing::debug!(
+                        "Skipping `pyproject.toml` in `{}` (no `[tool.uv]` section)",
+                        dir.display()
+                    );
+                    return Ok(None);
+                }
+
+                // Parse the full options. Since `[tool.uv]` exists, deserialization
+                // failures are configuration errors that should be fatal.
                 let pyproject =
                     info_span!("toml::from_str filesystem options pyproject.toml", path = %path.display())
                         .in_scope(|| toml::from_str::<PyProjectToml>(&content))
-                        .map_err(|err| Error::PyprojectToml(path.clone(), Box::new(err)))?;
+                        .map_err(|err| Error::PyprojectTomlToolUv(path.clone(), Box::new(err)))?;
                 let Some(tool) = pyproject.tool else {
                     tracing::debug!(
                         "Skipping `pyproject.toml` in `{}` (no `[tool]` section)",
@@ -592,6 +618,9 @@ pub enum Error {
 
     #[error("Failed to parse: `{}`", _0.user_display())]
     PyprojectToml(PathBuf, #[source] Box<toml::de::Error>),
+
+    #[error("Failed to parse: `{}`", _0.user_display())]
+    PyprojectTomlToolUv(PathBuf, #[source] Box<toml::de::Error>),
 
     #[error("Failed to parse: `{}`", _0.user_display())]
     UvToml(PathBuf, #[source] Box<toml::de::Error>),

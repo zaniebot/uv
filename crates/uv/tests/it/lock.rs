@@ -19039,18 +19039,11 @@ fn lock_invalid_index() -> Result<()> {
     ----- stdout -----
 
     ----- stderr -----
-    warning: Failed to parse `pyproject.toml` during settings discovery:
-      TOML parse error at line 12, column 16
-         |
-      12 |         name = "internal proxy"
-         |                ^^^^^^^^^^^^^^^^
-      Index names may only contain letters, digits, hyphens, underscores, and periods, but found unsupported character (` `) in: `internal proxy`
-
     error: Failed to parse: `pyproject.toml`
-      Caused by: TOML parse error at line 9, column 31
-      |
-    9 |         iniconfig = { index = "internal proxy" }
-      |                               ^^^^^^^^^^^^^^^^
+      Caused by: TOML parse error at line 12, column 16
+       |
+    12 |         name = "internal proxy"
+       |                ^^^^^^^^^^^^^^^^
     Index names may only contain letters, digits, hyphens, underscores, and periods, but found unsupported character (` `) in: `internal proxy`
     "#);
 
@@ -19349,13 +19342,6 @@ fn lock_unnamed_explicit_index() -> Result<()> {
     ----- stdout -----
 
     ----- stderr -----
-    warning: Failed to parse `pyproject.toml` during settings discovery:
-      TOML parse error at line 8, column 9
-        |
-      8 |         [[tool.uv.index]]
-        |         ^^^^^^^^^^^^^^^^^
-      An index with `explicit = true` requires a `name`: https://test.pypi.org/simple
-
     error: Failed to parse: `pyproject.toml`
       Caused by: TOML parse error at line 8, column 9
       |
@@ -19396,13 +19382,6 @@ fn lock_invalid_index_cache_control() -> Result<()> {
     ----- stdout -----
 
     ----- stderr -----
-    warning: Failed to parse `pyproject.toml` during settings discovery:
-      TOML parse error at line 11, column 9
-         |
-      11 |         cache-control.api = \"\"\"
-         |         ^^^^^^^^^^^^^
-      `cache-control.api` must be a valid HTTP header value
-
     error: Failed to parse: `pyproject.toml`
       Caused by: TOML parse error at line 11, column 9
        |
@@ -21789,24 +21768,19 @@ fn lock_dependency_metadata() -> Result<()> {
         "#,
     )?;
 
-    // The operation should warn.
+    // The operation should error.
     uv_snapshot!(context.filters(), context.lock(), @r#"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    warning: Failed to parse `pyproject.toml` during settings discovery:
-      TOML parse error at line 11, column 9
-         |
-      11 |         requires_dist = ["typing-extensions"]
-         |         ^^^^^^^^^^^^^
-      unknown field `requires_dist`, expected one of `name`, `version`, `requires-dist`, `requires-python`, `provides-extra`, `provides-extras`
-
-    Resolved 4 packages in [TIME]
-    Added idna v3.6
-    Removed iniconfig v2.0.0
-    Added sniffio v1.3.1
+    error: Failed to parse: `pyproject.toml`
+      Caused by: TOML parse error at line 11, column 9
+       |
+    11 |         requires_dist = ["typing-extensions"]
+       |         ^^^^^^^^^^^^^
+    unknown field `requires_dist`, expected one of `name`, `version`, `requires-dist`, `requires-python`, `provides-extra`, `provides-extras`
     "#);
 
     Ok(())
