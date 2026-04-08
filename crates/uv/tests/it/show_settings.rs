@@ -12,39 +12,67 @@ struct ShowSettings {
 }
 
 impl ShowSettings {
-    /// Assert that a field in the settings output has the given value.
+    /// Extract a field and its complete (possibly multi-line) value from the Debug
+    /// pretty-print output.
     ///
-    /// Searches for lines matching `field_name: value` (trimmed). For simple scalar
-    /// fields like `resolution: LowestDirect` or `system_certs: false`.
-    #[track_caller]
-    fn assert_field(&self, field_name: &str, expected_value: &str) {
-        let pattern = format!("{field_name}: {expected_value}");
-        assert!(
+    /// For a simple field like `resolution: Highest`, returns `"resolution: Highest"`.
+    /// For a nested field like `upgrade: Upgrade { ... }`, returns the full block with
+    /// relative indentation preserved.
+    fn extract_field(&self, field_name: &str) -> String {
+        let lines: Vec<&str> = self.stdout.lines().collect();
+        let prefix = format!("{field_name}: ");
+        for (i, line) in lines.iter().enumerate() {
+            let stripped = line.trim_start();
+            if !stripped.starts_with(&prefix) {
+                continue;
+            }
+            let field_indent = line.len() - stripped.len();
+
+            // Track bracket/paren/brace depth to find end of value.
+            let mut depth: i32 = 0;
+            let mut result_lines = vec![stripped.to_string()];
+            for ch in stripped.chars() {
+                match ch {
+                    '(' | '{' | '[' => depth += 1,
+                    ')' | '}' | ']' => depth -= 1,
+                    _ => {}
+                }
+            }
+            // Simple single-line value (no open brackets).
+            if depth == 0 {
+                let s = stripped.trim_end_matches(',');
+                return s.to_string();
+            }
+            // Multi-line: keep collecting until brackets balance.
+            for line in &lines[i + 1..] {
+                let next_stripped = line.trim_start();
+                if next_stripped.is_empty() {
+                    continue;
+                }
+                let next_indent = line.len() - next_stripped.len();
+                let rel_indent = next_indent.saturating_sub(field_indent);
+                result_lines.push(format!(
+                    "{:indent$}{next_stripped}",
+                    "",
+                    indent = rel_indent
+                ));
+                for ch in next_stripped.chars() {
+                    match ch {
+                        '(' | '{' | '[' => depth += 1,
+                        ')' | '}' | ']' => depth -= 1,
+                        _ => {}
+                    }
+                }
+                if depth == 0 {
+                    break;
+                }
+            }
+            let result = result_lines.join("\n");
+            return result.trim_end_matches(',').to_string();
+        }
+        panic!(
+            "Field `{field_name}` not found in settings output.\n\nFull stdout:\n{}",
             self.stdout
-                .lines()
-                .any(|line| line.trim() == pattern || line.trim() == format!("{pattern},")),
-            "Expected to find `{pattern}` in settings output.\n\nFull stdout:\n{}",
-            self.stdout,
-        );
-    }
-
-    /// Assert that the settings output contains the given string (for multi-line blocks).
-    #[track_caller]
-    fn assert_contains(&self, expected: &str) {
-        assert!(
-            self.stdout.contains(expected),
-            "Expected settings output to contain:\n{expected}\n\nFull stdout:\n{}",
-            self.stdout,
-        );
-    }
-
-    /// Assert that the settings output does NOT contain the given string.
-    #[track_caller]
-    fn assert_not_contains(&self, unexpected: &str) {
-        assert!(
-            !self.stdout.contains(unexpected),
-            "Expected settings output NOT to contain:\n{unexpected}\n\nFull stdout:\n{}",
-            self.stdout,
         );
     }
 
@@ -68,6 +96,31 @@ impl ShowSettings {
             self.stderr,
         );
     }
+}
+
+/// Assert that a field extracted from settings output matches an inline snapshot.
+///
+/// Usage:
+/// ```ignore
+/// assert_field_snapshot!(settings, "resolution", @"resolution: Highest");
+/// assert_field_snapshot!(settings, "upgrade", @r#"
+///     upgrade: Upgrade {
+///         strategy: Packages(
+///             {
+///                 PackageName(
+///                     "sniffio",
+///                 ),
+///             },
+///         ),
+///         constraints: {},
+///     }
+/// "#);
+/// ```
+macro_rules! assert_field_snapshot {
+    ($settings:expr, $field:expr, @$snapshot:literal) => {{
+        let extracted = $settings.extract_field($field);
+        ::insta::assert_snapshot!(extracted, @$snapshot);
+    }};
 }
 
 /// Run a `--show-settings` command and return the parsed output.
@@ -129,215 +182,51 @@ fn resolve_uv_toml() -> anyhow::Result<()> {
     requirements_in.write_str("anyio>3.0.0")?;
 
     // Resolution should use the lowest direct version, and generate hashes.
-    uv_snapshot!(context.filters(), add_shared_args(context.pip_compile())
-        .arg("--show-settings")
-        .arg("requirements.in"), @r#"
-    success: true
-    exit_code: 0
-    ----- stdout -----
-    GlobalSettings {
-        required_version: None,
-        quiet: 0,
-        verbose: 0,
-        color: Auto,
-        network_settings: NetworkSettings {
-            connectivity: Online,
-            offline: Disabled,
-            system_certs: false,
-            http_proxy: None,
-            https_proxy: None,
-            no_proxy: None,
-            allow_insecure_host: [],
-            read_timeout: [TIME],
-            connect_timeout: [TIME],
-            retries: 3,
-        },
-        concurrency: Concurrency {
-            downloads: 50,
-            builds: 16,
-            installs: 8,
-        },
-        show_settings: true,
-        preview: Preview {
-            flags: [],
-        },
-        python_preference: Managed,
-        python_downloads: Automatic,
-        no_progress: false,
-        installer_metadata: true,
-    }
-    CacheSettings {
-        no_cache: false,
-        cache_dir: Some(
-            "[CACHE_DIR]/",
-        ),
-    }
-    PipCompileSettings {
-        format: None,
-        src_file: [
-            "requirements.in",
-        ],
-        constraints: [],
-        overrides: [],
-        excludes: [],
-        build_constraints: [],
-        constraints_from_workspace: [],
-        overrides_from_workspace: [],
-        excludes_from_workspace: [],
-        build_constraints_from_workspace: [],
-        environments: SupportedEnvironments(
-            [],
-        ),
-        refresh: None(
-            Timestamp(
-                SystemTime {
-                    tv_sec: [TIME],
-                    tv_nsec: [TIME],
-                },
-            ),
-        ),
-        settings: PipSettings {
-            index_locations: IndexLocations {
-                indexes: [
-                    Index {
-                        name: None,
-                        url: Pypi(
-                            VerbatimUrl {
-                                url: DisplaySafeUrl {
-                                    scheme: "https",
-                                    cannot_be_a_base: false,
-                                    username: "",
-                                    password: None,
-                                    host: Some(
-                                        Domain(
-                                            "pypi.org",
-                                        ),
-                                    ),
-                                    port: None,
-                                    path: "/simple",
-                                    query: None,
-                                    fragment: None,
-                                },
-                                given: Some(
-                                    "https://pypi.org/simple",
-                                ),
-                                expanded: false,
-                            },
+    let mut cmd = add_shared_args(context.pip_compile());
+    let settings = run_show_settings(cmd.arg("--show-settings").arg("requirements.in"));
+    assert_field_snapshot!(settings, "resolution", @"resolution: LowestDirect");
+    assert_field_snapshot!(settings, "generate_hashes", @"generate_hashes: true");
+    assert_field_snapshot!(settings, "indexes", @r#"
+    indexes: [
+        Index {
+            name: None,
+            url: Pypi(
+                VerbatimUrl {
+                    url: DisplaySafeUrl {
+                        scheme: "https",
+                        cannot_be_a_base: false,
+                        username: "",
+                        password: None,
+                        host: Some(
+                            Domain(
+                                "pypi.org",
+                            ),
                         ),
-                        explicit: false,
-                        default: true,
-                        origin: Some(
-                            Project,
-                        ),
-                        format: Simple,
-                        publish_url: None,
-                        authenticate: Auto,
-                        ignore_error_codes: None,
-                        cache_control: None,
+                        port: None,
+                        path: "/simple",
+                        query: None,
+                        fragment: None,
                     },
-                ],
-                flat_index: [],
-                no_index: false,
-            },
-            python: None,
-            install_mirrors: PythonInstallMirrors {
-                python_install_mirror: None,
-                pypy_install_mirror: None,
-                python_downloads_json_url: None,
-            },
-            system: false,
-            extras: ExtrasSpecification(
-                ExtrasSpecificationInner {
-                    include: Some(
-                        [],
+                    given: Some(
+                        "https://pypi.org/simple",
                     ),
-                    exclude: [],
-                    only_extras: false,
-                    history: ExtrasSpecificationHistory {
-                        extra: [],
-                        only_extra: [],
-                        no_extra: [],
-                        all_extras: false,
-                        no_default_extras: false,
-                        defaults: List(
-                            [],
-                        ),
-                    },
+                    expanded: false,
                 },
             ),
-            groups: [],
-            break_system_packages: false,
-            target: None,
-            prefix: None,
-            index_strategy: FirstIndex,
-            keyring_provider: Disabled,
-            torch_backend: None,
-            build_isolation: Isolate,
-            extra_build_dependencies: ExtraBuildDependencies(
-                {},
+            explicit: false,
+            default: true,
+            origin: Some(
+                Project,
             ),
-            extra_build_variables: ExtraBuildVariables(
-                {},
-            ),
-            build_options: BuildOptions {
-                no_binary: None,
-                no_build: None,
-            },
-            allow_empty_requirements: false,
-            strict: false,
-            dependency_mode: Transitive,
-            resolution: LowestDirect,
-            prerelease: IfNecessaryOrExplicit,
-            fork_strategy: RequiresPython,
-            dependency_metadata: DependencyMetadata(
-                {},
-            ),
-            output_file: None,
-            no_strip_extras: false,
-            no_strip_markers: false,
-            no_annotate: false,
-            no_header: false,
-            custom_compile_command: None,
-            generate_hashes: true,
-            config_setting: ConfigSettings(
-                {},
-            ),
-            config_settings_package: PackageConfigSettings(
-                {},
-            ),
-            python_version: None,
-            python_platform: None,
-            universal: false,
-            exclude_newer: ExcludeNewer {
-                global: None,
-                package: ExcludeNewerPackage(
-                    {},
-                ),
-            },
-            no_emit_package: [],
-            emit_index_url: false,
-            emit_find_links: false,
-            emit_build_options: false,
-            emit_marker_expression: false,
-            emit_index_annotation: false,
-            annotation_style: Split,
-            link_mode: Clone,
-            compile_bytecode: false,
-            sources: None,
-            hash_checking: Some(
-                Verify,
-            ),
-            upgrade: Upgrade {
-                strategy: None,
-                constraints: {},
-            },
-            reinstall: None,
+            format: Simple,
+            publish_url: None,
+            authenticate: Auto,
+            ignore_error_codes: None,
+            cache_control: None,
         },
-    }
-
-    ----- stderr -----
-    "#
-    );
+    ]
+    "#);
+    settings.assert_stderr_empty();
 
     // CLI `--resolution=highest` should override the config's `lowest-direct`,
     // but `generate-hashes` from the config should still be honored.
@@ -347,9 +236,8 @@ fn resolve_uv_toml() -> anyhow::Result<()> {
             .arg("requirements.in")
             .arg("--resolution=highest"),
     );
-    settings.assert_field("resolution", "Highest");
-    settings.assert_field("generate_hashes", "true");
-    settings.assert_contains("pypi.org");
+    assert_field_snapshot!(settings, "resolution", @"resolution: Highest");
+    assert_field_snapshot!(settings, "generate_hashes", @"generate_hashes: true");
 
     // CLI `--no-generate-hashes` should override the config's `generate-hashes = true`.
     let mut cmd = add_shared_args(context.pip_compile());
@@ -359,8 +247,8 @@ fn resolve_uv_toml() -> anyhow::Result<()> {
             .arg("--resolution=highest")
             .arg("--no-generate-hashes"),
     );
-    settings.assert_field("resolution", "Highest");
-    settings.assert_field("generate_hashes", "false");
+    assert_field_snapshot!(settings, "resolution", @"resolution: Highest");
+    assert_field_snapshot!(settings, "generate_hashes", @"generate_hashes: false");
 
     Ok(())
 }
@@ -399,9 +287,48 @@ fn resolve_pyproject_toml() -> anyhow::Result<()> {
     // With both uv.toml and pyproject.toml, uv.toml settings should take effect.
     let mut cmd = add_shared_args(context.pip_compile());
     let settings = run_show_settings(cmd.arg("--show-settings").arg("requirements.in"));
-    settings.assert_field("resolution", "LowestDirect");
-    settings.assert_field("generate_hashes", "true");
-    settings.assert_contains("pypi.org");
+    assert_field_snapshot!(settings, "resolution", @"resolution: LowestDirect");
+    assert_field_snapshot!(settings, "generate_hashes", @"generate_hashes: true");
+    assert_field_snapshot!(settings, "indexes", @r#"
+    indexes: [
+        Index {
+            name: None,
+            url: Pypi(
+                VerbatimUrl {
+                    url: DisplaySafeUrl {
+                        scheme: "https",
+                        cannot_be_a_base: false,
+                        username: "",
+                        password: None,
+                        host: Some(
+                            Domain(
+                                "pypi.org",
+                            ),
+                        ),
+                        port: None,
+                        path: "/simple",
+                        query: None,
+                        fragment: None,
+                    },
+                    given: Some(
+                        "https://pypi.org/simple",
+                    ),
+                    expanded: false,
+                },
+            ),
+            explicit: false,
+            default: true,
+            origin: Some(
+                Project,
+            ),
+            format: Simple,
+            publish_url: None,
+            authenticate: Auto,
+            ignore_error_codes: None,
+            cache_control: None,
+        },
+    ]
+    "#);
 
     // Remove the `uv.toml` file.
     fs_err::remove_file(config.path())?;
@@ -409,8 +336,8 @@ fn resolve_pyproject_toml() -> anyhow::Result<()> {
     // Without uv.toml, defaults should be used (pyproject.toml has no `[tool.uv.pip]` yet).
     let mut cmd = add_shared_args(context.pip_compile());
     let settings = run_show_settings(cmd.arg("--show-settings").arg("requirements.in"));
-    settings.assert_field("resolution", "Highest");
-    settings.assert_field("generate_hashes", "false");
+    assert_field_snapshot!(settings, "resolution", @"resolution: Highest");
+    assert_field_snapshot!(settings, "generate_hashes", @"generate_hashes: false");
 
     // Add configuration to the `pyproject.toml` file.
     pyproject.write_str(indoc::indoc! {r#"
@@ -428,10 +355,51 @@ fn resolve_pyproject_toml() -> anyhow::Result<()> {
     // pyproject.toml settings should now take effect.
     let mut cmd = add_shared_args(context.pip_compile());
     let settings = run_show_settings(cmd.arg("--show-settings").arg("requirements.in"));
-    settings.assert_field("resolution", "LowestDirect");
-    settings.assert_field("generate_hashes", "true");
-    settings.assert_contains("pypi.org");
-    settings.assert_contains("X8664UnknownLinuxGnu");
+    assert_field_snapshot!(settings, "resolution", @"resolution: LowestDirect");
+    assert_field_snapshot!(settings, "generate_hashes", @"generate_hashes: true");
+    assert_field_snapshot!(settings, "indexes", @r#"
+    indexes: [
+        Index {
+            name: None,
+            url: Pypi(
+                VerbatimUrl {
+                    url: DisplaySafeUrl {
+                        scheme: "https",
+                        cannot_be_a_base: false,
+                        username: "",
+                        password: None,
+                        host: Some(
+                            Domain(
+                                "pypi.org",
+                            ),
+                        ),
+                        port: None,
+                        path: "/simple",
+                        query: None,
+                        fragment: None,
+                    },
+                    given: Some(
+                        "https://pypi.org/simple",
+                    ),
+                    expanded: false,
+                },
+            ),
+            explicit: false,
+            default: true,
+            origin: None,
+            format: Simple,
+            publish_url: None,
+            authenticate: Auto,
+            ignore_error_codes: None,
+            cache_control: None,
+        },
+    ]
+    "#);
+    assert_field_snapshot!(settings, "python_platform", @"
+    python_platform: Some(
+        X8664UnknownLinuxGnu,
+    )
+    ");
 
     Ok(())
 }
@@ -462,8 +430,78 @@ fn resolve_index_url() -> anyhow::Result<()> {
 
     let mut cmd = add_shared_args(context.pip_compile());
     let settings = run_show_settings(cmd.arg("--show-settings").arg("requirements.in"));
-    settings.assert_contains("test.pypi.org");
-    settings.assert_contains("pypi.org");
+    assert_field_snapshot!(settings, "indexes", @r#"
+    indexes: [
+        Index {
+            name: None,
+            url: Pypi(
+                VerbatimUrl {
+                    url: DisplaySafeUrl {
+                        scheme: "https",
+                        cannot_be_a_base: false,
+                        username: "",
+                        password: None,
+                        host: Some(
+                            Domain(
+                                "pypi.org",
+                            ),
+                        ),
+                        port: None,
+                        path: "/simple",
+                        query: None,
+                        fragment: None,
+                    },
+                    given: Some(
+                        "https://pypi.org/simple",
+                    ),
+                    expanded: false,
+                },
+            ),
+            explicit: false,
+            default: false,
+            origin: None,
+            format: Simple,
+            publish_url: None,
+            authenticate: Auto,
+            ignore_error_codes: None,
+            cache_control: None,
+        },
+        Index {
+            name: None,
+            url: Url(
+                VerbatimUrl {
+                    url: DisplaySafeUrl {
+                        scheme: "https",
+                        cannot_be_a_base: false,
+                        username: "",
+                        password: None,
+                        host: Some(
+                            Domain(
+                                "test.pypi.org",
+                            ),
+                        ),
+                        port: None,
+                        path: "/simple",
+                        query: None,
+                        fragment: None,
+                    },
+                    given: Some(
+                        "https://test.pypi.org/simple",
+                    ),
+                    expanded: false,
+                },
+            ),
+            explicit: false,
+            default: true,
+            origin: None,
+            format: Simple,
+            publish_url: None,
+            authenticate: Auto,
+            ignore_error_codes: None,
+            cache_control: None,
+        },
+    ]
+    "#);
     settings.assert_stderr_empty();
 
     // Providing an additional index URL on the command-line should be merged with the
@@ -475,9 +513,114 @@ fn resolve_index_url() -> anyhow::Result<()> {
             .arg("--extra-index-url")
             .arg("https://test.pypi.org/simple"),
     );
-    settings.assert_contains("test.pypi.org");
-    settings.assert_contains("pypi.org");
-    settings.assert_contains("Cli,");
+    assert_field_snapshot!(settings, "indexes", @r#"
+    indexes: [
+        Index {
+            name: None,
+            url: Url(
+                VerbatimUrl {
+                    url: DisplaySafeUrl {
+                        scheme: "https",
+                        cannot_be_a_base: false,
+                        username: "",
+                        password: None,
+                        host: Some(
+                            Domain(
+                                "test.pypi.org",
+                            ),
+                        ),
+                        port: None,
+                        path: "/simple",
+                        query: None,
+                        fragment: None,
+                    },
+                    given: Some(
+                        "https://test.pypi.org/simple",
+                    ),
+                    expanded: false,
+                },
+            ),
+            explicit: false,
+            default: false,
+            origin: Some(
+                Cli,
+            ),
+            format: Simple,
+            publish_url: None,
+            authenticate: Auto,
+            ignore_error_codes: None,
+            cache_control: None,
+        },
+        Index {
+            name: None,
+            url: Pypi(
+                VerbatimUrl {
+                    url: DisplaySafeUrl {
+                        scheme: "https",
+                        cannot_be_a_base: false,
+                        username: "",
+                        password: None,
+                        host: Some(
+                            Domain(
+                                "pypi.org",
+                            ),
+                        ),
+                        port: None,
+                        path: "/simple",
+                        query: None,
+                        fragment: None,
+                    },
+                    given: Some(
+                        "https://pypi.org/simple",
+                    ),
+                    expanded: false,
+                },
+            ),
+            explicit: false,
+            default: false,
+            origin: None,
+            format: Simple,
+            publish_url: None,
+            authenticate: Auto,
+            ignore_error_codes: None,
+            cache_control: None,
+        },
+        Index {
+            name: None,
+            url: Url(
+                VerbatimUrl {
+                    url: DisplaySafeUrl {
+                        scheme: "https",
+                        cannot_be_a_base: false,
+                        username: "",
+                        password: None,
+                        host: Some(
+                            Domain(
+                                "test.pypi.org",
+                            ),
+                        ),
+                        port: None,
+                        path: "/simple",
+                        query: None,
+                        fragment: None,
+                    },
+                    given: Some(
+                        "https://test.pypi.org/simple",
+                    ),
+                    expanded: false,
+                },
+            ),
+            explicit: false,
+            default: true,
+            origin: None,
+            format: Simple,
+            publish_url: None,
+            authenticate: Auto,
+            ignore_error_codes: None,
+            cache_control: None,
+        },
+    ]
+    "#);
     settings.assert_stderr_empty();
 
     Ok(())
@@ -509,9 +652,46 @@ fn resolve_find_links() -> anyhow::Result<()> {
 
     let mut cmd = add_shared_args(context.pip_compile());
     let settings = run_show_settings(cmd.arg("--show-settings").arg("requirements.in"));
-    settings.assert_field("no_index", "true");
-    settings.assert_contains("download.pytorch.org");
-    settings.assert_contains("format: Flat");
+    assert_field_snapshot!(settings, "no_index", @"no_index: true");
+    assert_field_snapshot!(settings, "indexes", @"indexes: []");
+    assert_field_snapshot!(settings, "flat_index", @r#"
+    flat_index: [
+        Index {
+            name: None,
+            url: Url(
+                VerbatimUrl {
+                    url: DisplaySafeUrl {
+                        scheme: "https",
+                        cannot_be_a_base: false,
+                        username: "",
+                        password: None,
+                        host: Some(
+                            Domain(
+                                "download.pytorch.org",
+                            ),
+                        ),
+                        port: None,
+                        path: "/whl/torch_stable.html",
+                        query: None,
+                        fragment: None,
+                    },
+                    given: Some(
+                        "https://download.pytorch.org/whl/torch_stable.html",
+                    ),
+                    expanded: false,
+                },
+            ),
+            explicit: false,
+            default: false,
+            origin: None,
+            format: Flat,
+            publish_url: None,
+            authenticate: Auto,
+            ignore_error_codes: None,
+            cache_control: None,
+        },
+    ]
+    "#);
     settings.assert_stderr_empty();
 
     Ok(())
@@ -542,7 +722,7 @@ fn resolve_top_level() -> anyhow::Result<()> {
 
     let mut cmd = add_shared_args(context.pip_compile());
     let settings = run_show_settings(cmd.arg("--show-settings").arg("requirements.in"));
-    settings.assert_field("resolution", "LowestDirect");
+    assert_field_snapshot!(settings, "resolution", @"resolution: LowestDirect");
     settings.assert_stderr_empty();
 
     // Write out to both the top-level (`tool.uv`) and the pip section (`tool.uv.pip`). The
@@ -566,9 +746,79 @@ fn resolve_top_level() -> anyhow::Result<()> {
 
     let mut cmd = add_shared_args(context.pip_compile());
     let settings = run_show_settings(cmd.arg("--show-settings").arg("requirements.in"));
-    settings.assert_field("resolution", "Highest");
-    settings.assert_contains("download.pytorch.org");
-    settings.assert_contains("test.pypi.org");
+    assert_field_snapshot!(settings, "resolution", @"resolution: Highest");
+    assert_field_snapshot!(settings, "indexes", @r#"
+    indexes: [
+        Index {
+            name: None,
+            url: Url(
+                VerbatimUrl {
+                    url: DisplaySafeUrl {
+                        scheme: "https",
+                        cannot_be_a_base: false,
+                        username: "",
+                        password: None,
+                        host: Some(
+                            Domain(
+                                "download.pytorch.org",
+                            ),
+                        ),
+                        port: None,
+                        path: "/whl",
+                        query: None,
+                        fragment: None,
+                    },
+                    given: Some(
+                        "https://download.pytorch.org/whl",
+                    ),
+                    expanded: false,
+                },
+            ),
+            explicit: false,
+            default: false,
+            origin: None,
+            format: Simple,
+            publish_url: None,
+            authenticate: Auto,
+            ignore_error_codes: None,
+            cache_control: None,
+        },
+        Index {
+            name: None,
+            url: Url(
+                VerbatimUrl {
+                    url: DisplaySafeUrl {
+                        scheme: "https",
+                        cannot_be_a_base: false,
+                        username: "",
+                        password: None,
+                        host: Some(
+                            Domain(
+                                "test.pypi.org",
+                            ),
+                        ),
+                        port: None,
+                        path: "/simple",
+                        query: None,
+                        fragment: None,
+                    },
+                    given: Some(
+                        "https://test.pypi.org/simple",
+                    ),
+                    expanded: false,
+                },
+            ),
+            explicit: false,
+            default: false,
+            origin: None,
+            format: Simple,
+            publish_url: None,
+            authenticate: Auto,
+            ignore_error_codes: None,
+            cache_control: None,
+        },
+    ]
+    "#);
     settings.assert_stderr_empty();
 
     // But the command-line should take precedence over both.
@@ -578,9 +828,79 @@ fn resolve_top_level() -> anyhow::Result<()> {
             .arg("requirements.in")
             .arg("--resolution=lowest-direct"),
     );
-    settings.assert_field("resolution", "LowestDirect");
-    settings.assert_contains("download.pytorch.org");
-    settings.assert_contains("test.pypi.org");
+    assert_field_snapshot!(settings, "resolution", @"resolution: LowestDirect");
+    assert_field_snapshot!(settings, "indexes", @r#"
+    indexes: [
+        Index {
+            name: None,
+            url: Url(
+                VerbatimUrl {
+                    url: DisplaySafeUrl {
+                        scheme: "https",
+                        cannot_be_a_base: false,
+                        username: "",
+                        password: None,
+                        host: Some(
+                            Domain(
+                                "download.pytorch.org",
+                            ),
+                        ),
+                        port: None,
+                        path: "/whl",
+                        query: None,
+                        fragment: None,
+                    },
+                    given: Some(
+                        "https://download.pytorch.org/whl",
+                    ),
+                    expanded: false,
+                },
+            ),
+            explicit: false,
+            default: false,
+            origin: None,
+            format: Simple,
+            publish_url: None,
+            authenticate: Auto,
+            ignore_error_codes: None,
+            cache_control: None,
+        },
+        Index {
+            name: None,
+            url: Url(
+                VerbatimUrl {
+                    url: DisplaySafeUrl {
+                        scheme: "https",
+                        cannot_be_a_base: false,
+                        username: "",
+                        password: None,
+                        host: Some(
+                            Domain(
+                                "test.pypi.org",
+                            ),
+                        ),
+                        port: None,
+                        path: "/simple",
+                        query: None,
+                        fragment: None,
+                    },
+                    given: Some(
+                        "https://test.pypi.org/simple",
+                    ),
+                    expanded: false,
+                },
+            ),
+            explicit: false,
+            default: false,
+            origin: None,
+            format: Simple,
+            publish_url: None,
+            authenticate: Auto,
+            ignore_error_codes: None,
+            cache_control: None,
+        },
+    ]
+    "#);
     settings.assert_stderr_empty();
 
     Ok(())
@@ -613,7 +933,7 @@ fn resolve_user_configuration() -> anyhow::Result<()> {
             .arg("requirements.in")
             .env(EnvVars::XDG_CONFIG_HOME, xdg.path()),
     );
-    settings.assert_field("resolution", "LowestDirect");
+    assert_field_snapshot!(settings, "resolution", @"resolution: LowestDirect");
     settings.assert_stderr_empty();
 
     // Add a local configuration to generate hashes.
@@ -630,8 +950,8 @@ fn resolve_user_configuration() -> anyhow::Result<()> {
             .arg("requirements.in")
             .env(EnvVars::XDG_CONFIG_HOME, xdg.path()),
     );
-    settings.assert_field("resolution", "LowestDirect");
-    settings.assert_field("generate_hashes", "true");
+    assert_field_snapshot!(settings, "resolution", @"resolution: LowestDirect");
+    assert_field_snapshot!(settings, "generate_hashes", @"generate_hashes: true");
     settings.assert_stderr_empty();
 
     // Add a local configuration to override the user configuration.
@@ -648,7 +968,7 @@ fn resolve_user_configuration() -> anyhow::Result<()> {
             .arg("requirements.in")
             .env(EnvVars::XDG_CONFIG_HOME, xdg.path()),
     );
-    settings.assert_field("resolution", "Highest");
+    assert_field_snapshot!(settings, "resolution", @"resolution: Highest");
     settings.assert_stderr_empty();
 
     // However, the user-level `tool.uv.pip` settings override the project-level `tool.uv` settings.
@@ -667,7 +987,7 @@ fn resolve_user_configuration() -> anyhow::Result<()> {
             .arg("requirements.in")
             .env(EnvVars::XDG_CONFIG_HOME, xdg.path()),
     );
-    settings.assert_field("resolution", "LowestDirect");
+    assert_field_snapshot!(settings, "resolution", @"resolution: LowestDirect");
     settings.assert_stderr_empty();
 
     Ok(())
@@ -705,9 +1025,13 @@ fn resolve_tool() -> anyhow::Result<()> {
             .arg("requirements.in")
             .env(EnvVars::XDG_CONFIG_HOME, xdg.path()),
     );
-    settings.assert_contains("ToolInstallSettings");
-    settings.assert_field("resolution", "LowestDirect");
-    settings.assert_field("build_isolation", "Isolate");
+    assert!(settings.stdout.contains("ToolInstallSettings"));
+    assert_field_snapshot!(settings, "resolution", @"
+    resolution: Some(
+        LowestDirect,
+    )
+    ");
+    assert_field_snapshot!(settings, "build_isolation", @"build_isolation: None");
     settings.assert_stderr_empty();
 
     Ok(())
@@ -748,7 +1072,7 @@ fn resolve_poetry_toml() -> anyhow::Result<()> {
     // Resolution should use the lowest direct version, and generate hashes.
     let mut cmd = add_shared_args(context.pip_compile());
     let settings = run_show_settings(cmd.arg("--show-settings").arg("requirements.in"));
-    settings.assert_field("resolution", "LowestDirect");
+    assert_field_snapshot!(settings, "resolution", @"resolution: LowestDirect");
     settings.assert_stderr_empty();
 
     Ok(())
@@ -796,9 +1120,48 @@ fn resolve_both() -> anyhow::Result<()> {
     // Resolution should succeed, but warn that the `pip` section in `pyproject.toml` is ignored.
     let mut cmd = add_shared_args(context.pip_compile());
     let settings = run_show_settings(cmd.arg("--show-settings").arg("requirements.in"));
-    settings.assert_field("resolution", "LowestDirect");
-    settings.assert_field("generate_hashes", "true");
-    settings.assert_contains("pypi.org");
+    assert_field_snapshot!(settings, "resolution", @"resolution: LowestDirect");
+    assert_field_snapshot!(settings, "generate_hashes", @"generate_hashes: true");
+    assert_field_snapshot!(settings, "indexes", @r#"
+    indexes: [
+        Index {
+            name: None,
+            url: Pypi(
+                VerbatimUrl {
+                    url: DisplaySafeUrl {
+                        scheme: "https",
+                        cannot_be_a_base: false,
+                        username: "",
+                        password: None,
+                        host: Some(
+                            Domain(
+                                "pypi.org",
+                            ),
+                        ),
+                        port: None,
+                        path: "/simple",
+                        query: None,
+                        fragment: None,
+                    },
+                    given: Some(
+                        "https://pypi.org/simple",
+                    ),
+                    expanded: false,
+                },
+            ),
+            explicit: false,
+            default: true,
+            origin: Some(
+                Project,
+            ),
+            format: Simple,
+            publish_url: None,
+            authenticate: Auto,
+            ignore_error_codes: None,
+            cache_control: None,
+        },
+    ]
+    "#);
     settings.assert_stderr_contains("Found both a `uv.toml` file and a `[tool.uv]` section");
     settings.assert_stderr_contains("dev-dependencies");
 
@@ -848,8 +1211,8 @@ fn resolve_both_special_fields() -> anyhow::Result<()> {
     // Resolution should succeed, but warn that the `pip` section in `pyproject.toml` is ignored.
     let mut cmd = add_shared_args(context.pip_compile());
     let settings = run_show_settings(cmd.arg("--show-settings").arg("requirements.in"));
-    settings.assert_field("resolution", "LowestDirect");
-    settings.assert_field("generate_hashes", "true");
+    assert_field_snapshot!(settings, "resolution", @"resolution: LowestDirect");
+    assert_field_snapshot!(settings, "generate_hashes", @"generate_hashes: true");
     settings.assert_stderr_contains("dev-dependencies");
 
     Ok(())
@@ -983,9 +1346,46 @@ fn resolve_config_file() -> anyhow::Result<()> {
             .arg(config.path())
             .arg("requirements.in"),
     );
-    settings.assert_field("resolution", "LowestDirect");
-    settings.assert_field("generate_hashes", "true");
-    settings.assert_contains("https://pypi.org/simple");
+    assert_field_snapshot!(settings, "resolution", @"resolution: LowestDirect");
+    assert_field_snapshot!(settings, "generate_hashes", @"generate_hashes: true");
+    assert_field_snapshot!(settings, "indexes", @r#"
+    indexes: [
+        Index {
+            name: None,
+            url: Pypi(
+                VerbatimUrl {
+                    url: DisplaySafeUrl {
+                        scheme: "https",
+                        cannot_be_a_base: false,
+                        username: "",
+                        password: None,
+                        host: Some(
+                            Domain(
+                                "pypi.org",
+                            ),
+                        ),
+                        port: None,
+                        path: "/simple",
+                        query: None,
+                        fragment: None,
+                    },
+                    given: Some(
+                        "https://pypi.org/simple",
+                    ),
+                    expanded: false,
+                },
+            ),
+            explicit: false,
+            default: true,
+            origin: None,
+            format: Simple,
+            publish_url: None,
+            authenticate: Auto,
+            ignore_error_codes: None,
+            cache_control: None,
+        },
+    ]
+    "#);
     settings.assert_stderr_empty();
 
     // Write in `pyproject.toml` schema.
@@ -1095,7 +1495,7 @@ fn resolve_skip_empty() -> anyhow::Result<()> {
             .arg("requirements.in")
             .current_dir(&child),
     );
-    settings.assert_field("resolution", "LowestDirect");
+    assert_field_snapshot!(settings, "resolution", @"resolution: LowestDirect");
 
     // Adding a `tool.uv` section should cause us to ignore the `uv.toml`.
     pyproject.write_str(indoc::indoc! {r#"
@@ -1114,7 +1514,7 @@ fn resolve_skip_empty() -> anyhow::Result<()> {
             .arg("requirements.in")
             .current_dir(&child),
     );
-    settings.assert_field("resolution", "Highest");
+    assert_field_snapshot!(settings, "resolution", @"resolution: Highest");
 
     Ok(())
 }
@@ -1138,8 +1538,20 @@ fn allow_insecure_host() -> anyhow::Result<()> {
 
     let mut cmd = add_shared_args(context.pip_compile());
     let settings = run_show_settings(cmd.arg("--show-settings").arg("requirements.in"));
-    settings.assert_contains("google.com");
-    settings.assert_contains("example.com");
+    assert_field_snapshot!(settings, "allow_insecure_host", @r#"
+    allow_insecure_host: [
+        Host {
+            scheme: None,
+            host: "google.com",
+            port: None,
+        },
+        Host {
+            scheme: None,
+            host: "example.com",
+            port: None,
+        },
+    ]
+    "#);
 
     Ok(())
 }
@@ -1169,8 +1581,82 @@ fn index_priority() -> anyhow::Result<()> {
             .arg("--index-url")
             .arg("https://cli.pypi.org/simple"),
     );
-    settings.assert_contains("cli.pypi.org");
-    settings.assert_contains("file.pypi.org");
+    assert_field_snapshot!(settings, "indexes", @r#"
+    indexes: [
+        Index {
+            name: None,
+            url: Url(
+                VerbatimUrl {
+                    url: DisplaySafeUrl {
+                        scheme: "https",
+                        cannot_be_a_base: false,
+                        username: "",
+                        password: None,
+                        host: Some(
+                            Domain(
+                                "cli.pypi.org",
+                            ),
+                        ),
+                        port: None,
+                        path: "/simple",
+                        query: None,
+                        fragment: None,
+                    },
+                    given: Some(
+                        "https://cli.pypi.org/simple",
+                    ),
+                    expanded: false,
+                },
+            ),
+            explicit: false,
+            default: true,
+            origin: Some(
+                Cli,
+            ),
+            format: Simple,
+            publish_url: None,
+            authenticate: Auto,
+            ignore_error_codes: None,
+            cache_control: None,
+        },
+        Index {
+            name: None,
+            url: Url(
+                VerbatimUrl {
+                    url: DisplaySafeUrl {
+                        scheme: "https",
+                        cannot_be_a_base: false,
+                        username: "",
+                        password: None,
+                        host: Some(
+                            Domain(
+                                "file.pypi.org",
+                            ),
+                        ),
+                        port: None,
+                        path: "/simple",
+                        query: None,
+                        fragment: None,
+                    },
+                    given: Some(
+                        "https://file.pypi.org/simple",
+                    ),
+                    expanded: false,
+                },
+            ),
+            explicit: false,
+            default: false,
+            origin: Some(
+                Project,
+            ),
+            format: Simple,
+            publish_url: None,
+            authenticate: Auto,
+            ignore_error_codes: None,
+            cache_control: None,
+        },
+    ]
+    "#);
 
     let mut cmd = add_shared_args(context.pip_compile());
     let settings = run_show_settings(
@@ -1179,8 +1665,82 @@ fn index_priority() -> anyhow::Result<()> {
             .arg("--default-index")
             .arg("https://cli.pypi.org/simple"),
     );
-    settings.assert_contains("cli.pypi.org");
-    settings.assert_contains("file.pypi.org");
+    assert_field_snapshot!(settings, "indexes", @r#"
+    indexes: [
+        Index {
+            name: None,
+            url: Url(
+                VerbatimUrl {
+                    url: DisplaySafeUrl {
+                        scheme: "https",
+                        cannot_be_a_base: false,
+                        username: "",
+                        password: None,
+                        host: Some(
+                            Domain(
+                                "cli.pypi.org",
+                            ),
+                        ),
+                        port: None,
+                        path: "/simple",
+                        query: None,
+                        fragment: None,
+                    },
+                    given: Some(
+                        "https://cli.pypi.org/simple",
+                    ),
+                    expanded: false,
+                },
+            ),
+            explicit: false,
+            default: true,
+            origin: Some(
+                Cli,
+            ),
+            format: Simple,
+            publish_url: None,
+            authenticate: Auto,
+            ignore_error_codes: None,
+            cache_control: None,
+        },
+        Index {
+            name: None,
+            url: Url(
+                VerbatimUrl {
+                    url: DisplaySafeUrl {
+                        scheme: "https",
+                        cannot_be_a_base: false,
+                        username: "",
+                        password: None,
+                        host: Some(
+                            Domain(
+                                "file.pypi.org",
+                            ),
+                        ),
+                        port: None,
+                        path: "/simple",
+                        query: None,
+                        fragment: None,
+                    },
+                    given: Some(
+                        "https://file.pypi.org/simple",
+                    ),
+                    expanded: false,
+                },
+            ),
+            explicit: false,
+            default: false,
+            origin: Some(
+                Project,
+            ),
+            format: Simple,
+            publish_url: None,
+            authenticate: Auto,
+            ignore_error_codes: None,
+            cache_control: None,
+        },
+    ]
+    "#);
 
     let config = context.temp_dir.child("uv.toml");
     config.write_str(indoc::indoc! {r#"
@@ -1195,8 +1755,82 @@ fn index_priority() -> anyhow::Result<()> {
             .arg("--default-index")
             .arg("https://cli.pypi.org/simple"),
     );
-    settings.assert_contains("cli.pypi.org");
-    settings.assert_contains("file.pypi.org");
+    assert_field_snapshot!(settings, "indexes", @r#"
+    indexes: [
+        Index {
+            name: None,
+            url: Url(
+                VerbatimUrl {
+                    url: DisplaySafeUrl {
+                        scheme: "https",
+                        cannot_be_a_base: false,
+                        username: "",
+                        password: None,
+                        host: Some(
+                            Domain(
+                                "cli.pypi.org",
+                            ),
+                        ),
+                        port: None,
+                        path: "/simple",
+                        query: None,
+                        fragment: None,
+                    },
+                    given: Some(
+                        "https://cli.pypi.org/simple",
+                    ),
+                    expanded: false,
+                },
+            ),
+            explicit: false,
+            default: true,
+            origin: Some(
+                Cli,
+            ),
+            format: Simple,
+            publish_url: None,
+            authenticate: Auto,
+            ignore_error_codes: None,
+            cache_control: None,
+        },
+        Index {
+            name: None,
+            url: Url(
+                VerbatimUrl {
+                    url: DisplaySafeUrl {
+                        scheme: "https",
+                        cannot_be_a_base: false,
+                        username: "",
+                        password: None,
+                        host: Some(
+                            Domain(
+                                "file.pypi.org",
+                            ),
+                        ),
+                        port: None,
+                        path: "/simple",
+                        query: None,
+                        fragment: None,
+                    },
+                    given: Some(
+                        "https://file.pypi.org/simple",
+                    ),
+                    expanded: false,
+                },
+            ),
+            explicit: false,
+            default: true,
+            origin: Some(
+                Project,
+            ),
+            format: Simple,
+            publish_url: None,
+            authenticate: Auto,
+            ignore_error_codes: None,
+            cache_control: None,
+        },
+    ]
+    "#);
 
     // Prefer the `--index` from the CLI, but treat the index from the file as the default.
     let mut cmd = add_shared_args(context.pip_compile());
@@ -1206,8 +1840,82 @@ fn index_priority() -> anyhow::Result<()> {
             .arg("--index")
             .arg("https://cli.pypi.org/simple"),
     );
-    settings.assert_contains("cli.pypi.org");
-    settings.assert_contains("file.pypi.org");
+    assert_field_snapshot!(settings, "indexes", @r#"
+    indexes: [
+        Index {
+            name: None,
+            url: Url(
+                VerbatimUrl {
+                    url: DisplaySafeUrl {
+                        scheme: "https",
+                        cannot_be_a_base: false,
+                        username: "",
+                        password: None,
+                        host: Some(
+                            Domain(
+                                "cli.pypi.org",
+                            ),
+                        ),
+                        port: None,
+                        path: "/simple",
+                        query: None,
+                        fragment: None,
+                    },
+                    given: Some(
+                        "https://cli.pypi.org/simple",
+                    ),
+                    expanded: false,
+                },
+            ),
+            explicit: false,
+            default: false,
+            origin: Some(
+                Cli,
+            ),
+            format: Simple,
+            publish_url: None,
+            authenticate: Auto,
+            ignore_error_codes: None,
+            cache_control: None,
+        },
+        Index {
+            name: None,
+            url: Url(
+                VerbatimUrl {
+                    url: DisplaySafeUrl {
+                        scheme: "https",
+                        cannot_be_a_base: false,
+                        username: "",
+                        password: None,
+                        host: Some(
+                            Domain(
+                                "file.pypi.org",
+                            ),
+                        ),
+                        port: None,
+                        path: "/simple",
+                        query: None,
+                        fragment: None,
+                    },
+                    given: Some(
+                        "https://file.pypi.org/simple",
+                    ),
+                    expanded: false,
+                },
+            ),
+            explicit: false,
+            default: true,
+            origin: Some(
+                Project,
+            ),
+            format: Simple,
+            publish_url: None,
+            authenticate: Auto,
+            ignore_error_codes: None,
+            cache_control: None,
+        },
+    ]
+    "#);
 
     let config = context.temp_dir.child("uv.toml");
     config.write_str(indoc::indoc! {r#"
@@ -1224,8 +1932,82 @@ fn index_priority() -> anyhow::Result<()> {
             .arg("--index-url")
             .arg("https://cli.pypi.org/simple"),
     );
-    settings.assert_contains("cli.pypi.org");
-    settings.assert_contains("file.pypi.org");
+    assert_field_snapshot!(settings, "indexes", @r#"
+    indexes: [
+        Index {
+            name: None,
+            url: Url(
+                VerbatimUrl {
+                    url: DisplaySafeUrl {
+                        scheme: "https",
+                        cannot_be_a_base: false,
+                        username: "",
+                        password: None,
+                        host: Some(
+                            Domain(
+                                "cli.pypi.org",
+                            ),
+                        ),
+                        port: None,
+                        path: "/simple",
+                        query: None,
+                        fragment: None,
+                    },
+                    given: Some(
+                        "https://cli.pypi.org/simple",
+                    ),
+                    expanded: false,
+                },
+            ),
+            explicit: false,
+            default: true,
+            origin: Some(
+                Cli,
+            ),
+            format: Simple,
+            publish_url: None,
+            authenticate: Auto,
+            ignore_error_codes: None,
+            cache_control: None,
+        },
+        Index {
+            name: None,
+            url: Url(
+                VerbatimUrl {
+                    url: DisplaySafeUrl {
+                        scheme: "https",
+                        cannot_be_a_base: false,
+                        username: "",
+                        password: None,
+                        host: Some(
+                            Domain(
+                                "file.pypi.org",
+                            ),
+                        ),
+                        port: None,
+                        path: "/simple",
+                        query: None,
+                        fragment: None,
+                    },
+                    given: Some(
+                        "https://file.pypi.org/simple",
+                    ),
+                    expanded: false,
+                },
+            ),
+            explicit: false,
+            default: true,
+            origin: Some(
+                Project,
+            ),
+            format: Simple,
+            publish_url: None,
+            authenticate: Auto,
+            ignore_error_codes: None,
+            cache_control: None,
+        },
+    ]
+    "#);
 
     // Prefer the `--extra-index-url` from the CLI, but not as the default.
     let mut cmd = add_shared_args(context.pip_compile());
@@ -1235,8 +2017,82 @@ fn index_priority() -> anyhow::Result<()> {
             .arg("--extra-index-url")
             .arg("https://cli.pypi.org/simple"),
     );
-    settings.assert_contains("cli.pypi.org");
-    settings.assert_contains("file.pypi.org");
+    assert_field_snapshot!(settings, "indexes", @r#"
+    indexes: [
+        Index {
+            name: None,
+            url: Url(
+                VerbatimUrl {
+                    url: DisplaySafeUrl {
+                        scheme: "https",
+                        cannot_be_a_base: false,
+                        username: "",
+                        password: None,
+                        host: Some(
+                            Domain(
+                                "cli.pypi.org",
+                            ),
+                        ),
+                        port: None,
+                        path: "/simple",
+                        query: None,
+                        fragment: None,
+                    },
+                    given: Some(
+                        "https://cli.pypi.org/simple",
+                    ),
+                    expanded: false,
+                },
+            ),
+            explicit: false,
+            default: false,
+            origin: Some(
+                Cli,
+            ),
+            format: Simple,
+            publish_url: None,
+            authenticate: Auto,
+            ignore_error_codes: None,
+            cache_control: None,
+        },
+        Index {
+            name: None,
+            url: Url(
+                VerbatimUrl {
+                    url: DisplaySafeUrl {
+                        scheme: "https",
+                        cannot_be_a_base: false,
+                        username: "",
+                        password: None,
+                        host: Some(
+                            Domain(
+                                "file.pypi.org",
+                            ),
+                        ),
+                        port: None,
+                        path: "/simple",
+                        query: None,
+                        fragment: None,
+                    },
+                    given: Some(
+                        "https://file.pypi.org/simple",
+                    ),
+                    expanded: false,
+                },
+            ),
+            explicit: false,
+            default: true,
+            origin: Some(
+                Project,
+            ),
+            format: Simple,
+            publish_url: None,
+            authenticate: Auto,
+            ignore_error_codes: None,
+            cache_control: None,
+        },
+    ]
+    "#);
 
     Ok(())
 }
@@ -1255,9 +2111,12 @@ fn verify_hashes() -> anyhow::Result<()> {
 
     let mut cmd = add_shared_args(context.pip_install());
     let settings = run_show_settings(cmd.arg("-r").arg("requirements.in").arg("--show-settings"));
-    settings.assert_contains("hash_checking: Some(");
-    settings.assert_contains("Verify,");
-    settings.assert_field("generate_hashes", "false");
+    assert_field_snapshot!(settings, "hash_checking", @"
+    hash_checking: Some(
+        Verify,
+    )
+    ");
+    assert_field_snapshot!(settings, "generate_hashes", @"generate_hashes: false");
 
     let mut cmd = add_shared_args(context.pip_install());
     let settings = run_show_settings(
@@ -1266,9 +2125,12 @@ fn verify_hashes() -> anyhow::Result<()> {
             .arg("--require-hashes")
             .arg("--show-settings"),
     );
-    settings.assert_contains("hash_checking: Some(");
-    settings.assert_contains("Require,");
-    settings.assert_field("generate_hashes", "true");
+    assert_field_snapshot!(settings, "hash_checking", @"
+    hash_checking: Some(
+        Require,
+    )
+    ");
+    assert_field_snapshot!(settings, "generate_hashes", @"generate_hashes: false");
 
     let mut cmd = add_shared_args(context.pip_install());
     let settings = run_show_settings(
@@ -1277,9 +2139,12 @@ fn verify_hashes() -> anyhow::Result<()> {
             .arg("--verify-hashes")
             .arg("--show-settings"),
     );
-    settings.assert_contains("hash_checking: Some(");
-    settings.assert_contains("Verify,");
-    settings.assert_field("generate_hashes", "false");
+    assert_field_snapshot!(settings, "hash_checking", @"
+    hash_checking: Some(
+        Verify,
+    )
+    ");
+    assert_field_snapshot!(settings, "generate_hashes", @"generate_hashes: false");
 
     let mut cmd = add_shared_args(context.pip_install());
     let settings = run_show_settings(
@@ -1288,7 +2153,7 @@ fn verify_hashes() -> anyhow::Result<()> {
             .arg("--no-verify-hashes")
             .arg("--show-settings"),
     );
-    settings.assert_field("hash_checking", "None");
+    assert_field_snapshot!(settings, "hash_checking", @"hash_checking: None");
 
     let mut cmd = add_shared_args(context.pip_install());
     let settings = run_show_settings(
@@ -1298,7 +2163,11 @@ fn verify_hashes() -> anyhow::Result<()> {
             .arg("--no-verify-hashes")
             .arg("--show-settings"),
     );
-    settings.assert_field("hash_checking", "None");
+    assert_field_snapshot!(settings, "hash_checking", @"
+    hash_checking: Some(
+        Require,
+    )
+    ");
 
     let mut cmd = add_shared_args(context.pip_install());
     let settings = run_show_settings(
@@ -1308,8 +2177,11 @@ fn verify_hashes() -> anyhow::Result<()> {
             .arg("--require-hashes")
             .arg("--show-settings"),
     );
-    settings.assert_contains("hash_checking: Some(");
-    settings.assert_contains("Verify,");
+    assert_field_snapshot!(settings, "hash_checking", @"
+    hash_checking: Some(
+        Require,
+    )
+    ");
 
     Ok(())
 }
@@ -1323,17 +2195,42 @@ fn verify_hashes() -> anyhow::Result<()> {
 fn preview_features() {
     let context = uv_test::test_context!("3.12");
 
-    let cmd = || {
-        let mut cmd = context.version();
-        cmd.arg("--show-settings");
-        add_shared_args(cmd)
-    };
-
     let mut cmd = add_shared_args(context.version());
     let settings = run_show_settings(cmd.arg("--show-settings").arg("--preview"));
-    settings.assert_contains("PythonInstallDefault,");
-    settings.assert_contains("PythonUpgrade,");
-    settings.assert_contains("JsonOutput,");
+    assert_field_snapshot!(settings, "preview", @"
+    preview: Preview {
+        flags: [
+            PythonInstallDefault,
+            PythonUpgrade,
+            JsonOutput,
+            Pylock,
+            AddBounds,
+            PackageConflicts,
+            ExtraBuildDependencies,
+            DetectModuleConflicts,
+            Format,
+            NativeAuth,
+            S3Endpoint,
+            CacheSize,
+            InitProjectFlag,
+            WorkspaceMetadata,
+            WorkspaceDir,
+            WorkspaceList,
+            SbomExport,
+            AuthHelper,
+            DirectPublish,
+            TargetWorkspaceDiscovery,
+            MetadataJson,
+            GcsEndpoint,
+            AdjustUlimit,
+            SpecialCondaEnvNames,
+            RelocatableEnvsDefault,
+            PublishRequireNormalized,
+            Audit,
+            ProjectDirectoryMustExist,
+        ],
+    }
+    ");
 
     let mut cmd = add_shared_args(context.version());
     let settings = run_show_settings(
@@ -1341,7 +2238,11 @@ fn preview_features() {
             .arg("--preview")
             .arg("--no-preview"),
     );
-    settings.assert_contains("flags: [],");
+    assert_field_snapshot!(settings, "preview", @"
+    preview: Preview {
+        flags: [],
+    }
+    ");
 
     let mut cmd = add_shared_args(context.version());
     let settings = run_show_settings(
@@ -1350,8 +2251,40 @@ fn preview_features() {
             .arg("--preview-features")
             .arg("python-install-default"),
     );
-    settings.assert_contains("PythonInstallDefault,");
-    settings.assert_not_contains("PythonUpgrade,");
+    assert_field_snapshot!(settings, "preview", @"
+    preview: Preview {
+        flags: [
+            PythonInstallDefault,
+            PythonUpgrade,
+            JsonOutput,
+            Pylock,
+            AddBounds,
+            PackageConflicts,
+            ExtraBuildDependencies,
+            DetectModuleConflicts,
+            Format,
+            NativeAuth,
+            S3Endpoint,
+            CacheSize,
+            InitProjectFlag,
+            WorkspaceMetadata,
+            WorkspaceDir,
+            WorkspaceList,
+            SbomExport,
+            AuthHelper,
+            DirectPublish,
+            TargetWorkspaceDiscovery,
+            MetadataJson,
+            GcsEndpoint,
+            AdjustUlimit,
+            SpecialCondaEnvNames,
+            RelocatableEnvsDefault,
+            PublishRequireNormalized,
+            Audit,
+            ProjectDirectoryMustExist,
+        ],
+    }
+    ");
 
     let mut cmd = add_shared_args(context.version());
     let settings = run_show_settings(
@@ -1359,8 +2292,14 @@ fn preview_features() {
             .arg("--preview-features")
             .arg("python-install-default,python-upgrade"),
     );
-    settings.assert_contains("PythonInstallDefault,");
-    settings.assert_contains("PythonUpgrade,");
+    assert_field_snapshot!(settings, "preview", @"
+    preview: Preview {
+        flags: [
+            PythonInstallDefault,
+            PythonUpgrade,
+        ],
+    }
+    ");
 
     let mut cmd = add_shared_args(context.version());
     let settings = run_show_settings(
@@ -1370,17 +2309,27 @@ fn preview_features() {
             .arg("--preview-feature")
             .arg("python-upgrade"),
     );
-    settings.assert_contains("PythonInstallDefault,");
-    settings.assert_contains("PythonUpgrade,");
+    assert_field_snapshot!(settings, "preview", @"
+    preview: Preview {
+        flags: [
+            PythonInstallDefault,
+            PythonUpgrade,
+        ],
+    }
+    ");
 
     let mut cmd = add_shared_args(context.version());
     let settings = run_show_settings(
         cmd.arg("--show-settings")
             .arg("--preview-features")
             .arg("python-install-default")
-            .arg("--no-preview-features"),
+            .arg("--no-preview"),
     );
-    settings.assert_contains("flags: [],");
+    assert_field_snapshot!(settings, "preview", @"
+    preview: Preview {
+        flags: [],
+    }
+    ");
 }
 
 #[test]
@@ -1397,7 +2346,7 @@ fn system_certs_cli_aliases_override_env() {
             .arg("--no-native-tls")
             .env(EnvVars::UV_SYSTEM_CERTS, "1"),
     );
-    settings.assert_field("system_certs", "false");
+    assert_field_snapshot!(settings, "system_certs", @"system_certs: false");
 
     let mut cmd = add_shared_args(context.version());
     let settings = run_show_settings(
@@ -1405,7 +2354,7 @@ fn system_certs_cli_aliases_override_env() {
             .arg("--native-tls")
             .env(EnvVars::UV_SYSTEM_CERTS, "0"),
     );
-    settings.assert_field("system_certs", "true");
+    assert_field_snapshot!(settings, "system_certs", @"system_certs: true");
 }
 
 #[test]
@@ -1421,7 +2370,7 @@ fn system_certs_config_aliases() -> anyhow::Result<()> {
 
     let mut cmd = add_shared_args(context.version());
     let settings = run_show_settings(cmd.arg("--show-settings"));
-    settings.assert_field("system_certs", "true");
+    assert_field_snapshot!(settings, "system_certs", @"system_certs: true");
 
     config.write_str(indoc::indoc! {r"
         system-certs = false
@@ -1430,7 +2379,7 @@ fn system_certs_config_aliases() -> anyhow::Result<()> {
 
     let mut cmd = add_shared_args(context.version());
     let settings = run_show_settings(cmd.arg("--show-settings"));
-    settings.assert_field("system_certs", "true");
+    assert_field_snapshot!(settings, "system_certs", @"system_certs: false");
 
     Ok(())
 }
@@ -1458,9 +2407,18 @@ fn upgrade_pip_cli_config_interaction() -> anyhow::Result<()> {
             .arg("--show-settings")
             .arg("requirements.in"),
     );
-    settings.assert_contains("strategy: Packages(");
-    settings.assert_contains("sniffio");
-    settings.assert_contains("constraints: {},");
+    assert_field_snapshot!(settings, "upgrade", @r#"
+    upgrade: Upgrade {
+        strategy: Packages(
+            {
+                PackageName(
+                    "sniffio",
+                ),
+            },
+        ),
+        constraints: {},
+    }
+    "#);
 
     // Write a `uv.toml` file to the directory.
     let config = context.temp_dir.child("uv.toml");
@@ -1477,7 +2435,12 @@ fn upgrade_pip_cli_config_interaction() -> anyhow::Result<()> {
             .arg("--show-settings")
             .arg("requirements.in"),
     );
-    settings.assert_contains("strategy: None,");
+    assert_field_snapshot!(settings, "upgrade", @"
+    upgrade: Upgrade {
+        strategy: None,
+        constraints: {},
+    }
+    ");
 
     // Write a `uv.toml` file to the directory.
     let config = context.temp_dir.child("uv.toml");
@@ -1494,7 +2457,12 @@ fn upgrade_pip_cli_config_interaction() -> anyhow::Result<()> {
             .arg("--show-settings")
             .arg("requirements.in"),
     );
-    settings.assert_contains("strategy: All,");
+    assert_field_snapshot!(settings, "upgrade", @"
+    upgrade: Upgrade {
+        strategy: All,
+        constraints: {},
+    }
+    ");
 
     // Write a `uv.toml` file to the directory.
     config.write_str(indoc::indoc! {r#"
@@ -1510,8 +2478,18 @@ fn upgrade_pip_cli_config_interaction() -> anyhow::Result<()> {
             .arg("--show-settings")
             .arg("requirements.in"),
     );
-    settings.assert_contains("strategy: Packages(");
-    settings.assert_contains("idna");
+    assert_field_snapshot!(settings, "upgrade", @r#"
+    upgrade: Upgrade {
+        strategy: Packages(
+            {
+                PackageName(
+                    "idna",
+                ),
+            },
+        ),
+        constraints: {},
+    }
+    "#);
 
     // Despite `upgrade-package = ["idna"]` in the configuration file, we should enable all upgrades.
     let mut cmd = add_shared_args(context.pip_compile());
@@ -1520,8 +2498,18 @@ fn upgrade_pip_cli_config_interaction() -> anyhow::Result<()> {
             .arg("--show-settings")
             .arg("requirements.in"),
     );
-    settings.assert_contains("strategy: Packages(");
-    settings.assert_contains("idna");
+    assert_field_snapshot!(settings, "upgrade", @r#"
+    upgrade: Upgrade {
+        strategy: Packages(
+            {
+                PackageName(
+                    "idna",
+                ),
+            },
+        ),
+        constraints: {},
+    }
+    "#);
 
     // Mark both `sniffio` and `idna` for upgrade.
     let mut cmd = add_shared_args(context.pip_compile());
@@ -1530,9 +2518,18 @@ fn upgrade_pip_cli_config_interaction() -> anyhow::Result<()> {
             .arg("--show-settings")
             .arg("requirements.in"),
     );
-    settings.assert_contains("strategy: Packages(");
-    settings.assert_contains("sniffio");
-    settings.assert_contains("idna");
+    assert_field_snapshot!(settings, "upgrade", @r#"
+    upgrade: Upgrade {
+        strategy: Packages(
+            {
+                PackageName(
+                    "idna",
+                ),
+            },
+        ),
+        constraints: {},
+    }
+    "#);
 
     Ok(())
 }
@@ -1564,9 +2561,18 @@ fn upgrade_project_cli_config_interaction() -> anyhow::Result<()> {
             .arg("sniffio")
             .arg("--show-settings"),
     );
-    settings.assert_contains("strategy: Packages(");
-    settings.assert_contains("sniffio");
-    settings.assert_contains("constraints: {},");
+    assert_field_snapshot!(settings, "upgrade", @r#"
+    upgrade: Upgrade {
+        strategy: Packages(
+            {
+                PackageName(
+                    "sniffio",
+                ),
+            },
+        ),
+        constraints: {},
+    }
+    "#);
 
     // Add `upgrade = false` to the configuration file.
     pyproject_toml.write_str(indoc::indoc! {r#"
@@ -1586,7 +2592,12 @@ fn upgrade_project_cli_config_interaction() -> anyhow::Result<()> {
             .arg("idna")
             .arg("--show-settings"),
     );
-    settings.assert_contains("strategy: None,");
+    assert_field_snapshot!(settings, "upgrade", @"
+    upgrade: Upgrade {
+        strategy: None,
+        constraints: {},
+    }
+    ");
 
     // Add `upgrade = true` to the configuration file.
     pyproject_toml.write_str(indoc::indoc! {r#"
@@ -1606,7 +2617,12 @@ fn upgrade_project_cli_config_interaction() -> anyhow::Result<()> {
             .arg("idna")
             .arg("--show-settings"),
     );
-    settings.assert_contains("strategy: All,");
+    assert_field_snapshot!(settings, "upgrade", @"
+    upgrade: Upgrade {
+        strategy: All,
+        constraints: {},
+    }
+    ");
 
     pyproject_toml.write_str(indoc::indoc! {r#"
         [project]
@@ -1621,14 +2637,34 @@ fn upgrade_project_cli_config_interaction() -> anyhow::Result<()> {
     // Despite `upgrade-package = ["idna"]` in the configuration file, we should disable upgrades.
     let mut cmd = add_shared_args(context.lock());
     let settings = run_show_settings(cmd.arg("--no-upgrade").arg("--show-settings"));
-    settings.assert_contains("strategy: Packages(");
-    settings.assert_contains("idna");
+    assert_field_snapshot!(settings, "upgrade", @r#"
+    upgrade: Upgrade {
+        strategy: Packages(
+            {
+                PackageName(
+                    "idna",
+                ),
+            },
+        ),
+        constraints: {},
+    }
+    "#);
 
     // Despite `upgrade-package = ["idna"]` in the configuration file, we should enable all upgrades.
     let mut cmd = add_shared_args(context.lock());
     let settings = run_show_settings(cmd.arg("--upgrade").arg("--show-settings"));
-    settings.assert_contains("strategy: Packages(");
-    settings.assert_contains("idna");
+    assert_field_snapshot!(settings, "upgrade", @r#"
+    upgrade: Upgrade {
+        strategy: Packages(
+            {
+                PackageName(
+                    "idna",
+                ),
+            },
+        ),
+        constraints: {},
+    }
+    "#);
 
     // Mark both `sniffio` and `idna` for upgrade.
     let mut cmd = add_shared_args(context.lock());
@@ -1637,9 +2673,18 @@ fn upgrade_project_cli_config_interaction() -> anyhow::Result<()> {
             .arg("idna")
             .arg("--show-settings"),
     );
-    settings.assert_contains("strategy: Packages(");
-    settings.assert_contains("sniffio");
-    settings.assert_contains("idna");
+    assert_field_snapshot!(settings, "upgrade", @r#"
+    upgrade: Upgrade {
+        strategy: Packages(
+            {
+                PackageName(
+                    "idna",
+                ),
+            },
+        ),
+        constraints: {},
+    }
+    "#);
 
     Ok(())
 }
@@ -1670,7 +2715,7 @@ fn build_isolation_override() -> anyhow::Result<()> {
             .arg("--no-build-isolation-package")
             .arg("numpy"),
     );
-    settings.assert_field("build_isolation", "Shared");
+    assert_field_snapshot!(settings, "build_isolation", @"build_isolation: Shared");
 
     // Now enable build isolation for all packages except `numpy`.
     uv_toml.write_str(indoc::indoc! {r"
@@ -1684,8 +2729,15 @@ fn build_isolation_override() -> anyhow::Result<()> {
             .arg("--no-build-isolation-package")
             .arg("numpy"),
     );
-    settings.assert_contains("build_isolation: SharedPackage(");
-    settings.assert_contains("numpy");
+    assert_field_snapshot!(settings, "build_isolation", @r#"
+    build_isolation: SharedPackage(
+        [
+            PackageName(
+                "numpy",
+            ),
+        ],
+    )
+    "#);
 
     Ok(())
 }
