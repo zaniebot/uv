@@ -4,6 +4,7 @@ use std::env::consts::EXE_SUFFIX;
 use std::io;
 use std::io::{BufWriter, Write};
 use std::path::Path;
+use std::time::SystemTime;
 
 use console::Term;
 use fs_err::File;
@@ -829,6 +830,8 @@ fn copy_launcher_windows(
     scripts: &Path,
     python_home: &Path,
 ) -> Result<(), Error> {
+    let destination = scripts.join(executable.exe(interpreter));
+
     // First priority: the `python.exe` and `pythonw.exe` shims.
     let shim = interpreter
         .stdlib()
@@ -836,7 +839,7 @@ fn copy_launcher_windows(
         .join("scripts")
         .join("nt")
         .join(executable.exe(interpreter));
-    match fs_err::copy(shim, scripts.join(executable.exe(interpreter))) {
+    match copy_and_touch_launcher(&shim, &destination) {
         Ok(_) => return Ok(()),
         Err(err) if err.kind() == io::ErrorKind::NotFound => {}
         Err(err) => {
@@ -853,7 +856,7 @@ fn copy_launcher_windows(
         .join("scripts")
         .join("nt")
         .join(executable.launcher(interpreter));
-    match fs_err::copy(shim, scripts.join(executable.exe(interpreter))) {
+    match copy_and_touch_launcher(&shim, &destination) {
         Ok(_) => return Ok(()),
         Err(err) if err.kind() == io::ErrorKind::NotFound => {}
         Err(err) => {
@@ -864,7 +867,7 @@ fn copy_launcher_windows(
     // Third priority: on Conda at least, we can look for the launcher shim next to
     // the Python executable itself.
     let shim = base_python.with_file_name(executable.launcher(interpreter));
-    match fs_err::copy(shim, scripts.join(executable.exe(interpreter))) {
+    match copy_and_touch_launcher(&shim, &destination) {
         Ok(_) => return Ok(()),
         Err(err) if err.kind() == io::ErrorKind::NotFound => {}
         Err(err) => {
@@ -875,9 +878,9 @@ fn copy_launcher_windows(
     // Fourth priority: if the launcher shim doesn't exist, assume this is
     // an embedded Python. Copy the Python executable itself, along with
     // the DLLs, `.pyd` files, and `.zip` files in the same directory.
-    match fs_err::copy(
-        base_python.with_file_name(executable.exe(interpreter)),
-        scripts.join(executable.exe(interpreter)),
+    match copy_and_touch_launcher(
+        &base_python.with_file_name(executable.exe(interpreter)),
+        &destination,
     ) {
         Ok(_) => {
             // Copy `.dll` and `.pyd` files from the top-level, and from the
@@ -939,4 +942,27 @@ fn copy_launcher_windows(
     }
 
     Err(Error::NotFound(base_python.user_display().to_string()))
+}
+
+/// Copy a Windows launcher shim, then refresh the destination's modified time.
+///
+/// [`fs::copy`] preserves the source file's modified time on Windows, which
+/// means a launcher copied from a Python installation inherits the (often
+/// ancient) mtime of the base interpreter. Explicitly touch the destination
+/// so tools that rely on file timestamps see the launcher as freshly created.
+fn copy_and_touch_launcher(from: &Path, to: &Path) -> io::Result<u64> {
+    let bytes = fs_err::copy(from, to)?;
+    // Opening with `write(true)` is required on Windows so the handle has
+    // `FILE_WRITE_ATTRIBUTES` access, which `SetFileTime` needs.
+    match fs_err::OpenOptions::new().write(true).open(to) {
+        Ok(file) => {
+            if let Err(err) = file.file().set_modified(SystemTime::now()) {
+                debug!("Failed to update mtime for {}: {err}", to.display());
+            }
+        }
+        Err(err) => {
+            debug!("Failed to open {} to update mtime: {err}", to.display());
+        }
+    }
+    Ok(bytes)
 }

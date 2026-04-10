@@ -1181,6 +1181,42 @@ fn create_venv_then_allow_existing() {
     );
 }
 
+/// The Windows launcher shims that uv copies into the virtual environment should
+/// have their modified time refreshed to reflect when they were placed in the
+/// environment, rather than inheriting the (often ancient) mtime of the shim in
+/// the base Python installation.
+#[test]
+#[cfg(windows)]
+fn windows_launcher_mtime_refreshed() -> Result<()> {
+    use std::time::{Duration, SystemTime};
+
+    let context = uv_test::test_context_with_versions!(&["3.12"]);
+
+    let before = SystemTime::now() - Duration::from_secs(60);
+
+    // Create a virtual environment at `.venv`.
+    context
+        .venv()
+        .arg(context.venv.as_os_str())
+        .arg("--python")
+        .arg("3.12")
+        .assert()
+        .success();
+
+    let python_exe = context.venv.child("Scripts").child("python.exe");
+    python_exe.assert(predicates::path::is_file());
+
+    let metadata = fs_err::metadata(python_exe.path())?;
+    let modified = metadata.modified()?;
+    assert!(
+        modified >= before,
+        "expected the copied `python.exe` launcher to have a refreshed mtime \
+         (modified = {modified:?}, before = {before:?})",
+    );
+
+    Ok(())
+}
+
 #[test]
 #[cfg(windows)]
 fn windows_shims() -> Result<()> {
