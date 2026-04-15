@@ -2130,6 +2130,61 @@ fn install_git_public_https() {
     context.assert_installed("uv_public_pypackage", "0.1.0");
 }
 
+/// When `GIT_DIR` is set in the environment (e.g., via `git bisect run`), uv's
+/// internal git operations for installing a git dependency should not be affected.
+///
+/// See: <https://github.com/astral-sh/uv/issues/19008>
+#[test]
+#[cfg(feature = "test-git")]
+fn install_git_public_https_with_git_dir_env() -> Result<()> {
+    let context = uv_test::test_context!("3.12");
+
+    // Create a dummy git repository to use as GIT_DIR, simulating the scenario
+    // where `uv run` is invoked from `git bisect run`.
+    let dummy_git_dir = context.temp_dir.child("dummy-repo");
+    fs::create_dir_all(dummy_git_dir.path())?;
+    std::process::Command::new("git")
+        .arg("init")
+        .arg(dummy_git_dir.path())
+        .output()?;
+    let git_dir = dummy_git_dir.path().join(".git");
+
+    // In addition to the standard filters, normalize system-specific paths.
+    let filters: Vec<_> = [
+        (r"@(\d|\w){40}", "@[COMMIT]"),
+        // Normalize git binary path and db hash which vary across systems.
+        (r"`[^`]+/git ", "`[GIT] "),
+        (r"/git-v0/db/\w+", "/git-v0/db/[DB_HASH]"),
+    ]
+    .into_iter()
+    .chain(context.filters())
+    .collect();
+
+    // Set GIT_DIR to simulate `git bisect run uv run` which sets GIT_DIR in
+    // the environment. This should not affect uv's internal git operations.
+    //
+    // Currently, this fails because `git init` in the cache directory is
+    // misdirected by `GIT_DIR` to operate on the wrong repository, so the
+    // subsequent `git fetch` (which does remove `GIT_DIR`) finds no repo.
+    uv_snapshot!(filters, context.pip_install()
+            .arg("uv-public-pypackage @ git+https://github.com/astral-test/uv-public-pypackage")
+            .env(EnvVars::GIT_DIR, &git_dir), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+
+    ----- stderr -----
+      × Failed to download and build `uv-public-pypackage @ git+https://github.com/astral-test/uv-public-pypackage`
+      ├─▶ Git operation failed
+      ├─▶ failed to clone into: [CACHE_DIR]/git-v0/db/[DB_HASH]
+      ╰─▶ process didn't exit successfully: `[GIT] fetch --force --update-head-ok 'https://github.com/astral-test/uv-public-pypackage' '+HEAD:refs/remotes/origin/HEAD'` (exit status: 128)
+          --- stderr
+          fatal: not a git repository (or any of the parent directories): .git
+    ");
+
+    Ok(())
+}
+
 /// Install a package from a public GitHub repository, omitting the `git+` prefix
 #[test]
 #[cfg(feature = "test-git")]
