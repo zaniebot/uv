@@ -2350,9 +2350,17 @@ struct ExcludeNewerWire {
 impl From<ExcludeNewerWire> for ExcludeNewer {
     fn from(wire: ExcludeNewerWire) -> Self {
         Self {
-            global: wire
-                .exclude_newer
-                .map(|timestamp| ExcludeNewerValue::new(timestamp, wire.exclude_newer_span)),
+            global: match (wire.exclude_newer, wire.exclude_newer_span) {
+                (Some(timestamp), span) => Some(ExcludeNewerValue::new(timestamp, span)),
+                // The lockfile has a span but the timestamp was stripped. Use a placeholder
+                // so comparison logic can match the span against the current config and
+                // treat this as a relative timestamp change (which doesn't invalidate the
+                // lockfile).
+                (None, Some(span)) => {
+                    Some(ExcludeNewerValue::new(Timestamp::UNIX_EPOCH, Some(span)))
+                }
+                (None, None) => None,
+            },
             package: wire.exclude_newer_package,
         }
     }
