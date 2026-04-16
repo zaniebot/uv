@@ -66,7 +66,8 @@ impl<'de> serde::Deserialize<'de> for ExcludeNewerSpan {
 pub enum ExcludeNewerValue {
     /// An absolute timestamp (no relative span).
     Absolute(Timestamp),
-    /// A relative span with a computed timestamp.
+    /// A relative span with a computed timestamp. The timestamp is computed once at creation
+    /// time so that a single consistent value is used throughout a resolution.
     Relative {
         timestamp: Timestamp,
         span: ExcludeNewerSpan,
@@ -110,10 +111,8 @@ impl ExcludeNewerValue {
         }
     }
 
-    /// Create a new [`ExcludeNewerValue`] from a span, computing the timestamp relative to
-    /// the current time.
-    ///
-    /// This is used when a lockfile has a span but the timestamp was stripped.
+    /// Create a [`Relative`](Self::Relative) value from a span, computing the timestamp
+    /// relative to the current time.
     pub fn from_span(span: ExcludeNewerSpan) -> Self {
         let now = current_time();
         let timestamp = now
@@ -122,7 +121,7 @@ impl ExcludeNewerValue {
         Self::Relative { timestamp, span }
     }
 
-    /// If this value was derived from a relative span, recompute the timestamp relative to now.
+    /// If this value has a relative span, recompute the timestamp relative to now.
     ///
     /// Returns `self` unchanged if there is no span (i.e., the timestamp is absolute).
     #[must_use]
