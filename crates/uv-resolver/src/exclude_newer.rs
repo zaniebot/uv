@@ -470,57 +470,54 @@ impl ExcludeNewer {
         Self { global, package }
     }
 
-    /// Returns the exclude-newer value for a specific package, returning `Some(value)` if the
-    /// package has a package-specific setting or falls back to the global value if set, or `None`
-    /// if exclude-newer is explicitly disabled for the package (set to `false`) or if no
-    /// exclude-newer is configured.
-    pub fn exclude_newer_package(&self, package_name: &PackageName) -> Option<ExcludeNewerValue> {
+    /// Returns the effective exclude-newer timestamp for a specific package, falling back to the
+    /// global value if no package-specific setting exists.
+    pub fn exclude_newer_package(&self, package_name: &PackageName) -> Option<Timestamp> {
         match self.package.get(package_name) {
-            Some(ExcludeNewerOverride::Enabled(timestamp)) => Some(timestamp.as_ref().clone()),
+            Some(ExcludeNewerOverride::Enabled(value)) => Some(value.timestamp()),
             Some(ExcludeNewerOverride::Disabled) => None,
-            None => self.global.clone(),
+            None => self.global.as_ref().map(ExcludeNewerValue::timestamp),
         }
     }
 
-    /// Returns the effective exclude-newer value for a package resolved from a specific index.
+    /// Returns the effective exclude-newer timestamp for a package resolved from a specific index.
     pub fn exclude_newer_package_for_index(
         &self,
         package_name: &PackageName,
         index: Option<&ExcludeNewerOverride>,
-    ) -> Option<ExcludeNewerValue> {
+    ) -> Option<Timestamp> {
         self.exclude_newer_package_for_index_with_source(package_name, index)
-            .map(|(exclude_newer, _)| exclude_newer)
+            .map(|(timestamp, _)| timestamp)
     }
 
-    /// Returns the effective exclude-newer value and its source for a package resolved from a
+    /// Returns the effective exclude-newer timestamp and its source for a package resolved from a
     /// specific index.
     pub(crate) fn exclude_newer_package_for_index_with_source(
         &self,
         package_name: &PackageName,
         index: Option<&ExcludeNewerOverride>,
-    ) -> Option<(ExcludeNewerValue, EffectiveExcludeNewerSource)> {
+    ) -> Option<(Timestamp, EffectiveExcludeNewerSource)> {
         match self.package.get(package_name) {
-            Some(ExcludeNewerOverride::Enabled(timestamp)) => Some((
-                timestamp.as_ref().clone(),
-                EffectiveExcludeNewerSource::Package,
-            )),
+            Some(ExcludeNewerOverride::Enabled(value)) => {
+                Some((value.timestamp(), EffectiveExcludeNewerSource::Package))
+            }
             Some(ExcludeNewerOverride::Disabled) => None,
             None => match index {
                 Some(ExcludeNewerOverride::Disabled) => {
                     Self::warn_index_exclude_newer_preview();
                     None
                 }
-                Some(ExcludeNewerOverride::Enabled(timestamp)) => Some((
+                Some(ExcludeNewerOverride::Enabled(value)) => Some((
                     {
                         Self::warn_index_exclude_newer_preview();
-                        ExcludeNewerValue::from(timestamp.timestamp())
+                        value.timestamp()
                     },
                     EffectiveExcludeNewerSource::Index,
                 )),
                 None => self
                     .global
-                    .clone()
-                    .map(|timestamp| (timestamp, EffectiveExcludeNewerSource::Global)),
+                    .as_ref()
+                    .map(|value| (value.timestamp(), EffectiveExcludeNewerSource::Global)),
             },
         }
     }
