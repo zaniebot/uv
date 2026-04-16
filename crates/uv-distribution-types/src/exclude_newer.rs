@@ -127,18 +127,9 @@ impl ExcludeNewerValue {
     /// Returns `self` unchanged if there is no span (i.e., the timestamp is absolute).
     #[must_use]
     pub fn recompute(self) -> Self {
-        let Self::Relative { span, timestamp } = self else {
-            return self;
-        };
-
-        let now = current_time();
-        let Ok(cutoff) = now.checked_sub(span.0.abs()) else {
-            return Self::Relative { timestamp, span };
-        };
-
-        Self::Relative {
-            timestamp: cutoff.into(),
-            span,
+        match self {
+            Self::Absolute(_) => self,
+            Self::Relative { span, .. } => Self::from_span(span),
         }
     }
 }
