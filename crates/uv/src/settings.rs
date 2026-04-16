@@ -2546,7 +2546,7 @@ impl FormatSettings {
             diff,
             extra_args,
             version,
-            exclude_newer: exclude_newer.map(|v| v.timestamp()),
+            exclude_newer: exclude_newer.and_then(|v| v.timestamp()),
             no_project,
             show_version,
         }

@@ -31,9 +31,9 @@ pub enum ExcludeNewerValueChange {
     /// A relative span was removed
     SpanRemoved,
     /// A relative span is present and the timestamp changed
-    RelativeTimestampChanged(Timestamp, Timestamp, ExcludeNewerSpan),
+    RelativeTimestampChanged(Option<Timestamp>, Option<Timestamp>, ExcludeNewerSpan),
     /// The timestamp changed and a relative span is not present
-    AbsoluteTimestampChanged(Timestamp, Timestamp),
+    AbsoluteTimestampChanged(Option<Timestamp>, Option<Timestamp>),
 }
 
 impl ExcludeNewerValueChange {
@@ -55,12 +55,16 @@ impl std::fmt::Display for ExcludeNewerValueChange {
                 write!(f, "removal of exclude newer span")
             }
             Self::RelativeTimestampChanged(old, new, span) => {
+                let old = old.map_or_else(|| "<none>".to_string(), |t| t.to_string());
+                let new = new.map_or_else(|| "<none>".to_string(), |t| t.to_string());
                 write!(
                     f,
                     "change of calculated ({span}) exclude newer timestamp from `{old}` to `{new}`"
                 )
             }
             Self::AbsoluteTimestampChanged(old, new) => {
+                let old = old.map_or_else(|| "<none>".to_string(), |t| t.to_string());
+                let new = new.map_or_else(|| "<none>".to_string(), |t| t.to_string());
                 write!(
                     f,
                     "change of exclude newer timestamp from `{old}` to `{new}`"
@@ -177,13 +181,15 @@ impl serde::Serialize for ExcludeNewerValueWithSpanRef<'_> {
     where
         S: serde::Serializer,
     {
-        if let Some(span) = self.0.span() {
+        if let (Some(timestamp), Some(span)) = (self.0.timestamp(), self.0.span()) {
             let mut map = serializer.serialize_map(Some(2))?;
-            map.serialize_entry("timestamp", &self.0.timestamp())?;
+            map.serialize_entry("timestamp", &timestamp)?;
             map.serialize_entry("span", span)?;
             map.end()
+        } else if let Some(timestamp) = self.0.timestamp() {
+            timestamp.serialize(serializer)
         } else {
-            self.0.timestamp().serialize(serializer)
+            serializer.serialize_none()
         }
     }
 }
@@ -510,13 +516,15 @@ impl ExcludeNewer {
                     Self::warn_index_exclude_newer_preview();
                     None
                 }
-                Some(ExcludeNewerOverride::Enabled(timestamp)) => Some((
-                    {
-                        Self::warn_index_exclude_newer_preview();
-                        ExcludeNewerValue::from(timestamp.timestamp())
-                    },
-                    EffectiveExcludeNewerSource::Index,
-                )),
+                Some(ExcludeNewerOverride::Enabled(timestamp)) => {
+                    Self::warn_index_exclude_newer_preview();
+                    timestamp.timestamp().map(|ts| {
+                        (
+                            ExcludeNewerValue::from(ts),
+                            EffectiveExcludeNewerSource::Index,
+                        )
+                    })
+                }
                 None => self
                     .global
                     .clone()

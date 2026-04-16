@@ -455,7 +455,11 @@ impl VersionMapLazy {
                 // upload time information.
                 let (excluded, upload_time) = if let Some(exclude_newer) = &self.exclude_newer {
                     match file.upload_time_utc_ms.as_ref() {
-                        Some(&upload_time) if upload_time >= exclude_newer.timestamp_millis() => {
+                        Some(&upload_time)
+                            if exclude_newer
+                                .timestamp_millis()
+                                .is_some_and(|cutoff| upload_time >= cutoff) =>
+                        {
                             trace!(
                                 "Excluding `{}` (uploaded {upload_time}) due to exclude-newer ({exclude_newer})",
                                 file.filename

@@ -62,22 +62,22 @@ impl<'de> serde::Deserialize<'de> for ExcludeNewerSpan {
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ExcludeNewerValue {
-    timestamp: Timestamp,
+    timestamp: Option<Timestamp>,
     span: Option<ExcludeNewerSpan>,
 }
 
 impl ExcludeNewerValue {
-    pub fn into_parts(self) -> (Timestamp, Option<ExcludeNewerSpan>) {
+    pub fn into_parts(self) -> (Option<Timestamp>, Option<ExcludeNewerSpan>) {
         (self.timestamp, self.span)
     }
 
     /// Return the [`Timestamp`] in milliseconds.
-    pub fn timestamp_millis(&self) -> i64 {
-        self.timestamp.as_millisecond()
+    pub fn timestamp_millis(&self) -> Option<i64> {
+        self.timestamp.map(Timestamp::as_millisecond)
     }
 
     /// Return the [`Timestamp`].
-    pub fn timestamp(&self) -> Timestamp {
+    pub fn timestamp(&self) -> Option<Timestamp> {
         self.timestamp
     }
 
@@ -87,8 +87,19 @@ impl ExcludeNewerValue {
     }
 
     /// Create a new [`ExcludeNewerValue`].
-    pub fn new(timestamp: Timestamp, span: Option<ExcludeNewerSpan>) -> Self {
+    pub fn new(timestamp: Option<Timestamp>, span: Option<ExcludeNewerSpan>) -> Self {
         Self { timestamp, span }
+    }
+
+    /// Create a new [`ExcludeNewerValue`] with only a span and no timestamp.
+    ///
+    /// This represents a lockfile entry where the timestamp was stripped but the span was
+    /// preserved.
+    pub fn span_only(span: ExcludeNewerSpan) -> Self {
+        Self {
+            timestamp: None,
+            span: Some(span),
+        }
     }
 
     /// If this value was derived from a relative span, recompute the timestamp relative to now.
@@ -117,7 +128,7 @@ impl ExcludeNewerValue {
         };
 
         Self {
-            timestamp: cutoff.into(),
+            timestamp: Some(cutoff.into()),
             span: Some(span),
         }
     }
@@ -128,7 +139,11 @@ impl serde::Serialize for ExcludeNewerValue {
     where
         S: serde::Serializer,
     {
-        self.timestamp.serialize(serializer)
+        if let Some(timestamp) = &self.timestamp {
+            timestamp.serialize(serializer)
+        } else {
+            serializer.serialize_none()
+        }
     }
 }
 
@@ -139,7 +154,7 @@ impl<'de> serde::Deserialize<'de> for ExcludeNewerValue {
     {
         #[derive(serde::Deserialize)]
         struct TableForm {
-            timestamp: Timestamp,
+            timestamp: Option<Timestamp>,
             span: Option<ExcludeNewerSpan>,
         }
 
@@ -160,7 +175,7 @@ impl<'de> serde::Deserialize<'de> for ExcludeNewerValue {
 impl From<Timestamp> for ExcludeNewerValue {
     fn from(timestamp: Timestamp) -> Self {
         Self {
-            timestamp,
+            timestamp: Some(timestamp),
             span: None,
         }
     }
@@ -213,7 +228,7 @@ impl FromStr for ExcludeNewerValue {
 
     fn from_str(input: &str) -> Result<Self, Self::Err> {
         if let Ok(timestamp) = input.parse::<Timestamp>() {
-            return Ok(Self::new(timestamp, None));
+            return Ok(Self::new(Some(timestamp), None));
         }
 
         let date_err = match input.parse::<jiff::civil::Date>() {
@@ -227,7 +242,7 @@ impl FromStr for ExcludeNewerValue {
                             "`{input}` parsed to date `{date}`, but could not be converted to a timestamp: {err}",
                         )
                     })?;
-                return Ok(Self::new(timestamp, None));
+                return Ok(Self::new(Some(timestamp), None));
             }
             Err(err) => err,
         };
@@ -269,7 +284,7 @@ impl FromStr for ExcludeNewerValue {
                 let cutoff = now.checked_sub(span.abs()).map_err(|err| {
                     format!("Duration `{input}` is too large to subtract from current time: {err}")
                 })?;
-                return Ok(Self::new(cutoff.into(), Some(ExcludeNewerSpan(span))));
+                return Ok(Self::new(Some(cutoff.into()), Some(ExcludeNewerSpan(span))));
             }
             Err(err) => err,
         };
@@ -280,7 +295,13 @@ impl FromStr for ExcludeNewerValue {
 
 impl std::fmt::Display for ExcludeNewerValue {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.timestamp.fmt(f)
+        if let Some(timestamp) = &self.timestamp {
+            timestamp.fmt(f)
+        } else if let Some(span) = &self.span {
+            write!(f, "<{span}>")
+        } else {
+            write!(f, "<none>")
+        }
     }
 }
 

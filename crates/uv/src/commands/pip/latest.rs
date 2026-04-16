@@ -86,7 +86,9 @@ impl LatestClient<'_> {
                     if let Some(exclude_newer) = &exclude_newer {
                         match file.upload_time_utc_ms.as_ref() {
                             Some(&upload_time)
-                                if upload_time >= exclude_newer.timestamp_millis() =>
+                                if exclude_newer
+                                    .timestamp_millis()
+                                    .is_some_and(|cutoff| upload_time >= cutoff) =>
                             {
                                 continue;
                             }

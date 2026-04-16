@@ -2771,7 +2771,9 @@ impl<InstalledPackages: InstalledPackagesProvider> ResolverState<InstalledPackag
                                 };
                                 prioritized_dist.files().all(|file| {
                                     file.upload_time_utc_ms.is_none_or(|upload_time| {
-                                        upload_time >= exclude_newer.timestamp_millis()
+                                        exclude_newer
+                                            .timestamp_millis()
+                                            .is_some_and(|cutoff| upload_time >= cutoff)
                                     })
                                 })
                             };
@@ -2794,7 +2796,9 @@ impl<InstalledPackages: InstalledPackagesProvider> ResolverState<InstalledPackag
                                 };
                                 prioritized_dist.files().all(|file| {
                                     file.upload_time_utc_ms.is_some_and(|upload_time| {
-                                        upload_time >= exclude_newer.timestamp_millis()
+                                        exclude_newer
+                                            .timestamp_millis()
+                                            .is_some_and(|cutoff| upload_time >= cutoff)
                                     })
                                 })
                             };
