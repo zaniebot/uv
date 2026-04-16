@@ -2256,9 +2256,6 @@ impl From<ToolOptionsWire> for ToolOptions {
         let exclude_newer = value.exclude_newer.map(|exclude_newer| {
             if exclude_newer.span().is_none() {
                 ExcludeNewerValue::new(exclude_newer.timestamp(), value.exclude_newer_span)
-            } else if exclude_newer.timestamp().is_none() && value.exclude_newer_span.is_some() {
-                // The wire format has a span stored separately; merge it in
-                ExcludeNewerValue::new(None, value.exclude_newer_span)
             } else {
                 exclude_newer
             }
@@ -2302,7 +2299,7 @@ impl From<ToolOptions> for ToolOptionsWire {
             .exclude_newer
             .map(ExcludeNewerValue::into_parts)
             .map_or((None, None), |(timestamp, span)| {
-                (timestamp.map(ExcludeNewerValue::from), span)
+                (Some(ExcludeNewerValue::from(timestamp)), span)
             });
 
         Self {

@@ -1174,12 +1174,13 @@ impl Lock {
                     for (name, setting) in &exclude_newer.package {
                         match setting {
                             ExcludeNewerOverride::Enabled(exclude_newer_value) => {
-                                if let (Some(timestamp), Some(span)) =
-                                    (exclude_newer_value.timestamp(), exclude_newer_value.span())
-                                {
+                                if let Some(span) = exclude_newer_value.span() {
                                     // Serialize as inline table with timestamp and span
                                     let mut inline = toml_edit::InlineTable::new();
-                                    inline.insert("timestamp", timestamp.to_string().into());
+                                    inline.insert(
+                                        "timestamp",
+                                        exclude_newer_value.timestamp().to_string().into(),
+                                    );
                                     inline.insert("span", span.to_string().into());
                                     package_table.insert(name.as_ref(), Item::Value(inline.into()));
                                 } else {
@@ -2350,12 +2351,12 @@ impl From<ExcludeNewerWire> for ExcludeNewer {
     fn from(wire: ExcludeNewerWire) -> Self {
         Self {
             global: match (wire.exclude_newer, wire.exclude_newer_span) {
-                (Some(timestamp), span) => Some(ExcludeNewerValue::new(Some(timestamp), span)),
-                // The lockfile has a span but the timestamp was stripped. Preserve the span
-                // so comparison logic can match it against the current config and treat the
-                // missing timestamp as a relative timestamp change (which doesn't invalidate
-                // the lockfile).
-                (None, Some(span)) => Some(ExcludeNewerValue::span_only(span)),
+                (Some(timestamp), span) => Some(ExcludeNewerValue::new(timestamp, span)),
+                // The lockfile has a span but the timestamp was stripped. Compute a
+                // timestamp from the span so comparison logic can match it against the
+                // current config and treat the difference as a relative timestamp change
+                // (which doesn't invalidate the lockfile).
+                (None, Some(span)) => Some(ExcludeNewerValue::from_span(span)),
                 (None, None) => None,
             },
             package: wire.exclude_newer_package,
@@ -2368,7 +2369,7 @@ impl From<ExcludeNewer> for ExcludeNewerWire {
         let (timestamp, span) = exclude_newer
             .global
             .map(ExcludeNewerValue::into_parts)
-            .map_or((None, None), |(t, s)| (t, s));
+            .map_or((None, None), |(t, s)| (Some(t), s));
         Self {
             exclude_newer: timestamp,
             exclude_newer_span: span,
