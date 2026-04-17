@@ -816,7 +816,7 @@ pub async fn upload_two_phase(
             )
         })?;
 
-        debug!("Got pre-signed URL for upload: {s3_url}");
+        debug!("Got pre-signed URL for upload");
 
         // Use a custom retry loop since streaming uploads can't be retried by the middleware.
         let file_size = fs_err::tokio::metadata(&group.file)
