@@ -2162,24 +2162,18 @@ fn install_git_public_https_with_git_dir_env() -> Result<()> {
 
     // Set GIT_DIR to simulate `git bisect run uv run` which sets GIT_DIR in
     // the environment. This should not affect uv's internal git operations.
-    //
-    // Currently, this fails because `git init` in the cache directory is
-    // misdirected by `GIT_DIR` to operate on the wrong repository, so the
-    // subsequent `git fetch` (which does remove `GIT_DIR`) finds no repo.
     uv_snapshot!(filters, context.pip_install()
             .arg("uv-public-pypackage @ git+https://github.com/astral-test/uv-public-pypackage")
             .env(EnvVars::GIT_DIR, &git_dir), @"
-    success: false
-    exit_code: 1
+    success: true
+    exit_code: 0
     ----- stdout -----
 
     ----- stderr -----
-      × Failed to download and build `uv-public-pypackage @ git+https://github.com/astral-test/uv-public-pypackage`
-      ├─▶ Git operation failed
-      ├─▶ failed to clone into: [CACHE_DIR]/git-v0/db/[DB_HASH]
-      ╰─▶ process didn't exit successfully: `[GIT] fetch --force --update-head-ok 'https://github.com/astral-test/uv-public-pypackage' '+HEAD:refs/remotes/origin/HEAD'` (exit status: 128)
-          --- stderr
-          fatal: not a git repository (or any of the parent directories): .git
+    Resolved 1 package in [TIME]
+    Prepared 1 package in [TIME]
+    Installed 1 package in [TIME]
+     + uv-public-pypackage==0.1.0 (from git+https://github.com/astral-test/uv-public-pypackage@[COMMIT])
     ");
 
     Ok(())

@@ -45,6 +45,37 @@ pub static GIT: LazyLock<Result<PathBuf, GitError>> = LazyLock::new(|| {
     })
 });
 
+/// Creates a [`ProcessBuilder`] for invoking `git` with environment variables
+/// that could misdirect operations (e.g., `GIT_DIR`) removed.
+///
+/// When uv is run by git (for example, `git bisect run uv run`), these
+/// variables are set by git and point to the *caller's* repository, not uv's
+/// internal cache repositories. Leaving them set causes git commands to
+/// silently operate on the wrong repository and can corrupt user data.
+fn git_cmd() -> Result<ProcessBuilder> {
+    let mut cmd = ProcessBuilder::new(GIT.as_ref()?);
+    cmd.env_remove(EnvVars::GIT_DIR)
+        .env_remove(EnvVars::GIT_WORK_TREE)
+        .env_remove(EnvVars::GIT_INDEX_FILE)
+        .env_remove(EnvVars::GIT_OBJECT_DIRECTORY)
+        .env_remove(EnvVars::GIT_ALTERNATE_OBJECT_DIRECTORIES);
+    Ok(cmd)
+}
+
+/// Creates a [`ProcessBuilder`] for invoking `git lfs` with environment
+/// variables that could misdirect operations removed.
+///
+/// See [`git_cmd`] for rationale.
+fn git_lfs_cmd() -> Result<ProcessBuilder> {
+    let mut cmd = GIT_LFS.as_ref().map_err(|e| anyhow!("{e}"))?.clone();
+    cmd.env_remove(EnvVars::GIT_DIR)
+        .env_remove(EnvVars::GIT_WORK_TREE)
+        .env_remove(EnvVars::GIT_INDEX_FILE)
+        .env_remove(EnvVars::GIT_OBJECT_DIRECTORY)
+        .env_remove(EnvVars::GIT_ALTERNATE_OBJECT_DIRECTORIES);
+    Ok(cmd)
+}
+
 /// Strategy when fetching refspecs for a [`GitReference`]
 enum RefspecStrategy {
     /// All refspecs should be fetched, if any fail then the fetch will fail.
@@ -166,10 +197,7 @@ impl GitRepository {
     /// Opens an existing Git repository at `path`.
     pub(crate) fn open(path: &Path) -> Result<Self> {
         // Make sure there is a Git repository at the specified path.
-        ProcessBuilder::new(GIT.as_ref()?)
-            .arg("rev-parse")
-            .cwd(path)
-            .exec_with_output()?;
+        git_cmd()?.arg("rev-parse").cwd(path).exec_with_output()?;
 
         Ok(Self {
             path: path.to_path_buf(),
@@ -185,10 +213,7 @@ impl GitRepository {
         // opts.external_template(false);
 
         // Initialize the repository.
-        ProcessBuilder::new(GIT.as_ref()?)
-            .arg("init")
-            .cwd(path)
-            .exec_with_output()?;
+        git_cmd()?.arg("init").cwd(path).exec_with_output()?;
 
         Ok(Self {
             path: path.to_path_buf(),
@@ -197,7 +222,7 @@ impl GitRepository {
 
     /// Parses the object ID of the given `refname`.
     fn rev_parse(&self, refname: &str) -> Result<GitOid> {
-        let result = ProcessBuilder::new(GIT.as_ref()?)
+        let result = git_cmd()?
             .arg("rev-parse")
             .arg(refname)
             .cwd(&self.path)
@@ -211,9 +236,7 @@ impl GitRepository {
     /// Verifies LFS artifacts have been initialized for a given `refname`.
     #[instrument(skip_all, fields(path = %self.path.user_display(), refname = %refname))]
     fn lfs_fsck_objects(&self, refname: &str) -> bool {
-        let mut cmd = if let Ok(lfs) = GIT_LFS.as_ref() {
-            lfs.clone()
-        } else {
+        let Ok(mut cmd) = git_lfs_cmd() else {
             warn!("Git LFS is not available, skipping LFS fetch");
             return false;
         };
@@ -359,7 +382,7 @@ impl GitDatabase {
 
     /// Get a short OID for a `revision`, usually 7 chars or more if ambiguous.
     pub(crate) fn to_short_id(&self, revision: GitOid) -> Result<String> {
-        let output = ProcessBuilder::new(GIT.as_ref()?)
+        let output = git_cmd()?
             .arg("rev-parse")
             .arg("--short")
             .arg(revision.as_str())
@@ -416,7 +439,7 @@ impl GitCheckout {
         // Perform a local clone of the repository, which will attempt to use
         // hardlinks to set up the repository. This should speed up the clone operation
         // quite a bit if it works.
-        let res = ProcessBuilder::new(GIT.as_ref()?)
+        let res = git_cmd()?
             .arg("clone")
             .arg("--local")
             // Make sure to pass the local file path and not a file://... url. If given a url,
@@ -429,7 +452,7 @@ impl GitCheckout {
         if let Err(e) = res {
             debug!("Cloning git repo with --local failed, retrying without hardlinks: {e}");
 
-            ProcessBuilder::new(GIT.as_ref()?)
+            git_cmd()?
                 .arg("clone")
                 .arg("--no-hardlinks")
                 .arg(database.repo.path.simplified_display().to_string())
@@ -490,7 +513,7 @@ impl GitCheckout {
         debug!("Reset {} to {}", self.repo.path.display(), self.revision);
 
         // Perform the hard reset.
-        ProcessBuilder::new(GIT.as_ref()?)
+        git_cmd()?
             .arg("reset")
             .arg("--hard")
             .arg(self.revision.as_str())
@@ -499,7 +522,7 @@ impl GitCheckout {
             .exec_with_output()?;
 
         // Update submodules (`git submodule update --recursive`).
-        ProcessBuilder::new(GIT.as_ref()?)
+        git_cmd()?
             .arg("submodule")
             .arg("update")
             .arg("--recursive")
@@ -690,7 +713,7 @@ fn fetch_with_cli(
     disable_ssl: bool,
     offline: bool,
 ) -> Result<()> {
-    let mut cmd = ProcessBuilder::new(GIT.as_ref()?);
+    let mut cmd = git_cmd()?;
     // Disable interactive prompts in the terminal, as they'll be erased by the progress bar
     // animation and the process will "hang". Interactive prompts via the GUI like `SSH_ASKPASS`
     // are still usable.
@@ -712,17 +735,6 @@ fn fetch_with_cli(
         .arg("--update-head-ok") // see discussion in #2078
         .arg(url.as_str())
         .args(refspecs)
-        // If cargo is run by git (for example, the `exec` command in `git
-        // rebase`), the GIT_DIR is set by git and will point to the wrong
-        // location (this takes precedence over the cwd). Make sure this is
-        // unset so git will look at cwd for the repo.
-        .env_remove(EnvVars::GIT_DIR)
-        // The reset of these may not be necessary, but I'm including them
-        // just to be extra paranoid and avoid any issues.
-        .env_remove(EnvVars::GIT_WORK_TREE)
-        .env_remove(EnvVars::GIT_INDEX_FILE)
-        .env_remove(EnvVars::GIT_OBJECT_DIRECTORY)
-        .env_remove(EnvVars::GIT_ALTERNATE_OBJECT_DIRECTORIES)
         .cwd(&repo.path);
 
     // We capture the output to avoid streaming it to the user's console during clones.
@@ -769,14 +781,12 @@ fn fetch_lfs(
     revision: &GitOid,
     disable_ssl: bool,
 ) -> Result<bool> {
-    let mut cmd = if let Ok(lfs) = GIT_LFS.as_ref() {
-        debug!("Fetching Git LFS objects");
-        lfs.clone()
-    } else {
+    let Ok(mut cmd) = git_lfs_cmd() else {
         // Since this feature is opt-in, warn if not available
         warn!("Git LFS is not available, skipping LFS fetch");
         return Ok(false);
     };
+    debug!("Fetching Git LFS objects");
 
     if disable_ssl {
         debug!("Disabling SSL verification for Git LFS");
@@ -786,12 +796,6 @@ fn fetch_lfs(
     cmd.arg("fetch")
         .arg(url.as_str())
         .arg(revision.as_str())
-        // These variables are unset for the same reason as in `fetch_with_cli`.
-        .env_remove(EnvVars::GIT_DIR)
-        .env_remove(EnvVars::GIT_WORK_TREE)
-        .env_remove(EnvVars::GIT_INDEX_FILE)
-        .env_remove(EnvVars::GIT_OBJECT_DIRECTORY)
-        .env_remove(EnvVars::GIT_ALTERNATE_OBJECT_DIRECTORIES)
         // We should not support requesting LFS artifacts with skip smudge being set.
         // While this may not be necessary, it's added to avoid any potential future issues.
         .env_remove(EnvVars::GIT_LFS_SKIP_SMUDGE)
