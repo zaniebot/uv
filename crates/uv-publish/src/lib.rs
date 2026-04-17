@@ -731,7 +731,14 @@ pub async fn validate(
 /// 3. Finalizes the upload with the registry.
 ///
 /// Returns `true` if the file was newly uploaded and `false` if it already existed.
-pub async fn upload_two_phase(
+pub fn elide_presigned_query(mut url: DisplaySafeUrl) -> DisplaySafeUrl {
+    if url.query().is_some() {
+        url.set_query(Some("..."));
+    }
+    url
+}
+
+async fn upload_two_phase(
     group: &UploadDistribution,
     form_metadata: &FormMetadata,
     registry: &DisplaySafeUrl,
@@ -816,7 +823,10 @@ pub async fn upload_two_phase(
             )
         })?;
 
-        debug!("Got pre-signed URL for upload: {s3_url}");
+        debug!(
+            "Got pre-signed URL for upload: {}",
+            elide_presigned_query(s3_url.clone())
+        );
 
         // Use a custom retry loop since streaming uploads can't be retried by the middleware.
         let file_size = fs_err::tokio::metadata(&group.file)
@@ -1578,6 +1588,19 @@ mod tests {
             Arc::new(DummyReporter),
         )
         .await
+    }
+
+    #[test]
+    fn presigned_url_logging_elides_query_values() {
+        let url = DisplaySafeUrl::parse(
+            "https://example.com/upload?X-Amz-Signature=secret&X-Amz-Credential=token",
+        )
+        .unwrap();
+
+        assert_eq!(
+            super::elide_presigned_query(url).to_string(),
+            "https://example.com/upload?..."
+        );
     }
 
     #[test]
