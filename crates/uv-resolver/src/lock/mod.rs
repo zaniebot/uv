@@ -2362,10 +2362,11 @@ impl From<ExcludeNewerWire> for ExcludeNewer {
 
 impl From<ExcludeNewer> for ExcludeNewerWire {
     fn from(exclude_newer: ExcludeNewer) -> Self {
-        let (timestamp, span) = exclude_newer
-            .global
-            .map(ExcludeNewerValue::into_parts)
-            .map_or((None, None), |(t, s)| (Some(t), s));
+        let (timestamp, span) = match exclude_newer.global {
+            Some(ExcludeNewerValue::Absolute(timestamp)) => (Some(timestamp), None),
+            Some(ExcludeNewerValue::Relative(span)) => (Some(Timestamp::UNIX_EPOCH), Some(span)),
+            None => (None, None),
+        };
         Self {
             exclude_newer: timestamp,
             exclude_newer_span: span,

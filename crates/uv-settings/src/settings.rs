@@ -2276,12 +2276,14 @@ impl From<ToolOptionsWire> for ToolOptions {
 
 impl From<ToolOptions> for ToolOptionsWire {
     fn from(value: ToolOptions) -> Self {
-        let (exclude_newer, exclude_newer_span) = value
-            .exclude_newer
-            .map(ExcludeNewerValue::into_parts)
-            .map_or((None, None), |(timestamp, span)| {
-                (Some(ExcludeNewerValue::from(timestamp)), span)
-            });
+        let (exclude_newer, exclude_newer_span) = match &value.exclude_newer {
+            Some(value @ ExcludeNewerValue::Absolute(_)) => (Some(value.clone()), None),
+            Some(value @ ExcludeNewerValue::Relative(span)) => (
+                Some(ExcludeNewerValue::Absolute(value.timestamp())),
+                Some(*span),
+            ),
+            None => (None, None),
+        };
 
         Self {
             index: value.index,

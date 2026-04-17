@@ -70,16 +70,9 @@ pub enum ExcludeNewerValue {
 }
 
 impl ExcludeNewerValue {
-    /// Split into a timestamp and optional span for wire serialization.
-    ///
-    /// For [`Relative`](Self::Relative) values, the timestamp is a placeholder — the span is
-    /// the source of truth.
-    pub fn into_parts(self) -> (Timestamp, Option<ExcludeNewerSpan>) {
-        match self {
-            Self::Absolute(timestamp) => (timestamp, None),
-            Self::Relative(span) => (Timestamp::UNIX_EPOCH, Some(span)),
-        }
-    }
+    /// A placeholder absolute timestamp (Unix epoch) used when serializing a [`Relative`](Self::Relative)
+    /// value to a wire format that requires a timestamp field.
+    pub const PLACEHOLDER: Self = Self::Absolute(Timestamp::UNIX_EPOCH);
 
     /// Return the effective [`Timestamp`].
     ///
