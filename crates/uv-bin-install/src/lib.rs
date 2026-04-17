@@ -34,6 +34,7 @@ use uv_redacted::DisplaySafeUrl;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Binary {
     Ruff,
+    Ty,
     Uv,
 }
 
@@ -51,6 +52,12 @@ impl Binary {
             ]
             .into_iter()
             .collect(),
+            Self::Ty => [
+                VersionSpecifier::greater_than_equal_version(Version::new([0, 0])),
+                VersionSpecifier::less_than_version(Version::new([0, 1])),
+            ]
+            .into_iter()
+            .collect(),
             Self::Uv => VersionSpecifiers::empty(),
         }
     }
@@ -61,6 +68,7 @@ impl Binary {
     pub fn name(&self) -> &'static str {
         match self {
             Self::Ruff => "ruff",
+            Self::Ty => "ty",
             Self::Uv => "uv",
         }
     }
@@ -77,6 +85,21 @@ impl Binary {
                 let suffix = format!("{version}/ruff-{platform}.{}", format.extension());
                 let canonical = format!("{RUFF_GITHUB_URL_PREFIX}{suffix}");
                 let mirror = format!("{RUFF_DEFAULT_MIRROR}{suffix}");
+                Ok(vec![
+                    DisplaySafeUrl::parse(&mirror).map_err(|err| Error::UrlParse {
+                        url: mirror,
+                        source: err,
+                    })?,
+                    DisplaySafeUrl::parse(&canonical).map_err(|err| Error::UrlParse {
+                        url: canonical,
+                        source: err,
+                    })?,
+                ])
+            }
+            Self::Ty => {
+                let suffix = format!("{version}/ty-{platform}.{}", format.extension());
+                let canonical = format!("{TY_GITHUB_URL_PREFIX}{suffix}");
+                let mirror = format!("{TY_DEFAULT_MIRROR}{suffix}");
                 Ok(vec![
                     DisplaySafeUrl::parse(&mirror).map_err(|err| Error::UrlParse {
                         url: mirror,
@@ -113,6 +136,11 @@ impl Binary {
                     .unwrap(),
                 DisplaySafeUrl::parse(&format!("{VERSIONS_MANIFEST_URL}/{name}.ndjson")).unwrap(),
             ],
+            Self::Ty => vec![
+                DisplaySafeUrl::parse(&format!("{VERSIONS_MANIFEST_MIRROR}/{name}.ndjson"))
+                    .unwrap(),
+                DisplaySafeUrl::parse(&format!("{VERSIONS_MANIFEST_URL}/{name}.ndjson")).unwrap(),
+            ],
             Self::Uv => vec![
                 DisplaySafeUrl::parse(&format!("{VERSIONS_MANIFEST_MIRROR}/{name}.ndjson"))
                     .unwrap(),
@@ -128,6 +156,15 @@ impl Binary {
             Self::Ruff => {
                 if let Some(suffix) = canonical_url.as_str().strip_prefix(RUFF_GITHUB_URL_PREFIX) {
                     let mirror_str = format!("{RUFF_DEFAULT_MIRROR}{suffix}");
+                    if let Ok(mirror_url) = DisplaySafeUrl::parse(&mirror_str) {
+                        return vec![mirror_url, canonical_url];
+                    }
+                }
+                vec![canonical_url]
+            }
+            Self::Ty => {
+                if let Some(suffix) = canonical_url.as_str().strip_prefix(TY_GITHUB_URL_PREFIX) {
+                    let mirror_str = format!("{TY_DEFAULT_MIRROR}{suffix}");
                     if let Ok(mirror_url) = DisplaySafeUrl::parse(&mirror_str) {
                         return vec![mirror_url, canonical_url];
                     }
@@ -220,6 +257,9 @@ impl fmt::Display for BinVersion {
 /// The canonical GitHub URL prefix for Ruff releases.
 const RUFF_GITHUB_URL_PREFIX: &str = "https://github.com/astral-sh/ruff/releases/download/";
 
+/// The canonical GitHub URL prefix for ty releases.
+const TY_GITHUB_URL_PREFIX: &str = "https://github.com/astral-sh/ty/releases/download/";
+
 /// The canonical GitHub URL prefix for uv releases.
 const UV_GITHUB_URL_PREFIX: &str = "https://github.com/astral-sh/uv/releases/download/";
 
@@ -228,6 +268,12 @@ const UV_GITHUB_URL_PREFIX: &str = "https://github.com/astral-sh/uv/releases/dow
 /// This mirror is tried first for Ruff downloads. If it fails, uv falls back to the canonical
 /// GitHub URL.
 const RUFF_DEFAULT_MIRROR: &str = "https://releases.astral.sh/github/ruff/releases/download/";
+
+/// The default Astral mirror for ty releases.
+///
+/// This mirror is tried first for ty downloads. If it fails, uv falls back to the canonical
+/// GitHub URL.
+const TY_DEFAULT_MIRROR: &str = "https://releases.astral.sh/github/ty/releases/download/";
 
 /// The canonical base URL for the versions manifest.
 const VERSIONS_MANIFEST_URL: &str = "https://raw.githubusercontent.com/astral-sh/versions/main/v1";
