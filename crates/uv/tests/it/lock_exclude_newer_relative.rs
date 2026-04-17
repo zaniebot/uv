@@ -480,7 +480,7 @@ fn lock_exclude_newer_package_relative() -> Result<()> {
     Resolved 2 packages in [TIME]
     ");
 
-    // And the `exclude-newer-package` timestamp value in the lockfile should be changed
+    // The `exclude-newer-package` span is unchanged; the timestamp is a placeholder
     let lock = context.read("uv.lock");
     assert_snapshot!(lock, @r#"
     version = 1
@@ -490,7 +490,7 @@ fn lock_exclude_newer_package_relative() -> Result<()> {
     [options]
 
     [options.exclude-newer-package]
-    idna = { timestamp = "2024-05-18T00:00:00Z", span = "P2W" }
+    idna = { timestamp = "2024-04-17T00:00:00Z", span = "P2W" }
 
     [[package]]
     name = "idna"

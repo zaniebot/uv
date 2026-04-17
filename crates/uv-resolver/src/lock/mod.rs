@@ -2352,11 +2352,7 @@ impl From<ExcludeNewerWire> for ExcludeNewer {
         Self {
             global: match (wire.exclude_newer, wire.exclude_newer_span) {
                 (Some(timestamp), span) => Some(ExcludeNewerValue::new(timestamp, span)),
-                // The lockfile has a span but the timestamp was stripped. Compute a
-                // timestamp from the span so comparison logic can match it against the
-                // current config and treat the difference as a relative timestamp change
-                // (which doesn't invalidate the lockfile).
-                (None, Some(span)) => Some(ExcludeNewerValue::from_span(span)),
+                (None, Some(span)) => Some(ExcludeNewerValue::Relative(span)),
                 (None, None) => None,
             },
             package: wire.exclude_newer_package,

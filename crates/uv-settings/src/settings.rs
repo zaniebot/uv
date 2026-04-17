@@ -525,25 +525,6 @@ pub struct ResolverInstallerOptions {
     pub no_binary_package: Option<Vec<PackageName>>,
 }
 
-impl ResolverInstallerOptions {
-    /// Recompute any relative exclude-newer values against the current time.
-    #[must_use]
-    pub fn recompute_exclude_newer(mut self) -> Self {
-        let exclude_newer = ExcludeNewer::new(
-            self.exclude_newer.take(),
-            self.exclude_newer_package.take().unwrap_or_default(),
-        )
-        .recompute();
-        self.exclude_newer = exclude_newer.global;
-        self.exclude_newer_package = if exclude_newer.package.is_empty() {
-            None
-        } else {
-            Some(exclude_newer.package)
-        };
-        self
-    }
-}
-
 impl From<ResolverInstallerSchema> for ResolverInstallerOptions {
     fn from(value: ResolverInstallerSchema) -> Self {
         let ResolverInstallerSchema {

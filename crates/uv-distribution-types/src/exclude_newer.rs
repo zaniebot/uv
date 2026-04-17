@@ -60,75 +60,57 @@ impl<'de> serde::Deserialize<'de> for ExcludeNewerSpan {
     }
 }
 
-/// An exclude-newer cutoff value: either an absolute timestamp or a relative span with a
-/// computed timestamp.
+/// An exclude-newer cutoff value: either an absolute timestamp or a relative span.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum ExcludeNewerValue {
     /// An absolute timestamp (no relative span).
     Absolute(Timestamp),
-    /// A relative span with a computed timestamp. The timestamp is computed once at creation
-    /// time so that a single consistent value is used throughout a resolution.
-    Relative {
-        timestamp: Timestamp,
-        span: ExcludeNewerSpan,
-    },
+    /// A relative span whose effective timestamp is computed on demand from the current time.
+    Relative(ExcludeNewerSpan),
 }
 
 impl ExcludeNewerValue {
-    /// Split into the stored timestamp and optional span for wire serialization.
+    /// Split into a timestamp and optional span for wire serialization.
+    ///
+    /// For [`Relative`](Self::Relative) values, the timestamp is a placeholder — the span is
+    /// the source of truth.
     pub fn into_parts(self) -> (Timestamp, Option<ExcludeNewerSpan>) {
         match self {
             Self::Absolute(timestamp) => (timestamp, None),
-            Self::Relative { timestamp, span } => (timestamp, Some(span)),
+            Self::Relative(span) => (Timestamp::UNIX_EPOCH, Some(span)),
         }
     }
 
-    /// Return the [`Timestamp`] in milliseconds.
-    pub fn timestamp_millis(&self) -> i64 {
-        self.timestamp().as_millisecond()
-    }
-
-    /// Return the [`Timestamp`].
+    /// Return the effective [`Timestamp`].
+    ///
+    /// For [`Relative`](Self::Relative) values this is computed from the span and the current
+    /// time on each call.
     pub fn timestamp(&self) -> Timestamp {
         match self {
-            Self::Absolute(timestamp) | Self::Relative { timestamp, .. } => *timestamp,
+            Self::Absolute(timestamp) => *timestamp,
+            Self::Relative(span) => {
+                let now = current_time();
+                now.checked_sub(span.0.abs())
+                    .map_or(now.timestamp(), |cutoff| cutoff.timestamp())
+            }
         }
     }
 
-    /// Return the [`ExcludeNewerSpan`] used to construct the [`Timestamp`], if any.
+    /// Return the [`ExcludeNewerSpan`], if any.
     pub fn span(&self) -> Option<&ExcludeNewerSpan> {
         match self {
             Self::Absolute(_) => None,
-            Self::Relative { span, .. } => Some(span),
+            Self::Relative(span) => Some(span),
         }
     }
 
     /// Create a new [`ExcludeNewerValue`] from a timestamp and optional span.
+    ///
+    /// When a span is provided the timestamp is ignored — the span is the source of truth.
     pub fn new(timestamp: Timestamp, span: Option<ExcludeNewerSpan>) -> Self {
         match span {
-            Some(span) => Self::Relative { timestamp, span },
+            Some(span) => Self::Relative(span),
             None => Self::Absolute(timestamp),
-        }
-    }
-
-    /// Create a [`Relative`](Self::Relative) value from a span, computing the timestamp
-    /// relative to the current time.
-    pub fn from_span(span: ExcludeNewerSpan) -> Self {
-        let now = current_time();
-        let timestamp = now
-            .checked_sub(span.0.abs())
-            .map_or(now.timestamp(), |cutoff| cutoff.timestamp());
-        Self::Relative { timestamp, span }
-    }
-
-    /// If this value has a relative span, recompute the timestamp relative to now.
-    ///
-    /// Returns `self` unchanged if there is no span (i.e., the timestamp is absolute).
-    #[must_use]
-    pub fn recompute(self) -> Self {
-        match self {
-            Self::Absolute(_) => self,
-            Self::Relative { span, .. } => Self::from_span(span),
         }
     }
 }
@@ -285,10 +267,10 @@ impl FromStr for ExcludeNewerValue {
                     ));
                 }
 
-                let cutoff = now.checked_sub(span.abs()).map_err(|err| {
+                now.checked_sub(span.abs()).map_err(|err| {
                     format!("Duration `{input}` is too large to subtract from current time: {err}")
                 })?;
-                return Ok(Self::new(cutoff.into(), Some(ExcludeNewerSpan(span))));
+                return Ok(Self::Relative(ExcludeNewerSpan(span)));
             }
             Err(err) => err,
         };

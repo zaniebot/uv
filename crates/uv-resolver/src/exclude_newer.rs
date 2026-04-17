@@ -348,25 +348,6 @@ impl ExcludeNewerPackage {
         self.0.is_empty()
     }
 
-    /// Recompute all relative span timestamps relative to the current time.
-    #[must_use]
-    pub fn recompute(self) -> Self {
-        Self(
-            self.0
-                .into_iter()
-                .map(|(name, setting)| {
-                    let setting = match setting {
-                        ExcludeNewerOverride::Disabled => ExcludeNewerOverride::Disabled,
-                        ExcludeNewerOverride::Enabled(value) => {
-                            ExcludeNewerOverride::Enabled(Box::new((*value).recompute()))
-                        }
-                    };
-                    (name, setting)
-                })
-                .collect(),
-        )
-    }
-
     pub fn compare(&self, other: &Self) -> Option<ExcludeNewerPackageChange> {
         for (package, setting) in self {
             match (setting, other.get(package)) {
@@ -525,17 +506,6 @@ impl ExcludeNewer {
     /// Returns true if this has any configuration (global or per-package).
     pub fn is_empty(&self) -> bool {
         self.global.is_none() && self.package.is_empty()
-    }
-
-    /// Recompute all relative span timestamps relative to the current time.
-    ///
-    /// For values with an absolute timestamp (no span), the timestamp is unchanged.
-    #[must_use]
-    pub fn recompute(self) -> Self {
-        Self {
-            global: self.global.map(ExcludeNewerValue::recompute),
-            package: self.package.recompute(),
-        }
     }
 
     pub fn compare(&self, other: &Self) -> Option<ExcludeNewerChange> {
