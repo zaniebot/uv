@@ -91,6 +91,13 @@ pub struct Vulnerability {
     pub modified: Option<Timestamp>,
 }
 
+fn sanitize_terminal_text(text: &str) -> String {
+    text.trim()
+        .chars()
+        .filter(|character| !character.is_control())
+        .collect()
+}
+
 impl Vulnerability {
     pub fn new(
         dependency: Dependency,
@@ -103,11 +110,10 @@ impl Vulnerability {
         published: Option<Timestamp>,
         modified: Option<Timestamp>,
     ) -> Self {
-        // Vulnerability summaries often contain excess whitespace, as well as newlines.
-        // We normalize these out and strip control characters, since summaries are
-        // rendered directly to the terminal.
-        let summary =
-            summary.map(|summary| summary.trim().chars().filter(|c| !c.is_control()).collect());
+        // Vulnerability text comes from a remote service and may be rendered directly to the
+        // terminal. Normalize whitespace and strip control characters before storing it.
+        let summary = summary.map(|summary| sanitize_terminal_text(&summary));
+        let description = description.map(|description| sanitize_terminal_text(&description));
 
         Self {
             dependency,
@@ -174,6 +180,30 @@ mod tests {
         assert_eq!(
             vulnerability.summary.as_deref(),
             Some("hello]52;c;spoofworld")
+        );
+    }
+
+    #[test]
+    fn vulnerability_description_strips_control_characters() {
+        let dependency = Dependency::new(
+            PackageName::from_owned("example".to_string()).expect("valid package name"),
+            Version::new([1, 0, 0]),
+        );
+        let vulnerability = Vulnerability::new(
+            dependency,
+            VulnerabilityID::new("OSV-1"),
+            None,
+            Some("  line 1\nline 2\u{1b}[31m  ".to_string()),
+            None,
+            Vec::new(),
+            Vec::new(),
+            None,
+            None,
+        );
+
+        assert_eq!(
+            vulnerability.description.as_deref(),
+            Some("line 1line 2[31m")
         );
     }
 }
