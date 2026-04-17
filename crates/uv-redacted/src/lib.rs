@@ -217,7 +217,7 @@ impl DisplaySafeUrl {
         Cow::Owned(url)
     }
 
-    /// Returns [`Display`] implementation that doesn't mask credentials.
+    /// Returns a [`Display`] implementation that doesn't mask credentials.
     #[inline]
     pub fn displayable_with_credentials(&self) -> impl Display {
         &self.0
@@ -269,7 +269,7 @@ impl Debug for DisplaySafeUrl {
             .field("host", &url.host())
             .field("port", &url.port())
             .field("path", &url.path())
-            .field("query", &url.query())
+            .field("query", &url.query().map(redact_signature_query))
             .field("fragment", &url.fragment())
             .finish()
     }
@@ -301,27 +301,50 @@ fn is_ssh_git_username(url: &Url) -> bool {
         && url.password().is_none()
 }
 
+fn redact_signature_query(query: &str) -> Cow<'_, str> {
+    const AWS_SIGNATURE_QUERY_PARAM: &str = "X-Amz-Signature";
+
+    let mut redacted_query = String::new();
+    let mut redacted = false;
+    for (index, part) in query.split('&').enumerate() {
+        if index > 0 {
+            redacted_query.push('&');
+        }
+
+        let name = part.split_once('=').map_or(part, |(name, _)| name);
+        if name == AWS_SIGNATURE_QUERY_PARAM {
+            redacted_query.push_str(AWS_SIGNATURE_QUERY_PARAM);
+            redacted_query.push_str("=****");
+            redacted = true;
+        } else {
+            redacted_query.push_str(part);
+        }
+    }
+
+    if redacted {
+        Cow::Owned(redacted_query)
+    } else {
+        Cow::Borrowed(query)
+    }
+}
+
 fn display_with_redacted_credentials(
     url: &Url,
     f: &mut std::fmt::Formatter<'_>,
 ) -> std::fmt::Result {
-    if url.password().is_none() && url.username() == "" {
-        return write!(f, "{url}");
-    }
-
-    // For URLs that use the `git` convention (i.e., `ssh://git@github.com/...`), avoid dropping the
-    // username.
-    if is_ssh_git_username(url) {
-        return write!(f, "{url}");
-    }
-
     write!(f, "{}://", url.scheme())?;
+
+    // For URLs that use the `git` convention (i.e., `ssh://git@github.com/...`), avoid masking the
+    // username.
+    let redact_credentials = !is_ssh_git_username(url);
 
     if url.username() != "" && url.password().is_some() {
         write!(f, "{}", url.username())?;
         write!(f, ":****@")?;
-    } else if url.username() != "" {
+    } else if url.username() != "" && redact_credentials {
         write!(f, "****@")?;
+    } else if url.username() != "" {
+        write!(f, "{}@", url.username())?;
     } else if url.password().is_some() {
         write!(f, ":****@")?;
     }
@@ -334,7 +357,7 @@ fn display_with_redacted_credentials(
 
     write!(f, "{}", url.path())?;
     if let Some(query) = url.query() {
-        write!(f, "?{query}")?;
+        write!(f, "?{}", redact_signature_query(query))?;
     }
     if let Some(fragment) = url.fragment() {
         write!(f, "#{fragment}")?;
@@ -453,12 +476,38 @@ mod tests {
 
     #[test]
     fn displayable_with_credentials() {
-        let url_str = "https://user:pass@pypi-proxy.fly.dev/basic-auth/simple";
+        let url_str =
+            "https://user:pass@pypi-proxy.fly.dev/basic-auth/simple?X-Amz-Signature=secret";
         let log_safe_url = DisplaySafeUrl::parse(url_str).unwrap();
         assert_eq!(
             log_safe_url.displayable_with_credentials().to_string(),
             url_str
         );
+    }
+
+    #[test]
+    fn display_redacts_signature_query_parameter() {
+        let log_safe_url = DisplaySafeUrl::parse(
+            "https://user:pass@example.com/upload?X-Amz-Credential=token&X-Amz-Signature=secret&other=value#fragment",
+        )
+        .unwrap();
+
+        assert_eq!(
+            log_safe_url.to_string(),
+            "https://user:****@example.com/upload?X-Amz-Credential=token&X-Amz-Signature=****&other=value#fragment"
+        );
+    }
+
+    #[test]
+    fn debug_redacts_signature_query_parameter() {
+        let log_safe_url = DisplaySafeUrl::parse(
+            "https://example.com/upload?X-Amz-Credential=token&X-Amz-Signature=secret",
+        )
+        .unwrap();
+        let debug = format!("{log_safe_url:?}");
+
+        assert!(debug.contains("X-Amz-Signature=****"));
+        assert!(!debug.contains("secret"));
     }
 
     #[test]
