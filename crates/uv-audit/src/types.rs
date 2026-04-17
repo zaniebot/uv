@@ -42,7 +42,7 @@ pub struct VulnerabilityID(SmallString);
 impl VulnerabilityID {
     /// Create a new vulnerability ID from a string.
     pub fn new(id: impl Into<SmallString>) -> Self {
-        Self(id.into())
+        Self(sanitize_terminal_text(id.into().as_ref()).into())
     }
 
     /// Get the string representation of this vulnerability ID.
@@ -158,6 +158,13 @@ mod tests {
     use uv_pep440::Version;
 
     use crate::types::{Dependency, Vulnerability, VulnerabilityID};
+
+    #[test]
+    fn vulnerability_id_strips_control_characters() {
+        let vulnerability_id = VulnerabilityID::new("  GHSA-1\u{1b}[31m  ");
+
+        assert_eq!(vulnerability_id.as_str(), "GHSA-1[31m");
+    }
 
     #[test]
     fn vulnerability_summary_strips_control_characters() {
