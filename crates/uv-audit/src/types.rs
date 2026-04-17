@@ -104,8 +104,15 @@ impl Vulnerability {
         modified: Option<Timestamp>,
     ) -> Self {
         // Vulnerability summaries often contain excess whitespace, as well as newlines.
-        // We normalize these out.
-        let summary = summary.map(|summary| summary.trim().replace('\n', ""));
+        // We normalize these out and strip control characters, since summaries are
+        // rendered directly to the terminal.
+        let summary = summary.map(|summary| {
+            summary
+                .trim()
+                .chars()
+                .filter(|c| !c.is_control())
+                .collect()
+        });
 
         Self {
             dependency,
@@ -141,6 +148,38 @@ impl Vulnerability {
                     || id.as_str().starts_with("CVE-")
             })
             .unwrap_or(&self.id)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use uv_normalize::PackageName;
+    use uv_pep440::Version;
+
+    use crate::types::{Dependency, Vulnerability, VulnerabilityID};
+
+    #[test]
+    fn vulnerability_summary_strips_control_characters() {
+        let dependency = Dependency::new(
+            PackageName::from_owned("example".to_string()).expect("valid package name"),
+            Version::new([1, 0, 0]),
+        );
+        let vulnerability = Vulnerability::new(
+            dependency,
+            VulnerabilityID::new("OSV-1"),
+            Some("  hello\u{1b}]52;c;spoof\u{7}world\n\t  ".to_string()),
+            None,
+            None,
+            Vec::new(),
+            Vec::new(),
+            None,
+            None,
+        );
+
+        assert_eq!(
+            vulnerability.summary.as_deref(),
+            Some("hello]52;c;spoofworld")
+        );
     }
 }
 
