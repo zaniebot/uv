@@ -106,13 +106,8 @@ impl Vulnerability {
         // Vulnerability summaries often contain excess whitespace, as well as newlines.
         // We normalize these out and strip control characters, since summaries are
         // rendered directly to the terminal.
-        let summary = summary.map(|summary| {
-            summary
-                .trim()
-                .chars()
-                .filter(|c| !c.is_control())
-                .collect()
-        });
+        let summary =
+            summary.map(|summary| summary.trim().chars().filter(|c| !c.is_control()).collect());
 
         Self {
             dependency,
