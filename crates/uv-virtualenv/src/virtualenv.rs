@@ -12,7 +12,7 @@ use owo_colors::OwoColorize;
 use tracing::{debug, trace};
 
 use crate::{Error, Prompt};
-use uv_fs::{CWD, Simplified, cachedir};
+use uv_fs::{CWD, Simplified, cachedir, remove_symlink};
 use uv_platform_tags::Os;
 use uv_pypi_types::Scheme;
 use uv_python::managed::{
@@ -612,6 +612,14 @@ fn confirm_clear(location: &Path, name: &'static str) -> Result<Option<bool>, io
 
 /// Perform a safe removal of a virtual environment.
 pub fn remove_virtualenv(location: &Path) -> Result<(), Error> {
+    // Never traverse a symlinked top-level environment path; only remove the link itself.
+    // This prevents deleting arbitrary directories when callers pass a path that may be
+    // attacker-controlled.
+    if fs_err::symlink_metadata(location)?.file_type().is_symlink() {
+        remove_symlink(location)?;
+        return Ok(());
+    }
+
     // On Windows, if the current executable is in the directory, defer self-deletion since Windows
     // won't let you unlink a running executable.
     #[cfg(windows)]
