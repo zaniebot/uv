@@ -48,7 +48,7 @@ fn lock_exclude_newer_relative() -> Result<()> {
     requires-python = ">=3.12"
 
     [options]
-    exclude-newer = "2024-04-10T00:00:00Z"
+    exclude-newer = "0001-01-01T00:00:00Z" # This has no effect and is included for backwards compatibility when using relative exclude-newer values.
     exclude-newer-span = "P3W"
 
     [[package]]
@@ -89,6 +89,8 @@ fn lock_exclude_newer_relative() -> Result<()> {
     Resolved 2 packages in [TIME]
     ");
 
+    assert_eq!(context.read("uv.lock"), lock);
+
     // Changing the span to 2 weeks should cause a new resolution.
     // 2 weeks before 2024-05-01 is 2024-04-17, which is after idna 3.7 (released 2024-04-11).
     uv_snapshot!(context.filters(), context
@@ -116,7 +118,7 @@ fn lock_exclude_newer_relative() -> Result<()> {
     requires-python = ">=3.12"
 
     [options]
-    exclude-newer = "2024-04-17T00:00:00Z"
+    exclude-newer = "0001-01-01T00:00:00Z" # This has no effect and is included for backwards compatibility when using relative exclude-newer values.
     exclude-newer-span = "P2W"
 
     [[package]]
@@ -165,7 +167,7 @@ fn lock_exclude_newer_relative() -> Result<()> {
     requires-python = ">=3.12"
 
     [options]
-    exclude-newer = "2024-05-18T00:00:00Z"
+    exclude-newer = "0001-01-01T00:00:00Z" # This has no effect and is included for backwards compatibility when using relative exclude-newer values.
     exclude-newer-span = "P2W"
 
     [[package]]
@@ -560,7 +562,7 @@ fn lock_exclude_newer_relative_pyproject() -> Result<()> {
     requires-python = ">=3.12"
 
     [options]
-    exclude-newer = "2024-04-10T00:00:00Z"
+    exclude-newer = "0001-01-01T00:00:00Z" # This has no effect and is included for backwards compatibility when using relative exclude-newer values.
     exclude-newer-span = "P3W"
 
     [[package]]
@@ -714,7 +716,7 @@ fn lock_exclude_newer_relative_global_and_package() -> Result<()> {
     requires-python = ">=3.12"
 
     [options]
-    exclude-newer = "2024-04-10T00:00:00Z"
+    exclude-newer = "0001-01-01T00:00:00Z" # This has no effect and is included for backwards compatibility when using relative exclude-newer values.
     exclude-newer-span = "P3W"
 
     [options.exclude-newer-package]
@@ -907,7 +909,7 @@ fn lock_exclude_newer_relative_global_and_package() -> Result<()> {
     requires-python = ">=3.12"
 
     [options]
-    exclude-newer = "2024-04-10T00:00:00Z"
+    exclude-newer = "0001-01-01T00:00:00Z" # This has no effect and is included for backwards compatibility when using relative exclude-newer values.
     exclude-newer-span = "P3W"
 
     [options.exclude-newer-package]
@@ -1235,7 +1237,7 @@ fn lock_exclude_newer_relative_no_timestamp_in_lockfile() -> Result<()> {
     requires-python = ">=3.12"
 
     [options]
-    exclude-newer = "2024-04-10T00:00:00Z"
+    exclude-newer = "0001-01-01T00:00:00Z" # This has no effect and is included for backwards compatibility when using relative exclude-newer values.
     exclude-newer-span = "P3W"
 
     [[package]]
@@ -1260,7 +1262,7 @@ fn lock_exclude_newer_relative_no_timestamp_in_lockfile() -> Result<()> {
     "#);
 
     // Manually remove the exclude-newer timestamp from the lockfile, leaving the span.
-    let lock = lock.replace("exclude-newer = \"2024-04-10T00:00:00Z\"\n", "");
+    let lock = lock.replace("exclude-newer = \"0001-01-01T00:00:00Z\" # This has no effect and is included for backwards compatibility when using relative exclude-newer values.\n", "");
     context.temp_dir.child("uv.lock").write_str(&lock)?;
 
     // The lockfile now has no exclude-newer timestamp, but the span is still present.
@@ -1277,6 +1279,37 @@ fn lock_exclude_newer_relative_no_timestamp_in_lockfile() -> Result<()> {
     ----- stderr -----
     Resolved 2 packages in [TIME]
     ");
+
+    // The lockfile retains the span but the timestamp is not restored or updated.
+    let lock = context.read("uv.lock");
+    assert_snapshot!(lock, @r#"
+    version = 1
+    revision = 3
+    requires-python = ">=3.12"
+
+    [options]
+    exclude-newer-span = "P3W"
+
+    [[package]]
+    name = "idna"
+    version = "3.6"
+    source = { registry = "https://pypi.org/simple" }
+    sdist = { url = "https://files.pythonhosted.org/packages/bf/3f/ea4b9117521a1e9c50344b909be7886dd00a519552724809bb1f486986c2/idna-3.6.tar.gz", hash = "sha256:9ecdbbd083b06798ae1e86adcbfe8ab1479cf864e4ee30fe4e46a003d12491ca", size = 175426, upload-time = "2023-11-25T15:40:54.902Z" }
+    wheels = [
+        { url = "https://files.pythonhosted.org/packages/c2/e7/a82b05cf63a603df6e68d59ae6a68bf5064484a0718ea5033660af4b54a9/idna-3.6-py3-none-any.whl", hash = "sha256:c05567e9c24a6b9faaa835c4821bad0590fbb9d5779e7caa6e1cc4978e7eb24f", size = 61567, upload-time = "2023-11-25T15:40:52.604Z" },
+    ]
+
+    [[package]]
+    name = "project"
+    version = "0.1.0"
+    source = { virtual = "." }
+    dependencies = [
+        { name = "idna" },
+    ]
+
+    [package.metadata]
+    requires-dist = [{ name = "idna" }]
+    "#);
 
     Ok(())
 }

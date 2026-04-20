@@ -70,9 +70,9 @@ pub enum ExcludeNewerValue {
 }
 
 impl ExcludeNewerValue {
-    /// A placeholder absolute timestamp (Unix epoch) used when serializing a [`Relative`](Self::Relative)
+    /// A placeholder timestamp used when serializing a [`Relative`](Self::Relative)
     /// value to a wire format that requires a timestamp field.
-    pub const PLACEHOLDER: Self = Self::Absolute(Timestamp::UNIX_EPOCH);
+    pub const PLACEHOLDER: &'static str = "0001-01-01T00:00:00Z";
 
     /// Return the effective [`Timestamp`].
     ///
