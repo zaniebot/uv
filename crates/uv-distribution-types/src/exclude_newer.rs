@@ -97,12 +97,12 @@ impl ExcludeNewerValue {
     }
 
     /// Create a new [`ExcludeNewerValue`] from an absolute timestamp.
-    pub fn from_timestamp(timestamp: Timestamp) -> Self {
+    pub fn absolute(timestamp: Timestamp) -> Self {
         Self::Absolute(timestamp)
     }
 
     /// Create a new [`ExcludeNewerValue`] from a relative span.
-    pub fn from_span(span: ExcludeNewerSpan) -> Self {
+    pub fn relative(span: ExcludeNewerSpan) -> Self {
         Self::Relative(span)
     }
 }
@@ -149,8 +149,8 @@ impl<'de> serde::Deserialize<'de> for ExcludeNewerValue {
         match Helper::deserialize(deserializer)? {
             Helper::String(s) => Self::from_str(&s).map_err(serde::de::Error::custom),
             Helper::Table(table) => Ok(match table.span {
-                Some(span) => Self::from_span(span),
-                None => Self::from_timestamp(table.timestamp),
+                Some(span) => Self::relative(span),
+                None => Self::absolute(table.timestamp),
             }),
         }
     }
@@ -158,7 +158,13 @@ impl<'de> serde::Deserialize<'de> for ExcludeNewerValue {
 
 impl From<Timestamp> for ExcludeNewerValue {
     fn from(timestamp: Timestamp) -> Self {
-        Self::from_timestamp(timestamp)
+        Self::Absolute(timestamp)
+    }
+}
+
+impl From<ExcludeNewerSpan> for ExcludeNewerValue {
+    fn from(span: ExcludeNewerSpan) -> Self {
+        Self::Relative(span)
     }
 }
 
@@ -209,7 +215,7 @@ impl FromStr for ExcludeNewerValue {
 
     fn from_str(input: &str) -> Result<Self, Self::Err> {
         if let Ok(timestamp) = input.parse::<Timestamp>() {
-            return Ok(Self::from_timestamp(timestamp));
+            return Ok(Self::absolute(timestamp));
         }
 
         let date_err = match input.parse::<jiff::civil::Date>() {
@@ -223,7 +229,7 @@ impl FromStr for ExcludeNewerValue {
                             "`{input}` parsed to date `{date}`, but could not be converted to a timestamp: {err}",
                         )
                     })?;
-                return Ok(Self::from_timestamp(timestamp));
+                return Ok(Self::absolute(timestamp));
             }
             Err(err) => err,
         };
@@ -265,7 +271,7 @@ impl FromStr for ExcludeNewerValue {
                 now.checked_sub(span.abs()).map_err(|err| {
                     format!("Duration `{input}` is too large to subtract from current time: {err}")
                 })?;
-                return Ok(Self::from_span(ExcludeNewerSpan(span)));
+                return Ok(Self::relative(ExcludeNewerSpan(span)));
             }
             Err(err) => err,
         };

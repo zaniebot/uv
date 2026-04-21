@@ -2358,11 +2358,11 @@ struct ExcludeNewerWire {
 impl From<ExcludeNewerWire> for ExcludeNewer {
     fn from(wire: ExcludeNewerWire) -> Self {
         let global = match (wire.exclude_newer, wire.exclude_newer_span) {
-            (Some(_), Some(span)) => Some(ExcludeNewerValue::from_span(span)),
-            (Some(timestamp), None) => Some(ExcludeNewerValue::from_timestamp(timestamp)),
+            (Some(_), Some(span)) => Some(ExcludeNewerValue::relative(span)),
+            (Some(timestamp), None) => Some(ExcludeNewerValue::absolute(timestamp)),
             // Preserve span-only lockfile entries. Relative values compute their timestamp on
             // demand, so a missing serialized timestamp should not invalidate the lockfile.
-            (None, Some(span)) => Some(ExcludeNewerValue::from_span(span)),
+            (None, Some(span)) => Some(ExcludeNewerValue::relative(span)),
             (None, None) => None,
         };
         Self {

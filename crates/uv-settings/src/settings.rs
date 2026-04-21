@@ -2238,7 +2238,7 @@ impl From<ToolOptionsWire> for ToolOptions {
             if let Some(span) = value.exclude_newer_span
                 && exclude_newer.span().is_none()
             {
-                ExcludeNewerValue::from_span(span)
+                ExcludeNewerValue::relative(span)
             } else {
                 exclude_newer
             }
@@ -2281,7 +2281,7 @@ impl From<ToolOptions> for ToolOptionsWire {
         let (exclude_newer, exclude_newer_span) = match &value.exclude_newer {
             Some(value @ ExcludeNewerValue::Absolute(_)) => (Some(value.clone()), None),
             Some(value @ ExcludeNewerValue::Relative(span)) => (
-                Some(ExcludeNewerValue::Absolute(value.timestamp())),
+                Some(ExcludeNewerValue::absolute(value.timestamp())),
                 Some(*span),
             ),
             None => (None, None),
