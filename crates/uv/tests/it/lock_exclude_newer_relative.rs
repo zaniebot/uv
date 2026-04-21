@@ -373,7 +373,7 @@ fn lock_exclude_newer_package_relative() -> Result<()> {
     [options]
 
     [options.exclude-newer-package]
-    idna = { timestamp = "2024-04-10T00:00:00Z", span = "P3W" }
+    idna = { timestamp = "0001-01-01T00:00:00Z", span = "P3W" }
 
     [[package]]
     name = "idna"
@@ -442,7 +442,7 @@ fn lock_exclude_newer_package_relative() -> Result<()> {
     [options]
 
     [options.exclude-newer-package]
-    idna = { timestamp = "2024-04-17T00:00:00Z", span = "P2W" }
+    idna = { timestamp = "0001-01-01T00:00:00Z", span = "P2W" }
 
     [[package]]
     name = "idna"
@@ -492,7 +492,7 @@ fn lock_exclude_newer_package_relative() -> Result<()> {
     [options]
 
     [options.exclude-newer-package]
-    idna = { timestamp = "2024-04-17T00:00:00Z", span = "P2W" }
+    idna = { timestamp = "0001-01-01T00:00:00Z", span = "P2W" }
 
     [[package]]
     name = "idna"
@@ -501,6 +501,127 @@ fn lock_exclude_newer_package_relative() -> Result<()> {
     sdist = { url = "https://files.pythonhosted.org/packages/21/ed/f86a79a07470cb07819390452f178b3bef1d375f2ec021ecfc709fc7cf07/idna-3.7.tar.gz", hash = "sha256:028ff3aadf0609c1fd278d8ea3089299412a7a8b9bd005dd08b9f8285bcb5cfc", size = 189575, upload-time = "2024-04-11T03:34:43.276Z" }
     wheels = [
         { url = "https://files.pythonhosted.org/packages/e5/3e/741d8c82801c347547f8a2a06aa57dbb1992be9e948df2ea0eda2c8b79e8/idna-3.7-py3-none-any.whl", hash = "sha256:82fee1fc78add43492d3a1898bfa6d8a904cc97d8427f683ed8e798d07761aa0", size = 66836, upload-time = "2024-04-11T03:34:41.447Z" },
+    ]
+
+    [[package]]
+    name = "project"
+    version = "0.1.0"
+    source = { virtual = "." }
+    dependencies = [
+        { name = "idna" },
+    ]
+
+    [package.metadata]
+    requires-dist = [{ name = "idna" }]
+    "#);
+
+    Ok(())
+}
+
+/// A lockfile with a relative exclude-newer-package value remains valid when the
+/// placeholder timestamp is omitted.
+#[test]
+fn lock_exclude_newer_package_relative_missing_timestamp() -> Result<()> {
+    let context = uv_test::test_context!("3.12");
+    let pyproject_toml = context.temp_dir.child("pyproject.toml");
+    pyproject_toml.write_str(
+        r#"
+        [project]
+        name = "project"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        dependencies = ["idna"]
+        "#,
+    )?;
+
+    let current_timestamp = "2024-05-01T00:00:00Z";
+    uv_snapshot!(context.filters(), context
+        .lock()
+        .env_remove(EnvVars::UV_EXCLUDE_NEWER)
+        .env(EnvVars::UV_TEST_CURRENT_TIMESTAMP, current_timestamp)
+        .arg("--exclude-newer-package")
+        .arg("idna=3 weeks"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Resolved 2 packages in [TIME]
+    ");
+
+    let lock = context.read("uv.lock");
+    assert_snapshot!(lock, @r#"
+    version = 1
+    revision = 3
+    requires-python = ">=3.12"
+
+    [options]
+
+    [options.exclude-newer-package]
+    idna = { timestamp = "0001-01-01T00:00:00Z", span = "P3W" }
+
+    [[package]]
+    name = "idna"
+    version = "3.6"
+    source = { registry = "https://pypi.org/simple" }
+    sdist = { url = "https://files.pythonhosted.org/packages/bf/3f/ea4b9117521a1e9c50344b909be7886dd00a519552724809bb1f486986c2/idna-3.6.tar.gz", hash = "sha256:9ecdbbd083b06798ae1e86adcbfe8ab1479cf864e4ee30fe4e46a003d12491ca", size = 175426, upload-time = "2023-11-25T15:40:54.902Z" }
+    wheels = [
+        { url = "https://files.pythonhosted.org/packages/c2/e7/a82b05cf63a603df6e68d59ae6a68bf5064484a0718ea5033660af4b54a9/idna-3.6-py3-none-any.whl", hash = "sha256:c05567e9c24a6b9faaa835c4821bad0590fbb9d5779e7caa6e1cc4978e7eb24f", size = 61567, upload-time = "2023-11-25T15:40:52.604Z" },
+    ]
+
+    [[package]]
+    name = "project"
+    version = "0.1.0"
+    source = { virtual = "." }
+    dependencies = [
+        { name = "idna" },
+    ]
+
+    [package.metadata]
+    requires-dist = [{ name = "idna" }]
+    "#);
+
+    // Manually remove the placeholder timestamp from the lockfile, leaving the span.
+    let lock = lock.replace(
+        "idna = { timestamp = \"0001-01-01T00:00:00Z\", span = \"P3W\" }",
+        "idna = { span = \"P3W\" }",
+    );
+    context.temp_dir.child("uv.lock").write_str(&lock)?;
+
+    // Since the span still matches the configured relative value, the missing timestamp alone
+    // should not invalidate the lockfile.
+    uv_snapshot!(context.filters(), context
+        .lock()
+        .env_remove(EnvVars::UV_EXCLUDE_NEWER)
+        .env(EnvVars::UV_TEST_CURRENT_TIMESTAMP, current_timestamp)
+        .arg("--exclude-newer-package")
+        .arg("idna=3 weeks"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Resolved 2 packages in [TIME]
+    ");
+
+    let lock = context.read("uv.lock");
+    assert_snapshot!(lock, @r#"
+    version = 1
+    revision = 3
+    requires-python = ">=3.12"
+
+    [options]
+
+    [options.exclude-newer-package]
+    idna = { span = "P3W" }
+
+    [[package]]
+    name = "idna"
+    version = "3.6"
+    source = { registry = "https://pypi.org/simple" }
+    sdist = { url = "https://files.pythonhosted.org/packages/bf/3f/ea4b9117521a1e9c50344b909be7886dd00a519552724809bb1f486986c2/idna-3.6.tar.gz", hash = "sha256:9ecdbbd083b06798ae1e86adcbfe8ab1479cf864e4ee30fe4e46a003d12491ca", size = 175426, upload-time = "2023-11-25T15:40:54.902Z" }
+    wheels = [
+        { url = "https://files.pythonhosted.org/packages/c2/e7/a82b05cf63a603df6e68d59ae6a68bf5064484a0718ea5033660af4b54a9/idna-3.6-py3-none-any.whl", hash = "sha256:c05567e9c24a6b9faaa835c4821bad0590fbb9d5779e7caa6e1cc4978e7eb24f", size = 61567, upload-time = "2023-11-25T15:40:52.604Z" },
     ]
 
     [[package]]
@@ -635,7 +756,7 @@ fn lock_exclude_newer_package_relative_pyproject() -> Result<()> {
     [options]
 
     [options.exclude-newer-package]
-    idna = { timestamp = "2024-04-10T00:00:00Z", span = "P3W" }
+    idna = { timestamp = "0001-01-01T00:00:00Z", span = "P3W" }
 
     [[package]]
     name = "idna"
@@ -720,7 +841,7 @@ fn lock_exclude_newer_relative_global_and_package() -> Result<()> {
     exclude-newer-span = "P3W"
 
     [options.exclude-newer-package]
-    typing-extensions = { timestamp = "2024-04-17T00:00:00Z", span = "P2W" }
+    typing-extensions = { timestamp = "0001-01-01T00:00:00Z", span = "P2W" }
 
     [[package]]
     name = "idna"
@@ -844,7 +965,7 @@ fn lock_exclude_newer_relative_global_and_package() -> Result<()> {
     exclude-newer = "2024-05-20T00:00:00Z"
 
     [options.exclude-newer-package]
-    typing-extensions = { timestamp = "2024-04-17T00:00:00Z", span = "P2W" }
+    typing-extensions = { timestamp = "0001-01-01T00:00:00Z", span = "P2W" }
 
     [[package]]
     name = "idna"
