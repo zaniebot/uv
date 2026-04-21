@@ -400,10 +400,11 @@ struct VersionMapLazy {
     /// The set of compatibility tags that determines whether a wheel is usable
     /// in the current environment.
     tags: Option<Tags>,
-    /// Files newer than this timestamp are considered excluded, i.e., that they cannot be selected by the
-    /// resolver.
+    /// Files newer than this timestamp are considered excluded, i.e., that
+    /// they cannot be selected by the resolver.
     included_version_cutoff: Option<Timestamp>,
-    /// Files newer than this timestamp are considered unavailable, i.e., that they do not exist.
+    /// Files newer than this timestamp are considered unavailable, i.e., that
+    /// they do not exist.
     available_version_cutoff: Option<Timestamp>,
     /// Which yanked versions are allowed
     allowed_yanks: AllowedYanks,
@@ -563,7 +564,7 @@ impl VersionMapLazy {
             return SourceDistCompatibility::Incompatible(IncompatibleSource::NoBuild);
         }
 
-        // Check if after upload time cutoff
+        // Check if the distribution is considered excluded by `exclude-newer`.
         if excluded {
             return SourceDistCompatibility::Incompatible(IncompatibleSource::ExcludeNewer(
                 upload_time,
@@ -612,7 +613,7 @@ impl VersionMapLazy {
             return WheelCompatibility::Incompatible(IncompatibleWheel::NoBinary);
         }
 
-        // Check if after upload time cutoff
+        // Check if the distribution is considered excluded by `exclude-newer`.
         if excluded {
             return WheelCompatibility::Incompatible(IncompatibleWheel::ExcludeNewer(upload_time));
         }

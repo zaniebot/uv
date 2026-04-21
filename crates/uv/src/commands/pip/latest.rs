@@ -82,7 +82,9 @@ impl LatestClient<'_> {
                 let mut best = None;
 
                 for (filename, file) in files.all() {
-                    // Skip distributions uploaded after the cutoff.
+                    // Treat distributions uploaded at or after the cutoff as unavailable for
+                    // latest-version lookup. Distributions with missing upload times are not
+                    // excluded.
                     if let Some(exclude_newer) = &exclude_newer {
                         match file.upload_time_utc_ms.as_ref() {
                             Some(&upload_time) if upload_time >= exclude_newer.as_millisecond() => {
