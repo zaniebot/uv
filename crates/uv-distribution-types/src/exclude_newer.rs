@@ -60,7 +60,6 @@ impl<'de> serde::Deserialize<'de> for ExcludeNewerSpan {
     }
 }
 
-/// An exclude-newer cutoff value: either an absolute timestamp or a relative span.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum ExcludeNewerValue {
     /// An absolute timestamp.
