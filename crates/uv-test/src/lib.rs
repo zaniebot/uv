@@ -193,6 +193,30 @@ impl TestContext {
         self
     }
 
+    /// Set the simulated "now" for all commands in this context.
+    ///
+    /// Sets both [`EnvVars::UV_TEST_CURRENT_TIMESTAMP`], which drives relative
+    /// exclude-newer calculations, and [`EnvVars::UV_TEST_AVAILABLE_VERSION_CUTOFF`],
+    /// which bounds the version universe the resolver sees. Tests that simulate
+    /// a different "now" need both in sync so snapshots don't change when new
+    /// package versions are published after the simulated time.
+    ///
+    /// Tests that need to change the simulated time partway through can call
+    /// this again via shadowing (`let context = context.with_current_timestamp(...)`);
+    /// later entries in [`Self::extra_env`] override earlier ones.
+    #[must_use]
+    pub fn with_current_timestamp(mut self, timestamp: &str) -> Self {
+        self.extra_env.push((
+            EnvVars::UV_TEST_CURRENT_TIMESTAMP.into(),
+            timestamp.into(),
+        ));
+        self.extra_env.push((
+            EnvVars::UV_TEST_AVAILABLE_VERSION_CUTOFF.into(),
+            timestamp.into(),
+        ));
+        self
+    }
+
     /// Set the "http timeout" for all commands in this context.
     #[must_use]
     pub fn with_http_timeout(mut self, http_timeout: &str) -> Self {

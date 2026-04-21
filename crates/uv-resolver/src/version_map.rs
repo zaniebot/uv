@@ -19,6 +19,7 @@ use uv_normalize::PackageName;
 use uv_pep440::Version;
 use uv_platform_tags::{IncompatibleTag, TagCompatibility, Tags};
 use uv_pypi_types::{HashDigest, ResolutionMetadata, Yanked};
+use uv_static::EnvVars;
 use uv_types::HashStrategy;
 use uv_warnings::warn_user_once;
 
@@ -113,6 +114,9 @@ impl VersionMap {
                 },
             }
         }
+        let available_version_cutoff = std::env::var(EnvVars::UV_TEST_AVAILABLE_VERSION_CUTOFF)
+            .ok()
+            .and_then(|value| value.parse().ok());
         Self {
             inner: VersionMapInner::Lazy(VersionMapLazy {
                 map,
@@ -128,6 +132,7 @@ impl VersionMap {
                 hasher: hasher.clone(),
                 requires_python: requires_python.clone(),
                 exclude_newer,
+                available_version_cutoff,
             }),
         }
     }
@@ -399,6 +404,19 @@ struct VersionMapLazy {
     tags: Option<Tags>,
     /// Whether files newer than this timestamp should be excluded or not.
     exclude_newer: Option<ExcludeNewerValue>,
+    /// A test-only upper bound on the files we consider available, sourced from
+    /// [`EnvVars::UV_TEST_AVAILABLE_VERSION_CUTOFF`].
+    ///
+    /// Unlike [`Self::exclude_newer`], a file is only excluded when we can
+    /// confirm its upload time exceeds the cutoff — files with missing upload
+    /// dates are kept as-is and no warning is emitted. This is important when
+    /// a per-package or per-index override disables `exclude-newer`, which is
+    /// the common reason a test would want to see packages beyond the normal
+    /// `UV_EXCLUDE_NEWER` horizon; we still want those resolutions bounded by
+    /// the test timestamp so snapshots stay stable as new versions are
+    /// published, without disturbing other tests (e.g. those using local
+    /// indexes with no upload dates).
+    available_version_cutoff: Option<ExcludeNewerValue>,
     /// Which yanked versions are allowed
     allowed_yanks: AllowedYanks,
     /// The hashes of allowed distributions.
@@ -453,7 +471,9 @@ impl VersionMapLazy {
             for (filename, file) in files.all() {
                 // Support resolving as if it were an earlier timestamp, at least as long files have
                 // upload time information.
-                let (excluded, upload_time) = if let Some(exclude_newer) = &self.exclude_newer {
+                let (mut excluded, mut upload_time) = if let Some(exclude_newer) =
+                    &self.exclude_newer
+                {
                     match file.upload_time_utc_ms.as_ref() {
                         Some(&upload_time) if upload_time >= exclude_newer.timestamp_millis() => {
                             trace!(
@@ -474,6 +494,26 @@ impl VersionMapLazy {
                 } else {
                     (false, None)
                 };
+
+                // Apply the test-only `UV_TEST_AVAILABLE_VERSION_CUTOFF`, if set, so that
+                // per-package or per-index `exclude-newer` overrides (including disabling
+                // the cutoff) still produce deterministic resolutions in tests. Files with
+                // missing upload times are kept so that tests using local indexes (which
+                // typically lack upload dates) aren't accidentally filtered.
+                if !excluded {
+                    if let Some(available_cutoff) = &self.available_version_cutoff {
+                        if let Some(&ut) = file.upload_time_utc_ms.as_ref() {
+                            if ut >= available_cutoff.timestamp_millis() {
+                                trace!(
+                                    "Excluding `{}` (uploaded {ut}) due to UV_TEST_AVAILABLE_VERSION_CUTOFF ({available_cutoff})",
+                                    file.filename
+                                );
+                                excluded = true;
+                                upload_time = Some(ut);
+                            }
+                        }
+                    }
+                }
 
                 // Prioritize amongst all available files.
                 let yanked = file.yanked.as_deref();

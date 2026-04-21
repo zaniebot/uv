@@ -296,10 +296,9 @@ fn outdated_exclude_newer_relative() -> Result<()> {
     // Lock at 2024-05-01 with `--exclude-newer "3 weeks"`.
     // Cutoff: 2024-04-10 → resolves idna 3.6 (released 2023-11-25, before cutoff).
     // idna 3.7 (released 2024-04-11) is excluded.
-    uv_snapshot!(context.filters(), context
-        .lock()
+    let context = context.with_current_timestamp("2024-05-01T00:00:00Z");
+    uv_snapshot!(context.filters(), context.lock()
         .env_remove(EnvVars::UV_EXCLUDE_NEWER)
-        .env(EnvVars::UV_TEST_CURRENT_TIMESTAMP, "2024-05-01T00:00:00Z")
         .arg("--exclude-newer")
         .arg("3 weeks"), @"
     success: true
@@ -313,12 +312,11 @@ fn outdated_exclude_newer_relative() -> Result<()> {
     // Run `--outdated` at a later time (2024-06-01) with the same span.
     // The recomputed cutoff is 2024-05-11, which is after idna 3.7 (2024-04-11),
     // so idna 3.7 should be reported as the latest version.
-    uv_snapshot!(context.filters(), context
-        .tree()
+    let context = context.with_current_timestamp("2024-06-01T00:00:00Z");
+    uv_snapshot!(context.filters(), context.tree()
         .arg("--outdated")
         .arg("--universal")
         .env_remove(EnvVars::UV_EXCLUDE_NEWER)
-        .env(EnvVars::UV_TEST_CURRENT_TIMESTAMP, "2024-06-01T00:00:00Z")
         .arg("--exclude-newer")
         .arg("3 weeks"), @"
     success: true

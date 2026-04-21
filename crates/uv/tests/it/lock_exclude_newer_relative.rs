@@ -26,10 +26,9 @@ fn lock_exclude_newer_relative() -> Result<()> {
 
     // 3 weeks before 2024-05-01 is 2024-04-10, which is before idna 3.7 (released 2024-04-11).
     let current_timestamp = "2024-05-01T00:00:00Z";
-    uv_snapshot!(context.filters(), context
-        .lock()
+    let context = context.with_current_timestamp(current_timestamp);
+    uv_snapshot!(context.filters(), context.lock()
         .env_remove(EnvVars::UV_EXCLUDE_NEWER)
-        .env(EnvVars::UV_TEST_CURRENT_TIMESTAMP, current_timestamp)
         .arg("--exclude-newer")
         .arg("3 weeks"), @"
     success: true
@@ -74,10 +73,9 @@ fn lock_exclude_newer_relative() -> Result<()> {
 
     // Changing the current time should not result in a new lockfile
     let later_timestamp = "2024-06-01T00:00:00Z";
-    uv_snapshot!(context.filters(), context
-        .lock()
+    let context = context.with_current_timestamp(later_timestamp);
+    uv_snapshot!(context.filters(), context.lock()
         .env_remove(EnvVars::UV_EXCLUDE_NEWER)
-        .env(EnvVars::UV_TEST_CURRENT_TIMESTAMP, later_timestamp)
         .arg("--exclude-newer")
         .arg("3 weeks")
         .arg("--locked"), @"
@@ -93,10 +91,9 @@ fn lock_exclude_newer_relative() -> Result<()> {
 
     // Changing the span to 2 weeks should cause a new resolution.
     // 2 weeks before 2024-05-01 is 2024-04-17, which is after idna 3.7 (released 2024-04-11).
-    uv_snapshot!(context.filters(), context
-        .lock()
+    let context = context.with_current_timestamp(current_timestamp);
+    uv_snapshot!(context.filters(), context.lock()
         .env_remove(EnvVars::UV_EXCLUDE_NEWER)
-        .env(EnvVars::UV_TEST_CURRENT_TIMESTAMP, current_timestamp)
         .arg("--exclude-newer")
         .arg("2 weeks")
         .arg("--upgrade"), @"
@@ -144,10 +141,9 @@ fn lock_exclude_newer_relative() -> Result<()> {
 
     // Similarly, using something like `--upgrade` should cause a new resolution
     let current_timestamp = "2024-06-01T00:00:00Z";
-    uv_snapshot!(context.filters(), context
-        .lock()
+    let context = context.with_current_timestamp(current_timestamp);
+    uv_snapshot!(context.filters(), context.lock()
         .env_remove(EnvVars::UV_EXCLUDE_NEWER)
-        .env(EnvVars::UV_TEST_CURRENT_TIMESTAMP, current_timestamp)
         .arg("--exclude-newer")
         .arg("2 weeks")
         .arg("--upgrade"), @"
@@ -193,10 +189,9 @@ fn lock_exclude_newer_relative() -> Result<()> {
 
     // Similarly, using something like `--refresh` should cause a new resolution
     let current_timestamp = "2024-07-01T00:00:00Z";
-    uv_snapshot!(context.filters(), context
-        .lock()
+    let context = context.with_current_timestamp(current_timestamp);
+    uv_snapshot!(context.filters(), context.lock()
         .env_remove(EnvVars::UV_EXCLUDE_NEWER)
-        .env(EnvVars::UV_TEST_CURRENT_TIMESTAMP, current_timestamp)
         .arg("--exclude-newer")
         .arg("2 weeks")
         .arg("--refresh"), @"
@@ -235,10 +230,9 @@ fn lock_exclude_newer_older_vs_newer() -> Result<()> {
     // Start with a cutoff that allows idna 3.7 (released 2024-04-11)
     // 2 weeks before 2024-05-01 is 2024-04-17, which is AFTER idna 3.7 release
     let current_timestamp = "2024-05-01T00:00:00Z";
-    uv_snapshot!(context.filters(), context
-        .lock()
+    let context = context.with_current_timestamp(current_timestamp);
+    uv_snapshot!(context.filters(), context.lock()
         .env_remove(EnvVars::UV_EXCLUDE_NEWER)
-        .env(EnvVars::UV_TEST_CURRENT_TIMESTAMP, current_timestamp)
         .arg("--exclude-newer")
         .arg("2 weeks"), @"
     success: true
@@ -257,10 +251,9 @@ fn lock_exclude_newer_older_vs_newer() -> Result<()> {
 
     // Now make exclude-newer OLDER (more restrictive): 3 weeks back from 2024-05-01 is 2024-04-10
     // This is BEFORE idna 3.7 release (2024-04-11), so 3.7 becomes INVALID and must be replaced
-    uv_snapshot!(context.filters(), context
-        .lock()
+    let context = context.with_current_timestamp(current_timestamp);
+    uv_snapshot!(context.filters(), context.lock()
         .env_remove(EnvVars::UV_EXCLUDE_NEWER)
-        .env(EnvVars::UV_TEST_CURRENT_TIMESTAMP, current_timestamp)
         .arg("--exclude-newer")
         .arg("3 weeks"), @"
     success: true
@@ -281,10 +274,9 @@ fn lock_exclude_newer_older_vs_newer() -> Result<()> {
 
     // Now make exclude-newer NEWER (less restrictive): back to 2 weeks (2024-04-17)
     // This allows idna 3.7 again, but existing version (3.6) is still valid so it stays
-    uv_snapshot!(context.filters(), context
-        .lock()
+    let context = context.with_current_timestamp(current_timestamp);
+    uv_snapshot!(context.filters(), context.lock()
         .env_remove(EnvVars::UV_EXCLUDE_NEWER)
-        .env(EnvVars::UV_TEST_CURRENT_TIMESTAMP, current_timestamp)
         .arg("--exclude-newer")
         .arg("2 weeks"), @"
     success: true
@@ -303,10 +295,9 @@ fn lock_exclude_newer_older_vs_newer() -> Result<()> {
     );
 
     // With --upgrade, should now get idna 3.7 since the constraint allows it
-    uv_snapshot!(context.filters(), context
-        .lock()
+    let context = context.with_current_timestamp(current_timestamp);
+    uv_snapshot!(context.filters(), context.lock()
         .env_remove(EnvVars::UV_EXCLUDE_NEWER)
-        .env(EnvVars::UV_TEST_CURRENT_TIMESTAMP, current_timestamp)
         .arg("--exclude-newer")
         .arg("2 weeks")
         .arg("--upgrade"), @"
@@ -349,10 +340,9 @@ fn lock_exclude_newer_package_relative() -> Result<()> {
 
     // 3 weeks before 2024-05-01 is 2024-04-10, which is before idna 3.7 (released 2024-04-11).
     let current_timestamp = "2024-05-01T00:00:00Z";
-    uv_snapshot!(context.filters(), context
-        .lock()
+    let context = context.with_current_timestamp(current_timestamp);
+    uv_snapshot!(context.filters(), context.lock()
         .env_remove(EnvVars::UV_EXCLUDE_NEWER)
-        .env(EnvVars::UV_TEST_CURRENT_TIMESTAMP, current_timestamp)
         .arg("--exclude-newer-package")
         .arg("idna=3 weeks"), @"
     success: true
@@ -398,10 +388,9 @@ fn lock_exclude_newer_package_relative() -> Result<()> {
 
     // Changing the current time should not result in a new lockfile
     let later_timestamp = "2024-06-01T00:00:00Z";
-    uv_snapshot!(context.filters(), context
-        .lock()
+    let context = context.with_current_timestamp(later_timestamp);
+    uv_snapshot!(context.filters(), context.lock()
         .env_remove(EnvVars::UV_EXCLUDE_NEWER)
-        .env(EnvVars::UV_TEST_CURRENT_TIMESTAMP, later_timestamp)
         .arg("--exclude-newer-package")
         .arg("idna=3 weeks")
         .arg("--locked"), @"
@@ -415,10 +404,9 @@ fn lock_exclude_newer_package_relative() -> Result<()> {
 
     // Changing the span to 2 weeks should cause a new resolution.
     // 2 weeks before 2024-05-01 is 2024-04-17, which is after idna 3.7 (released 2024-04-11).
-    uv_snapshot!(context.filters(), context
-        .lock()
+    let context = context.with_current_timestamp(current_timestamp);
+    uv_snapshot!(context.filters(), context.lock()
         .env_remove(EnvVars::UV_EXCLUDE_NEWER)
-        .env(EnvVars::UV_TEST_CURRENT_TIMESTAMP, current_timestamp)
         .arg("--exclude-newer-package")
         .arg("idna=2 weeks")
         .arg("--upgrade"), @"
@@ -467,10 +455,9 @@ fn lock_exclude_newer_package_relative() -> Result<()> {
 
     // Similarly, using something like `--upgrade` should cause a new resolution
     let current_timestamp = "2024-06-01T00:00:00Z";
-    uv_snapshot!(context.filters(), context
-        .lock()
+    let context = context.with_current_timestamp(current_timestamp);
+    uv_snapshot!(context.filters(), context.lock()
         .env_remove(EnvVars::UV_EXCLUDE_NEWER)
-        .env(EnvVars::UV_TEST_CURRENT_TIMESTAMP, current_timestamp)
         .arg("--exclude-newer-package")
         .arg("idna=2 weeks")
         .arg("--upgrade"), @"
@@ -542,10 +529,9 @@ fn lock_exclude_newer_relative_pyproject() -> Result<()> {
 
     // 3 weeks before 2024-05-01 is 2024-04-10, which is before idna 3.7 (released 2024-04-11).
     let current_timestamp = "2024-05-01T00:00:00Z";
-    uv_snapshot!(context.filters(), context
-        .lock()
-        .env_remove(EnvVars::UV_EXCLUDE_NEWER)
-        .env(EnvVars::UV_TEST_CURRENT_TIMESTAMP, current_timestamp), @"
+    let context = context.with_current_timestamp(current_timestamp);
+    uv_snapshot!(context.filters(), context.lock()
+        .env_remove(EnvVars::UV_EXCLUDE_NEWER), @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -613,10 +599,9 @@ fn lock_exclude_newer_package_relative_pyproject() -> Result<()> {
 
     // 3 weeks before 2024-05-01 is 2024-04-10, which is before idna 3.7 (released 2024-04-11).
     let current_timestamp = "2024-05-01T00:00:00Z";
-    uv_snapshot!(context.filters(), context
-        .lock()
-        .env_remove(EnvVars::UV_EXCLUDE_NEWER)
-        .env(EnvVars::UV_TEST_CURRENT_TIMESTAMP, current_timestamp), @"
+    let context = context.with_current_timestamp(current_timestamp);
+    uv_snapshot!(context.filters(), context.lock()
+        .env_remove(EnvVars::UV_EXCLUDE_NEWER), @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -691,10 +676,9 @@ fn lock_exclude_newer_relative_global_and_package() -> Result<()> {
     let current_timestamp = "2024-05-01T00:00:00Z";
 
     // Lock with both global exclude-newer and package-specific override using relative durations
-    uv_snapshot!(context.filters(), context
-        .lock()
+    let context = context.with_current_timestamp(current_timestamp);
+    uv_snapshot!(context.filters(), context.lock()
         .env_remove(EnvVars::UV_EXCLUDE_NEWER)
-        .env(EnvVars::UV_TEST_CURRENT_TIMESTAMP, current_timestamp)
         .arg("--exclude-newer")
         .arg("3 weeks")
         .arg("--exclude-newer-package")
@@ -758,10 +742,9 @@ fn lock_exclude_newer_relative_global_and_package() -> Result<()> {
 
     // Changing the current time should not invalidate the lockfile
     let later_timestamp = "2024-07-01T00:00:00Z";
-    uv_snapshot!(context.filters(), context
-        .lock()
+    let context = context.with_current_timestamp(later_timestamp);
+    uv_snapshot!(context.filters(), context.lock()
         .env_remove(EnvVars::UV_EXCLUDE_NEWER)
-        .env(EnvVars::UV_TEST_CURRENT_TIMESTAMP, later_timestamp)
         .arg("--exclude-newer")
         .arg("3 weeks")
         .arg("--exclude-newer-package")
@@ -777,10 +760,9 @@ fn lock_exclude_newer_relative_global_and_package() -> Result<()> {
 
     // Changing the global span to 2 weeks should cause a new resolution.
     // 2 weeks before 2024-05-01 is 2024-04-17 (after idna 3.7 released 2024-04-11) → idna 3.7
-    uv_snapshot!(context.filters(), context
-        .lock()
+    let context = context.with_current_timestamp(current_timestamp);
+    uv_snapshot!(context.filters(), context.lock()
         .env_remove(EnvVars::UV_EXCLUDE_NEWER)
-        .env(EnvVars::UV_TEST_CURRENT_TIMESTAMP, current_timestamp)
         .arg("--exclude-newer")
         .arg("2 weeks")
         .arg("--exclude-newer-package")
@@ -797,10 +779,9 @@ fn lock_exclude_newer_relative_global_and_package() -> Result<()> {
     ");
 
     // Changing the package-specific span should also invalidate the lockfile
-    uv_snapshot!(context.filters(), context
-        .lock()
+    let context = context.with_current_timestamp(current_timestamp);
+    uv_snapshot!(context.filters(), context.lock()
         .env_remove(EnvVars::UV_EXCLUDE_NEWER)
-        .env(EnvVars::UV_TEST_CURRENT_TIMESTAMP, current_timestamp)
         .arg("--exclude-newer")
         .arg("2 weeks")
         .arg("--exclude-newer-package")
@@ -815,10 +796,9 @@ fn lock_exclude_newer_relative_global_and_package() -> Result<()> {
     ");
 
     // Use an absolute global value and relative package value
-    uv_snapshot!(context.filters(), context
-        .lock()
+    let context = context.with_current_timestamp(current_timestamp);
+    uv_snapshot!(context.filters(), context.lock()
         .env_remove(EnvVars::UV_EXCLUDE_NEWER)
-        .env(EnvVars::UV_TEST_CURRENT_TIMESTAMP, current_timestamp)
         .arg("--exclude-newer")
         .arg("2024-05-20T00:00:00Z")
         .arg("--exclude-newer-package")
@@ -881,10 +861,9 @@ fn lock_exclude_newer_relative_global_and_package() -> Result<()> {
     "#);
 
     // Use a relative global value and absolute package value
-    uv_snapshot!(context.filters(), context
-        .lock()
+    let context = context.with_current_timestamp(current_timestamp);
+    uv_snapshot!(context.filters(), context.lock()
         .env_remove(EnvVars::UV_EXCLUDE_NEWER)
-        .env(EnvVars::UV_TEST_CURRENT_TIMESTAMP, current_timestamp)
         .arg("--exclude-newer")
         .arg("3 weeks")
         .arg("--exclude-newer-package")
@@ -1218,10 +1197,9 @@ fn lock_exclude_newer_relative_no_timestamp_in_lockfile() -> Result<()> {
     )?;
 
     let current_timestamp = "2024-05-01T00:00:00Z";
-    uv_snapshot!(context.filters(), context
-        .lock()
-        .env_remove(EnvVars::UV_EXCLUDE_NEWER)
-        .env(EnvVars::UV_TEST_CURRENT_TIMESTAMP, current_timestamp), @"
+    let context = context.with_current_timestamp(current_timestamp);
+    uv_snapshot!(context.filters(), context.lock()
+        .env_remove(EnvVars::UV_EXCLUDE_NEWER), @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1267,10 +1245,9 @@ fn lock_exclude_newer_relative_no_timestamp_in_lockfile() -> Result<()> {
 
     // The lockfile now has no exclude-newer, but `pyproject.toml` still configures one,
     // so the resolver detects "addition of global exclude newer" and re-resolves.
-    uv_snapshot!(context.filters(), context
-        .lock()
-        .env_remove(EnvVars::UV_EXCLUDE_NEWER)
-        .env(EnvVars::UV_TEST_CURRENT_TIMESTAMP, current_timestamp), @"
+    let context = context.with_current_timestamp(current_timestamp);
+    uv_snapshot!(context.filters(), context.lock()
+        .env_remove(EnvVars::UV_EXCLUDE_NEWER), @"
     success: true
     exit_code: 0
     ----- stdout -----
