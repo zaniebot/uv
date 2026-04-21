@@ -33535,7 +33535,7 @@ fn lock_exclude_newer_package_disable() -> Result<()> {
         name = "project"
         version = "0.1.0"
         requires-python = ">=3.12"
-        dependencies = ["idna", "iniconfig"]
+        dependencies = ["idna<3.12", "iniconfig"]
         "#,
     )?;
 
@@ -33601,7 +33601,7 @@ fn lock_exclude_newer_package_disable() -> Result<()> {
 
         [package.metadata]
         requires-dist = [
-            { name = "idna" },
+            { name = "idna", specifier = "<3.12" },
             { name = "iniconfig" },
         ]
         "#
