@@ -514,7 +514,16 @@ async fn build_package(
     // (1) Explicit request from user
     let mut interpreter_request = python_request.map(PythonRequest::parse);
 
-    // (2) Request from `.python-version`
+    // (2) Request from `[tool.uv] python` in `pyproject.toml`
+    if interpreter_request.is_none() {
+        if let Ok(workspace) = workspace {
+            if let Some(pin) = workspace.python() {
+                interpreter_request = Some(PythonRequest::parse(pin));
+            }
+        }
+    }
+
+    // (3) Request from `.python-version`
     if interpreter_request.is_none() {
         interpreter_request = PythonVersionFile::discover(
             source.directory(),
@@ -522,15 +531,6 @@ async fn build_package(
         )
         .await?
         .and_then(PythonVersionFile::into_version);
-    }
-
-    // (3) Request from `[tool.uv] python` in `pyproject.toml`
-    if interpreter_request.is_none() {
-        if let Ok(workspace) = workspace {
-            if let Some(pin) = workspace.python() {
-                interpreter_request = Some(PythonRequest::parse(pin));
-            }
-        }
     }
 
     // (4) `Requires-Python` in `pyproject.toml`

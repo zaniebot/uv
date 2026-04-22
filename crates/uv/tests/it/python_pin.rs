@@ -1033,8 +1033,8 @@ python = "3.11"
     Ok(())
 }
 
-/// When both `.python-version` and `[tool.uv] python` are set, `uv python pin` reports the
-/// `[tool.uv] python` value with a warning (it takes priority for reads).
+/// When both `.python-version` and `[tool.uv] python` are set, `[tool.uv] python` takes priority
+/// for reads, both via `uv python pin` (with a warning) and throughout uv.
 #[test]
 fn python_pin_pyproject_takes_priority_for_read() -> Result<()> {
     let context = uv_test::test_context_with_versions!(&["3.11", "3.12"]);
@@ -1064,6 +1064,16 @@ python = "3.12"
 
     ----- stderr -----
     warning: Reading Python pin from `tool.uv.python` in `pyproject.toml`
+    ");
+
+    // Likewise, `uv python find` resolves the `tool.uv.python` pin, without any warning.
+    uv_snapshot!(context.filters(), context.python_find(), @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    [PYTHON-3.12]
+
+    ----- stderr -----
     ");
 
     Ok(())

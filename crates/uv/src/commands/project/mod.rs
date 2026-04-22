@@ -1223,6 +1223,11 @@ impl WorkspacePython {
             let source = PythonRequestSource::UserRequest;
             let request = Some(request);
             (source, request)
+        } else if let Some(pin) = workspace.and_then(Workspace::python) {
+            // (2) Request from `[tool.uv] python` in `pyproject.toml`
+            let source = PythonRequestSource::PyprojectTomlPython;
+            let request = Some(PythonRequest::parse(pin));
+            (source, request)
         } else if let Some(file) = PythonVersionFile::discover(
             project_dir,
             &VersionFileDiscoveryOptions::default()
@@ -1242,14 +1247,9 @@ impl WorkspacePython {
                 _ => true,
             }
         }) {
-            // (2) Request from `.python-version`
+            // (3) Request from `.python-version`
             let source = PythonRequestSource::DotPythonVersion(file.clone());
             let request = file.version().cloned();
-            (source, request)
-        } else if let Some(pin) = workspace.and_then(Workspace::python) {
-            // (3) Request from `[tool.uv] python` in `pyproject.toml`
-            let source = PythonRequestSource::PyprojectTomlPython;
-            let request = Some(PythonRequest::parse(pin));
             (source, request)
         } else {
             // (4) `requires-python` in `pyproject.toml`

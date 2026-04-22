@@ -372,6 +372,9 @@ async fn init_project(
     let python_request = if let Some(request) = python {
         // (1) Explicit request from user
         Some(PythonRequest::parse(&request))
+    } else if let Some(pin) = workspace.as_ref().and_then(|w| w.python()) {
+        // (2) Request from `[tool.uv] python` in the workspace `pyproject.toml`
+        Some(PythonRequest::parse(pin))
     } else if let Some(file) = PythonVersionFile::discover(
         path,
         &VersionFileDiscoveryOptions::default()
@@ -385,11 +388,8 @@ async fn init_project(
     )
     .await?
     {
-        // (2) Request from `.python-version`
+        // (3) Request from `.python-version`
         file.into_version()
-    } else if let Some(pin) = workspace.as_ref().and_then(|w| w.python()) {
-        // (3) Request from `[tool.uv] python` in the workspace `pyproject.toml`
-        Some(PythonRequest::parse(pin))
     } else {
         None
     };
