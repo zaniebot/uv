@@ -96,6 +96,23 @@ fn find_verbose_flag(args: &[std::ffi::OsString]) -> Option<&str> {
     })
 }
 
+/// Check if the given arguments contain a [`ToolRunCommand`] flag that was likely misplaced after
+/// the tool name (e.g., `uvx foo --with bar` instead of `uvx --with bar foo`).
+fn find_misplaced_uv_flag(args: &[std::ffi::OsString]) -> Option<&'static str> {
+    const UV_FLAGS: &[&str] = &[
+        "--with",
+        "--with-editable",
+        "--with-requirements",
+        "--from",
+    ];
+    args.iter().find_map(|arg| {
+        let arg_str = arg.to_str()?;
+        // Match both `--with foo` and `--with=foo`.
+        let name = arg_str.split_once('=').map_or(arg_str, |(name, _)| name);
+        UV_FLAGS.iter().copied().find(|flag| *flag == name)
+    })
+}
+
 /// Run a command.
 #[expect(clippy::fn_params_excessive_bools)]
 pub(crate) async fn run(
@@ -443,7 +460,30 @@ pub(crate) async fn run(
     }
     .with_context(|| format!("Failed to spawn: `{executable}`"))?;
 
-    run_to_completion(handle).await
+    let status = run_to_completion(handle).await?;
+
+    // If the subprocess exited non-zero and we can see a `uv tool run` flag like `--with` in the
+    // arguments we forwarded to it, the user likely put it after the tool name by mistake (e.g.,
+    // `uvx foo --with bar` instead of `uvx --with bar foo`). Nudge them toward the correct
+    // invocation. Stderr is inherited, so we can only match on argv — the signal from a misplaced
+    // `--with` alone is still specific enough to be useful.
+    if !matches!(status, ExitStatus::Success)
+        && let Some(flag) = find_misplaced_uv_flag(args)
+    {
+        writeln!(
+            printer.stderr(),
+            "{}{} `{}` was passed to `{}`, not to `{}`. If this was intended for `{}`, place it before the command, e.g., `{}`",
+            "hint".bold().cyan(),
+            ":".bold(),
+            flag.cyan(),
+            target.cyan(),
+            invocation_source.to_string().cyan(),
+            invocation_source.to_string().cyan(),
+            format!("{invocation_source} {flag} <value> {target}").green(),
+        )?;
+    }
+
+    Ok(status)
 }
 
 /// Return the entry points for the specified package.

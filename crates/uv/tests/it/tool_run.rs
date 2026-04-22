@@ -2980,6 +2980,97 @@ fn tool_run_verbose_hint() {
     ");
 }
 
+/// Test that when the tool subprocess exits non-zero and its arguments include a `uv tool run`
+/// flag (e.g., `--with`), we show a hint suggesting the user intended to pass it to `uv tool run`
+/// before the command name. See <https://github.com/astral-sh/uv/issues/19116>.
+#[test]
+fn tool_run_misplaced_uv_flag_hint() {
+    let context = uv_test::test_context!("3.12")
+        .with_filtered_counts()
+        .with_filter((
+            r"(?m)^ERROR: usage: pytest \[options\].*$",
+            "[PYTEST USAGE]",
+        ))
+        .with_filter((r"(?m)^  rootdir: .*$", "  rootdir: [ROOTDIR]"))
+        .with_filter((r"(?m)^  inifile: .*$", "  inifile: [INIFILE]"));
+    let tool_dir = context.temp_dir.child("tools");
+    let bin_dir = context.temp_dir.child("bin");
+
+    // `--with` placed after the tool name is forwarded to pytest, which rejects it. The hint
+    // should point the user at the correct invocation.
+    uv_snapshot!(context.filters(), context.tool_run()
+        .arg("pytest")
+        .arg("--with")
+        .arg("setuptools")
+        .env(EnvVars::UV_TOOL_DIR, tool_dir.as_os_str())
+        .env(EnvVars::XDG_BIN_HOME, bin_dir.as_os_str()), @r"
+    success: false
+    exit_code: 4
+    ----- stdout -----
+
+    ----- stderr -----
+    Resolved [N] packages in [TIME]
+    Prepared [N] packages in [TIME]
+    Installed [N] packages in [TIME]
+     + iniconfig==2.0.0
+     + packaging==24.0
+     + pluggy==1.4.0
+     + pytest==8.1.1
+    [PYTEST USAGE]
+    pytest: error: unrecognized arguments: --with
+      inifile: [INIFILE]
+      rootdir: [ROOTDIR]
+
+    hint: `--with` was passed to `pytest`, not to `uv tool run`. If this was intended for `uv tool run`, place it before the command, e.g., `uv tool run --with <value> pytest`
+    ");
+
+    // Same thing, but with `--from` and the `--flag=value` form.
+    uv_snapshot!(context.filters(), context.tool_run()
+        .arg("pytest")
+        .arg("--from=setuptools")
+        .env(EnvVars::UV_TOOL_DIR, tool_dir.as_os_str())
+        .env(EnvVars::XDG_BIN_HOME, bin_dir.as_os_str()), @r"
+    success: false
+    exit_code: 4
+    ----- stdout -----
+
+    ----- stderr -----
+    Resolved [N] packages in [TIME]
+    [PYTEST USAGE]
+    pytest: error: unrecognized arguments: --from=setuptools
+      inifile: [INIFILE]
+      rootdir: [ROOTDIR]
+
+    hint: `--from` was passed to `pytest`, not to `uv tool run`. If this was intended for `uv tool run`, place it before the command, e.g., `uv tool run --from <value> pytest`
+    ");
+
+    // Sanity check: the hint does not fire when the tool exits successfully, even if a matching
+    // flag appears in the tool's arguments (`--version` on pytest succeeds; `--with` is consumed
+    // by `uv tool run` here because it's before the command).
+    uv_snapshot!(context.filters(), context.tool_run()
+        .arg("--with")
+        .arg("setuptools")
+        .arg("pytest")
+        .arg("--version")
+        .env(EnvVars::UV_TOOL_DIR, tool_dir.as_os_str())
+        .env(EnvVars::XDG_BIN_HOME, bin_dir.as_os_str()), @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    pytest 8.1.1
+
+    ----- stderr -----
+    Resolved [N] packages in [TIME]
+    Prepared [N] packages in [TIME]
+    Installed [N] packages in [TIME]
+     + iniconfig==2.0.0
+     + packaging==24.0
+     + pluggy==1.4.0
+     + pytest==8.1.1
+     + setuptools==69.2.0
+    ");
+}
+
 #[test]
 fn tool_run_with_compatible_build_constraints() -> Result<()> {
     let context = uv_test::test_context!("3.9")
