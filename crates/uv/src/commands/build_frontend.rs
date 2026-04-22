@@ -524,7 +524,16 @@ async fn build_package(
         .and_then(PythonVersionFile::into_version);
     }
 
-    // (3) `Requires-Python` in `pyproject.toml`
+    // (3) Request from `[tool.uv] python` in `pyproject.toml`
+    if interpreter_request.is_none() {
+        if let Ok(workspace) = workspace {
+            if let Some(pin) = workspace.python() {
+                interpreter_request = Some(PythonRequest::parse(pin));
+            }
+        }
+    }
+
+    // (4) `Requires-Python` in `pyproject.toml`
     if interpreter_request.is_none() {
         if let Ok(workspace) = workspace {
             let groups = DependencyGroupsWithDefaults::none();

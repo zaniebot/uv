@@ -386,6 +386,23 @@ pub struct ToolUv {
     )]
     pub managed: Option<bool>,
 
+    /// The Python version to pin for the project.
+    ///
+    /// Equivalent to a `.python-version` file, but declared in the project's `pyproject.toml`.
+    /// When set, uv uses this version to create and manage the project's virtual environment.
+    ///
+    /// Writing this field is gated behind the `python-pin-pyproject` preview feature (i.e., it
+    /// is only written by `uv python pin` when the preview feature is enabled). It is read
+    /// without requiring the preview feature.
+    #[option(
+        default = "None",
+        value_type = "str",
+        example = r#"
+            python = "3.12"
+        "#
+    )]
+    pub python: Option<String>,
+
     /// Whether the project should be considered a Python package, or a non-package ("virtual")
     /// project.
     ///

@@ -810,6 +810,16 @@ impl Workspace {
         &self.pyproject_toml
     }
 
+    /// The Python version declared via `[tool.uv] python` in the workspace root `pyproject.toml`,
+    /// if any.
+    pub fn python(&self) -> Option<&str> {
+        self.pyproject_toml
+            .tool
+            .as_ref()
+            .and_then(|tool| tool.uv.as_ref())
+            .and_then(|uv| uv.python.as_deref())
+    }
+
     /// Returns `true` if the path is excluded by the workspace.
     pub fn excludes(&self, project_path: &Path) -> Result<bool, WorkspaceError> {
         if let Some(workspace) = self
@@ -2125,6 +2135,7 @@ mod tests {
                         "exclude": null
                       },
                       "managed": null,
+                      "python": null,
                       "package": null,
                       "default-groups": null,
                       "dependency-groups": null,
@@ -2226,6 +2237,7 @@ mod tests {
                         "exclude": null
                       },
                       "managed": null,
+                      "python": null,
                       "package": null,
                       "default-groups": null,
                       "dependency-groups": null,
@@ -2440,6 +2452,7 @@ mod tests {
                         ]
                       },
                       "managed": null,
+                      "python": null,
                       "package": null,
                       "default-groups": null,
                       "dependency-groups": null,
@@ -2550,6 +2563,7 @@ mod tests {
                         ]
                       },
                       "managed": null,
+                      "python": null,
                       "package": null,
                       "default-groups": null,
                       "dependency-groups": null,
@@ -2673,6 +2687,7 @@ mod tests {
                         ]
                       },
                       "managed": null,
+                      "python": null,
                       "package": null,
                       "default-groups": null,
                       "dependency-groups": null,
@@ -2770,6 +2785,7 @@ mod tests {
                         ]
                       },
                       "managed": null,
+                      "python": null,
                       "package": null,
                       "default-groups": null,
                       "dependency-groups": null,

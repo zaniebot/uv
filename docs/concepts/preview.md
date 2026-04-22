@@ -62,6 +62,9 @@ The following preview features are available:
 - `pylock`: Allows installing from `pylock.toml` files.
 - `python-install-default`: Allows
   [installing `python` and `python3` executables](./python-versions.md#installing-python-executables).
+- `python-pin-pyproject`: Makes `uv python pin` write the Python pin to
+  [`tool.uv.python`](../reference/settings.md#python) in `pyproject.toml` instead of a
+  `.python-version` file.
 - `format`: Allows using `uv format`.
 - `index-exclude-newer`: Allows setting `exclude-newer` on configured package indexes.
 - `native-auth`: Enables storage of credentials in a

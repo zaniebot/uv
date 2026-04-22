@@ -199,6 +199,17 @@ pub(crate) enum ProjectError {
     RequiresPythonProjectIncompatibility(Version, RequiresPython, RequiresPythonSources, bool),
 
     #[error(
+        "The Python request from `tool.uv.python` in `pyproject.toml` resolved to Python {version}, which is incompatible with the project's Python requirement: `{requires_python}`{}\nUse `uv python pin` to update `tool.uv.python` to a compatible version",
+        format_optional_requires_python_sources(requires_python_sources, *workspace),
+    )]
+    PyprojectTomlPythonProjectIncompatibility {
+        version: Version,
+        requires_python: RequiresPython,
+        requires_python_sources: Box<RequiresPythonSources>,
+        workspace: bool,
+    },
+
+    #[error(
         "The requested interpreter resolved to Python {0}, which is incompatible with the script's Python requirement: `{1}`"
     )]
     RequestedPythonScriptIncompatibility(Version, RequiresPython),
@@ -577,6 +588,14 @@ pub(crate) fn validate_project_requires_python(
                 workspace: workspace_non_trivial,
             })
         }
+        PythonRequestSource::PyprojectTomlPython => {
+            Err(ProjectError::PyprojectTomlPythonProjectIncompatibility {
+                version: interpreter.python_version().clone(),
+                requires_python: requires_python.clone(),
+                requires_python_sources: Box::new(conflicting_requires),
+                workspace: workspace_non_trivial,
+            })
+        }
         PythonRequestSource::RequiresPython => {
             Err(ProjectError::RequiresPythonProjectIncompatibility(
                 interpreter.python_version().clone(),
@@ -611,7 +630,7 @@ fn validate_script_requires_python(
                 requires_python.clone(),
             ))
         }
-        PythonRequestSource::RequiresPython => {
+        PythonRequestSource::PyprojectTomlPython | PythonRequestSource::RequiresPython => {
             Err(ProjectError::RequiresPythonScriptIncompatibility(
                 interpreter.python_version().clone(),
                 requires_python.clone(),
@@ -1150,6 +1169,8 @@ pub(crate) enum PythonRequestSource {
     UserRequest,
     /// The request was inferred from a `.python-version` or `.python-versions` file.
     DotPythonVersion(PythonVersionFile),
+    /// The request was inferred from a `[tool.uv] python` entry in a `pyproject.toml` file.
+    PyprojectTomlPython,
     /// The request was inferred from a `pyproject.toml` file.
     RequiresPython,
 }
@@ -1161,6 +1182,7 @@ impl std::fmt::Display for PythonRequestSource {
             Self::DotPythonVersion(file) => {
                 write!(f, "version file at `{}`", file.path().user_display())
             }
+            Self::PyprojectTomlPython => write!(f, "`tool.uv.python` in `pyproject.toml`"),
             Self::RequiresPython => write!(f, "`requires-python` metadata"),
         }
     }
@@ -1224,8 +1246,13 @@ impl WorkspacePython {
             let source = PythonRequestSource::DotPythonVersion(file.clone());
             let request = file.version().cloned();
             (source, request)
+        } else if let Some(pin) = workspace.and_then(Workspace::python) {
+            // (3) Request from `[tool.uv] python` in `pyproject.toml`
+            let source = PythonRequestSource::PyprojectTomlPython;
+            let request = Some(PythonRequest::parse(pin));
+            (source, request)
         } else {
-            // (3) `requires-python` in `pyproject.toml`
+            // (4) `requires-python` in `pyproject.toml`
             let request = requires_python
                 .as_ref()
                 .map(RequiresPython::specifiers)

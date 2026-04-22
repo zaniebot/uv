@@ -450,6 +450,10 @@
       "description": "Mirror URL to use for downloading managed PyPy installations.\n\nBy default, managed PyPy installations are downloaded from [downloads.python.org](https://downloads.python.org/).\nThis variable can be set to a mirror URL to use a different source for PyPy installations.\nThe provided URL will replace `https://downloads.python.org/pypy` in, e.g., `https://downloads.python.org/pypy/pypy3.8-v7.3.7-osx64.tar.bz2`.\n\nDistributions can be read from a\nlocal directory by using the `file://` URL scheme.",
       "type": ["string", "null"]
     },
+    "python": {
+      "description": "The Python version to pin for the project.\n\nEquivalent to a `.python-version` file, but declared in the project's `pyproject.toml`.\nWhen set, uv uses this version to create and manage the project's virtual environment.\n\nWriting this field is gated behind the `python-pin-pyproject` preview feature (i.e., it\nis only written by `uv python pin` when the preview feature is enabled). It is read\nwithout requiring the preview feature.",
+      "type": ["string", "null"]
+    },
     "python-downloads": {
       "description": "Whether to allow Python downloads.",
       "anyOf": [

@@ -1218,6 +1218,53 @@ impl PyProjectTomlMut {
         dynamic.iter().any(|val| val.as_str() == Some("version"))
     }
 
+    /// Set the value of `tool.uv.python`, creating the `[tool.uv]` table if necessary.
+    pub fn set_python(&mut self, python: &str) -> Result<(), Error> {
+        let uv = self
+            .doc
+            .entry("tool")
+            .or_insert(implicit())
+            .as_table_mut()
+            .ok_or(Error::MalformedWorkspace)?
+            .entry("uv")
+            .or_insert(implicit())
+            .as_table_mut()
+            .ok_or(Error::MalformedWorkspace)?;
+
+        if let Some(existing) = uv.get_mut("python") {
+            if let Some(value) = existing.as_value_mut() {
+                let mut formatted = Value::from(python);
+                *formatted.decor_mut() = value.decor().clone();
+                *value = formatted;
+            } else {
+                *existing = Item::Value(Value::from(python));
+            }
+        } else {
+            uv.insert("python", Item::Value(Value::from(python)));
+        }
+
+        Ok(())
+    }
+
+    /// Remove `tool.uv.python`, if present. Returns the removed value, if any.
+    pub fn remove_python(&mut self) -> Result<Option<String>, Error> {
+        let Some(uv) = self
+            .doc
+            .get_mut("tool")
+            .and_then(Item::as_table_mut)
+            .and_then(|tool| tool.get_mut("uv"))
+            .and_then(Item::as_table_mut)
+        else {
+            return Ok(None);
+        };
+
+        let removed = uv
+            .remove("python")
+            .and_then(|item| item.as_str().map(ToString::to_string));
+
+        Ok(removed)
+    }
+
     pub fn set_version(&mut self, version: &Version) -> Result<(), Error> {
         let project = self
             .doc

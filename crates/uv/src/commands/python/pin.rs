@@ -10,13 +10,14 @@ use uv_cache::Cache;
 use uv_client::BaseClientBuilder;
 use uv_configuration::DependencyGroupsWithDefaults;
 use uv_fs::Simplified;
-use uv_preview::Preview;
+use uv_preview::{Preview, PreviewFeature};
 use uv_python::{
     EnvironmentPreference, PYTHON_VERSION_FILENAME, PythonDownloads, PythonInstallation,
     PythonPreference, PythonRequest, PythonVersionFile, VersionFileDiscoveryOptions,
 };
 use uv_settings::PythonInstallMirrors;
 use uv_warnings::warn_user_once;
+use uv_workspace::pyproject_mut::{DependencyTarget, PyProjectTomlMut};
 use uv_workspace::{DiscoveryOptions, VirtualProject, WorkspaceCache};
 
 use crate::commands::{
@@ -56,6 +57,22 @@ pub(crate) async fn pin(
         }
     };
 
+    // Look for a `[tool.uv] python` pin in the project's `pyproject.toml`.
+    // Never consult the `pyproject.toml` when operating on the global pin.
+    let pyproject_pin = if global {
+        None
+    } else {
+        virtual_project
+            .as_ref()
+            .and_then(|project| project.pyproject_toml().tool.as_ref())
+            .and_then(|tool| tool.uv.as_ref())
+            .and_then(|uv| uv.python.as_deref())
+            .map(ToString::to_string)
+    };
+    let pyproject_path = virtual_project
+        .as_ref()
+        .map(|project| project.root().join("pyproject.toml"));
+
     // Search for an existing file, we won't necessarily write to this, we'll construct a target
     // path if there's a request later on.
     let version_file = PythonVersionFile::discover(
@@ -65,6 +82,24 @@ pub(crate) async fn pin(
     .await;
 
     if rm {
+        // Prefer removing the `[tool.uv] python` pin when the preview feature is enabled.
+        if preview.is_enabled(PreviewFeature::PythonPinPyproject) && pyproject_pin.is_some() {
+            let pyproject_path = pyproject_path
+                .as_ref()
+                .expect("a pyproject.toml path is available when a pin was read from it");
+            warn_user_once!(
+                "The `python-pin-pyproject` preview feature is enabled. Removing the Python pin from `tool.uv.python` in `{}`",
+                pyproject_path.user_display(),
+            );
+            remove_pyproject_python(pyproject_path).await?;
+            writeln!(
+                printer.stdout(),
+                "Removed Python pin from `{}`",
+                pyproject_path.user_display()
+            )?;
+            return Ok(ExitStatus::Success);
+        }
+
         let Some(file) = version_file? else {
             if global {
                 bail!("No global Python pin found");
@@ -91,7 +126,37 @@ pub(crate) async fn pin(
     }
 
     let Some(request) = request else {
-        // Display the current pinned Python version
+        // Display the current pinned Python version. If a `[tool.uv] python` pin is set, warn and
+        // display that value; otherwise, fall back to the version file.
+        if let Some(pin) = pyproject_pin.as_deref() {
+            let pyproject_path = pyproject_path
+                .as_ref()
+                .expect("a pyproject.toml path is available when a pin was read from it");
+            warn_user_once!(
+                "Reading Python pin from `tool.uv.python` in `{}`",
+                pyproject_path.user_display(),
+            );
+            let parsed = PythonRequest::parse(pin);
+            writeln!(printer.stdout(), "{}", parsed.to_canonical_string())?;
+            if let Some(virtual_project) = &virtual_project {
+                let client = client_builder.clone().retries(0).build()?;
+                let download_list = ManagedPythonDownloadList::new(
+                    &client,
+                    install_mirrors.python_downloads_json_url.as_deref(),
+                )
+                .await?;
+                warn_if_existing_pin_incompatible_with_project(
+                    &parsed,
+                    virtual_project,
+                    python_preference,
+                    &download_list,
+                    cache,
+                    preview,
+                );
+            }
+            return Ok(ExitStatus::Success);
+        }
+
         if let Some(file) = version_file? {
             for pin in file.versions() {
                 writeln!(printer.stdout(), "{}", pin.to_canonical_string())?;
@@ -202,6 +267,48 @@ pub(crate) async fn pin(
         request
     };
 
+    // If the `python-pin-pyproject` preview feature is enabled, write the pin to the project's
+    // `pyproject.toml` instead of a `.python-version` file.
+    if !global && preview.is_enabled(PreviewFeature::PythonPinPyproject) {
+        if let Some(pyproject_path) = &pyproject_path {
+            warn_user_once!(
+                "The `python-pin-pyproject` preview feature is enabled. Writing the Python pin to `tool.uv.python` in `{}`",
+                pyproject_path.user_display(),
+            );
+
+            let canonical = request.to_canonical_string();
+            let existing = pyproject_pin.clone();
+            write_pyproject_python(pyproject_path, &canonical).await?;
+
+            if let Some(existing) = existing {
+                if existing != canonical {
+                    writeln!(
+                        printer.stdout(),
+                        "Updated `{}` from `{}` -> `{}`",
+                        pyproject_path.user_display().cyan(),
+                        existing.green(),
+                        canonical.green(),
+                    )?;
+                } else {
+                    writeln!(
+                        printer.stdout(),
+                        "Pinned `{}` to `{}`",
+                        pyproject_path.user_display().cyan(),
+                        canonical.green(),
+                    )?;
+                }
+            } else {
+                writeln!(
+                    printer.stdout(),
+                    "Pinned `{}` to `{}`",
+                    pyproject_path.user_display().cyan(),
+                    canonical.green(),
+                )?;
+            }
+            return Ok(ExitStatus::Success);
+        }
+    }
+
     let existing = version_file.ok().flatten();
     // TODO(zanieb): Allow updating the discovered version file with an `--update` flag.
     let new = if global {
@@ -241,6 +348,24 @@ pub(crate) async fn pin(
     }
 
     Ok(ExitStatus::Success)
+}
+
+/// Write a `[tool.uv] python` value to the `pyproject.toml` at the given path.
+async fn write_pyproject_python(path: &Path, value: &str) -> Result<()> {
+    let contents = fs_err::tokio::read_to_string(path).await?;
+    let mut doc = PyProjectTomlMut::from_toml(&contents, DependencyTarget::PyProjectToml)?;
+    doc.set_python(value)?;
+    fs_err::tokio::write(path, doc.to_string()).await?;
+    Ok(())
+}
+
+/// Remove the `[tool.uv] python` value from the `pyproject.toml` at the given path.
+async fn remove_pyproject_python(path: &Path) -> Result<()> {
+    let contents = fs_err::tokio::read_to_string(path).await?;
+    let mut doc = PyProjectTomlMut::from_toml(&contents, DependencyTarget::PyProjectToml)?;
+    doc.remove_python()?;
+    fs_err::tokio::write(path, doc.to_string()).await?;
+    Ok(())
 }
 
 /// Check if pinned request is compatible with the workspace/project's `Requires-Python`.
@@ -362,3 +487,4 @@ fn assert_pin_compatible_with_project(pin: &Pin, virtual_project: &VirtualProjec
         requires_python
     ))
 }
+

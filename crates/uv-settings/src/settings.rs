@@ -187,6 +187,9 @@ pub struct Options {
     pub r#package: Option<serde::de::IgnoredAny>,
 
     #[cfg_attr(feature = "schemars", schemars(skip))]
+    pub python: Option<serde::de::IgnoredAny>,
+
+    #[cfg_attr(feature = "schemars", schemars(skip))]
     pub build_backend: Option<serde::de::IgnoredAny>,
 }
 
@@ -2453,6 +2456,7 @@ pub struct OptionsWire {
     sources: Option<serde::de::IgnoredAny>,
     managed: Option<serde::de::IgnoredAny>,
     r#package: Option<serde::de::IgnoredAny>,
+    python: Option<serde::de::IgnoredAny>,
     default_groups: Option<serde::de::IgnoredAny>,
     dependency_groups: Option<serde::de::IgnoredAny>,
     dev_dependencies: Option<serde::de::IgnoredAny>,
@@ -2536,6 +2540,7 @@ impl From<OptionsWire> for Options {
             dev_dependencies,
             managed,
             package,
+            python,
             add_bounds: bounds,
             // Used by the build backend
             build_backend,
@@ -2624,6 +2629,7 @@ impl From<OptionsWire> for Options {
             dependency_groups,
             managed,
             package,
+            python,
         }
     }
 }

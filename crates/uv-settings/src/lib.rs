@@ -308,6 +308,7 @@ fn validate_uv_toml(path: &Path, options: &Options) -> Result<(), Error> {
         dependency_groups,
         managed,
         package,
+        python,
         build_backend,
     } = options;
     // The `uv.toml` format is not allowed to include any of the following, which are
@@ -345,6 +346,9 @@ fn validate_uv_toml(path: &Path, options: &Options) -> Result<(), Error> {
     }
     if package.is_some() {
         return Err(Error::PyprojectOnlyField(path.to_path_buf(), "package"));
+    }
+    if python.is_some() {
+        return Err(Error::PyprojectOnlyField(path.to_path_buf(), "python"));
     }
     if build_backend.is_some() {
         return Err(Error::PyprojectOnlyField(
@@ -457,6 +461,7 @@ fn warn_uv_toml_masked_fields(options: &Options) {
         dependency_groups: _,
         managed: _,
         package: _,
+        python: _,
         build_backend: _,
     } = options;
 

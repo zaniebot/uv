@@ -895,3 +895,220 @@ fn python_pin_rm() {
     error: No Python version file found; use `--rm --global` to remove the global pin
     ");
 }
+
+/// With the `python-pin-pyproject` preview feature enabled, `uv python pin` should write to the
+/// project's `pyproject.toml` instead of a `.python-version` file.
+#[test]
+fn python_pin_pyproject_preview_write() -> Result<()> {
+    let context = uv_test::test_context_with_versions!(&["3.11", "3.12"]);
+
+    let pyproject_toml = context.temp_dir.child("pyproject.toml");
+    pyproject_toml.write_str(
+        r#"
+[project]
+name = "project"
+version = "0.1.0"
+requires-python = ">=3.11"
+"#,
+    )?;
+
+    // Pin with the preview feature enabled; should write to `[tool.uv] python`.
+    uv_snapshot!(context.filters(), context.python_pin()
+        .arg("3.12")
+        .env(EnvVars::UV_PREVIEW_FEATURES, "python-pin-pyproject"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    Pinned `pyproject.toml` to `3.12`
+
+    ----- stderr -----
+    warning: The `python-pin-pyproject` preview feature is enabled. Writing the Python pin to `tool.uv.python` in `pyproject.toml`
+    ");
+
+    // The `.python-version` file should not exist.
+    assert!(!context.temp_dir.child(PYTHON_VERSION_FILENAME).exists());
+
+    let pyproject_contents = context.read("pyproject.toml");
+    assert_snapshot!(pyproject_contents, @r#"
+
+    [project]
+    name = "project"
+    version = "0.1.0"
+    requires-python = ">=3.11"
+
+    [tool.uv]
+    python = "3.12"
+    "#);
+
+    // Update an existing pin with the preview feature enabled.
+    uv_snapshot!(context.filters(), context.python_pin()
+        .arg("3.11")
+        .env(EnvVars::UV_PREVIEW_FEATURES, "python-pin-pyproject"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    Updated `pyproject.toml` from `3.12` -> `3.11`
+
+    ----- stderr -----
+    warning: The `python-pin-pyproject` preview feature is enabled. Writing the Python pin to `tool.uv.python` in `pyproject.toml`
+    ");
+
+    let pyproject_contents = context.read("pyproject.toml");
+    assert_snapshot!(pyproject_contents, @r#"
+
+    [project]
+    name = "project"
+    version = "0.1.0"
+    requires-python = ">=3.11"
+
+    [tool.uv]
+    python = "3.11"
+    "#);
+
+    Ok(())
+}
+
+/// Reading an existing `[tool.uv] python` via `uv python pin` should warn, even without the
+/// preview feature.
+#[test]
+fn python_pin_pyproject_read_warns() -> Result<()> {
+    let context = uv_test::test_context_with_versions!(&["3.11", "3.12"]);
+
+    let pyproject_toml = context.temp_dir.child("pyproject.toml");
+    pyproject_toml.write_str(
+        r#"
+[project]
+name = "project"
+version = "0.1.0"
+requires-python = ">=3.11"
+
+[tool.uv]
+python = "3.12"
+"#,
+    )?;
+
+    // Displaying the current pin should warn.
+    uv_snapshot!(context.filters(), context.python_pin(), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    3.12
+
+    ----- stderr -----
+    warning: Reading Python pin from `tool.uv.python` in `pyproject.toml`
+    ");
+
+    Ok(())
+}
+
+/// `[tool.uv] python` should be read by uv without the preview feature and without a warning by
+/// non-`uv python pin` commands.
+#[test]
+fn python_pin_pyproject_read_without_preview() -> Result<()> {
+    let context = uv_test::test_context_with_versions!(&["3.11", "3.12"]);
+
+    let pyproject_toml = context.temp_dir.child("pyproject.toml");
+    pyproject_toml.write_str(
+        r#"
+[project]
+name = "project"
+version = "0.1.0"
+requires-python = ">=3.11"
+
+[tool.uv]
+python = "3.11"
+"#,
+    )?;
+
+    // `uv python find` should resolve the pinned Python without any preview warning.
+    uv_snapshot!(context.filters(), context.python_find(), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    [PYTHON-3.11]
+
+    ----- stderr -----
+    ");
+
+    Ok(())
+}
+
+/// When both `.python-version` and `[tool.uv] python` are set, `uv python pin` reports the
+/// `[tool.uv] python` value with a warning (it takes priority for reads).
+#[test]
+fn python_pin_pyproject_takes_priority_for_read() -> Result<()> {
+    let context = uv_test::test_context_with_versions!(&["3.11", "3.12"]);
+
+    let pyproject_toml = context.temp_dir.child("pyproject.toml");
+    pyproject_toml.write_str(
+        r#"
+[project]
+name = "project"
+version = "0.1.0"
+requires-python = ">=3.11"
+
+[tool.uv]
+python = "3.12"
+"#,
+    )?;
+
+    let python_version = context.temp_dir.child(PYTHON_VERSION_FILENAME);
+    python_version.write_str("3.11\n")?;
+
+    // The `tool.uv.python` pin is reported first, with a warning.
+    uv_snapshot!(context.filters(), context.python_pin(), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    3.12
+
+    ----- stderr -----
+    warning: Reading Python pin from `tool.uv.python` in `pyproject.toml`
+    ");
+
+    Ok(())
+}
+
+/// `uv python pin --rm` should remove `[tool.uv] python` when the preview feature is enabled.
+#[test]
+fn python_pin_pyproject_rm() -> Result<()> {
+    let context = uv_test::test_context_with_versions!(&["3.11", "3.12"]);
+
+    let pyproject_toml = context.temp_dir.child("pyproject.toml");
+    pyproject_toml.write_str(
+        r#"
+[project]
+name = "project"
+version = "0.1.0"
+requires-python = ">=3.11"
+
+[tool.uv]
+python = "3.12"
+"#,
+    )?;
+
+    uv_snapshot!(context.filters(), context.python_pin()
+        .arg("--rm")
+        .env(EnvVars::UV_PREVIEW_FEATURES, "python-pin-pyproject"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    Removed Python pin from `pyproject.toml`
+
+    ----- stderr -----
+    warning: The `python-pin-pyproject` preview feature is enabled. Removing the Python pin from `tool.uv.python` in `pyproject.toml`
+    ");
+
+    let pyproject_contents = context.read("pyproject.toml");
+    assert_snapshot!(pyproject_contents, @r#"
+
+    [project]
+    name = "project"
+    version = "0.1.0"
+    requires-python = ">=3.11"
+
+    [tool.uv]
+    "#);
+
+    Ok(())
+}

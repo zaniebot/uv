@@ -387,6 +387,9 @@ async fn init_project(
     {
         // (2) Request from `.python-version`
         file.into_version()
+    } else if let Some(pin) = workspace.as_ref().and_then(|w| w.python()) {
+        // (3) Request from `[tool.uv] python` in the workspace `pyproject.toml`
+        Some(PythonRequest::parse(pin))
     } else {
         None
     };
