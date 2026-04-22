@@ -3021,6 +3021,7 @@ fn tool_run_misplaced_uv_flag_hint() {
       inifile: [INIFILE]
       rootdir: [ROOTDIR]
 
+
     hint: `--with` was passed to `pytest`, not to `uv tool run`. If this was intended for `uv tool run`, place it before the command, e.g., `uv tool run --with <value> pytest`
     ");
 
@@ -3040,6 +3041,7 @@ fn tool_run_misplaced_uv_flag_hint() {
     pytest: error: unrecognized arguments: --from=setuptools
       inifile: [INIFILE]
       rootdir: [ROOTDIR]
+
 
     hint: `--from` was passed to `pytest`, not to `uv tool run`. If this was intended for `uv tool run`, place it before the command, e.g., `uv tool run --from <value> pytest`
     ");

@@ -470,6 +470,7 @@ pub(crate) async fn run(
     if !matches!(status, ExitStatus::Success)
         && let Some(flag) = find_misplaced_uv_flag(args)
     {
+        writeln!(printer.stderr())?;
         writeln!(
             printer.stderr(),
             "{}{} `{}` was passed to `{}`, not to `{}`. If this was intended for `{}`, place it before the command, e.g., `{}`",
