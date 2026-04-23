@@ -1203,6 +1203,16 @@ impl EnvVars {
     #[attr_added_in("0.11.7")]
     pub const UV_TEST_AVAILABLE_VERSION_CUTOFF: &'static str = "UV_TEST_AVAILABLE_VERSION_CUTOFF";
 
+    /// A comma-separated list of `package==version` entries that should be treated
+    /// as available by the resolver regardless of [`UV_TEST_AVAILABLE_VERSION_CUTOFF`].
+    ///
+    /// This is used to allow individual tests to pin specific versions that were
+    /// released after the default cutoff, without disabling the cutoff entirely
+    /// (which would make the test non-deterministic as new versions are released).
+    #[attr_hidden]
+    #[attr_added_in("0.11.7")]
+    pub const UV_TEST_AVAILABLE_VERSIONS: &'static str = "UV_TEST_AVAILABLE_VERSIONS";
+
     /// `.env` files from which to load environment variables when executing `uv run` commands.
     #[attr_added_in("0.4.30")]
     pub const UV_ENV_FILE: &'static str = "UV_ENV_FILE";

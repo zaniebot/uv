@@ -1,5 +1,10 @@
+use std::collections::BTreeSet;
 use std::future::Future;
+use std::str::FromStr;
 use std::sync::Arc;
+
+use rustc_hash::FxHashMap;
+
 use uv_client::MetadataFormat;
 use uv_configuration::BuildOptions;
 use uv_distribution::{ArchiveMetadata, DistributionDatabase, Reporter};
@@ -119,6 +124,7 @@ pub struct DefaultResolverProvider<'a, Context: BuildContext> {
     hasher: HashStrategy,
     exclude_newer: ExcludeNewer,
     available_version_cutoff: Option<jiff::Timestamp>,
+    available_versions: FxHashMap<PackageName, BTreeSet<Version>>,
     index_locations: &'a IndexLocations,
     build_options: &'a BuildOptions,
     capabilities: &'a IndexCapabilities,
@@ -149,6 +155,10 @@ impl<'a, Context: BuildContext> DefaultResolverProvider<'a, Context> {
             available_version_cutoff: std::env::var(EnvVars::UV_TEST_AVAILABLE_VERSION_CUTOFF)
                 .ok()
                 .and_then(|value| value.parse().ok()),
+            available_versions: std::env::var(EnvVars::UV_TEST_AVAILABLE_VERSIONS)
+                .ok()
+                .map(|value| parse_available_versions(&value))
+                .unwrap_or_default(),
             index_locations,
             build_options,
             capabilities,
@@ -165,6 +175,30 @@ impl<'a, Context: BuildContext> DefaultResolverProvider<'a, Context> {
             self.index_locations.exclude_newer_for(index),
         )
     }
+}
+
+/// Parse a comma-separated list of `package==version` entries into a map from
+/// [`PackageName`] to the set of [`Version`]s that should be considered available
+/// regardless of the test available-version cutoff.
+fn parse_available_versions(value: &str) -> FxHashMap<PackageName, BTreeSet<Version>> {
+    let mut map: FxHashMap<PackageName, BTreeSet<Version>> = FxHashMap::default();
+    for entry in value.split(',') {
+        let entry = entry.trim();
+        if entry.is_empty() {
+            continue;
+        }
+        let Some((name, version)) = entry.split_once("==") else {
+            continue;
+        };
+        let Ok(name) = PackageName::from_str(name.trim()) else {
+            continue;
+        };
+        let Ok(version) = Version::from_str(version.trim()) else {
+            continue;
+        };
+        map.entry(name).or_default().insert(version);
+    }
+    map
 }
 
 impl<Context: BuildContext> ResolverProvider for DefaultResolverProvider<'_, Context> {
@@ -201,6 +235,8 @@ impl<Context: BuildContext> ResolverProvider for DefaultResolverProvider<'_, Con
                             .is_none()
                             .then_some(self.available_version_cutoff)
                             .flatten();
+                        let available_versions =
+                            self.available_versions.get(package_name).cloned();
 
                         match metadata {
                             MetadataFormat::Simple(metadata) => VersionMap::from_simple_metadata(
@@ -213,6 +249,7 @@ impl<Context: BuildContext> ResolverProvider for DefaultResolverProvider<'_, Con
                                 &self.hasher,
                                 included_version_cutoff,
                                 available_version_cutoff,
+                                available_versions,
                                 flat_index
                                     .and_then(|flat_index| flat_index.get(package_name))
                                     .cloned(),

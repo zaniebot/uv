@@ -17855,6 +17855,10 @@ fn incompatible_cuda() -> Result<()> {
     uv_snapshot!(context
         .pip_compile()
         .env_remove(EnvVars::UV_EXCLUDE_NEWER)
+        .env(
+            EnvVars::UV_TEST_AVAILABLE_VERSIONS,
+            "torch==2.6.0+cu126,torchvision==0.16.0+cu121",
+        )
         .env(EnvVars::UV_TORCH_BACKEND, "auto")
         .env(EnvVars::UV_CUDA_DRIVER_VERSION, "525.60.13")
         .arg("--preview")

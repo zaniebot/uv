@@ -5,6 +5,7 @@ use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::fmt::{Display, Formatter, Write};
 use std::ops::Bound;
+use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Instant;
 use std::{iter, slice, thread};
@@ -2729,6 +2730,31 @@ impl<InstalledPackages: InstalledPackagesProvider> ResolverState<InstalledPackag
             std::env::var(EnvVars::UV_TEST_AVAILABLE_VERSION_CUTOFF)
                 .ok()
                 .and_then(|s| s.parse().ok());
+        let available_version_allowlist: FxHashMap<PackageName, BTreeSet<Version>> =
+            std::env::var(EnvVars::UV_TEST_AVAILABLE_VERSIONS)
+                .ok()
+                .map(|value| {
+                    let mut map: FxHashMap<PackageName, BTreeSet<Version>> =
+                        FxHashMap::default();
+                    for entry in value.split(',') {
+                        let entry = entry.trim();
+                        if entry.is_empty() {
+                            continue;
+                        }
+                        let Some((name, version)) = entry.split_once("==") else {
+                            continue;
+                        };
+                        let Ok(name) = PackageName::from_str(name.trim()) else {
+                            continue;
+                        };
+                        let Ok(version) = Version::from_str(version.trim()) else {
+                            continue;
+                        };
+                        map.entry(name).or_default().insert(version);
+                    }
+                    map
+                })
+                .unwrap_or_default();
 
         for package in err.packages() {
             let Some(name) = package.name() else { continue };
@@ -2791,6 +2817,12 @@ impl<InstalledPackages: InstalledPackagesProvider> ResolverState<InstalledPackag
                                 let Some(ref exclude_newer) = available_version_cutoff else {
                                     return false;
                                 };
+                                if available_version_allowlist
+                                    .get(name)
+                                    .is_some_and(|versions| versions.contains(version))
+                                {
+                                    return false;
+                                }
                                 let Some(prioritized_dist) = dists.prioritized_dist() else {
                                     return false;
                                 };

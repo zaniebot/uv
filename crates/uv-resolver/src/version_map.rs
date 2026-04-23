@@ -1,5 +1,5 @@
-use std::collections::Bound;
 use std::collections::btree_map::{BTreeMap, Entry};
+use std::collections::{BTreeSet, Bound};
 use std::ops::RangeBounds;
 use std::sync::OnceLock;
 
@@ -54,6 +54,7 @@ impl VersionMap {
         hasher: &HashStrategy,
         included_version_cutoff: Option<Timestamp>,
         available_version_cutoff: Option<Timestamp>,
+        available_versions: Option<BTreeSet<Version>>,
         flat_index: Option<FlatDistributions>,
         build_options: &BuildOptions,
     ) -> Self {
@@ -131,6 +132,7 @@ impl VersionMap {
                 requires_python: requires_python.clone(),
                 included_version_cutoff,
                 available_version_cutoff,
+                available_versions: available_versions.unwrap_or_default(),
             }),
         }
     }
@@ -405,6 +407,9 @@ struct VersionMapLazy {
     included_version_cutoff: Option<Timestamp>,
     /// Files newer than this timestamp are considered unavailable, i.e., that they do not exist.
     available_version_cutoff: Option<Timestamp>,
+    /// Versions of this package that bypass [`VersionMapLazy::available_version_cutoff`] and are
+    /// always considered available.
+    available_versions: BTreeSet<Version>,
     /// Which yanked versions are allowed
     allowed_yanks: AllowedYanks,
     /// The hashes of allowed distributions.
@@ -459,6 +464,7 @@ impl VersionMapLazy {
             for (filename, file) in files.all() {
                 // Support resolving as if it were an earlier timestamp, at least as long files have
                 // upload time information.
+                let allowlisted = self.available_versions.contains(filename.version());
                 let (excluded, upload_time) = if let Some(included_version_cutoff) =
                     &self.included_version_cutoff
                 {
@@ -484,7 +490,8 @@ impl VersionMapLazy {
                 } else if let Some(available_version_cutoff) = &self.available_version_cutoff {
                     match file.upload_time_utc_ms.as_ref() {
                         Some(&upload_time)
-                            if upload_time >= available_version_cutoff.as_millisecond() =>
+                            if upload_time >= available_version_cutoff.as_millisecond()
+                                && !allowlisted =>
                         {
                             trace!(
                                 "Excluding `{}` (uploaded {upload_time}) due to available version cutoff ({available_version_cutoff})",
