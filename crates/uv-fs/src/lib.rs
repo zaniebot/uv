@@ -80,29 +80,52 @@ pub async fn read_to_string_transcode(path: impl AsRef<Path>) -> std::io::Result
 
 /// Create a symlink at `dst` pointing to `src`, replacing any existing symlink.
 ///
-/// On Windows, this uses the `junction` crate to create a junction point. The
-/// operation is _not_ atomic, as we first delete the junction, then create a
-/// junction at the same path.
+/// On Windows, this uses the `junction` crate to create a junction point, since
+/// junctions don't require elevated privileges. The operation is _not_ atomic, as
+/// we first delete the junction, then create a junction at the same path.
+///
+/// If junction creation is not supported by the underlying filesystem (e.g., when
+/// running under Wine, which does not implement the reparse-point ioctl used for
+/// junctions), this falls back to creating a Windows directory symbolic link via
+/// `CreateSymbolicLinkW`. Wine implements that as a Unix symlink, so the operation
+/// succeeds without requiring `SeCreateSymbolicLinkPrivilege`.
 ///
 /// Note that because junctions are used, the source must be a directory.
 ///
 /// Changes to this function should be reflected in [`create_symlink`].
 #[cfg(windows)]
 pub fn replace_symlink(src: impl AsRef<Path>, dst: impl AsRef<Path>) -> std::io::Result<()> {
+    let src = src.as_ref();
+    let dst = dst.as_ref();
+
     // If the source is a file, we can't create a junction
-    if src.as_ref().is_file() {
+    if src.is_file() {
         return Err(std::io::Error::new(
             std::io::ErrorKind::InvalidInput,
             format!(
                 "Cannot create a junction for {}: is not a directory",
-                src.as_ref().display()
+                src.display()
             ),
         ));
     }
 
+    match replace_with_junction(src, dst) {
+        Ok(()) => Ok(()),
+        // Filesystems that don't support reparse-point ioctls (e.g., Wine) report
+        // `ERROR_NOT_SUPPORTED` (`ErrorKind::Unsupported`). Fall back to a Windows
+        // directory symbolic link, which Wine implements as a Unix symlink.
+        Err(err) if err.kind() == std::io::ErrorKind::Unsupported => {
+            replace_with_symlink_dir(src, dst)
+        }
+        Err(err) => Err(err),
+    }
+}
+
+#[cfg(windows)]
+fn replace_with_junction(src: &Path, dst: &Path) -> std::io::Result<()> {
     // Remove the existing symlink, if any.
-    match junction::delete(dunce::simplified(dst.as_ref())) {
-        Ok(()) => match fs_err::remove_dir_all(dst.as_ref()) {
+    match junction::delete(dunce::simplified(dst)) {
+        Ok(()) => match fs_err::remove_dir_all(dst) {
             Ok(()) => {}
             Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
             Err(err) => return Err(err),
@@ -112,10 +135,25 @@ pub fn replace_symlink(src: impl AsRef<Path>, dst: impl AsRef<Path>) -> std::io:
     }
 
     // Replace it with a new symlink.
-    junction::create(
-        dunce::simplified(src.as_ref()),
-        dunce::simplified(dst.as_ref()),
-    )
+    junction::create(dunce::simplified(src), dunce::simplified(dst))
+}
+
+#[cfg(windows)]
+fn replace_with_symlink_dir(src: &Path, dst: &Path) -> std::io::Result<()> {
+    // Best-effort removal of any existing entry. The destination may be a
+    // directory, file, or symlink, so try the directory removal first and
+    // fall back to file removal if that fails.
+    match fs_err::remove_dir_all(dst) {
+        Ok(()) => {}
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
+        Err(_) => match fs_err::remove_file(dst) {
+            Ok(()) => {}
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
+            Err(err) => return Err(err),
+        },
+    }
+
+    fs_err::os::windows::fs::symlink_dir(dunce::simplified(src), dunce::simplified(dst))
 }
 
 /// Create a symlink at `dst` pointing to `src`, replacing any existing symlink if necessary.
@@ -143,28 +181,37 @@ pub fn replace_symlink(src: impl AsRef<Path>, dst: impl AsRef<Path>) -> std::io:
 
 /// Create a symlink at `dst` pointing to `src`.
 ///
-/// On Windows, this uses the `junction` crate to create a junction point.
+/// On Windows, this uses the `junction` crate to create a junction point, falling
+/// back to a Windows directory symbolic link if junction creation is not supported
+/// by the underlying filesystem (e.g., under Wine). See [`replace_symlink`] for
+/// details on the fallback behavior.
 ///
 /// Note that because junctions are used, the source must be a directory.
 ///
 /// Changes to this function should be reflected in [`replace_symlink`].
 #[cfg(windows)]
 pub fn create_symlink(src: impl AsRef<Path>, dst: impl AsRef<Path>) -> std::io::Result<()> {
+    let src = src.as_ref();
+    let dst = dst.as_ref();
+
     // If the source is a file, we can't create a junction
-    if src.as_ref().is_file() {
+    if src.is_file() {
         return Err(std::io::Error::new(
             std::io::ErrorKind::InvalidInput,
             format!(
                 "Cannot create a junction for {}: is not a directory",
-                src.as_ref().display()
+                src.display()
             ),
         ));
     }
 
-    junction::create(
-        dunce::simplified(src.as_ref()),
-        dunce::simplified(dst.as_ref()),
-    )
+    match junction::create(dunce::simplified(src), dunce::simplified(dst)) {
+        Ok(()) => Ok(()),
+        Err(err) if err.kind() == std::io::ErrorKind::Unsupported => {
+            fs_err::os::windows::fs::symlink_dir(dunce::simplified(src), dunce::simplified(dst))
+        }
+        Err(err) => Err(err),
+    }
 }
 
 /// Create a symlink at `dst` pointing to `src`.

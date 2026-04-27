@@ -839,11 +839,12 @@ impl PythonMinorVersionLink {
                 ));
             }
             Err(err) if err.kind() == io::ErrorKind::AlreadyExists => {}
-            // Some platforms or filesystems do not support symlinks or junctions
-            // (e.g., Windows builds running under Wine, where creating a junction
-            // returns `ERROR_NOT_SUPPORTED`). Treat this as a warning rather than a
-            // hard failure: the Python installation is still usable, just without
-            // the convenience minor version link.
+            // `uv-fs::replace_symlink` falls back from junctions to directory
+            // symbolic links when the filesystem rejects the junction ioctl
+            // (e.g., under Wine). If that fallback _also_ reports `Unsupported`,
+            // the filesystem can't host either form of link; treat this as a
+            // warning rather than a hard failure, since the Python installation
+            // itself is still usable without the convenience minor version link.
             Err(err) if err.kind() == io::ErrorKind::Unsupported => {
                 warn_user_once!(
                     "Failed to create Python minor version link at {}: \
