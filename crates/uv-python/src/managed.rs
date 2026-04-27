@@ -24,7 +24,6 @@ use uv_platform::{LibcDetectionError, Platform};
 use uv_state::{StateBucket, StateStore};
 use uv_static::EnvVars;
 use uv_trampoline_builder::{Launcher, LauncherKind};
-use uv_warnings::warn_user_once;
 
 use crate::discovery::VersionRequest;
 use crate::downloads::{Error as DownloadError, ManagedPythonDownload};
@@ -817,15 +816,10 @@ impl PythonMinorVersionLink {
     }
 
     pub fn create_directory(&self) -> Result<(), Error> {
-        let result = replace_symlink(
+        match replace_symlink(
             self.target_directory.as_path(),
             self.symlink_directory.as_path(),
-        );
-        self.handle_create_directory_result(result)
-    }
-
-    fn handle_create_directory_result(&self, result: io::Result<()>) -> Result<(), Error> {
-        match result {
+        ) {
             Ok(()) => {
                 debug!(
                     "Created link {} -> {}",
@@ -839,19 +833,6 @@ impl PythonMinorVersionLink {
                 ));
             }
             Err(err) if err.kind() == io::ErrorKind::AlreadyExists => {}
-            // `uv-fs::replace_symlink` falls back from junctions to directory
-            // symbolic links when the filesystem rejects the junction ioctl
-            // (e.g., under Wine). If that fallback _also_ reports `Unsupported`,
-            // the filesystem can't host either form of link; treat this as a
-            // warning rather than a hard failure, since the Python installation
-            // itself is still usable without the convenience minor version link.
-            Err(err) if err.kind() == io::ErrorKind::Unsupported => {
-                warn_user_once!(
-                    "Failed to create Python minor version link at {}: \
-                     not supported by the current platform or filesystem ({err})",
-                    self.symlink_directory.user_display(),
-                );
-            }
             Err(err) => {
                 return Err(Error::PythonMinorVersionLinkDirectory(err));
             }
@@ -1412,67 +1393,5 @@ mod tests {
                 );
             },
         );
-    }
-
-    /// Regression test for <https://github.com/astral-sh/uv/issues/19187>.
-    ///
-    /// On platforms or filesystems that do not support symlinks/junctions
-    /// (e.g., a Windows build of `uv` running under Wine), creating the minor
-    /// version link should be skipped with a warning rather than failing the
-    /// install.
-    #[test]
-    fn test_create_directory_unsupported_is_warning() {
-        let installation = create_test_installation(
-            ImplementationName::CPython,
-            3,
-            10,
-            8,
-            None,
-            PythonVariant::Default,
-            None,
-        );
-        let link = PythonMinorVersionLink::from_installation(&installation)
-            .expect("CPython should produce a minor version link");
-
-        let unsupported = io::Error::from(io::ErrorKind::Unsupported);
-        assert!(
-            link.handle_create_directory_result(Err(unsupported))
-                .is_ok()
-        );
-    }
-
-    #[test]
-    fn test_create_directory_other_errors_propagate() {
-        let installation = create_test_installation(
-            ImplementationName::CPython,
-            3,
-            10,
-            8,
-            None,
-            PythonVariant::Default,
-            None,
-        );
-        let link = PythonMinorVersionLink::from_installation(&installation)
-            .expect("CPython should produce a minor version link");
-
-        let permission_denied = io::Error::from(io::ErrorKind::PermissionDenied);
-        assert!(matches!(
-            link.handle_create_directory_result(Err(permission_denied)),
-            Err(Error::PythonMinorVersionLinkDirectory(_))
-        ));
-
-        let not_found = io::Error::from(io::ErrorKind::NotFound);
-        assert!(matches!(
-            link.handle_create_directory_result(Err(not_found)),
-            Err(Error::MissingPythonMinorVersionLinkTargetDirectory(_))
-        ));
-
-        let already_exists = io::Error::from(io::ErrorKind::AlreadyExists);
-        assert!(
-            link.handle_create_directory_result(Err(already_exists))
-                .is_ok()
-        );
-
-        assert!(link.handle_create_directory_result(Ok(())).is_ok());
     }
 }
