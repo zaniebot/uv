@@ -4799,6 +4799,45 @@ fn run_remote_pep723_script() {
     ");
 }
 
+#[tokio::test]
+async fn run_remote_requirements_redacts_fetch_error_credentials() -> Result<()> {
+    use wiremock::matchers::{method, path};
+    use wiremock::{Mock, MockServer, ResponseTemplate};
+
+    let context = uv_test::test_context!("3.12");
+    let context = context.with_filter((r"127\.0\.0\.1:\d+", "[SERVER]"));
+
+    let script = context.temp_dir.child("main.py");
+    script.write_str("print('hello')")?;
+
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/requirements.txt"))
+        .respond_with(ResponseTemplate::new(500))
+        .mount(&server)
+        .await;
+
+    let url = format!("{}/requirements.txt", server.uri()).replacen(
+        "http://",
+        "http://username:password@",
+        1,
+    );
+
+    uv_snapshot!(context.filters(), context.run()
+        .arg("--with-requirements")
+        .arg(url)
+        .arg(script.as_os_str()), @"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    error: Error while accessing remote requirements file: `http://username:****@[LOCALHOST]/requirements.txt`
+    ");
+
+    Ok(())
+}
+
 #[cfg(unix)] // A URL could be a valid filepath on Unix but not on Windows
 #[test]
 fn run_url_like_with_local_file_priority() -> Result<()> {
