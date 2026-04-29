@@ -304,16 +304,13 @@ impl LockedFile {
                         .create(true)
                         .open(path.as_ref())?;
 
-                    // We don't want to `try_set_permissions` in cases where another user's process
-                    // has already created the lockfile and changed its permissions because we might
-                    // not have permission to change the permissions which would produce a confusing
-                    // warning.
-                    if file
-                        .metadata()
-                        .is_ok_and(|metadata| metadata.permissions().mode() != DESIRED_MODE)
-                    {
-                        try_set_permissions(file.file(), path.as_ref());
-                    }
+                    // Apply the desired mode via `fchmod` on the open fd, so we adjust the file
+                    // we actually hold, not whatever might appear at the path now. Skipping based
+                    // on a metadata check would race with another process changing the mode, and
+                    // `Permissions::mode()` includes file-type bits (e.g. `S_IFREG`), so it would
+                    // never equal `DESIRED_MODE` for a regular file. If another user owns the file,
+                    // `fchmod` will fail and `try_set_permissions` logs a warning.
+                    try_set_permissions(file.file(), path.as_ref());
                     Ok(file)
                 } else {
                     let temp_path = err.file.into_temp_path();
