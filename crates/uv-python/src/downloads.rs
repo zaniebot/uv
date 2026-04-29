@@ -1381,9 +1381,22 @@ impl ManagedPythonDownload {
         }
 
         // Remove the target if it already exists.
-        if path.is_dir() {
-            debug!("Removing existing directory: {}", path.user_display());
-            fs_err::tokio::remove_dir_all(&path).await?;
+        //
+        // We use [`fs_err::tokio::symlink_metadata`] to inspect the target without following
+        // symlinks; otherwise, if `path` was concurrently replaced with a symlink to a directory
+        // elsewhere, [`fs_err::tokio::remove_dir_all`] could descend into and delete that
+        // unrelated directory.
+        match fs_err::tokio::symlink_metadata(&path).await {
+            Ok(metadata) if metadata.file_type().is_dir() => {
+                debug!("Removing existing directory: {}", path.user_display());
+                fs_err::tokio::remove_dir_all(&path).await?;
+            }
+            Ok(_) => {
+                debug!("Removing existing file at: {}", path.user_display());
+                fs_err::tokio::remove_file(&path).await?;
+            }
+            Err(err) if err.kind() == io::ErrorKind::NotFound => {}
+            Err(err) => return Err(err.into()),
         }
 
         // Persist it to the target.

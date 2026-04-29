@@ -2413,6 +2413,60 @@ fn python_install_broken_link() {
     });
 }
 
+/// If the managed Python install path is a symlink to an unrelated directory
+/// (e.g., concurrently substituted by another process), `--reinstall` must remove
+/// only the symlink and not descend into and delete the symlink's target.
+#[cfg(unix)]
+#[test]
+fn python_reinstall_does_not_follow_symlink() {
+    use fs_err::os::unix::fs::symlink;
+
+    let context = uv_test::test_context_with_versions!(&[])
+        .with_filtered_python_keys()
+        .with_filtered_exe_suffix()
+        .with_managed_python_dirs()
+        .with_python_download_cache();
+
+    let managed_dir = context.temp_dir.child("managed");
+    let platform_key = platform_key_from_env().unwrap();
+    let install_path = managed_dir.child(format!("cpython-3.12.8-{platform_key}"));
+
+    // Create a sentinel directory outside the managed tree with a marker file.
+    let sentinel_dir = context.temp_dir.child("sentinel");
+    sentinel_dir.create_dir_all().unwrap();
+    let sentinel_file = sentinel_dir.child("keep-me");
+    sentinel_file.write_str("must-not-be-deleted").unwrap();
+
+    // Place a symlink at the would-be install path that points to the sentinel.
+    managed_dir.create_dir_all().unwrap();
+    symlink(sentinel_dir.path(), install_path.path()).unwrap();
+
+    // Reinstall: even though the install path is a symlink-to-directory, we
+    // must not follow it and remove the sentinel's contents.
+    uv_snapshot!(context.filters(), context.python_install().arg("3.12.8").arg("--reinstall"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Installed Python 3.12.8 in [TIME]
+     + cpython-3.12.8-[PLATFORM] (python3.12)
+    ");
+
+    // The sentinel directory and file must still exist.
+    sentinel_dir.assert(predicate::path::is_dir());
+    sentinel_file.assert(predicate::path::exists());
+    sentinel_file.assert(predicate::str::contains("must-not-be-deleted"));
+
+    // The install path should now be a real directory, not the previous symlink.
+    let install_metadata = install_path.path().symlink_metadata().unwrap();
+    assert!(
+        install_metadata.file_type().is_dir(),
+        "expected install path to be a real directory, got: {:?}",
+        install_metadata.file_type()
+    );
+}
+
 /// Test that --default works with pre-release versions (e.g., 3.15.0a1).
 /// This test verifies the fix for issue #16696 where --default didn't create
 /// python.exe and python3.exe links for pre-release versions.
