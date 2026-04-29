@@ -7,7 +7,7 @@ use std::str::FromStr;
 use thiserror::Error;
 use url::Url;
 
-const SENSITIVE_QUERY_PARAMETERS: &[&str] = &[
+const SENSITIVE_QUERY_VARIABLES: &[&str] = &[
     "X-Amz-Credential",
     "X-Amz-Security-Token",
     "X-Amz-Signature",
@@ -252,7 +252,7 @@ impl Display for DisplaySafeUrl {
 
 impl Debug for DisplaySafeUrl {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let url = url_with_redacted_sensitive_query_values(&self.0);
+        let url = redact_sensitive_query_variables(&self.0, SENSITIVE_QUERY_VARIABLES);
         let url = url.as_ref();
         // For URLs that use the `git` convention (i.e., `ssh://git@github.com/...`), avoid masking the
         // username.
@@ -308,16 +308,19 @@ fn is_ssh_git_username(url: &Url) -> bool {
         && url.password().is_none()
 }
 
-fn is_sensitive_query_parameter(key: &str) -> bool {
-    SENSITIVE_QUERY_PARAMETERS
+fn is_sensitive_query_variable(key: &str, sensitive_query_variables: &[&str]) -> bool {
+    sensitive_query_variables
         .iter()
         .any(|sensitive| key.eq_ignore_ascii_case(sensitive))
 }
 
-fn url_with_redacted_sensitive_query_values(url: &Url) -> Cow<'_, Url> {
+fn redact_sensitive_query_variables<'a>(
+    url: &'a Url,
+    sensitive_query_variables: &[&str],
+) -> Cow<'a, Url> {
     if !url
         .query_pairs()
-        .any(|(key, _value)| is_sensitive_query_parameter(&key))
+        .any(|(key, _value)| is_sensitive_query_variable(&key, sensitive_query_variables))
     {
         return Cow::Borrowed(url);
     }
@@ -325,7 +328,7 @@ fn url_with_redacted_sensitive_query_values(url: &Url) -> Cow<'_, Url> {
     let query_pairs: Vec<_> = url
         .query_pairs()
         .map(|(key, value)| {
-            let value = if is_sensitive_query_parameter(&key) {
+            let value = if is_sensitive_query_variable(&key, sensitive_query_variables) {
                 Cow::Borrowed("****")
             } else {
                 value
@@ -343,7 +346,7 @@ fn display_with_redacted_credentials(
     url: &Url,
     f: &mut std::fmt::Formatter<'_>,
 ) -> std::fmt::Result {
-    let url = url_with_redacted_sensitive_query_values(url);
+    let url = redact_sensitive_query_variables(url, SENSITIVE_QUERY_VARIABLES);
     let url = url.as_ref();
     // For URLs that use the `git` convention (i.e., `ssh://git@github.com/...`), avoid dropping the
     // username.
@@ -557,6 +560,17 @@ mod tests {
         assert_eq!(
             log_safe_url.to_string(),
             "https://bucket.s3.amazonaws.com/dist.whl?token=secret"
+        );
+    }
+
+    #[test]
+    fn redact_custom_sensitive_query_variables() {
+        let url = Url::parse("https://example.com/path?token=secret&safe=value").unwrap();
+        let url = redact_sensitive_query_variables(&url, &["token"]);
+
+        assert_eq!(
+            url.as_ref().as_str(),
+            "https://example.com/path?token=****&safe=value"
         );
     }
 
