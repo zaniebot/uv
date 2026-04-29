@@ -323,6 +323,56 @@ fn prune_unzipped() -> Result<()> {
     Ok(())
 }
 
+/// `cache prune` must not follow symlinks within the archive bucket when deleting an
+/// unreferenced entry.
+///
+/// Regression test: previously, prune called [`fs_err::canonicalize`] on each archive
+/// entry and passed the resolved path to `rm_rf`. A symlink swapped into the archive
+/// bucket could redirect the deletion to a different cache entry (or anywhere on the
+/// filesystem) between the canonicalize and rm_rf calls.
+#[cfg(unix)]
+#[test]
+fn prune_archive_entry_symlink_does_not_redirect() -> Result<()> {
+    use fs_err::os::unix::fs::symlink;
+
+    let context = uv_test::test_context!("3.12");
+
+    let requirements_txt = context.temp_dir.child("requirements.txt");
+    requirements_txt.write_str("anyio")?;
+
+    // Populate the cache.
+    context
+        .pip_sync()
+        .arg("requirements.txt")
+        .assert()
+        .success();
+
+    // Plant a victim file outside the cache, then create a symlink masquerading as an
+    // unreferenced archive entry that points at the victim.
+    let victim = context.temp_dir.child("victim.txt");
+    victim.write_str("do not delete me")?;
+
+    let archive_bucket = context.cache_dir.child("archive-v0");
+    archive_bucket.create_dir_all()?;
+    let dangling_link = archive_bucket.path().join("dangling");
+    symlink(victim.path(), &dangling_link)?;
+
+    context.prune().assert().success();
+
+    // The symlink itself must be removed (it is unreferenced)...
+    assert!(
+        fs_err::symlink_metadata(&dangling_link).is_err(),
+        "the unreferenced symlink in the archive bucket should have been removed"
+    );
+    // ...but the victim outside the cache must remain intact.
+    assert!(
+        victim.path().exists(),
+        "prune should not follow the symlink and delete the file it points to"
+    );
+
+    Ok(())
+}
+
 /// `cache prune` should remove any stale source distribution revisions.
 #[test]
 fn prune_stale_revision() -> Result<()> {

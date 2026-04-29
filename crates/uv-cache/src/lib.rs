@@ -690,10 +690,15 @@ impl Cache {
             Ok(entries) => {
                 for entry in entries {
                     let entry = entry?;
-                    let path = fs_err::canonicalize(entry.path())?;
-                    if !references.contains_key(&path) {
+                    let path = entry.path();
+                    // Resolve symlinks only to look up against [`references`], whose keys are
+                    // canonical paths from [`Cache::resolve_link`]. Deletion uses the un-resolved
+                    // [`entry.path()`] so that a symlink swap can't redirect [`rm_rf`] to a
+                    // different cache entry between the lookup and the deletion.
+                    let canonical = fs_err::canonicalize(&path)?;
+                    if !references.contains_key(&canonical) {
                         debug!("Removing dangling cache archive: {}", path.display());
-                        summary += rm_rf(path)?;
+                        summary += rm_rf(&path)?;
                     }
                 }
             }
