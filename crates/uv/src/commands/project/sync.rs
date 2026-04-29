@@ -37,10 +37,6 @@ use uv_warnings::warn_user;
 use uv_workspace::pyproject::Source;
 use uv_workspace::{DiscoveryOptions, MemberDiscovery, VirtualProject, Workspace, WorkspaceCache};
 
-use crate::commands::pip::loggers::{DefaultInstallLogger, DefaultResolveLogger, InstallLogger};
-use crate::commands::pip::operations::{ChangedDist, Changelog, Modifications};
-use crate::commands::pip::resolution_markers;
-use crate::commands::pip::{operations, resolution_tags};
 use crate::commands::project::install_target::InstallTarget;
 use crate::commands::project::lock::{LockMode, LockOperation, LockResult};
 use crate::commands::project::lock_target::LockTarget;
@@ -55,6 +51,10 @@ use crate::settings::{
     ResolverSettings,
 };
 use uv_cli_output::printer::Printer;
+use uv_operations::installation::{ChangedDist, Changelog, Modifications};
+use uv_operations::loggers::{DefaultInstallLogger, DefaultResolveLogger, InstallLogger};
+use uv_operations::resolution::resolution_markers;
+use uv_operations::resolution::resolution_tags;
 
 /// Sync the project environment.
 pub(crate) async fn sync(
@@ -297,7 +297,9 @@ pub(crate) async fn sync(
                     )?;
                     return Ok(ExitStatus::Success);
                 }
-                Err(ProjectError::Operation(operations::Error::OutdatedEnvironment(changelog))) => {
+                Err(ProjectError::Operation(uv_operations::Error::OutdatedEnvironment(
+                    changelog,
+                ))) => {
                     write_sync_report(
                         &target,
                         &environment,
@@ -310,7 +312,7 @@ pub(crate) async fn sync(
                     return diagnostics::OperationDiagnostic::with_system_certs(
                         client_builder.system_certs(),
                     )
-                    .report(operations::Error::OutdatedEnvironment(changelog))
+                    .report(uv_operations::Error::OutdatedEnvironment(changelog))
                     .map_or(Ok(ExitStatus::Failure), |err| Err(err.into()));
                 }
                 Err(ProjectError::Operation(err)) => {
@@ -440,7 +442,7 @@ pub(crate) async fn sync(
     .await
     {
         Ok(changelog) => changelog,
-        Err(ProjectError::Operation(operations::Error::OutdatedEnvironment(changelog))) => {
+        Err(ProjectError::Operation(uv_operations::Error::OutdatedEnvironment(changelog))) => {
             write_sync_report(
                 &target,
                 &environment,
@@ -453,7 +455,7 @@ pub(crate) async fn sync(
             return diagnostics::OperationDiagnostic::with_system_certs(
                 client_builder.system_certs(),
             )
-            .report(operations::Error::OutdatedEnvironment(changelog))
+            .report(uv_operations::Error::OutdatedEnvironment(changelog))
             .map_or(Ok(ExitStatus::Failure), |err| Err(err.into()));
         }
         Err(ProjectError::Operation(err)) => {
@@ -854,7 +856,7 @@ pub(super) async fn do_sync(
     let site_packages = SitePackages::from_environment(venv)?;
 
     // Sync the environment.
-    let changelog = operations::install(
+    let changelog = uv_operations::installation::install(
         &resolution,
         site_packages,
         InstallationStrategy::Strict,

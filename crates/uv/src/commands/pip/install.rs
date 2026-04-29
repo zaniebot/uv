@@ -40,14 +40,14 @@ use uv_warnings::warn_user;
 use uv_workspace::WorkspaceCache;
 use uv_workspace::pyproject::ExtraBuildDependencies;
 
-use crate::commands::pip::loggers::{DefaultInstallLogger, DefaultResolveLogger, InstallLogger};
-use crate::commands::pip::operations::Modifications;
-use crate::commands::pip::operations::{report_interpreter, report_target_environment};
-use crate::commands::pip::{operations, resolution_markers, resolution_tags};
 use crate::commands::pylock::{read_pylock_toml, resolve_pylock_toml};
 use crate::commands::{ExitStatus, diagnostics};
 use uv_cli_output::printer::Printer;
 use uv_cli_output::reporters::PythonDownloadReporter;
+use uv_operations::environment::{report_interpreter, report_target_environment};
+use uv_operations::installation::Modifications;
+use uv_operations::loggers::{DefaultInstallLogger, DefaultResolveLogger, InstallLogger};
+use uv_operations::resolution::{resolution_markers, resolution_tags};
 
 /// Install packages into the current environment.
 #[expect(clippy::fn_params_excessive_bools)]
@@ -126,7 +126,7 @@ pub(crate) async fn pip_install(
         no_binary,
         no_build,
         extras: _,
-    } = operations::read_requirements(
+    } = uv_operations::requirements::read_requirements(
         requirements,
         constraints,
         overrides,
@@ -173,7 +173,7 @@ pub(crate) async fn pip_install(
 
     // Read build constraints.
     let build_constraints: Vec<NameRequirementSpecification> =
-        operations::read_constraints(build_constraints, &client_builder)
+        uv_operations::requirements::read_constraints(build_constraints, &client_builder)
             .await?
             .into_iter()
             .chain(
@@ -537,7 +537,7 @@ pub(crate) async fn pip_install(
             .build();
 
         // Resolve the requirements.
-        let (resolution, hasher) = match operations::resolve(
+        let (resolution, hasher) = match uv_operations::resolution::resolve(
             requirements,
             constraints,
             overrides,
@@ -612,7 +612,7 @@ pub(crate) async fn pip_install(
     );
 
     // Sync the environment.
-    match operations::install(
+    match uv_operations::installation::install(
         &resolution,
         site_packages,
         InstallationStrategy::Permissive,
@@ -648,11 +648,11 @@ pub(crate) async fn pip_install(
     }
 
     // Notify the user of any resolution diagnostics.
-    operations::diagnose_resolution(resolution.diagnostics(), printer)?;
+    uv_operations::diagnostics::diagnose_resolution(resolution.diagnostics(), printer)?;
 
     // Notify the user of any environment diagnostics.
     if strict && !dry_run.enabled() {
-        operations::diagnose_environment(
+        uv_operations::diagnostics::diagnose_environment(
             &resolution,
             &environment,
             &marker_env,

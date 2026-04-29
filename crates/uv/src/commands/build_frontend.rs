@@ -44,7 +44,6 @@ use uv_workspace::pyproject::ExtraBuildDependencies;
 use uv_workspace::{DiscoveryOptions, Workspace, WorkspaceCache, WorkspaceError};
 
 use crate::commands::ExitStatus;
-use crate::commands::pip::operations;
 use crate::commands::project::{ProjectError, find_requires_python};
 use crate::settings::ResolverSettings;
 use uv_cli_output::printer::Printer;
@@ -67,7 +66,7 @@ enum Error {
     #[error(transparent)]
     Extract(#[from] uv_extract::Error),
     #[error(transparent)]
-    Operations(#[from] operations::Error),
+    Operations(#[from] uv_operations::Error),
     #[error(transparent)]
     Join(#[from] tokio::task::JoinError),
     #[error(transparent)]
@@ -559,7 +558,7 @@ async fn build_package(
 
     // Read build constraints.
     let build_constraints =
-        operations::read_constraints(build_constraints, &client_builder).await?;
+        uv_operations::requirements::read_constraints(build_constraints, &client_builder).await?;
 
     // Collect the set of required hashes.
     let hasher = if let Some(hash_checking) = hash_checking {

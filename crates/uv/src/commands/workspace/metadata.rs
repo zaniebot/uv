@@ -14,13 +14,13 @@ use uv_settings::PythonInstallMirrors;
 use uv_warnings::warn_user;
 use uv_workspace::{DiscoveryOptions, VirtualProject, Workspace, WorkspaceCache};
 
-use crate::commands::pip::loggers::DefaultResolveLogger;
 use crate::commands::project::lock::{LockMode, LockOperation};
 use crate::commands::project::lock_target::LockTarget;
 use crate::commands::project::{ProjectError, ProjectInterpreter, UniversalState, WorkspacePython};
 use crate::commands::{ExitStatus, diagnostics};
 use crate::settings::{FrozenSource, LockCheck, ResolverSettings};
 use uv_cli_output::printer::Printer;
+use uv_operations::loggers::DefaultResolveLogger;
 
 /// Display metadata about the workspace.
 pub(crate) async fn metadata(

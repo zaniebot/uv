@@ -51,9 +51,6 @@ use uv_workspace::dependency_groups::DependencyGroupError;
 use uv_workspace::pyproject::{ExtraBuildDependency, PyProjectToml};
 use uv_workspace::{RequiresPythonSources, Workspace, WorkspaceCache};
 
-use crate::commands::pip;
-use crate::commands::pip::loggers::{InstallLogger, ResolveLogger};
-use crate::commands::pip::operations::{Changelog, Modifications};
 use crate::commands::project::install_target::InstallTarget;
 use crate::settings::{
     FrozenSource, InstallerSettingsRef, LockCheckSource, ResolverInstallerSettings,
@@ -62,6 +59,9 @@ use crate::settings::{
 use uv_cli_output::format::{capitalize, conjunction};
 use uv_cli_output::printer::Printer;
 use uv_cli_output::reporters::{PythonDownloadReporter, ResolverReporter};
+use uv_operations::installation::{Changelog, Modifications};
+use uv_operations::loggers::{InstallLogger, ResolveLogger};
+use uv_operations::resolution::{resolution_markers, resolution_tags};
 
 pub(crate) mod add;
 pub(crate) mod audit;
@@ -301,7 +301,7 @@ pub(crate) enum ProjectError {
     Lock(#[from] uv_resolver::LockError),
 
     #[error(transparent)]
-    Operation(#[from] pip::operations::Error),
+    Operation(#[from] uv_operations::Error),
 
     #[error(transparent)]
     Interpreter(#[from] uv_python::InterpreterError),
@@ -2045,8 +2045,8 @@ pub(crate) async fn resolve_environment(
     let client_builder = client_builder.clone().keyring(*keyring_provider);
 
     // Determine the tags, markers, and interpreter to use for resolution.
-    let tags = pip::resolution_tags(None, python_platform, interpreter)?;
-    let marker_env = pip::resolution_markers(None, python_platform, interpreter);
+    let tags = resolution_tags(None, python_platform, interpreter)?;
+    let marker_env = resolution_markers(None, python_platform, interpreter);
     let python_requirement = PythonRequirement::from_interpreter(interpreter);
 
     // Determine the PyTorch backend.
@@ -2175,7 +2175,7 @@ pub(crate) async fn resolve_environment(
     );
 
     // Resolve the requirements.
-    Ok(pip::operations::resolve(
+    Ok(uv_operations::resolution::resolve(
         requirements,
         constraints,
         overrides,
@@ -2316,7 +2316,7 @@ pub(crate) async fn sync_environment(
     );
 
     // Sync the environment.
-    pip::operations::install(
+    uv_operations::installation::install(
         resolution,
         site_packages,
         InstallationStrategy::Permissive,
@@ -2342,7 +2342,7 @@ pub(crate) async fn sync_environment(
     .await?;
 
     // Notify the user of any resolution diagnostics.
-    pip::operations::diagnose_resolution(resolution.diagnostics(), printer)?;
+    uv_operations::diagnostics::diagnose_resolution(resolution.diagnostics(), printer)?;
 
     Ok(venv)
 }
@@ -2428,8 +2428,8 @@ pub(crate) async fn update_environment(
 
     // Determine markers and tags to use for resolution.
     let interpreter = venv.interpreter();
-    let marker_env = pip::resolution_markers(None, python_platform, interpreter);
-    let tags = pip::resolution_tags(None, python_platform, interpreter)?;
+    let marker_env = resolution_markers(None, python_platform, interpreter);
+    let tags = resolution_tags(None, python_platform, interpreter)?;
 
     // Check if the current environment satisfies the requirements
     let site_packages = SitePackages::from_environment(&venv)?;
@@ -2574,7 +2574,7 @@ pub(crate) async fn update_environment(
     );
 
     // Resolve the requirements.
-    let (resolution, hasher) = match pip::operations::resolve(
+    let (resolution, hasher) = match uv_operations::resolution::resolve(
         requirements,
         constraints,
         overrides,
@@ -2609,7 +2609,7 @@ pub(crate) async fn update_environment(
         Err(err) => return Err(err.into()),
     };
     // Sync the environment.
-    let changelog = pip::operations::install(
+    let changelog = uv_operations::installation::install(
         &resolution,
         site_packages,
         InstallationStrategy::Permissive,
@@ -2635,7 +2635,7 @@ pub(crate) async fn update_environment(
     .await?;
 
     // Notify the user of any resolution diagnostics.
-    pip::operations::diagnose_resolution(resolution.diagnostics(), printer)?;
+    uv_operations::diagnostics::diagnose_resolution(resolution.diagnostics(), printer)?;
 
     Ok(EnvironmentUpdate {
         environment: venv,

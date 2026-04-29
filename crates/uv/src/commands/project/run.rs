@@ -57,10 +57,6 @@ struct GistResponse {
 struct GistFile {
     raw_url: String,
 }
-use crate::commands::pip::loggers::{
-    DefaultInstallLogger, DefaultResolveLogger, SummaryInstallLogger, SummaryResolveLogger,
-};
-use crate::commands::pip::operations::Modifications;
 use crate::commands::project::environment::{CachedEnvironment, EphemeralEnvironment};
 use crate::commands::project::install_target::InstallTarget;
 use crate::commands::project::lock::LockMode;
@@ -78,6 +74,10 @@ use crate::settings::{
 };
 use uv_cli_output::printer::Printer;
 use uv_cli_output::reporters::PythonDownloadReporter;
+use uv_operations::installation::Modifications;
+use uv_operations::loggers::{
+    DefaultInstallLogger, DefaultResolveLogger, SummaryInstallLogger, SummaryResolveLogger,
+};
 
 /// Run a command.
 #[expect(clippy::fn_params_excessive_bools)]

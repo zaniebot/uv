@@ -20,10 +20,10 @@ use uv_tool::InstalledTools;
 use uv_warnings::warn_user;
 
 use crate::commands::ExitStatus;
-use crate::commands::pip::latest::LatestClient;
 use crate::settings::ResolverInstallerSettings;
 use uv_cli_output::printer::Printer;
 use uv_cli_output::reporters::LatestVersionReporter;
+use uv_operations::latest::LatestClient;
 
 /// List installed tools.
 #[expect(clippy::fn_params_excessive_bools)]

@@ -22,7 +22,6 @@ use uv_scripts::Pep723Script;
 use uv_settings::PythonInstallMirrors;
 use uv_workspace::{DiscoveryOptions, MemberDiscovery, VirtualProject, WorkspaceCache};
 
-use crate::commands::pip::loggers::DefaultResolveLogger;
 use crate::commands::project::install_target::InstallTarget;
 use crate::commands::project::lock::{LockMode, LockOperation};
 use crate::commands::project::lock_target::LockTarget;
@@ -34,6 +33,7 @@ use crate::commands::{ExitStatus, diagnostics};
 use crate::settings::{FrozenSource, LockCheck, ResolverSettings};
 use uv_cli_output::printer::Printer;
 use uv_cli_output::writer::OutputWriter;
+use uv_operations::loggers::DefaultResolveLogger;
 
 #[derive(Debug, Clone)]
 #[expect(clippy::large_enum_variant)]

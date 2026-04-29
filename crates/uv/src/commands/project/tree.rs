@@ -17,9 +17,6 @@ use uv_scripts::Pep723Script;
 use uv_settings::PythonInstallMirrors;
 use uv_workspace::{DiscoveryOptions, Workspace, WorkspaceCache};
 
-use crate::commands::pip::latest::LatestClient;
-use crate::commands::pip::loggers::DefaultResolveLogger;
-use crate::commands::pip::resolution_markers;
 use crate::commands::project::lock::{LockMode, LockOperation};
 use crate::commands::project::lock_target::LockTarget;
 use crate::commands::project::{
@@ -32,6 +29,9 @@ use crate::settings::LockCheck;
 use crate::settings::ResolverSettings;
 use uv_cli_output::printer::Printer;
 use uv_cli_output::reporters::LatestVersionReporter;
+use uv_operations::latest::LatestClient;
+use uv_operations::loggers::DefaultResolveLogger;
+use uv_operations::resolution::resolution_markers;
 
 /// Run a command.
 #[expect(clippy::fn_params_excessive_bools)]

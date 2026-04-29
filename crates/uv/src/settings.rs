@@ -64,7 +64,8 @@ use uv_workspace::pyproject::{DependencyType, ExtraBuildDependencies};
 use uv_workspace::pyproject_mut::AddBoundsKind;
 
 use crate::commands::ToolRunCommand;
-use crate::commands::{InitKind, InitProjectKind, pip::operations::Modifications};
+use crate::commands::{InitKind, InitProjectKind};
+use uv_operations::installation::Modifications;
 
 /// The default publish URL.
 const PYPI_PUBLISH_URL: &str = "https://upload.pypi.org/legacy/";

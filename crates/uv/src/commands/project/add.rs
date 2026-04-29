@@ -42,10 +42,6 @@ use uv_workspace::pyproject::{DependencyType, Source, SourceError, Sources, Tool
 use uv_workspace::pyproject_mut::{AddBoundsKind, ArrayEdit, DependencyTarget, PyProjectTomlMut};
 use uv_workspace::{DiscoveryOptions, VirtualProject, WorkspaceCache};
 
-use crate::commands::pip::loggers::{
-    DefaultInstallLogger, DefaultResolveLogger, SummaryResolveLogger,
-};
-use crate::commands::pip::operations::Modifications;
 use crate::commands::project::install_target::InstallTarget;
 use crate::commands::project::lock::LockMode;
 use crate::commands::project::lock_target::LockTarget;
@@ -57,6 +53,8 @@ use crate::commands::{ExitStatus, ScriptPath, diagnostics, project};
 use crate::settings::{FrozenSource, LockCheck, ResolverInstallerSettings};
 use uv_cli_output::printer::Printer;
 use uv_cli_output::reporters::{PythonDownloadReporter, ResolverReporter};
+use uv_operations::installation::Modifications;
+use uv_operations::loggers::{DefaultInstallLogger, DefaultResolveLogger, SummaryResolveLogger};
 
 /// Add one or more packages to the project requirements.
 #[expect(clippy::fn_params_excessive_bools)]

@@ -35,10 +35,6 @@ use uv_workspace::WorkspaceCache;
 
 use crate::commands::ExitStatus;
 use crate::commands::diagnostics;
-use crate::commands::pip::latest::LatestClient;
-use crate::commands::pip::loggers::{DefaultInstallLogger, DefaultResolveLogger};
-use crate::commands::pip::operations::{self, Modifications};
-use crate::commands::pip::{resolution_markers, resolution_tags};
 use crate::commands::project::{
     EnvironmentSpecification, PlatformState, ProjectError, resolve_environment, resolve_names,
     sync_environment, update_environment,
@@ -50,6 +46,10 @@ use crate::commands::tool::{Target, ToolRequest};
 use crate::settings::{ResolverInstallerSettings, ResolverSettings};
 use uv_cli_output::printer::Printer;
 use uv_cli_output::reporters::PythonDownloadReporter;
+use uv_operations::installation::Modifications;
+use uv_operations::latest::LatestClient;
+use uv_operations::loggers::{DefaultInstallLogger, DefaultResolveLogger};
+use uv_operations::resolution::{resolution_markers, resolution_tags};
 
 /// Install a tool.
 #[expect(clippy::fn_params_excessive_bools)]
@@ -404,7 +404,7 @@ pub(crate) async fn install(
 
     // Resolve the build constraints.
     let build_constraints: Vec<Requirement> =
-        operations::read_constraints(build_constraints, &client_builder)
+        uv_operations::requirements::read_constraints(build_constraints, &client_builder)
             .await?
             .into_iter()
             .map(|constraint| constraint.requirement)

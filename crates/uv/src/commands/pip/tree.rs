@@ -27,10 +27,10 @@ use uv_python::{EnvironmentPreference, PythonEnvironment, PythonPreference, Pyth
 use uv_resolver::{ExcludeNewer, PrereleaseMode};
 
 use crate::commands::ExitStatus;
-use crate::commands::pip::latest::LatestClient;
-use crate::commands::pip::operations::report_target_environment;
 use uv_cli_output::printer::Printer;
 use uv_cli_output::reporters::LatestVersionReporter;
+use uv_operations::environment::report_target_environment;
+use uv_operations::latest::LatestClient;
 
 /// Display the installed packages in the current environment as a dependency tree.
 #[expect(clippy::fn_params_excessive_bools)]

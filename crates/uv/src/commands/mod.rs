@@ -1,9 +1,5 @@
 use std::path::PathBuf;
-use std::{fmt::Write, process::ExitCode};
-
-use anyhow::Context;
-use owo_colors::OwoColorize;
-use tracing::debug;
+use std::process::ExitCode;
 
 pub(crate) use auth::dir::dir as auth_dir;
 pub(crate) use auth::helper::helper as auth_helper;
@@ -56,21 +52,12 @@ pub(crate) use tool::run::run as tool_run;
 pub(crate) use tool::uninstall::uninstall as tool_uninstall;
 pub(crate) use tool::update_shell::update_shell as tool_update_shell;
 pub(crate) use tool::upgrade::upgrade as tool_upgrade;
-use uv_cache::Cache;
-use uv_configuration::Concurrency;
 pub(crate) use uv_console::human_readable_bytes;
-use uv_fs::{CWD, Simplified};
-use uv_installer::compile_tree;
-use uv_python::PythonEnvironment;
 use uv_scripts::Pep723Script;
 pub(crate) use venv::venv;
 pub(crate) use workspace::dir::dir;
 pub(crate) use workspace::list::list;
 pub(crate) use workspace::metadata::metadata;
-
-use crate::commands::pip::operations::ChangedDist;
-use uv_cli_output::format::elapsed;
-use uv_cli_output::printer::Printer;
 
 mod auth;
 pub(crate) mod build_backend;
@@ -116,71 +103,6 @@ impl From<ExitStatus> for ExitCode {
             ExitStatus::External(code) => Self::from(code),
         }
     }
-}
-
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
-pub(super) enum ChangeEventKind {
-    /// The package was removed from the environment.
-    Removed,
-    /// The package was added to the environment.
-    Added,
-    /// The package was reinstalled without changing versions.
-    Reinstalled,
-}
-
-#[derive(Debug)]
-pub(super) struct ChangeEvent<'a> {
-    dist: &'a ChangedDist,
-    kind: ChangeEventKind,
-}
-
-/// Compile all Python source files in site-packages to bytecode, to speed up the
-/// initial run of any subsequent executions.
-///
-/// See the `--compile` option on `pip sync` and `pip install`.
-pub(super) async fn compile_bytecode(
-    venv: &PythonEnvironment,
-    concurrency: &Concurrency,
-    cache: &Cache,
-    printer: Printer,
-) -> anyhow::Result<()> {
-    let start = std::time::Instant::now();
-    let mut files = 0;
-    for site_packages in venv.site_packages() {
-        let site_packages = CWD.join(site_packages);
-        if !site_packages.exists() {
-            debug!(
-                "Skipping non-existent site-packages directory: {}",
-                site_packages.display()
-            );
-            continue;
-        }
-        files += compile_tree(
-            &site_packages,
-            venv.python_executable(),
-            concurrency,
-            cache.root(),
-        )
-        .await
-        .with_context(|| {
-            format!(
-                "Failed to bytecode-compile Python file in: {}",
-                site_packages.user_display()
-            )
-        })?;
-    }
-    let s = if files == 1 { "" } else { "s" };
-    writeln!(
-        printer.stderr(),
-        "{}",
-        format!(
-            "Bytecode compiled {} {}",
-            format!("{files} file{s}").bold(),
-            format!("in {}", elapsed(start.elapsed())).dimmed()
-        )
-        .dimmed()
-    )?;
-    Ok(())
 }
 
 /// A Python file that may or may not include an existing PEP 723 script tag.

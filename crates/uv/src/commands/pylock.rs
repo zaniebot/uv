@@ -15,7 +15,7 @@ use uv_python::{Interpreter, PythonVersion};
 use uv_resolver::PylockToml;
 use uv_types::HashStrategy;
 
-use crate::commands::pip::{resolution_markers, resolution_tags};
+use uv_operations::resolution::{resolution_markers, resolution_tags};
 
 /// Read a `pylock.toml` from a local path or HTTP(S) URL and parse it.
 ///

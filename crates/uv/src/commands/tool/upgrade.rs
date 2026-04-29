@@ -25,10 +25,6 @@ use uv_types::SourceTreeEditablePolicy;
 use uv_warnings::write_error_chain;
 use uv_workspace::WorkspaceCache;
 
-use crate::commands::pip::loggers::{
-    DefaultInstallLogger, SummaryResolveLogger, UpgradeInstallLogger,
-};
-use crate::commands::pip::operations::Modifications;
 use crate::commands::project::{
     EnvironmentUpdate, PlatformState, resolve_environment, sync_environment, update_environment,
 };
@@ -38,6 +34,8 @@ use crate::settings::ResolverInstallerSettings;
 use uv_cli_output::format::conjunction;
 use uv_cli_output::printer::Printer;
 use uv_cli_output::reporters::PythonDownloadReporter;
+use uv_operations::installation::Modifications;
+use uv_operations::loggers::{DefaultInstallLogger, SummaryResolveLogger, UpgradeInstallLogger};
 
 /// Upgrade a tool.
 pub(crate) async fn upgrade(

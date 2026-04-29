@@ -5,8 +5,6 @@ use std::path::Path;
 
 use crate::commands::ExitStatus;
 use crate::commands::diagnostics;
-use crate::commands::pip::loggers::DefaultResolveLogger;
-use crate::commands::pip::resolution_markers;
 use crate::commands::project::default_dependency_groups;
 use crate::commands::project::lock::{LockMode, LockOperation};
 use crate::commands::project::lock_target::LockTarget;
@@ -16,6 +14,8 @@ use crate::commands::project::{
 use crate::settings::{FrozenSource, LockCheck, ResolverSettings};
 use uv_cli_output::printer::Printer;
 use uv_cli_output::reporters::AuditReporter;
+use uv_operations::loggers::DefaultResolveLogger;
+use uv_operations::resolution::resolution_markers;
 
 use anyhow::Result;
 use rustc_hash::FxHashSet;

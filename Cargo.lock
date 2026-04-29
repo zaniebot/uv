@@ -5839,6 +5839,7 @@ dependencies = [
  "uv-installer",
  "uv-logging",
  "uv-normalize",
+ "uv-operations",
  "uv-pep440",
  "uv-pep508",
  "uv-performance-memory-allocator",
@@ -6787,6 +6788,44 @@ dependencies = [
  "dashmap",
  "futures",
  "tokio",
+]
+
+[[package]]
+name = "uv-operations"
+version = "0.0.41"
+dependencies = [
+ "anyhow",
+ "itertools 0.14.0",
+ "jiff",
+ "owo-colors",
+ "rkyv",
+ "rustc-hash",
+ "thiserror 2.0.18",
+ "tokio",
+ "tracing",
+ "uv-cache",
+ "uv-cli-output",
+ "uv-client",
+ "uv-configuration",
+ "uv-dispatch",
+ "uv-distribution",
+ "uv-distribution-filename",
+ "uv-distribution-types",
+ "uv-fs",
+ "uv-install-wheel",
+ "uv-installer",
+ "uv-normalize",
+ "uv-pep440",
+ "uv-pep508",
+ "uv-platform-tags",
+ "uv-preview",
+ "uv-pypi-types",
+ "uv-python",
+ "uv-requirements",
+ "uv-resolver",
+ "uv-tool",
+ "uv-types",
+ "uv-warnings",
 ]
 
 [[package]]

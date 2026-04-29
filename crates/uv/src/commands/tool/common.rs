@@ -27,7 +27,6 @@ use uv_shell::Shell;
 use uv_tool::{InstalledTools, Tool, ToolEntrypoint, entrypoint_paths};
 use uv_warnings::warn_user_once;
 
-use crate::commands::pip;
 use crate::commands::project::ProjectError;
 use uv_cli_output::printer::Printer;
 use uv_cli_output::reporters::PythonDownloadReporter;
@@ -76,7 +75,7 @@ pub(crate) fn remove_entrypoints(tool: &Tool) {
 pub(crate) async fn refine_interpreter(
     interpreter: &Interpreter,
     python_request: Option<&PythonRequest>,
-    err: &pip::operations::Error,
+    err: &uv_operations::Error,
     client_builder: &BaseClientBuilder<'_>,
     reporter: &PythonDownloadReporter,
     install_mirrors: &PythonInstallMirrors,
@@ -85,8 +84,7 @@ pub(crate) async fn refine_interpreter(
     cache: &Cache,
     preview: Preview,
 ) -> anyhow::Result<Option<Interpreter>, ProjectError> {
-    let pip::operations::Error::Resolve(uv_resolver::ResolveError::NoSolution(no_solution_err)) =
-        err
+    let uv_operations::Error::Resolve(uv_resolver::ResolveError::NoSolution(no_solution_err)) = err
     else {
         return Ok(None);
     };

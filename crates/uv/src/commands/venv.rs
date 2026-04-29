@@ -36,11 +36,12 @@ use uv_warnings::warn_user;
 use uv_workspace::{DiscoveryOptions, VirtualProject, WorkspaceCache, WorkspaceError};
 
 use crate::commands::ExitStatus;
-use crate::commands::pip::loggers::{DefaultInstallLogger, InstallLogger};
-use crate::commands::pip::operations::{Changelog, report_interpreter};
 use crate::commands::project::{WorkspacePython, validate_project_requires_python};
 use uv_cli_output::printer::Printer;
 use uv_cli_output::reporters::PythonDownloadReporter;
+use uv_operations::environment::report_interpreter;
+use uv_operations::installation::Changelog;
+use uv_operations::loggers::{DefaultInstallLogger, InstallLogger};
 
 use super::project::default_dependency_groups;
 

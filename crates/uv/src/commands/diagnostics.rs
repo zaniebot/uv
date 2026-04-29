@@ -12,8 +12,6 @@ use uv_normalize::PackageName;
 use uv_pep440::Version;
 use uv_resolver::SentinelRange;
 
-use crate::commands::pip;
-
 static SUGGESTIONS: LazyLock<FxHashMap<PackageName, PackageName>> = LazyLock::new(|| {
     let suggestions: Vec<(String, String)> =
         serde_json::from_str(include_str!("suggestions.json")).unwrap();
@@ -71,9 +69,9 @@ impl OperationDiagnostic {
     /// Attempt to report an error with rich diagnostic context.
     ///
     /// Returns `Some` if the error was not handled.
-    pub(crate) fn report(self, err: pip::operations::Error) -> Option<pip::operations::Error> {
+    pub(crate) fn report(self, err: uv_operations::Error) -> Option<uv_operations::Error> {
         match err {
-            pip::operations::Error::Resolve(uv_resolver::ResolveError::NoSolution(err)) => {
+            uv_operations::Error::Resolve(uv_resolver::ResolveError::NoSolution(err)) => {
                 if let Some(context) = self.context {
                     no_solution_context(&err, context);
                 } else if let Some(hint) = self.hint {
@@ -83,7 +81,7 @@ impl OperationDiagnostic {
                 }
                 None
             }
-            pip::operations::Error::Resolve(uv_resolver::ResolveError::Dist(
+            uv_operations::Error::Resolve(uv_resolver::ResolveError::Dist(
                 kind,
                 dist,
                 chain,
@@ -92,7 +90,7 @@ impl OperationDiagnostic {
                 requested_dist_error(kind, dist, &chain, err, self.hint);
                 None
             }
-            pip::operations::Error::Resolve(uv_resolver::ResolveError::Dependencies(
+            uv_operations::Error::Resolve(uv_resolver::ResolveError::Dependencies(
                 error,
                 name,
                 version,
@@ -101,7 +99,7 @@ impl OperationDiagnostic {
                 dependencies_error(error, &name, &version, &chain, self.hint.clone());
                 None
             }
-            pip::operations::Error::Requirements(uv_requirements::Error::Dist(kind, dist, err)) => {
+            uv_operations::Error::Requirements(uv_requirements::Error::Dist(kind, dist, err)) => {
                 dist_error(
                     kind,
                     dist,
@@ -111,7 +109,7 @@ impl OperationDiagnostic {
                 );
                 None
             }
-            pip::operations::Error::Prepare(uv_installer::PrepareError::Dist(
+            uv_operations::Error::Prepare(uv_installer::PrepareError::Dist(
                 kind,
                 dist,
                 chain,
@@ -120,23 +118,23 @@ impl OperationDiagnostic {
                 dist_error(kind, dist, &chain, Arc::new(*err), self.hint);
                 None
             }
-            pip::operations::Error::Requirements(err) => {
+            uv_operations::Error::Requirements(err) => {
                 if let Some(context) = self.context {
                     let err = miette::Report::msg(format!("{err}"))
                         .context(format!("Failed to resolve {context} requirement"));
                     anstream::eprint!("{err:?}");
                     None
                 } else {
-                    Some(pip::operations::Error::Requirements(err))
+                    Some(uv_operations::Error::Requirements(err))
                 }
             }
-            pip::operations::Error::Resolve(uv_resolver::ResolveError::Client(err))
+            uv_operations::Error::Resolve(uv_resolver::ResolveError::Client(err))
                 if !self.system_certs && err.is_ssl() =>
             {
                 system_certs_hint(err);
                 None
             }
-            err @ pip::operations::Error::OutdatedEnvironment(..) => {
+            err @ uv_operations::Error::OutdatedEnvironment(..) => {
                 anstream::eprintln!("{}", err);
                 None
             }

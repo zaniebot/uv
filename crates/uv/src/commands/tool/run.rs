@@ -47,12 +47,6 @@ use uv_workspace::WorkspaceCache;
 
 use crate::child::run_to_completion;
 use crate::commands::ExitStatus;
-use crate::commands::pip;
-use crate::commands::pip::latest::LatestClient;
-use crate::commands::pip::loggers::{
-    DefaultInstallLogger, DefaultResolveLogger, SummaryInstallLogger, SummaryResolveLogger,
-};
-use crate::commands::pip::operations;
 use crate::commands::project::{
     EnvironmentSpecification, PlatformState, ProjectError, resolve_names,
 };
@@ -63,6 +57,11 @@ use crate::settings::ResolverInstallerSettings;
 use crate::settings::ResolverSettings;
 use uv_cli_output::printer::Printer;
 use uv_cli_output::reporters::PythonDownloadReporter;
+use uv_operations::latest::LatestClient;
+use uv_operations::loggers::{
+    DefaultInstallLogger, DefaultResolveLogger, SummaryInstallLogger, SummaryResolveLogger,
+};
+use uv_operations::resolution;
 
 /// The user-facing command used to invoke a tool run.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -1073,9 +1072,13 @@ async fn get_or_create_environment(
                     .into_inner();
 
                     // Determine the markers and tags to use for the resolution.
-                    let markers =
-                        pip::resolution_markers(None, python_platform.as_ref(), &interpreter);
-                    let tags = pip::resolution_tags(None, python_platform.as_ref(), &interpreter)?;
+                    let markers = resolution::resolution_markers(
+                        None,
+                        python_platform.as_ref(),
+                        &interpreter,
+                    );
+                    let tags =
+                        resolution::resolution_tags(None, python_platform.as_ref(), &interpreter)?;
 
                     // Check if the installed packages meet the requirements.
                     let site_packages = SitePackages::from_environment(environment.environment())?;
@@ -1122,7 +1125,7 @@ async fn get_or_create_environment(
 
     // Read the `--build-constraints` requirements.
     let build_constraints = Constraints::from_requirements(
-        operations::read_constraints(build_constraints, client_builder)
+        uv_operations::requirements::read_constraints(build_constraints, client_builder)
             .await?
             .into_iter()
             .map(|constraint| constraint.requirement),

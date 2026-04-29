@@ -10,13 +10,28 @@ use uv_configuration::DryRun;
 use uv_distribution_types::Name;
 use uv_normalize::PackageName;
 
-use crate::commands::pip::operations::{Changelog, ShortSpecifier};
-use crate::commands::{ChangeEvent, ChangeEventKind};
+use crate::installation::{ChangedDist, Changelog, ShortSpecifier};
 use uv_cli_output::format::elapsed;
 use uv_cli_output::printer::Printer;
 
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
+enum ChangeEventKind {
+    /// The package was removed from the environment.
+    Removed,
+    /// The package was added to the environment.
+    Added,
+    /// The package was reinstalled without changing versions.
+    Reinstalled,
+}
+
+#[derive(Debug)]
+struct ChangeEvent<'a> {
+    dist: &'a ChangedDist,
+    kind: ChangeEventKind,
+}
+
 /// A trait to handle logging during install operations.
-pub(crate) trait InstallLogger {
+pub trait InstallLogger {
     /// Log the completion of the audit phase.
     fn on_check(
         &self,
@@ -60,7 +75,7 @@ pub(crate) trait InstallLogger {
 
 /// The default logger for install operations.
 #[derive(Debug, Default, Clone, Copy)]
-pub(crate) struct DefaultInstallLogger;
+pub struct DefaultInstallLogger;
 
 impl InstallLogger for DefaultInstallLogger {
     fn on_check(
@@ -246,7 +261,7 @@ impl InstallLogger for DefaultInstallLogger {
 /// A logger that only shows installs and uninstalls, the minimal logging necessary to understand
 /// environment changes.
 #[derive(Debug, Default, Clone, Copy)]
-pub(crate) struct SummaryInstallLogger;
+pub struct SummaryInstallLogger;
 
 impl InstallLogger for SummaryInstallLogger {
     fn on_check(
@@ -302,13 +317,13 @@ impl InstallLogger for SummaryInstallLogger {
 
 /// A logger that shows special output for the modification of the given target.
 #[derive(Debug, Clone)]
-pub(crate) struct UpgradeInstallLogger {
+pub struct UpgradeInstallLogger {
     target: PackageName,
 }
 
 impl UpgradeInstallLogger {
     /// Create a new logger for the given target.
-    pub(crate) fn new(target: PackageName) -> Self {
+    pub fn new(target: PackageName) -> Self {
         Self { target }
     }
 }
@@ -470,7 +485,7 @@ impl InstallLogger for UpgradeInstallLogger {
 }
 
 /// A trait to handle logging during resolve operations.
-pub(crate) trait ResolveLogger {
+pub trait ResolveLogger {
     /// Log the completion of the operation.
     fn on_complete(&self, count: usize, start: std::time::Instant, printer: Printer)
     -> fmt::Result;
@@ -478,7 +493,7 @@ pub(crate) trait ResolveLogger {
 
 /// The default logger for resolve operations.
 #[derive(Debug, Default, Clone, Copy)]
-pub(crate) struct DefaultResolveLogger;
+pub struct DefaultResolveLogger;
 
 impl ResolveLogger for DefaultResolveLogger {
     fn on_complete(
@@ -511,7 +526,7 @@ impl ResolveLogger for DefaultResolveLogger {
 
 /// A logger that doesn't show any output.
 #[derive(Debug, Default, Clone, Copy)]
-pub(crate) struct SummaryResolveLogger;
+pub struct SummaryResolveLogger;
 
 impl ResolveLogger for SummaryResolveLogger {
     fn on_complete(

@@ -19,8 +19,8 @@ use uv_python::{
 };
 
 use crate::commands::ExitStatus;
-use crate::commands::pip::operations::report_target_environment;
 use uv_cli_output::printer::Printer;
+use uv_operations::environment::report_target_environment;
 
 /// Show information about one or more installed packages.
 pub(crate) fn pip_show(

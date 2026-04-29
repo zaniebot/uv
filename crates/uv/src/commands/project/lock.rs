@@ -44,16 +44,16 @@ use uv_workspace::{
     DiscoveryOptions, Editability, VirtualProject, WorkspaceCache, WorkspaceMember,
 };
 
-use crate::commands::pip::loggers::{DefaultResolveLogger, ResolveLogger, SummaryResolveLogger};
 use crate::commands::project::lock_target::LockTarget;
 use crate::commands::project::{
     MissingLockfileSource, ProjectError, ProjectInterpreter, ScriptInterpreter, UniversalState,
     WorkspacePython, init_script_python_requirement, script_extra_build_requires,
 };
-use crate::commands::{ExitStatus, ScriptPath, diagnostics, pip};
+use crate::commands::{ExitStatus, ScriptPath, diagnostics};
 use crate::settings::{FrozenSource, LockCheck, LockCheckSource, ResolverSettings};
 use uv_cli_output::printer::Printer;
 use uv_cli_output::reporters::{PythonDownloadReporter, ResolverReporter};
+use uv_operations::loggers::{DefaultResolveLogger, ResolveLogger, SummaryResolveLogger};
 
 /// The result of running a lock operation.
 #[derive(Debug, Clone)]
@@ -930,7 +930,7 @@ async fn do_lock(
             );
 
             // Resolve the requirements.
-            let (resolution, _) = pip::operations::resolve(
+            let (resolution, _) = uv_operations::resolution::resolve(
                 ExtrasResolver::new(&hasher, state.index(), database)
                     .with_reporter(Arc::new(ResolverReporter::from(printer)))
                     .resolve(target.members_requirements())
@@ -989,7 +989,7 @@ async fn do_lock(
             logger.on_complete(resolution.len(), start, printer)?;
 
             // Notify the user of any resolution diagnostics.
-            pip::operations::diagnose_resolution(resolution.diagnostics(), printer)?;
+            uv_operations::diagnostics::diagnose_resolution(resolution.diagnostics(), printer)?;
 
             let manifest = ResolverManifest::new(
                 members,

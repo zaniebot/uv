@@ -53,12 +53,12 @@ use uv_warnings::warn_user;
 use uv_workspace::WorkspaceCache;
 use uv_workspace::pyproject::ExtraBuildDependencies;
 
-use crate::commands::pip::loggers::DefaultResolveLogger;
-use crate::commands::pip::{operations, resolution_markers, resolution_tags};
 use crate::commands::{ExitStatus, diagnostics};
 use uv_cli_output::printer::Printer;
 use uv_cli_output::reporters::PythonDownloadReporter;
 use uv_cli_output::writer::OutputWriter;
+use uv_operations::loggers::DefaultResolveLogger;
+use uv_operations::resolution::{resolution_markers, resolution_tags};
 
 /// Resolve a set of requirements into a set of pinned versions.
 #[expect(clippy::fn_params_excessive_bools)]
@@ -257,7 +257,7 @@ pub(crate) async fn pip_compile(
 
     // Read build constraints.
     let build_constraints: Vec<NameRequirementSpecification> =
-        operations::read_constraints(build_constraints, &client_builder)
+        uv_operations::requirements::read_constraints(build_constraints, &client_builder)
             .await?
             .into_iter()
             .chain(
@@ -566,7 +566,7 @@ pub(crate) async fn pip_compile(
         .build();
 
     // Resolve the requirements.
-    let resolution = match operations::resolve(
+    let resolution = match uv_operations::resolution::resolve(
         requirements,
         constraints,
         overrides,
@@ -791,7 +791,7 @@ pub(crate) async fn pip_compile(
     writer.commit().await?;
 
     // Notify the user of any resolution diagnostics.
-    operations::diagnose_resolution(resolution.diagnostics(), printer)?;
+    uv_operations::diagnostics::diagnose_resolution(resolution.diagnostics(), printer)?;
 
     Ok(ExitStatus::Success)
 }
