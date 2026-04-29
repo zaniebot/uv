@@ -391,8 +391,8 @@ lto = "fat"
 # building the release, where as `profiling` is meant for building `uv`
 # for running benchmarks.
 #
-# The main differences here are to avoid stripping debug information
-# and disabling lto. This does result in a mismatch between our release
+# The main differences here are to preserve line-table debug information
+# and disable lto. This does result in a mismatch between our release
 # configuration and our benchmarking configuration, which is unfortunate.
 # But compile times with `lto = true` are completely untenable:
 #
@@ -413,6 +413,9 @@ lto = "fat"
 #        Compiling uv v0.2.34 (/home/andrew/astral/uv/crates/uv)
 #         Finished `profiling` profile [optimized + debuginfo] target(s) in 30.09s
 #
+# And using line-table-only debug information preserves file:line panic
+# backtraces while reducing compile and link times.
+#
 # We get more reasonable-ish compile times. At least, it's not enough
 # time to get up and get a cup of coffee before it completes.
 #
@@ -424,7 +427,7 @@ lto = "fat"
 [profile.profiling]
 inherits = "release"
 strip = false
-debug = "full"
+debug = "line-tables-only"
 lto = false
 
 # Profile for fast test execution: Skip debug info generation, and
