@@ -27,6 +27,7 @@ uv has Tier 3 support
 (["best effort"](https://doc.rust-lang.org/beta/rustc/platform-support.html#tier-3)) for the
 following platforms:
 
+- Android
 - FreeBSD (x86_64)
 - Windows (i686)
 
