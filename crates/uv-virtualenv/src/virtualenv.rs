@@ -297,25 +297,33 @@ pub(crate) fn create(
     // transparent upgrades.
     if cfg!(windows) {
         if using_minor_version_link {
+            // Link `python.exe` and the GIL-disabled console variant to the same target,
+            // but use the GUI trampoline pointing at the managed install's `pythonw.exe`
+            // for the windowed variants so that running `pythonw.exe` does not allocate
+            // a console window. See https://github.com/astral-sh/uv/issues/19226.
             let target = scripts.join(WindowsExecutable::Python.exe(interpreter));
-            replace_link_to_executable(target.as_path(), &executable_target)
+            replace_link_to_executable(target.as_path(), &executable_target, false)
                 .map_err(Error::Python)?;
+            let pythonw_target =
+                executable_target.with_file_name(WindowsExecutable::Pythonw.exe(interpreter));
             let targetw = scripts.join(WindowsExecutable::Pythonw.exe(interpreter));
-            replace_link_to_executable(targetw.as_path(), &executable_target)
+            replace_link_to_executable(targetw.as_path(), &pythonw_target, true)
                 .map_err(Error::Python)?;
             if interpreter.gil_disabled() {
                 let targett = scripts.join(WindowsExecutable::PythonMajorMinort.exe(interpreter));
-                replace_link_to_executable(targett.as_path(), &executable_target)
+                replace_link_to_executable(targett.as_path(), &executable_target, false)
                     .map_err(Error::Python)?;
+                let pythonwt_target = executable_target
+                    .with_file_name(WindowsExecutable::PythonwMajorMinort.exe(interpreter));
                 let targetwt = scripts.join(WindowsExecutable::PythonwMajorMinort.exe(interpreter));
-                replace_link_to_executable(targetwt.as_path(), &executable_target)
+                replace_link_to_executable(targetwt.as_path(), &pythonwt_target, true)
                     .map_err(Error::Python)?;
             }
         } else if matches!(interpreter.platform().os(), Os::Pyodide { .. }) {
             // For Pyodide, link only `python.exe`.
             // This should not be copied as `python.exe` is a wrapper that launches Pyodide.
             let target = scripts.join(WindowsExecutable::Python.exe(interpreter));
-            replace_link_to_executable(target.as_path(), &executable_target)
+            replace_link_to_executable(target.as_path(), &executable_target, false)
                 .map_err(Error::Python)?;
         } else {
             // Always copy `python.exe`.

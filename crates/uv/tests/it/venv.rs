@@ -1228,6 +1228,35 @@ fn windows_shims() -> Result<()> {
     Ok(())
 }
 
+/// On Windows, `python.exe` and `pythonw.exe` in a uv-managed venv must not be
+/// byte-identical: `pythonw.exe` should be a GUI trampoline pointing at the
+/// managed install's `pythonw.exe`, while `python.exe` is a console trampoline
+/// pointing at `python.exe`. See <https://github.com/astral-sh/uv/issues/19226>.
+#[test]
+#[cfg(windows)]
+fn windows_pythonw_differs_from_python() {
+    let context =
+        uv_test::test_context_with_versions!(&["3.12"]).with_versions_as_managed(&["3.12"]);
+
+    context
+        .venv()
+        .arg(context.venv.as_os_str())
+        .assert()
+        .success();
+
+    let python = context.venv.child("Scripts").child("python.exe");
+    let pythonw = context.venv.child("Scripts").child("pythonw.exe");
+    python.assert(predicates::path::is_file());
+    pythonw.assert(predicates::path::is_file());
+
+    let python_bytes = fs_err::read(python.path()).expect("read python.exe");
+    let pythonw_bytes = fs_err::read(pythonw.path()).expect("read pythonw.exe");
+    assert_ne!(
+        python_bytes, pythonw_bytes,
+        "`pythonw.exe` should not be byte-identical to `python.exe`"
+    );
+}
+
 #[test]
 fn verify_pyvenv_cfg() {
     let context = uv_test::test_context!("3.12");
