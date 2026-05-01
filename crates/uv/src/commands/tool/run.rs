@@ -125,6 +125,7 @@ pub(crate) async fn run(
     env_file: Vec<PathBuf>,
     no_env_file: bool,
     preview: Preview,
+    profile_path: Option<PathBuf>,
 ) -> anyhow::Result<ExitStatus> {
     /// Whether or not a path looks like a Python script based on the file extension.
     fn has_python_script_ext(path: &Path) -> bool {
@@ -443,7 +444,30 @@ pub(crate) async fn run(
     }
     .with_context(|| format!("Failed to spawn: `{executable}`"))?;
 
-    run_to_completion(handle).await
+    let profiler = match (profile_path, handle.id()) {
+        (Some(path), Some(pid)) => Some(uv_profile::Profiler::start(
+            pid,
+            path,
+            uv_profile::ProfilerOptions::default(),
+        )),
+        (Some(_), None) => {
+            warn_user!(
+                "`--profile-path` was set but the child PID is unavailable; profiling disabled"
+            );
+            None
+        }
+        (None, _) => None,
+    };
+
+    let status = run_to_completion(handle).await;
+
+    if let Some(profiler) = profiler {
+        if let Err(err) = profiler.finish().await {
+            warn_user!("failed to write memory profile: {err:#}");
+        }
+    }
+
+    status
 }
 
 /// Return the entry points for the specified package.

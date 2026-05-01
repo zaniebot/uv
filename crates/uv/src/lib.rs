@@ -1487,6 +1487,7 @@ async fn run(cli: Cli) -> Result<ExitStatus> {
                 args.env_file,
                 args.no_env_file,
                 globals.preview,
+                args.profile_path,
             ))
             .await
         }
@@ -2205,6 +2206,7 @@ async fn run_project(
                 args.env_file,
                 globals.preview,
                 args.max_recursion_depth,
+                args.profile_path,
             ))
             .await
         }

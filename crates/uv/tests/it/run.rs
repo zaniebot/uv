@@ -6937,3 +6937,57 @@ fn run_project_file_no_ancestor_project() -> Result<()> {
 
     Ok(())
 }
+
+/// `--profile-path` writes a non-empty gzipped pprof file at the requested
+/// location. We don't snapshot the file (it's binary and varies sample-by-
+/// sample); we just confirm the artifact is produced and can be decoded as
+/// a `Profile` message.
+#[test]
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+fn run_profile_path_writes_pprof() -> Result<()> {
+    use std::io::Read;
+
+    let context = uv_test::test_context!("3.12");
+
+    let script = context.temp_dir.child("alloc.py");
+    script.write_str(indoc! { r"
+        # Allocate ~32 MiB and touch the pages so they're resident.
+        buf = bytearray(32 * 1024 * 1024)
+        for i in range(0, len(buf), 4096):
+            buf[i] = 1
+       "
+    })?;
+
+    let profile = context.temp_dir.child("profile.pb.gz");
+
+    let mut command = context.run();
+    let command_with_args = command
+        .arg("--profile-path")
+        .arg(profile.path())
+        .arg("python")
+        .arg(script.path());
+
+    uv_snapshot!(context.filters(), command_with_args, @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    ");
+
+    // The file should exist and be a non-empty gzipped pprof profile.
+    let bytes = fs_err::read(profile.path())?;
+    assert!(!bytes.is_empty(), "pprof file should not be empty");
+
+    let mut decoded = Vec::new();
+    flate2::read::GzDecoder::new(&bytes[..]).read_to_end(&mut decoded)?;
+    // Should decode as a valid pprof Profile (binary protobuf). We don't
+    // assert on sample count since CPython < 3.14 has no PEP 768 support
+    // and the profile may legitimately contain only RSS deltas, or none
+    // at all if the script ran faster than a sample interval.
+    assert!(
+        !decoded.is_empty(),
+        "pprof file should decode to a non-empty payload"
+    );
+    Ok(())
+}

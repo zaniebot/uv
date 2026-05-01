@@ -115,6 +115,7 @@ pub(crate) async fn run(
     env_file: EnvFile,
     preview: Preview,
     max_recursion_depth: u32,
+    profile_path: Option<PathBuf>,
 ) -> anyhow::Result<ExitStatus> {
     // Check if max recursion depth was exceeded. This most commonly happens
     // for scripts with a shebang line like `#!/usr/bin/env -S uv run`, so try
@@ -1341,7 +1342,30 @@ hint: If you are running a script with `{}` in the shebang, you may need to incl
         .spawn()
         .with_context(|| format!("Failed to spawn: `{}`", command.display_executable()))?;
 
-    run_to_completion(handle).await
+    let profiler = match (profile_path, handle.id()) {
+        (Some(path), Some(pid)) => Some(uv_profile::Profiler::start(
+            pid,
+            path,
+            uv_profile::ProfilerOptions::default(),
+        )),
+        (Some(_), None) => {
+            warn_user!(
+                "`--profile-path` was set but the child PID is unavailable; profiling disabled"
+            );
+            None
+        }
+        (None, _) => None,
+    };
+
+    let status = run_to_completion(handle).await;
+
+    if let Some(profiler) = profiler {
+        if let Err(err) = profiler.finish().await {
+            warn_user!("failed to write memory profile: {err:#}");
+        }
+    }
+
+    status
 }
 
 /// Returns `true` if we can skip creating an additional ephemeral environment in `uv run`.

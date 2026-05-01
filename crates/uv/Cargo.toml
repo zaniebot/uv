@@ -46,6 +46,7 @@ uv-performance-memory-allocator = { workspace = true, optional = true }
 uv-platform = { workspace = true }
 uv-platform-tags = { workspace = true }
 uv-preview = { workspace = true }
+uv-profile = { workspace = true }
 uv-publish = { workspace = true }
 uv-pypi-types = { workspace = true }
 uv-python = { workspace = true, features = ["schemars"] }

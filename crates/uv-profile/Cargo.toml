@@ -1,0 +1,37 @@
+[package]
+name = "uv-profile"
+version = "0.0.41"
+description = "Memory profiler for uv: RSS sampling and pprof output"
+edition = { workspace = true }
+rust-version = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
+authors = { workspace = true }
+license = { workspace = true }
+
+[lib]
+doctest = false
+
+[lints]
+workspace = true
+
+[dependencies]
+uv-pep768 = { workspace = true }
+
+anyhow = { workspace = true }
+flate2 = { workspace = true }
+fs-err = { workspace = true }
+prost = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt", "sync", "time"] }
+tracing = { workspace = true }
+
+[target.'cfg(unix)'.dependencies]
+libc = { workspace = true }
+
+[build-dependencies]
+prost-build = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt", "rt-multi-thread", "sync", "time"] }

@@ -605,6 +605,7 @@ pub(crate) struct RunSettings {
     pub(crate) settings: ResolverInstallerSettings,
     pub(crate) env_file: EnvFile,
     pub(crate) max_recursion_depth: u32,
+    pub(crate) profile_path: Option<PathBuf>,
 }
 
 impl RunSettings {
@@ -662,6 +663,7 @@ impl RunSettings {
             env_file,
             no_env_file,
             max_recursion_depth,
+            profile_path,
         } = args;
 
         let filesystem_install_mirrors = filesystem
@@ -744,6 +746,7 @@ impl RunSettings {
                 .install_mirrors
                 .combine(filesystem_install_mirrors),
             max_recursion_depth: max_recursion_depth.unwrap_or(Self::DEFAULT_MAX_RECURSION_DEPTH),
+            profile_path,
         }
     }
 }
@@ -770,6 +773,7 @@ pub(crate) struct ToolRunSettings {
     pub(crate) settings: ResolverInstallerSettings,
     pub(crate) env_file: Vec<PathBuf>,
     pub(crate) no_env_file: bool,
+    pub(crate) profile_path: Option<PathBuf>,
 }
 
 impl ToolRunSettings {
@@ -801,6 +805,7 @@ impl ToolRunSettings {
             python_platform,
             torch_backend,
             generate_shell_completion: _,
+            profile_path,
         } = args;
 
         // If `--upgrade` was passed explicitly, warn.
@@ -894,6 +899,7 @@ impl ToolRunSettings {
                 .combine(filesystem_install_mirrors),
             env_file,
             no_env_file,
+            profile_path,
         }
     }
 }

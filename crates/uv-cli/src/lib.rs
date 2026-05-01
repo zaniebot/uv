@@ -3798,6 +3798,18 @@ pub struct RunArgs {
     #[arg(long, hide = true, env = EnvVars::UV_RUN_MAX_RECURSION_DEPTH)]
     pub max_recursion_depth: Option<u32>,
 
+    /// Write a memory profile of the child process to the given path.
+    ///
+    /// The output is a gzipped pprof profile (binary protobuf) with samples
+    /// attributed by RSS bytes per Python call stack. Open with
+    /// `go tool pprof <path>` or <https://speedscope.app>.
+    ///
+    /// Stack attribution requires CPython 3.14+ (PEP 768). On older Python or
+    /// when attach is denied, the profile contains RSS-over-time samples
+    /// without per-frame attribution.
+    #[arg(long, value_hint = ValueHint::FilePath)]
+    pub profile_path: Option<PathBuf>,
+
     /// The platform for which requirements should be installed.
     ///
     /// Represented as a "target triple", a string that describes the target platform in terms of
@@ -5555,6 +5567,13 @@ pub struct ToolRunArgs {
     /// By default, environment modifications are omitted, but enabled under `--verbose`.
     #[arg(long, value_parser = clap::builder::BoolishValueParser::new(), hide = true)]
     pub show_resolution: bool,
+
+    /// Write a memory profile of the child process to the given path.
+    ///
+    /// See `uv run --profile-path` for details on the output format and
+    /// platform support.
+    #[arg(long, value_hint = ValueHint::FilePath)]
+    pub profile_path: Option<PathBuf>,
 
     /// The platform for which requirements should be installed.
     ///
