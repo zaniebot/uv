@@ -355,10 +355,7 @@ pub fn resolver_options(
         no_build_isolation: flag(no_build_isolation, build_isolation, "build-isolation"),
         no_build_isolation_package: Some(no_build_isolation_package),
         extra_build_dependencies: None,
-        exclude_newer: ExcludeNewer::from_args(
-            exclude_newer,
-            exclude_newer_package.unwrap_or_default(),
-        ),
+        exclude_newer: ExcludeNewer::from_args(exclude_newer, exclude_newer_package.unwrap_or_default()),
         link_mode,
         no_build: flag(no_build, build, "build"),
         no_build_package: Some(no_build_package),
