@@ -1,0 +1,960 @@
+{
+  "dist_version": "0.28.7-prerelease.1",
+  "announcement_tag": "0.8.3",
+  "announcement_tag_is_implicit": false,
+  "announcement_is_prerelease": false,
+  "announcement_title": "0.8.3",
+  "announcement_changelog": "### Python\n\n- Add CPython 3.14.0rc1\n\nSee the [`python-build-standalone` release notes](https://github.com/astral-sh/python-build-standalone/releases/tag/20250723) for more details.\n\n### Enhancements\n\n- Allow non-standard entrypoint names in `uv_build` ([#14867](https://github.com/astral-sh/uv/pull/14867))\n- Publish riscv64 wheels to PyPI ([#14852](https://github.com/astral-sh/uv/pull/14852))\n\n### Bug fixes\n\n- Avoid writing redacted credentials to tool receipt ([#14855](https://github.com/astral-sh/uv/pull/14855))\n- Respect `--with` versions over base environment versions ([#14863](https://github.com/astral-sh/uv/pull/14863))\n- Respect credentials from all defined indexes ([#14858](https://github.com/astral-sh/uv/pull/14858))\n- Fix missed stabilization of removal of registry entry during Python uninstall ([#14859](https://github.com/astral-sh/uv/pull/14859))\n- Improve concurrency safety of Python downloads into cache ([#14846](https://github.com/astral-sh/uv/pull/14846))\n\n### Documentation\n\n- Fix typos in `uv_build` reference documentation ([#14853](https://github.com/astral-sh/uv/pull/14853))\n- Move the \"Cargo\" install method further down in docs ([#14842](https://github.com/astral-sh/uv/pull/14842))",
+  "announcement_github_body": "## Release Notes\n\n### Python\n\n- Add CPython 3.14.0rc1\n\nSee the [`python-build-standalone` release notes](https://github.com/astral-sh/python-build-standalone/releases/tag/20250723) for more details.\n\n### Enhancements\n\n- Allow non-standard entrypoint names in `uv_build` ([#14867](https://github.com/astral-sh/uv/pull/14867))\n- Publish riscv64 wheels to PyPI ([#14852](https://github.com/astral-sh/uv/pull/14852))\n\n### Bug fixes\n\n- Avoid writing redacted credentials to tool receipt ([#14855](https://github.com/astral-sh/uv/pull/14855))\n- Respect `--with` versions over base environment versions ([#14863](https://github.com/astral-sh/uv/pull/14863))\n- Respect credentials from all defined indexes ([#14858](https://github.com/astral-sh/uv/pull/14858))\n- Fix missed stabilization of removal of registry entry during Python uninstall ([#14859](https://github.com/astral-sh/uv/pull/14859))\n- Improve concurrency safety of Python downloads into cache ([#14846](https://github.com/astral-sh/uv/pull/14846))\n\n### Documentation\n\n- Fix typos in `uv_build` reference documentation ([#14853](https://github.com/astral-sh/uv/pull/14853))\n- Move the \"Cargo\" install method further down in docs ([#14842](https://github.com/astral-sh/uv/pull/14842))\n\n## Install uv 0.8.3\n\n### Install prebuilt binaries via shell script\n\n```sh\ncurl --proto '=https' --tlsv1.2 -LsSf https://github.com/astral-sh/uv/releases/download/0.8.3/uv-installer.sh | sh\n```\n\n### Install prebuilt binaries via powershell script\n\n```sh\npowershell -ExecutionPolicy Bypass -c \"irm https://github.com/astral-sh/uv/releases/download/0.8.3/uv-installer.ps1 | iex\"\n```\n\n## Download uv 0.8.3\n\n|  File  | Platform | Checksum |\n|--------|----------|----------|\n| [uv-aarch64-apple-darwin.tar.gz](https://github.com/astral-sh/uv/releases/download/0.8.3/uv-aarch64-apple-darwin.tar.gz) | Apple Silicon macOS | [checksum](https://github.com/astral-sh/uv/releases/download/0.8.3/uv-aarch64-apple-darwin.tar.gz.sha256) |\n| [uv-x86_64-apple-darwin.tar.gz](https://github.com/astral-sh/uv/releases/download/0.8.3/uv-x86_64-apple-darwin.tar.gz) | Intel macOS | [checksum](https://github.com/astral-sh/uv/releases/download/0.8.3/uv-x86_64-apple-darwin.tar.gz.sha256) |\n| [uv-aarch64-pc-windows-msvc.zip](https://github.com/astral-sh/uv/releases/download/0.8.3/uv-aarch64-pc-windows-msvc.zip) | ARM64 Windows | [checksum](https://github.com/astral-sh/uv/releases/download/0.8.3/uv-aarch64-pc-windows-msvc.zip.sha256) |\n| [uv-i686-pc-windows-msvc.zip](https://github.com/astral-sh/uv/releases/download/0.8.3/uv-i686-pc-windows-msvc.zip) | x86 Windows | [checksum](https://github.com/astral-sh/uv/releases/download/0.8.3/uv-i686-pc-windows-msvc.zip.sha256) |\n| [uv-x86_64-pc-windows-msvc.zip](https://github.com/astral-sh/uv/releases/download/0.8.3/uv-x86_64-pc-windows-msvc.zip) | x64 Windows | [checksum](https://github.com/astral-sh/uv/releases/download/0.8.3/uv-x86_64-pc-windows-msvc.zip.sha256) |\n| [uv-aarch64-unknown-linux-gnu.tar.gz](https://github.com/astral-sh/uv/releases/download/0.8.3/uv-aarch64-unknown-linux-gnu.tar.gz) | ARM64 Linux | [checksum](https://github.com/astral-sh/uv/releases/download/0.8.3/uv-aarch64-unknown-linux-gnu.tar.gz.sha256) |\n| [uv-i686-unknown-linux-gnu.tar.gz](https://github.com/astral-sh/uv/releases/download/0.8.3/uv-i686-unknown-linux-gnu.tar.gz) | x86 Linux | [checksum](https://github.com/astral-sh/uv/releases/download/0.8.3/uv-i686-unknown-linux-gnu.tar.gz.sha256) |\n| [uv-powerpc64-unknown-linux-gnu.tar.gz](https://github.com/astral-sh/uv/releases/download/0.8.3/uv-powerpc64-unknown-linux-gnu.tar.gz) | PPC64 Linux | [checksum](https://github.com/astral-sh/uv/releases/download/0.8.3/uv-powerpc64-unknown-linux-gnu.tar.gz.sha256) |\n| [uv-powerpc64le-unknown-linux-gnu.tar.gz](https://github.com/astral-sh/uv/releases/download/0.8.3/uv-powerpc64le-unknown-linux-gnu.tar.gz) | PPC64LE Linux | [checksum](https://github.com/astral-sh/uv/releases/download/0.8.3/uv-powerpc64le-unknown-linux-gnu.tar.gz.sha256) |\n| [uv-riscv64gc-unknown-linux-gnu.tar.gz](https://github.com/astral-sh/uv/releases/download/0.8.3/uv-riscv64gc-unknown-linux-gnu.tar.gz) | RISCV Linux | [checksum](https://github.com/astral-sh/uv/releases/download/0.8.3/uv-riscv64gc-unknown-linux-gnu.tar.gz.sha256) |\n| [uv-s390x-unknown-linux-gnu.tar.gz](https://github.com/astral-sh/uv/releases/download/0.8.3/uv-s390x-unknown-linux-gnu.tar.gz) | S390x Linux | [checksum](https://github.com/astral-sh/uv/releases/download/0.8.3/uv-s390x-unknown-linux-gnu.tar.gz.sha256) |\n| [uv-x86_64-unknown-linux-gnu.tar.gz](https://github.com/astral-sh/uv/releases/download/0.8.3/uv-x86_64-unknown-linux-gnu.tar.gz) | x64 Linux | [checksum](https://github.com/astral-sh/uv/releases/download/0.8.3/uv-x86_64-unknown-linux-gnu.tar.gz.sha256) |\n| [uv-armv7-unknown-linux-gnueabihf.tar.gz](https://github.com/astral-sh/uv/releases/download/0.8.3/uv-armv7-unknown-linux-gnueabihf.tar.gz) | ARMv7 Linux | [checksum](https://github.com/astral-sh/uv/releases/download/0.8.3/uv-armv7-unknown-linux-gnueabihf.tar.gz.sha256) |\n| [uv-aarch64-unknown-linux-musl.tar.gz](https://github.com/astral-sh/uv/releases/download/0.8.3/uv-aarch64-unknown-linux-musl.tar.gz) | ARM64 MUSL Linux | [checksum](https://github.com/astral-sh/uv/releases/download/0.8.3/uv-aarch64-unknown-linux-musl.tar.gz.sha256) |\n| [uv-i686-unknown-linux-musl.tar.gz](https://github.com/astral-sh/uv/releases/download/0.8.3/uv-i686-unknown-linux-musl.tar.gz) | x86 MUSL Linux | [checksum](https://github.com/astral-sh/uv/releases/download/0.8.3/uv-i686-unknown-linux-musl.tar.gz.sha256) |\n| [uv-x86_64-unknown-linux-musl.tar.gz](https://github.com/astral-sh/uv/releases/download/0.8.3/uv-x86_64-unknown-linux-musl.tar.gz) | x64 MUSL Linux | [checksum](https://github.com/astral-sh/uv/releases/download/0.8.3/uv-x86_64-unknown-linux-musl.tar.gz.sha256) |\n| [uv-arm-unknown-linux-musleabihf.tar.gz](https://github.com/astral-sh/uv/releases/download/0.8.3/uv-arm-unknown-linux-musleabihf.tar.gz) | ARMv6 MUSL Linux (Hardfloat) | [checksum](https://github.com/astral-sh/uv/releases/download/0.8.3/uv-arm-unknown-linux-musleabihf.tar.gz.sha256) |\n| [uv-armv7-unknown-linux-musleabihf.tar.gz](https://github.com/astral-sh/uv/releases/download/0.8.3/uv-armv7-unknown-linux-musleabihf.tar.gz) | ARMv7 MUSL Linux | [checksum](https://github.com/astral-sh/uv/releases/download/0.8.3/uv-armv7-unknown-linux-musleabihf.tar.gz.sha256) |\n\n",
+  "releases": [
+    {
+      "app_name": "uv",
+      "app_version": "0.8.3",
+      "env": {
+        "install_dir_env_var": "UV_INSTALL_DIR",
+        "unmanaged_dir_env_var": "UV_UNMANAGED_INSTALL",
+        "disable_update_env_var": "UV_DISABLE_UPDATE",
+        "no_modify_path_env_var": "UV_NO_MODIFY_PATH",
+        "github_base_url_env_var": "UV_INSTALLER_GITHUB_BASE_URL",
+        "ghe_base_url_env_var": "UV_INSTALLER_GHE_BASE_URL",
+        "github_token_env_var": "UV_GITHUB_TOKEN"
+      },
+      "display_name": "uv",
+      "display": true,
+      "artifacts": [
+        "source.tar.gz",
+        "source.tar.gz.sha256",
+        "uv-installer.sh",
+        "uv-installer.ps1",
+        "sha256.sum",
+        "uv-aarch64-apple-darwin.tar.gz",
+        "uv-aarch64-apple-darwin.tar.gz.sha256",
+        "uv-aarch64-pc-windows-msvc.zip",
+        "uv-aarch64-pc-windows-msvc.zip.sha256",
+        "uv-aarch64-unknown-linux-gnu.tar.gz",
+        "uv-aarch64-unknown-linux-gnu.tar.gz.sha256",
+        "uv-aarch64-unknown-linux-musl.tar.gz",
+        "uv-aarch64-unknown-linux-musl.tar.gz.sha256",
+        "uv-arm-unknown-linux-musleabihf.tar.gz",
+        "uv-arm-unknown-linux-musleabihf.tar.gz.sha256",
+        "uv-armv7-unknown-linux-gnueabihf.tar.gz",
+        "uv-armv7-unknown-linux-gnueabihf.tar.gz.sha256",
+        "uv-armv7-unknown-linux-musleabihf.tar.gz",
+        "uv-armv7-unknown-linux-musleabihf.tar.gz.sha256",
+        "uv-i686-pc-windows-msvc.zip",
+        "uv-i686-pc-windows-msvc.zip.sha256",
+        "uv-i686-unknown-linux-gnu.tar.gz",
+        "uv-i686-unknown-linux-gnu.tar.gz.sha256",
+        "uv-i686-unknown-linux-musl.tar.gz",
+        "uv-i686-unknown-linux-musl.tar.gz.sha256",
+        "uv-powerpc64-unknown-linux-gnu.tar.gz",
+        "uv-powerpc64-unknown-linux-gnu.tar.gz.sha256",
+        "uv-powerpc64le-unknown-linux-gnu.tar.gz",
+        "uv-powerpc64le-unknown-linux-gnu.tar.gz.sha256",
+        "uv-riscv64gc-unknown-linux-gnu.tar.gz",
+        "uv-riscv64gc-unknown-linux-gnu.tar.gz.sha256",
+        "uv-s390x-unknown-linux-gnu.tar.gz",
+        "uv-s390x-unknown-linux-gnu.tar.gz.sha256",
+        "uv-x86_64-apple-darwin.tar.gz",
+        "uv-x86_64-apple-darwin.tar.gz.sha256",
+        "uv-x86_64-pc-windows-msvc.zip",
+        "uv-x86_64-pc-windows-msvc.zip.sha256",
+        "uv-x86_64-unknown-linux-gnu.tar.gz",
+        "uv-x86_64-unknown-linux-gnu.tar.gz.sha256",
+        "uv-x86_64-unknown-linux-musl.tar.gz",
+        "uv-x86_64-unknown-linux-musl.tar.gz.sha256"
+      ],
+      "hosting": {
+        "github": {
+          "artifact_base_url": "https://github.com",
+          "artifact_download_path": "/astral-sh/uv/releases/download/0.8.3",
+          "owner": "astral-sh",
+          "repo": "uv"
+        }
+      }
+    }
+  ],
+  "artifacts": {
+    "sha256.sum": {
+      "name": "sha256.sum",
+      "kind": "unified-checksum"
+    },
+    "source.tar.gz": {
+      "name": "source.tar.gz",
+      "kind": "source-tarball",
+      "checksum": "source.tar.gz.sha256"
+    },
+    "source.tar.gz.sha256": {
+      "name": "source.tar.gz.sha256",
+      "kind": "checksum"
+    },
+    "uv-aarch64-apple-darwin.tar.gz": {
+      "name": "uv-aarch64-apple-darwin.tar.gz",
+      "kind": "executable-zip",
+      "target_triples": [
+        "aarch64-apple-darwin"
+      ],
+      "assets": [
+        {
+          "id": "uv-aarch64-apple-darwin-exe-uv",
+          "name": "uv",
+          "path": "uv",
+          "kind": "executable"
+        },
+        {
+          "id": "uv-aarch64-apple-darwin-exe-uvx",
+          "name": "uvx",
+          "path": "uvx",
+          "kind": "executable"
+        }
+      ],
+      "checksum": "uv-aarch64-apple-darwin.tar.gz.sha256"
+    },
+    "uv-aarch64-apple-darwin.tar.gz.sha256": {
+      "name": "uv-aarch64-apple-darwin.tar.gz.sha256",
+      "kind": "checksum",
+      "target_triples": [
+        "aarch64-apple-darwin"
+      ]
+    },
+    "uv-aarch64-pc-windows-msvc.zip": {
+      "name": "uv-aarch64-pc-windows-msvc.zip",
+      "kind": "executable-zip",
+      "target_triples": [
+        "aarch64-pc-windows-msvc"
+      ],
+      "assets": [
+        {
+          "id": "uv-aarch64-pc-windows-msvc-exe-uv",
+          "name": "uv",
+          "path": "uv.exe",
+          "kind": "executable"
+        },
+        {
+          "id": "uv-aarch64-pc-windows-msvc-exe-uvw",
+          "name": "uvw",
+          "path": "uvw.exe",
+          "kind": "executable"
+        },
+        {
+          "id": "uv-aarch64-pc-windows-msvc-exe-uvx",
+          "name": "uvx",
+          "path": "uvx.exe",
+          "kind": "executable"
+        }
+      ],
+      "checksum": "uv-aarch64-pc-windows-msvc.zip.sha256"
+    },
+    "uv-aarch64-pc-windows-msvc.zip.sha256": {
+      "name": "uv-aarch64-pc-windows-msvc.zip.sha256",
+      "kind": "checksum",
+      "target_triples": [
+        "aarch64-pc-windows-msvc"
+      ]
+    },
+    "uv-aarch64-unknown-linux-gnu.tar.gz": {
+      "name": "uv-aarch64-unknown-linux-gnu.tar.gz",
+      "kind": "executable-zip",
+      "target_triples": [
+        "aarch64-unknown-linux-gnu"
+      ],
+      "assets": [
+        {
+          "id": "uv-aarch64-unknown-linux-gnu-exe-uv",
+          "name": "uv",
+          "path": "uv",
+          "kind": "executable"
+        },
+        {
+          "id": "uv-aarch64-unknown-linux-gnu-exe-uvx",
+          "name": "uvx",
+          "path": "uvx",
+          "kind": "executable"
+        }
+      ],
+      "checksum": "uv-aarch64-unknown-linux-gnu.tar.gz.sha256"
+    },
+    "uv-aarch64-unknown-linux-gnu.tar.gz.sha256": {
+      "name": "uv-aarch64-unknown-linux-gnu.tar.gz.sha256",
+      "kind": "checksum",
+      "target_triples": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    "uv-aarch64-unknown-linux-musl.tar.gz": {
+      "name": "uv-aarch64-unknown-linux-musl.tar.gz",
+      "kind": "executable-zip",
+      "target_triples": [
+        "aarch64-unknown-linux-musl"
+      ],
+      "assets": [
+        {
+          "id": "uv-aarch64-unknown-linux-musl-exe-uv",
+          "name": "uv",
+          "path": "uv",
+          "kind": "executable"
+        },
+        {
+          "id": "uv-aarch64-unknown-linux-musl-exe-uvx",
+          "name": "uvx",
+          "path": "uvx",
+          "kind": "executable"
+        }
+      ],
+      "checksum": "uv-aarch64-unknown-linux-musl.tar.gz.sha256"
+    },
+    "uv-aarch64-unknown-linux-musl.tar.gz.sha256": {
+      "name": "uv-aarch64-unknown-linux-musl.tar.gz.sha256",
+      "kind": "checksum",
+      "target_triples": [
+        "aarch64-unknown-linux-musl"
+      ]
+    },
+    "uv-arm-unknown-linux-musleabihf.tar.gz": {
+      "name": "uv-arm-unknown-linux-musleabihf.tar.gz",
+      "kind": "executable-zip",
+      "target_triples": [
+        "arm-unknown-linux-musleabihf"
+      ],
+      "assets": [
+        {
+          "id": "uv-arm-unknown-linux-musleabihf-exe-uv",
+          "name": "uv",
+          "path": "uv",
+          "kind": "executable"
+        },
+        {
+          "id": "uv-arm-unknown-linux-musleabihf-exe-uvx",
+          "name": "uvx",
+          "path": "uvx",
+          "kind": "executable"
+        }
+      ],
+      "checksum": "uv-arm-unknown-linux-musleabihf.tar.gz.sha256"
+    },
+    "uv-arm-unknown-linux-musleabihf.tar.gz.sha256": {
+      "name": "uv-arm-unknown-linux-musleabihf.tar.gz.sha256",
+      "kind": "checksum",
+      "target_triples": [
+        "arm-unknown-linux-musleabihf"
+      ]
+    },
+    "uv-armv7-unknown-linux-gnueabihf.tar.gz": {
+      "name": "uv-armv7-unknown-linux-gnueabihf.tar.gz",
+      "kind": "executable-zip",
+      "target_triples": [
+        "armv7-unknown-linux-gnueabihf"
+      ],
+      "assets": [
+        {
+          "id": "uv-armv7-unknown-linux-gnueabihf-exe-uv",
+          "name": "uv",
+          "path": "uv",
+          "kind": "executable"
+        },
+        {
+          "id": "uv-armv7-unknown-linux-gnueabihf-exe-uvx",
+          "name": "uvx",
+          "path": "uvx",
+          "kind": "executable"
+        }
+      ],
+      "checksum": "uv-armv7-unknown-linux-gnueabihf.tar.gz.sha256"
+    },
+    "uv-armv7-unknown-linux-gnueabihf.tar.gz.sha256": {
+      "name": "uv-armv7-unknown-linux-gnueabihf.tar.gz.sha256",
+      "kind": "checksum",
+      "target_triples": [
+        "armv7-unknown-linux-gnueabihf"
+      ]
+    },
+    "uv-armv7-unknown-linux-musleabihf.tar.gz": {
+      "name": "uv-armv7-unknown-linux-musleabihf.tar.gz",
+      "kind": "executable-zip",
+      "target_triples": [
+        "armv7-unknown-linux-musleabihf"
+      ],
+      "assets": [
+        {
+          "id": "uv-armv7-unknown-linux-musleabihf-exe-uv",
+          "name": "uv",
+          "path": "uv",
+          "kind": "executable"
+        },
+        {
+          "id": "uv-armv7-unknown-linux-musleabihf-exe-uvx",
+          "name": "uvx",
+          "path": "uvx",
+          "kind": "executable"
+        }
+      ],
+      "checksum": "uv-armv7-unknown-linux-musleabihf.tar.gz.sha256"
+    },
+    "uv-armv7-unknown-linux-musleabihf.tar.gz.sha256": {
+      "name": "uv-armv7-unknown-linux-musleabihf.tar.gz.sha256",
+      "kind": "checksum",
+      "target_triples": [
+        "armv7-unknown-linux-musleabihf"
+      ]
+    },
+    "uv-i686-pc-windows-msvc.zip": {
+      "name": "uv-i686-pc-windows-msvc.zip",
+      "kind": "executable-zip",
+      "target_triples": [
+        "i686-pc-windows-msvc"
+      ],
+      "assets": [
+        {
+          "id": "uv-i686-pc-windows-msvc-exe-uv",
+          "name": "uv",
+          "path": "uv.exe",
+          "kind": "executable"
+        },
+        {
+          "id": "uv-i686-pc-windows-msvc-exe-uvw",
+          "name": "uvw",
+          "path": "uvw.exe",
+          "kind": "executable"
+        },
+        {
+          "id": "uv-i686-pc-windows-msvc-exe-uvx",
+          "name": "uvx",
+          "path": "uvx.exe",
+          "kind": "executable"
+        }
+      ],
+      "checksum": "uv-i686-pc-windows-msvc.zip.sha256"
+    },
+    "uv-i686-pc-windows-msvc.zip.sha256": {
+      "name": "uv-i686-pc-windows-msvc.zip.sha256",
+      "kind": "checksum",
+      "target_triples": [
+        "i686-pc-windows-msvc"
+      ]
+    },
+    "uv-i686-unknown-linux-gnu.tar.gz": {
+      "name": "uv-i686-unknown-linux-gnu.tar.gz",
+      "kind": "executable-zip",
+      "target_triples": [
+        "i686-unknown-linux-gnu"
+      ],
+      "assets": [
+        {
+          "id": "uv-i686-unknown-linux-gnu-exe-uv",
+          "name": "uv",
+          "path": "uv",
+          "kind": "executable"
+        },
+        {
+          "id": "uv-i686-unknown-linux-gnu-exe-uvx",
+          "name": "uvx",
+          "path": "uvx",
+          "kind": "executable"
+        }
+      ],
+      "checksum": "uv-i686-unknown-linux-gnu.tar.gz.sha256"
+    },
+    "uv-i686-unknown-linux-gnu.tar.gz.sha256": {
+      "name": "uv-i686-unknown-linux-gnu.tar.gz.sha256",
+      "kind": "checksum",
+      "target_triples": [
+        "i686-unknown-linux-gnu"
+      ]
+    },
+    "uv-i686-unknown-linux-musl.tar.gz": {
+      "name": "uv-i686-unknown-linux-musl.tar.gz",
+      "kind": "executable-zip",
+      "target_triples": [
+        "i686-unknown-linux-musl"
+      ],
+      "assets": [
+        {
+          "id": "uv-i686-unknown-linux-musl-exe-uv",
+          "name": "uv",
+          "path": "uv",
+          "kind": "executable"
+        },
+        {
+          "id": "uv-i686-unknown-linux-musl-exe-uvx",
+          "name": "uvx",
+          "path": "uvx",
+          "kind": "executable"
+        }
+      ],
+      "checksum": "uv-i686-unknown-linux-musl.tar.gz.sha256"
+    },
+    "uv-i686-unknown-linux-musl.tar.gz.sha256": {
+      "name": "uv-i686-unknown-linux-musl.tar.gz.sha256",
+      "kind": "checksum",
+      "target_triples": [
+        "i686-unknown-linux-musl"
+      ]
+    },
+    "uv-installer.ps1": {
+      "name": "uv-installer.ps1",
+      "kind": "installer",
+      "target_triples": [
+        "aarch64-pc-windows-gnu",
+        "aarch64-pc-windows-msvc",
+        "i686-pc-windows-gnu",
+        "i686-pc-windows-msvc",
+        "x86_64-pc-windows-gnu",
+        "x86_64-pc-windows-msvc"
+      ],
+      "install_hint": "powershell -ExecutionPolicy Bypass -c \"irm https://github.com/astral-sh/uv/releases/download/0.8.3/uv-installer.ps1 | iex\"",
+      "description": "Install prebuilt binaries via powershell script"
+    },
+    "uv-installer.sh": {
+      "name": "uv-installer.sh",
+      "kind": "installer",
+      "target_triples": [
+        "aarch64-apple-darwin",
+        "aarch64-pc-windows-gnu",
+        "aarch64-unknown-linux-gnu",
+        "aarch64-unknown-linux-musl-dynamic",
+        "aarch64-unknown-linux-musl-static",
+        "arm-unknown-linux-gnueabihf",
+        "arm-unknown-linux-musl-dynamiceabihf",
+        "arm-unknown-linux-musl-staticeabihf",
+        "armv7-unknown-linux-gnueabihf",
+        "armv7-unknown-linux-musl-dynamiceabihf",
+        "armv7-unknown-linux-musl-staticeabihf",
+        "i686-pc-windows-gnu",
+        "i686-unknown-linux-gnu",
+        "i686-unknown-linux-musl-dynamic",
+        "i686-unknown-linux-musl-static",
+        "powerpc64-unknown-linux-gnu",
+        "powerpc64le-unknown-linux-gnu",
+        "riscv64gc-unknown-linux-gnu",
+        "s390x-unknown-linux-gnu",
+        "x86_64-apple-darwin",
+        "x86_64-pc-windows-gnu",
+        "x86_64-unknown-linux-gnu",
+        "x86_64-unknown-linux-musl-dynamic",
+        "x86_64-unknown-linux-musl-static"
+      ],
+      "install_hint": "curl --proto '=https' --tlsv1.2 -LsSf https://github.com/astral-sh/uv/releases/download/0.8.3/uv-installer.sh | sh",
+      "description": "Install prebuilt binaries via shell script"
+    },
+    "uv-powerpc64-unknown-linux-gnu.tar.gz": {
+      "name": "uv-powerpc64-unknown-linux-gnu.tar.gz",
+      "kind": "executable-zip",
+      "target_triples": [
+        "powerpc64-unknown-linux-gnu"
+      ],
+      "assets": [
+        {
+          "id": "uv-powerpc64-unknown-linux-gnu-exe-uv",
+          "name": "uv",
+          "path": "uv",
+          "kind": "executable"
+        },
+        {
+          "id": "uv-powerpc64-unknown-linux-gnu-exe-uvx",
+          "name": "uvx",
+          "path": "uvx",
+          "kind": "executable"
+        }
+      ],
+      "checksum": "uv-powerpc64-unknown-linux-gnu.tar.gz.sha256"
+    },
+    "uv-powerpc64-unknown-linux-gnu.tar.gz.sha256": {
+      "name": "uv-powerpc64-unknown-linux-gnu.tar.gz.sha256",
+      "kind": "checksum",
+      "target_triples": [
+        "powerpc64-unknown-linux-gnu"
+      ]
+    },
+    "uv-powerpc64le-unknown-linux-gnu.tar.gz": {
+      "name": "uv-powerpc64le-unknown-linux-gnu.tar.gz",
+      "kind": "executable-zip",
+      "target_triples": [
+        "powerpc64le-unknown-linux-gnu"
+      ],
+      "assets": [
+        {
+          "id": "uv-powerpc64le-unknown-linux-gnu-exe-uv",
+          "name": "uv",
+          "path": "uv",
+          "kind": "executable"
+        },
+        {
+          "id": "uv-powerpc64le-unknown-linux-gnu-exe-uvx",
+          "name": "uvx",
+          "path": "uvx",
+          "kind": "executable"
+        }
+      ],
+      "checksum": "uv-powerpc64le-unknown-linux-gnu.tar.gz.sha256"
+    },
+    "uv-powerpc64le-unknown-linux-gnu.tar.gz.sha256": {
+      "name": "uv-powerpc64le-unknown-linux-gnu.tar.gz.sha256",
+      "kind": "checksum",
+      "target_triples": [
+        "powerpc64le-unknown-linux-gnu"
+      ]
+    },
+    "uv-riscv64gc-unknown-linux-gnu.tar.gz": {
+      "name": "uv-riscv64gc-unknown-linux-gnu.tar.gz",
+      "kind": "executable-zip",
+      "target_triples": [
+        "riscv64gc-unknown-linux-gnu"
+      ],
+      "assets": [
+        {
+          "id": "uv-riscv64gc-unknown-linux-gnu-exe-uv",
+          "name": "uv",
+          "path": "uv",
+          "kind": "executable"
+        },
+        {
+          "id": "uv-riscv64gc-unknown-linux-gnu-exe-uvx",
+          "name": "uvx",
+          "path": "uvx",
+          "kind": "executable"
+        }
+      ],
+      "checksum": "uv-riscv64gc-unknown-linux-gnu.tar.gz.sha256"
+    },
+    "uv-riscv64gc-unknown-linux-gnu.tar.gz.sha256": {
+      "name": "uv-riscv64gc-unknown-linux-gnu.tar.gz.sha256",
+      "kind": "checksum",
+      "target_triples": [
+        "riscv64gc-unknown-linux-gnu"
+      ]
+    },
+    "uv-s390x-unknown-linux-gnu.tar.gz": {
+      "name": "uv-s390x-unknown-linux-gnu.tar.gz",
+      "kind": "executable-zip",
+      "target_triples": [
+        "s390x-unknown-linux-gnu"
+      ],
+      "assets": [
+        {
+          "id": "uv-s390x-unknown-linux-gnu-exe-uv",
+          "name": "uv",
+          "path": "uv",
+          "kind": "executable"
+        },
+        {
+          "id": "uv-s390x-unknown-linux-gnu-exe-uvx",
+          "name": "uvx",
+          "path": "uvx",
+          "kind": "executable"
+        }
+      ],
+      "checksum": "uv-s390x-unknown-linux-gnu.tar.gz.sha256"
+    },
+    "uv-s390x-unknown-linux-gnu.tar.gz.sha256": {
+      "name": "uv-s390x-unknown-linux-gnu.tar.gz.sha256",
+      "kind": "checksum",
+      "target_triples": [
+        "s390x-unknown-linux-gnu"
+      ]
+    },
+    "uv-x86_64-apple-darwin.tar.gz": {
+      "name": "uv-x86_64-apple-darwin.tar.gz",
+      "kind": "executable-zip",
+      "target_triples": [
+        "x86_64-apple-darwin"
+      ],
+      "assets": [
+        {
+          "id": "uv-x86_64-apple-darwin-exe-uv",
+          "name": "uv",
+          "path": "uv",
+          "kind": "executable"
+        },
+        {
+          "id": "uv-x86_64-apple-darwin-exe-uvx",
+          "name": "uvx",
+          "path": "uvx",
+          "kind": "executable"
+        }
+      ],
+      "checksum": "uv-x86_64-apple-darwin.tar.gz.sha256"
+    },
+    "uv-x86_64-apple-darwin.tar.gz.sha256": {
+      "name": "uv-x86_64-apple-darwin.tar.gz.sha256",
+      "kind": "checksum",
+      "target_triples": [
+        "x86_64-apple-darwin"
+      ]
+    },
+    "uv-x86_64-pc-windows-msvc.zip": {
+      "name": "uv-x86_64-pc-windows-msvc.zip",
+      "kind": "executable-zip",
+      "target_triples": [
+        "x86_64-pc-windows-msvc"
+      ],
+      "assets": [
+        {
+          "id": "uv-x86_64-pc-windows-msvc-exe-uv",
+          "name": "uv",
+          "path": "uv.exe",
+          "kind": "executable"
+        },
+        {
+          "id": "uv-x86_64-pc-windows-msvc-exe-uvw",
+          "name": "uvw",
+          "path": "uvw.exe",
+          "kind": "executable"
+        },
+        {
+          "id": "uv-x86_64-pc-windows-msvc-exe-uvx",
+          "name": "uvx",
+          "path": "uvx.exe",
+          "kind": "executable"
+        }
+      ],
+      "checksum": "uv-x86_64-pc-windows-msvc.zip.sha256"
+    },
+    "uv-x86_64-pc-windows-msvc.zip.sha256": {
+      "name": "uv-x86_64-pc-windows-msvc.zip.sha256",
+      "kind": "checksum",
+      "target_triples": [
+        "x86_64-pc-windows-msvc"
+      ]
+    },
+    "uv-x86_64-unknown-linux-gnu.tar.gz": {
+      "name": "uv-x86_64-unknown-linux-gnu.tar.gz",
+      "kind": "executable-zip",
+      "target_triples": [
+        "x86_64-unknown-linux-gnu"
+      ],
+      "assets": [
+        {
+          "id": "uv-x86_64-unknown-linux-gnu-exe-uv",
+          "name": "uv",
+          "path": "uv",
+          "kind": "executable"
+        },
+        {
+          "id": "uv-x86_64-unknown-linux-gnu-exe-uvx",
+          "name": "uvx",
+          "path": "uvx",
+          "kind": "executable"
+        }
+      ],
+      "checksum": "uv-x86_64-unknown-linux-gnu.tar.gz.sha256"
+    },
+    "uv-x86_64-unknown-linux-gnu.tar.gz.sha256": {
+      "name": "uv-x86_64-unknown-linux-gnu.tar.gz.sha256",
+      "kind": "checksum",
+      "target_triples": [
+        "x86_64-unknown-linux-gnu"
+      ]
+    },
+    "uv-x86_64-unknown-linux-musl.tar.gz": {
+      "name": "uv-x86_64-unknown-linux-musl.tar.gz",
+      "kind": "executable-zip",
+      "target_triples": [
+        "x86_64-unknown-linux-musl"
+      ],
+      "assets": [
+        {
+          "id": "uv-x86_64-unknown-linux-musl-exe-uv",
+          "name": "uv",
+          "path": "uv",
+          "kind": "executable"
+        },
+        {
+          "id": "uv-x86_64-unknown-linux-musl-exe-uvx",
+          "name": "uvx",
+          "path": "uvx",
+          "kind": "executable"
+        }
+      ],
+      "checksum": "uv-x86_64-unknown-linux-musl.tar.gz.sha256"
+    },
+    "uv-x86_64-unknown-linux-musl.tar.gz.sha256": {
+      "name": "uv-x86_64-unknown-linux-musl.tar.gz.sha256",
+      "kind": "checksum",
+      "target_triples": [
+        "x86_64-unknown-linux-musl"
+      ]
+    }
+  },
+  "systems": {
+    "plan:all:": {
+      "id": "plan:all:",
+      "cargo_version_line": "cargo 1.88.0 (873a06493 2025-05-10)",
+      "build_environment": {
+        "macos": {
+          "os_version": "14.7.2"
+        }
+      }
+    }
+  },
+  "publish_prereleases": false,
+  "force_latest": false,
+  "ci": {
+    "github": {
+      "artifacts_matrix": {
+        "include": [
+          {
+            "runner": "macos-13",
+            "host": "x86_64-apple-darwin",
+            "install_dist": {
+              "shell": "sh",
+              "run": "curl --proto '=https' --tlsv1.2 -LsSf https://github.com/astral-sh/cargo-dist/releases/download/v0.28.7-prerelease.1/cargo-dist-installer.sh | sh"
+            },
+            "dist_args": "--artifacts=local --target=aarch64-apple-darwin",
+            "targets": [
+              "aarch64-apple-darwin"
+            ],
+            "cache_provider": "github"
+          },
+          {
+            "runner": "ubuntu-22.04",
+            "host": "x86_64-unknown-linux-gnu",
+            "container": {
+              "image": "messense/cargo-xwin",
+              "host": "x86_64-unknown-linux-musl",
+              "package_manager": "apt"
+            },
+            "install_dist": {
+              "shell": "sh",
+              "run": "curl --proto '=https' --tlsv1.2 -LsSf https://github.com/astral-sh/cargo-dist/releases/download/v0.28.7-prerelease.1/cargo-dist-installer.sh | sh"
+            },
+            "dist_args": "--artifacts=local --target=aarch64-pc-windows-msvc",
+            "targets": [
+              "aarch64-pc-windows-msvc"
+            ],
+            "packages_install": "if ! command -v cargo-xwin > /dev/null 2>&1; then\n  if ! command -v pip3 > /dev/null 2>&1; then\n    dnf install --assumeyes python3-pip\n    pip3 install --upgrade pip\n  fi\n  pip3 install cargo-xwin\nfi",
+            "cache_provider": "github"
+          },
+          {
+            "runner": "ubuntu-22.04",
+            "host": "x86_64-unknown-linux-gnu",
+            "install_dist": {
+              "shell": "sh",
+              "run": "curl --proto '=https' --tlsv1.2 -LsSf https://github.com/astral-sh/cargo-dist/releases/download/v0.28.7-prerelease.1/cargo-dist-installer.sh | sh"
+            },
+            "dist_args": "--artifacts=local --target=aarch64-unknown-linux-gnu",
+            "targets": [
+              "aarch64-unknown-linux-gnu"
+            ],
+            "packages_install": "if ! command -v cargo-zigbuild > /dev/null 2>&1; then\n  if ! command -v pip3 > /dev/null 2>&1; then\n    dnf install --assumeyes python3-pip\n    pip3 install --upgrade pip\n  fi\n  pip3 install cargo-zigbuild\nfi",
+            "cache_provider": "github"
+          },
+          {
+            "runner": "ubuntu-22.04",
+            "host": "x86_64-unknown-linux-gnu",
+            "install_dist": {
+              "shell": "sh",
+              "run": "curl --proto '=https' --tlsv1.2 -LsSf https://github.com/astral-sh/cargo-dist/releases/download/v0.28.7-prerelease.1/cargo-dist-installer.sh | sh"
+            },
+            "dist_args": "--artifacts=local --target=aarch64-unknown-linux-musl",
+            "targets": [
+              "aarch64-unknown-linux-musl"
+            ],
+            "packages_install": "sudo apt-get update\nsudo apt-get install musl-tools\nif ! command -v cargo-zigbuild > /dev/null 2>&1; then\n  if ! command -v pip3 > /dev/null 2>&1; then\n    dnf install --assumeyes python3-pip\n    pip3 install --upgrade pip\n  fi\n  pip3 install cargo-zigbuild\nfi",
+            "cache_provider": "github"
+          },
+          {
+            "runner": "ubuntu-22.04",
+            "host": "x86_64-unknown-linux-gnu",
+            "install_dist": {
+              "shell": "sh",
+              "run": "curl --proto '=https' --tlsv1.2 -LsSf https://github.com/astral-sh/cargo-dist/releases/download/v0.28.7-prerelease.1/cargo-dist-installer.sh | sh"
+            },
+            "dist_args": "--artifacts=local --target=arm-unknown-linux-musleabihf",
+            "targets": [
+              "arm-unknown-linux-musleabihf"
+            ],
+            "packages_install": "if ! command -v cargo-zigbuild > /dev/null 2>&1; then\n  if ! command -v pip3 > /dev/null 2>&1; then\n    dnf install --assumeyes python3-pip\n    pip3 install --upgrade pip\n  fi\n  pip3 install cargo-zigbuild\nfi",
+            "cache_provider": "github"
+          },
+          {
+            "runner": "ubuntu-22.04",
+            "host": "x86_64-unknown-linux-gnu",
+            "install_dist": {
+              "shell": "sh",
+              "run": "curl --proto '=https' --tlsv1.2 -LsSf https://github.com/astral-sh/cargo-dist/releases/download/v0.28.7-prerelease.1/cargo-dist-installer.sh | sh"
+            },
+            "dist_args": "--artifacts=local --target=armv7-unknown-linux-gnueabihf",
+            "targets": [
+              "armv7-unknown-linux-gnueabihf"
+            ],
+            "packages_install": "if ! command -v cargo-zigbuild > /dev/null 2>&1; then\n  if ! command -v pip3 > /dev/null 2>&1; then\n    dnf install --assumeyes python3-pip\n    pip3 install --upgrade pip\n  fi\n  pip3 install cargo-zigbuild\nfi",
+            "cache_provider": "github"
+          },
+          {
+            "runner": "ubuntu-22.04",
+            "host": "x86_64-unknown-linux-gnu",
+            "install_dist": {
+              "shell": "sh",
+              "run": "curl --proto '=https' --tlsv1.2 -LsSf https://github.com/astral-sh/cargo-dist/releases/download/v0.28.7-prerelease.1/cargo-dist-installer.sh | sh"
+            },
+            "dist_args": "--artifacts=local --target=armv7-unknown-linux-musleabihf",
+            "targets": [
+              "armv7-unknown-linux-musleabihf"
+            ],
+            "packages_install": "if ! command -v cargo-zigbuild > /dev/null 2>&1; then\n  if ! command -v pip3 > /dev/null 2>&1; then\n    dnf install --assumeyes python3-pip\n    pip3 install --upgrade pip\n  fi\n  pip3 install cargo-zigbuild\nfi",
+            "cache_provider": "github"
+          },
+          {
+            "runner": "ubuntu-22.04",
+            "host": "x86_64-unknown-linux-gnu",
+            "container": {
+              "image": "messense/cargo-xwin",
+              "host": "x86_64-unknown-linux-musl",
+              "package_manager": "apt"
+            },
+            "install_dist": {
+              "shell": "sh",
+              "run": "curl --proto '=https' --tlsv1.2 -LsSf https://github.com/astral-sh/cargo-dist/releases/download/v0.28.7-prerelease.1/cargo-dist-installer.sh | sh"
+            },
+            "dist_args": "--artifacts=local --target=i686-pc-windows-msvc",
+            "targets": [
+              "i686-pc-windows-msvc"
+            ],
+            "packages_install": "if ! command -v cargo-xwin > /dev/null 2>&1; then\n  if ! command -v pip3 > /dev/null 2>&1; then\n    dnf install --assumeyes python3-pip\n    pip3 install --upgrade pip\n  fi\n  pip3 install cargo-xwin\nfi",
+            "cache_provider": "github"
+          },
+          {
+            "runner": "ubuntu-22.04",
+            "host": "x86_64-unknown-linux-gnu",
+            "install_dist": {
+              "shell": "sh",
+              "run": "curl --proto '=https' --tlsv1.2 -LsSf https://github.com/astral-sh/cargo-dist/releases/download/v0.28.7-prerelease.1/cargo-dist-installer.sh | sh"
+            },
+            "dist_args": "--artifacts=local --target=i686-unknown-linux-gnu",
+            "targets": [
+              "i686-unknown-linux-gnu"
+            ],
+            "packages_install": "if ! command -v cargo-zigbuild > /dev/null 2>&1; then\n  if ! command -v pip3 > /dev/null 2>&1; then\n    dnf install --assumeyes python3-pip\n    pip3 install --upgrade pip\n  fi\n  pip3 install cargo-zigbuild\nfi",
+            "cache_provider": "github"
+          },
+          {
+            "runner": "ubuntu-22.04",
+            "host": "x86_64-unknown-linux-gnu",
+            "install_dist": {
+              "shell": "sh",
+              "run": "curl --proto '=https' --tlsv1.2 -LsSf https://github.com/astral-sh/cargo-dist/releases/download/v0.28.7-prerelease.1/cargo-dist-installer.sh | sh"
+            },
+            "dist_args": "--artifacts=local --target=i686-unknown-linux-musl",
+            "targets": [
+              "i686-unknown-linux-musl"
+            ],
+            "packages_install": "sudo apt-get update\nsudo apt-get install musl-tools\nif ! command -v cargo-zigbuild > /dev/null 2>&1; then\n  if ! command -v pip3 > /dev/null 2>&1; then\n    dnf install --assumeyes python3-pip\n    pip3 install --upgrade pip\n  fi\n  pip3 install cargo-zigbuild\nfi",
+            "cache_provider": "github"
+          },
+          {
+            "runner": "ubuntu-22.04",
+            "host": "x86_64-unknown-linux-gnu",
+            "install_dist": {
+              "shell": "sh",
+              "run": "curl --proto '=https' --tlsv1.2 -LsSf https://github.com/astral-sh/cargo-dist/releases/download/v0.28.7-prerelease.1/cargo-dist-installer.sh | sh"
+            },
+            "dist_args": "--artifacts=local --target=powerpc64-unknown-linux-gnu",
+            "targets": [
+              "powerpc64-unknown-linux-gnu"
+            ],
+            "packages_install": "if ! command -v cargo-zigbuild > /dev/null 2>&1; then\n  if ! command -v pip3 > /dev/null 2>&1; then\n    dnf install --assumeyes python3-pip\n    pip3 install --upgrade pip\n  fi\n  pip3 install cargo-zigbuild\nfi",
+            "cache_provider": "github"
+          },
+          {
+            "runner": "ubuntu-22.04",
+            "host": "x86_64-unknown-linux-gnu",
+            "install_dist": {
+              "shell": "sh",
+              "run": "curl --proto '=https' --tlsv1.2 -LsSf https://github.com/astral-sh/cargo-dist/releases/download/v0.28.7-prerelease.1/cargo-dist-installer.sh | sh"
+            },
+            "dist_args": "--artifacts=local --target=powerpc64le-unknown-linux-gnu",
+            "targets": [
+              "powerpc64le-unknown-linux-gnu"
+            ],
+            "packages_install": "if ! command -v cargo-zigbuild > /dev/null 2>&1; then\n  if ! command -v pip3 > /dev/null 2>&1; then\n    dnf install --assumeyes python3-pip\n    pip3 install --upgrade pip\n  fi\n  pip3 install cargo-zigbuild\nfi",
+            "cache_provider": "github"
+          },
+          {
+            "runner": "ubuntu-22.04",
+            "host": "x86_64-unknown-linux-gnu",
+            "install_dist": {
+              "shell": "sh",
+              "run": "curl --proto '=https' --tlsv1.2 -LsSf https://github.com/astral-sh/cargo-dist/releases/download/v0.28.7-prerelease.1/cargo-dist-installer.sh | sh"
+            },
+            "dist_args": "--artifacts=local --target=riscv64gc-unknown-linux-gnu",
+            "targets": [
+              "riscv64gc-unknown-linux-gnu"
+            ],
+            "packages_install": "if ! command -v cargo-zigbuild > /dev/null 2>&1; then\n  if ! command -v pip3 > /dev/null 2>&1; then\n    dnf install --assumeyes python3-pip\n    pip3 install --upgrade pip\n  fi\n  pip3 install cargo-zigbuild\nfi",
+            "cache_provider": "github"
+          },
+          {
+            "runner": "ubuntu-22.04",
+            "host": "x86_64-unknown-linux-gnu",
+            "install_dist": {
+              "shell": "sh",
+              "run": "curl --proto '=https' --tlsv1.2 -LsSf https://github.com/astral-sh/cargo-dist/releases/download/v0.28.7-prerelease.1/cargo-dist-installer.sh | sh"
+            },
+            "dist_args": "--artifacts=local --target=s390x-unknown-linux-gnu",
+            "targets": [
+              "s390x-unknown-linux-gnu"
+            ],
+            "packages_install": "if ! command -v cargo-zigbuild > /dev/null 2>&1; then\n  if ! command -v pip3 > /dev/null 2>&1; then\n    dnf install --assumeyes python3-pip\n    pip3 install --upgrade pip\n  fi\n  pip3 install cargo-zigbuild\nfi",
+            "cache_provider": "github"
+          },
+          {
+            "runner": "macos-13",
+            "host": "x86_64-apple-darwin",
+            "install_dist": {
+              "shell": "sh",
+              "run": "curl --proto '=https' --tlsv1.2 -LsSf https://github.com/astral-sh/cargo-dist/releases/download/v0.28.7-prerelease.1/cargo-dist-installer.sh | sh"
+            },
+            "dist_args": "--artifacts=local --target=x86_64-apple-darwin",
+            "targets": [
+              "x86_64-apple-darwin"
+            ],
+            "cache_provider": "github"
+          },
+          {
+            "runner": "windows-2022",
+            "host": "x86_64-pc-windows-msvc",
+            "install_dist": {
+              "shell": "pwsh",
+              "run": "irm https://github.com/astral-sh/cargo-dist/releases/download/v0.28.7-prerelease.1/cargo-dist-installer.ps1 | iex"
+            },
+            "dist_args": "--artifacts=local --target=x86_64-pc-windows-msvc",
+            "targets": [
+              "x86_64-pc-windows-msvc"
+            ],
+            "cache_provider": "github"
+          },
+          {
+            "runner": "ubuntu-22.04",
+            "host": "x86_64-unknown-linux-gnu",
+            "install_dist": {
+              "shell": "sh",
+              "run": "curl --proto '=https' --tlsv1.2 -LsSf https://github.com/astral-sh/cargo-dist/releases/download/v0.28.7-prerelease.1/cargo-dist-installer.sh | sh"
+            },
+            "dist_args": "--artifacts=local --target=x86_64-unknown-linux-gnu",
+            "targets": [
+              "x86_64-unknown-linux-gnu"
+            ],
+            "cache_provider": "github"
+          },
+          {
+            "runner": "ubuntu-22.04",
+            "host": "x86_64-unknown-linux-gnu",
+            "install_dist": {
+              "shell": "sh",
+              "run": "curl --proto '=https' --tlsv1.2 -LsSf https://github.com/astral-sh/cargo-dist/releases/download/v0.28.7-prerelease.1/cargo-dist-installer.sh | sh"
+            },
+            "dist_args": "--artifacts=local --target=x86_64-unknown-linux-musl",
+            "targets": [
+              "x86_64-unknown-linux-musl"
+            ],
+            "packages_install": "sudo apt-get update\nsudo apt-get install musl-tools",
+            "cache_provider": "github"
+          }
+        ]
+      },
+      "pr_run_mode": "plan"
+    }
+  },
+  "linkage": [],
+  "upload_files": []
+}
