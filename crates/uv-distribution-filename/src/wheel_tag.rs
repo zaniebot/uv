@@ -69,6 +69,29 @@ impl WheelTag {
             Self::Large { large } => large.build_tag.as_ref(),
         }
     }
+
+    /// Return the string representation of the tags without the build tag prefix.
+    ///
+    /// For `Small` tags, this is just `python-abi-platform`.
+    /// For `Large` tags, this strips the build tag prefix from the repr if present.
+    pub(crate) fn repr_without_build_tag(&self) -> String {
+        match self {
+            Self::Small { small } => format!("{small}"),
+            Self::Large { large } => {
+                if large.build_tag.is_some() {
+                    // The repr includes the build tag as a prefix: `build-python-abi-platform`.
+                    // Strip it.
+                    if let Some(idx) = large.repr.find('-') {
+                        large.repr[idx + 1..].to_string()
+                    } else {
+                        large.repr.to_string()
+                    }
+                } else {
+                    large.repr.to_string()
+                }
+            }
+        }
+    }
 }
 
 impl Display for WheelTag {

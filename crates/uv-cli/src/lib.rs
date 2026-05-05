@@ -41,6 +41,26 @@ pub mod compat;
 pub mod options;
 pub mod version;
 
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
+pub enum PublishConflict {
+    /// Error when a file with the same name but different hash already exists on the index.
+    ///
+    /// This is the default behavior.
+    #[default]
+    Fail,
+    /// Skip upload if a file with the same name already exists on the index.
+    ///
+    /// Requires `--check-url` (or `--index`, which implies a check URL).
+    Skip,
+    /// When a conflict is detected, increment the build number and upload with a new filename.
+    ///
+    /// When a file with the same name but a different hash exists on the index, find the highest
+    /// build number among matching wheels and upload with an incremented build tag.
+    ///
+    /// Only works for wheels, not source distributions. Requires `--check-url` (or `--index`).
+    IncrementBuild,
+}
+
 #[derive(Debug, Clone, Copy, clap::ValueEnum)]
 pub enum VersionFormat {
     /// Display the version as plain text.
@@ -7668,6 +7688,12 @@ pub struct PublishArgs {
     /// The index must provide one of the supported hashes (SHA-256, SHA-384, or SHA-512).
     #[arg(long, env = EnvVars::UV_PUBLISH_CHECK_URL, hide_env_values = true)]
     pub check_url: Option<IndexUrl>,
+
+    /// Conflict resolution strategy when a file with the same name already exists on the index.
+    ///
+    /// Requires `--check-url` (or `--index`, which implies a check URL).
+    #[arg(long, value_enum, default_value_t = PublishConflict::default())]
+    pub on_conflict: PublishConflict,
 
     #[arg(long, hide = true)]
     pub skip_existing: bool,

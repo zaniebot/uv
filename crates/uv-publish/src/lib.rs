@@ -1457,6 +1457,286 @@ async fn handle_response(registry: &Url, response: Response) -> Result<(), Publi
     ))
 }
 
+/// Query the simple API for a package and find the maximum build number among wheels
+/// that match the given wheel filename (ignoring build tags).
+///
+/// Returns `None` if no matching wheels are found on the index.
+pub async fn find_max_build_number(
+    check_url_client: &CheckUrlClient<'_>,
+    wheel: &uv_distribution_filename::WheelFilename,
+    download_concurrency: &Semaphore,
+) -> Result<Option<u64>, PublishError> {
+    let CheckUrlClient {
+        index_url,
+        registry_client_builder,
+        client,
+        index_capabilities,
+        cache,
+    } = check_url_client;
+
+    let cache_refresh = (*cache)
+        .clone()
+        .with_refresh(Refresh::from_args(None, vec![wheel.name.clone()]));
+    let registry_client = registry_client_builder
+        .clone()
+        .cache(cache_refresh)
+        .wrap_existing(client);
+
+    debug!("Querying index for existing builds of {}", wheel.name);
+    let response = match registry_client
+        .simple_detail(
+            &wheel.name,
+            Some(index_url.into()),
+            index_capabilities,
+            download_concurrency,
+        )
+        .await
+    {
+        Ok(response) => response,
+        Err(err) => {
+            return match err.kind() {
+                uv_client::ErrorKind::RemotePackageNotFound(_) => Ok(None),
+                _ => Err(PublishError::CheckUrlIndex(err)),
+            };
+        }
+    };
+
+    let [(_, MetadataFormat::Simple(simple_metadata))] = response.as_slice() else {
+        unreachable!("We queried a single index, we must get a single response");
+    };
+    let simple_metadata = OwnedArchive::deserialize(simple_metadata);
+    let Some(metadatum) = simple_metadata
+        .iter()
+        .find(|metadatum| metadatum.version == wheel.version)
+    else {
+        return Ok(None);
+    };
+
+    let max_build = metadatum
+        .files
+        .wheels
+        .iter()
+        .filter(|entry| entry.name.matches_ignoring_build_tag(wheel))
+        .filter_map(|entry| {
+            entry
+                .name
+                .build_tag()
+                .map(uv_distribution_filename::BuildTag::number)
+        })
+        .max();
+
+    Ok(max_build)
+}
+
+/// Rewrite a wheel file with a new build tag.
+///
+/// Copies all ZIP entries verbatim except the `WHEEL` metadata file (where the `Build` field is
+/// added/updated) and the `RECORD` file (which is regenerated with updated hashes).
+///
+/// Returns the path to a temporary file containing the rewritten wheel.
+pub fn rewrite_wheel_build_tag(
+    source_path: &Path,
+    new_build_tag: &uv_distribution_filename::BuildTag,
+) -> Result<tempfile::NamedTempFile, PublishError> {
+    use sha2::{Digest, Sha256};
+    use std::io::{Read, Write};
+
+    let source_file = fs_err::File::open(source_path).map_err(|err| {
+        PublishError::PublishPrepare(
+            source_path.to_path_buf(),
+            Box::new(PublishPrepareError::Io(err)),
+        )
+    })?;
+    let mut archive = zip::ZipArchive::new(source_file).map_err(|err| {
+        PublishError::PublishPrepare(
+            source_path.to_path_buf(),
+            Box::new(PublishPrepareError::Io(io::Error::new(
+                io::ErrorKind::InvalidData,
+                err,
+            ))),
+        )
+    })?;
+
+    // Find the .dist-info directory name.
+    let dist_info_prefix = {
+        let mut prefix = None;
+        for i in 0..archive.len() {
+            let entry = archive.by_index(i).map_err(|err| {
+                PublishError::PublishPrepare(
+                    source_path.to_path_buf(),
+                    Box::new(PublishPrepareError::Io(io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        err,
+                    ))),
+                )
+            })?;
+            let name = entry.name();
+            if let Some(rest) = name.strip_suffix(".dist-info/WHEEL") {
+                prefix = Some(rest.to_string());
+                break;
+            }
+            if let Some(rest) = name.strip_suffix(".dist-info/RECORD") {
+                prefix = Some(rest.to_string());
+                break;
+            }
+        }
+        prefix.ok_or_else(|| {
+            PublishError::PublishPrepare(
+                source_path.to_path_buf(),
+                Box::new(PublishPrepareError::Io(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "No .dist-info directory found in wheel",
+                ))),
+            )
+        })?
+    };
+
+    let wheel_path = format!("{dist_info_prefix}.dist-info/WHEEL");
+    let record_path = format!("{dist_info_prefix}.dist-info/RECORD");
+
+    let mut temp_file = tempfile::NamedTempFile::new().map_err(|err| {
+        PublishError::PublishPrepare(
+            source_path.to_path_buf(),
+            Box::new(PublishPrepareError::Io(err)),
+        )
+    })?;
+
+    // Track records for RECORD regeneration: (path, sha256_b64, size)
+    let mut records: Vec<(String, String, u64)> = Vec::new();
+
+    {
+        let mut writer = zip::ZipWriter::new(&mut temp_file);
+
+        for i in 0..archive.len() {
+            let mut entry = archive.by_index(i).map_err(|err| {
+                PublishError::PublishPrepare(
+                    source_path.to_path_buf(),
+                    Box::new(PublishPrepareError::Io(io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        err,
+                    ))),
+                )
+            })?;
+            let entry_name = entry.name().to_string();
+
+            if entry_name == record_path {
+                // Skip RECORD; we'll regenerate it.
+                continue;
+            }
+
+            if entry_name == wheel_path {
+                // Read and modify the WHEEL file.
+                let mut contents = String::new();
+                entry.read_to_string(&mut contents).map_err(|err| {
+                    PublishError::PublishPrepare(
+                        source_path.to_path_buf(),
+                        Box::new(PublishPrepareError::Io(err)),
+                    )
+                })?;
+
+                // Remove existing Build line and add new one.
+                let mut lines: Vec<&str> = contents.lines().collect();
+                lines.retain(|line| !line.starts_with("Build:"));
+                let new_contents = format!("{}\nBuild: {new_build_tag}\n", lines.join("\n"));
+
+                let options = zip::write::SimpleFileOptions::default()
+                    .compression_method(zip::CompressionMethod::Deflated);
+                writer.start_file(&entry_name, options).map_err(|err| {
+                    PublishError::PublishPrepare(
+                        source_path.to_path_buf(),
+                        Box::new(PublishPrepareError::Io(io::Error::other(err))),
+                    )
+                })?;
+                writer.write_all(new_contents.as_bytes()).map_err(|err| {
+                    PublishError::PublishPrepare(
+                        source_path.to_path_buf(),
+                        Box::new(PublishPrepareError::Io(err)),
+                    )
+                })?;
+
+                // Record hash for RECORD.
+                let hash = Sha256::digest(new_contents.as_bytes());
+                let hash_b64 = base64_url_encode(&hash);
+                records.push((entry_name, hash_b64, new_contents.len() as u64));
+            } else {
+                // Copy entry verbatim.
+                writer.raw_copy_file(entry).map_err(|err| {
+                    PublishError::PublishPrepare(
+                        source_path.to_path_buf(),
+                        Box::new(PublishPrepareError::Io(io::Error::other(err))),
+                    )
+                })?;
+
+                // We need the hash for RECORD. For raw-copied files, read from the
+                // original archive again to compute the hash.
+                let mut entry2 = archive.by_index(i).map_err(|err| {
+                    PublishError::PublishPrepare(
+                        source_path.to_path_buf(),
+                        Box::new(PublishPrepareError::Io(io::Error::new(
+                            io::ErrorKind::InvalidData,
+                            err,
+                        ))),
+                    )
+                })?;
+                let mut buf = Vec::new();
+                entry2.read_to_end(&mut buf).map_err(|err| {
+                    PublishError::PublishPrepare(
+                        source_path.to_path_buf(),
+                        Box::new(PublishPrepareError::Io(err)),
+                    )
+                })?;
+                let hash = Sha256::digest(&buf);
+                let hash_b64 = base64_url_encode(&hash);
+                records.push((entry_name, hash_b64, buf.len() as u64));
+            }
+        }
+
+        // Write the new RECORD file.
+        let mut record_contents = String::new();
+        for (path, hash, size) in &records {
+            use std::fmt::Write as _;
+            writeln!(record_contents, "{path},sha256={hash},{size}").unwrap();
+        }
+        // RECORD's own entry has no hash.
+        {
+            use std::fmt::Write as _;
+            writeln!(record_contents, "{record_path},,").unwrap();
+        }
+
+        let options = zip::write::SimpleFileOptions::default()
+            .compression_method(zip::CompressionMethod::Deflated);
+        writer.start_file(&record_path, options).map_err(|err| {
+            PublishError::PublishPrepare(
+                source_path.to_path_buf(),
+                Box::new(PublishPrepareError::Io(io::Error::other(err))),
+            )
+        })?;
+        writer
+            .write_all(record_contents.as_bytes())
+            .map_err(|err| {
+                PublishError::PublishPrepare(
+                    source_path.to_path_buf(),
+                    Box::new(PublishPrepareError::Io(err)),
+                )
+            })?;
+
+        writer.finish().map_err(|err| {
+            PublishError::PublishPrepare(
+                source_path.to_path_buf(),
+                Box::new(PublishPrepareError::Io(io::Error::other(err))),
+            )
+        })?;
+    }
+
+    Ok(temp_file)
+}
+
+/// Encode bytes as URL-safe base64 (no padding), as used in RECORD files.
+fn base64_url_encode(bytes: &[u8]) -> String {
+    use base64::Engine;
+    base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(bytes)
+}
+
 #[cfg(test)]
 mod tests {
     use std::path::PathBuf;
@@ -2170,6 +2450,60 @@ mod tests {
         error: Failed to publish `../../test/links/tqdm-4.66.1-py3-none-manylinux_2_12_x86_64.manylinux2010_x86_64.musllinux_1_1_x86_64.whl` to https://different.auth.tld/final/
           Caused by: Redirected URL is not in the same realm. Redirected to: https://different.auth.tld/final/
         "
+        );
+    }
+
+    #[test]
+    fn test_rewrite_wheel_build_tag() {
+        use crate::rewrite_wheel_build_tag;
+        use std::io::Read;
+        use uv_distribution_filename::BuildTag;
+
+        let wheel_path = PathBuf::from("../../test/links/ok-1.0.0-py3-none-any.whl");
+        if !wheel_path.exists() {
+            // Skip if test file not available.
+            return;
+        }
+
+        let build_tag = BuildTag::new(1, None);
+        let temp_file = rewrite_wheel_build_tag(&wheel_path, &build_tag).unwrap();
+
+        // Verify the result is a valid zip file.
+        let file = fs_err::File::open(temp_file.path()).unwrap();
+        let mut archive = zip::ZipArchive::new(file).unwrap();
+
+        // Check that WHEEL file contains Build: 1.
+        let mut wheel_content = String::new();
+        let mut found_wheel = false;
+        for i in 0..archive.len() {
+            let mut entry = archive.by_index(i).unwrap();
+            if entry.name().ends_with(".dist-info/WHEEL") {
+                entry.read_to_string(&mut wheel_content).unwrap();
+                found_wheel = true;
+                break;
+            }
+        }
+        assert!(found_wheel, "WHEEL file not found in rewritten wheel");
+        assert!(
+            wheel_content.contains("Build: 1"),
+            "WHEEL file should contain 'Build: 1', got: {wheel_content}"
+        );
+
+        // Check that RECORD file exists and has content.
+        let mut record_content = String::new();
+        let mut found_record = false;
+        for i in 0..archive.len() {
+            let mut entry = archive.by_index(i).unwrap();
+            if entry.name().ends_with(".dist-info/RECORD") {
+                entry.read_to_string(&mut record_content).unwrap();
+                found_record = true;
+                break;
+            }
+        }
+        assert!(found_record, "RECORD file not found in rewritten wheel");
+        assert!(
+            record_content.contains("sha256="),
+            "RECORD file should contain sha256 hashes"
         );
     }
 }

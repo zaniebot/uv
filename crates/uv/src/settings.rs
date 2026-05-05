@@ -4079,6 +4079,7 @@ pub(crate) struct PublishSettings {
     pub(crate) dry_run: bool,
     pub(crate) no_attestations: bool,
     pub(crate) direct: bool,
+    pub(crate) on_conflict: uv_cli::PublishConflict,
 
     // Both CLI and configuration.
     pub(crate) publish_url: DisplaySafeUrl,
@@ -4126,6 +4127,7 @@ impl PublishSettings {
             dry_run: args.dry_run,
             no_attestations: args.no_attestations,
             direct: args.direct,
+            on_conflict: args.on_conflict,
             publish_url: args
                 .publish_url
                 .combine(publish_url)

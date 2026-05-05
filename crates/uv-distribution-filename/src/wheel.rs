@@ -13,6 +13,7 @@ use uv_platform_tags::{
     AbiTag, LanguageTag, ParseAbiTagError, ParseLanguageTagError, ParsePlatformTagError,
     PlatformTag, TagCompatibility, Tags,
 };
+use uv_small_str::SmallString;
 
 use crate::splitter::MemchrSplitter;
 use crate::wheel_tag::{WheelTag, WheelTagLarge, WheelTagSmall};
@@ -150,6 +151,38 @@ impl WheelFilename {
     /// Return the wheel's build tag, if present.
     pub fn build_tag(&self) -> Option<&BuildTag> {
         self.tags.build_tag()
+    }
+
+    /// Return a new `WheelFilename` with the given build tag.
+    #[must_use]
+    pub fn with_build_tag(&self, build_tag: BuildTag) -> Self {
+        // Build the `buildtag-python-abi-platform` repr string.
+        let base_repr = self.tags.repr_without_build_tag();
+        let repr = format!("{build_tag}-{base_repr}");
+        let large = WheelTagLarge {
+            build_tag: Some(build_tag),
+            python_tag: self.python_tags().iter().copied().collect(),
+            abi_tag: self.abi_tags().iter().copied().collect(),
+            platform_tag: self.platform_tags().iter().cloned().collect(),
+            repr: SmallString::from(repr),
+        };
+        Self {
+            name: self.name.clone(),
+            version: self.version.clone(),
+            tags: WheelTag::Large {
+                large: Box::new(large),
+            },
+        }
+    }
+
+    /// Returns `true` if two wheel filenames match ignoring build tags
+    /// (same name, version, python, abi, platform tags).
+    pub fn matches_ignoring_build_tag(&self, other: &Self) -> bool {
+        self.name == other.name
+            && self.version == other.version
+            && self.python_tags() == other.python_tags()
+            && self.abi_tags() == other.abi_tags()
+            && self.platform_tags() == other.platform_tags()
     }
 
     /// Parse a wheel filename from the stem (e.g., `foo-1.2.3-py3-none-any`).

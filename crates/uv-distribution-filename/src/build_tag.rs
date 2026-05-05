@@ -62,6 +62,18 @@ impl FromStr for BuildTag {
     }
 }
 
+impl BuildTag {
+    /// Create a new `BuildTag` with a numeric prefix and optional string suffix.
+    pub fn new(number: u64, suffix: Option<SmallString>) -> Self {
+        Self(number, suffix)
+    }
+
+    /// Return the numeric prefix of the build tag.
+    pub fn number(&self) -> u64 {
+        self.0
+    }
+}
+
 impl std::fmt::Display for BuildTag {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self.1 {

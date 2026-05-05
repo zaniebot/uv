@@ -5,18 +5,21 @@ use anyhow::{Context, Result, bail};
 use console::Term;
 use owo_colors::{AnsiColors, OwoColorize};
 use tokio::sync::Semaphore;
-use tracing::{debug, info, trace};
+use tracing::{debug, info, trace, warn};
 use uv_auth::{Credentials, DEFAULT_TOLERANCE_SECS, PyxTokenStore};
 use uv_cache::Cache;
+use uv_cli::PublishConflict;
 use uv_client::{
     AuthIntegration, BaseClient, BaseClientBuilder, RedirectPolicy, RegistryClientBuilder,
 };
 use uv_configuration::{KeyringProviderType, TrustedPublishing};
+use uv_distribution_filename::{BuildTag, DistFilename};
 use uv_distribution_types::{IndexCapabilities, IndexLocations, IndexUrl};
 use uv_preview::{Preview, PreviewFeature};
 use uv_publish::{
     CheckUrlClient, FormMetadata, PublishError, TrustedPublishResult, check_trusted_publishing,
-    group_files_for_publishing, upload, upload_two_phase,
+    find_max_build_number, group_files_for_publishing, rewrite_wheel_build_tag, upload,
+    upload_two_phase,
 };
 use uv_redacted::DisplaySafeUrl;
 use uv_settings::EnvironmentOptions;
@@ -41,6 +44,7 @@ pub(crate) async fn publish(
     dry_run: bool,
     no_attestations: bool,
     direct: bool,
+    on_conflict: PublishConflict,
     preview: Preview,
     cache: &Cache,
     printer: Printer,
@@ -192,22 +196,160 @@ pub(crate) async fn publish(
         None
     };
 
+    // Validate on_conflict requirements.
+    if on_conflict != PublishConflict::Fail && check_url_client.is_none() {
+        bail!(
+            "`--on-conflict {on_conflict}` requires `--check-url` or `--index` to query the index for existing files",
+            on_conflict = match on_conflict {
+                PublishConflict::Skip => "skip",
+                PublishConflict::IncrementBuild => "increment-build",
+                PublishConflict::Fail => unreachable!(),
+            }
+        );
+    }
+
     for group in groups {
+        // Pre-check the index for existing files when check_url is configured.
         if let Some(check_url_client) = &check_url_client {
-            if uv_publish::check_url(
+            match uv_publish::check_url(
                 check_url_client,
                 &group.file,
                 &group.filename,
                 &download_concurrency,
             )
-            .await?
+            .await
             {
-                writeln!(
-                    printer.stderr(),
-                    "File {} already exists, skipping",
-                    group.filename
-                )?;
-                continue;
+                Ok(true) => {
+                    // File exists with matching hash — skip in all modes.
+                    writeln!(
+                        printer.stderr(),
+                        "File {} already exists, skipping",
+                        group.filename
+                    )?;
+                    continue;
+                }
+                Ok(false) => {
+                    // File doesn't exist on the index, proceed with upload.
+                }
+                Err(err @ PublishError::HashMismatch { .. }) => {
+                    match on_conflict {
+                        PublishConflict::Fail => {
+                            return Err(err.into());
+                        }
+                        PublishConflict::Skip => {
+                            writeln!(
+                                printer.stderr(),
+                                "File {} already exists (different content), skipping",
+                                group.filename
+                            )?;
+                            continue;
+                        }
+                        PublishConflict::IncrementBuild => {
+                            const MAX_RETRIES: u32 = 3;
+
+                            let DistFilename::WheelFilename(ref wheel) = group.filename else {
+                                bail!(
+                                    "`--on-conflict increment-build` is only supported for wheels, \
+                                    not source distributions: {}",
+                                    group.filename
+                                );
+                            };
+
+                            let max_build = find_max_build_number(
+                                check_url_client,
+                                wheel,
+                                &download_concurrency,
+                            )
+                            .await?;
+
+                            let mut new_build_number = max_build.map_or(1, |n| n + 1);
+
+                            // Retry loop for race conditions.
+                            let mut attempt = 0;
+                            loop {
+                                let new_tag = BuildTag::new(new_build_number, None);
+                                let new_wheel_filename = wheel.with_build_tag(new_tag.clone());
+
+                                debug!("Rewriting {} with build tag {new_tag}", group.filename);
+
+                                let temp_file = rewrite_wheel_build_tag(&group.file, &new_tag)?;
+                                let temp_path = temp_file.path().to_path_buf();
+
+                                let new_dist_filename =
+                                    DistFilename::WheelFilename(new_wheel_filename.clone());
+                                let new_raw_filename = new_wheel_filename.to_string();
+
+                                let form_metadata =
+                                    FormMetadata::read_from_file(&temp_path, &new_dist_filename)
+                                        .await
+                                        .map_err(|err| {
+                                            PublishError::PublishPrepare(
+                                                temp_path.clone(),
+                                                Box::new(err),
+                                            )
+                                        })?;
+
+                                let size = fs_err::metadata(&temp_path)?.len();
+                                let (bytes, unit) = human_readable_bytes(size);
+                                writeln!(
+                                    printer.stderr(),
+                                    "{} {} {}",
+                                    "Uploading".bold().green(),
+                                    new_raw_filename,
+                                    format!("({bytes:.1}{unit})").dimmed()
+                                )?;
+
+                                let rewritten_group = uv_publish::UploadDistribution {
+                                    file: temp_path.clone(),
+                                    raw_filename: new_raw_filename,
+                                    filename: new_dist_filename,
+                                    attestations: vec![],
+                                };
+
+                                let result = upload(
+                                    &rewritten_group,
+                                    &form_metadata,
+                                    &publish_url,
+                                    &upload_client,
+                                    retry_policy,
+                                    &credentials,
+                                    Some(check_url_client),
+                                    &download_concurrency,
+                                    Arc::new(PublishReporter::single(printer)),
+                                )
+                                .await;
+
+                                match result {
+                                    Ok(uploaded) => {
+                                        info!("Upload succeeded");
+                                        if !uploaded {
+                                            writeln!(
+                                                printer.stderr(),
+                                                "{}",
+                                                "File already exists, skipping".dimmed()
+                                            )?;
+                                        }
+                                        break;
+                                    }
+                                    Err(err) => {
+                                        attempt += 1;
+                                        if attempt >= MAX_RETRIES {
+                                            return Err(err.into());
+                                        }
+                                        warn!(
+                                            "Upload failed (attempt {attempt}/{MAX_RETRIES}), \
+                                            retrying with incremented build number"
+                                        );
+                                        new_build_number += 1;
+                                    }
+                                }
+                            }
+
+                            continue;
+                        }
+                    }
+                }
+                Err(err) => return Err(err.into()),
             }
         }
 

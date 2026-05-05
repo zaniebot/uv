@@ -171,7 +171,7 @@ fn skip_existing_redirect() {
     ----- stdout -----
 
     ----- stderr -----
-    error: `uv publish` does not support `--skip-existing` because there is not a reliable way to identify when an upload fails due to an existing distribution. Instead, use `--check-url` to provide the URL to the simple API for your index. uv will check the index for existing distributions before attempting uploads.
+    error: `uv publish` does not support `--skip-existing`. Instead, use `--on-conflict skip` with `--check-url` to skip existing distributions, or `--on-conflict increment-build` to auto-increment build tags on conflict.
     "
     );
 }
@@ -609,6 +609,216 @@ async fn gitlab_trusted_publishing_testpypi_id_token() {
     ----- stderr -----
     Publishing 1 file to http://[LOCALHOST]/upload
     Uploading ok-1.0.0-py3-none-any.whl ([SIZE])
+    "
+    );
+}
+
+/// `--on-conflict skip` without `--check-url` should error.
+#[test]
+fn on_conflict_skip_requires_check_url() {
+    let context = TestContext::new("3.12");
+
+    uv_snapshot!(context.filters(), context.publish()
+        .arg("-u")
+        .arg("dummy")
+        .arg("-p")
+        .arg("dummy")
+        .arg("--publish-url")
+        .arg("https://test.pypi.org/legacy/")
+        .arg("--on-conflict")
+        .arg("skip")
+        .arg(dummy_wheel()), @"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    Publishing 1 file to https://test.pypi.org/legacy/
+    error: `--on-conflict skip` requires `--check-url` or `--index` to query the index for existing files
+    "
+    );
+}
+
+/// `--on-conflict increment-build` without `--check-url` should error.
+#[test]
+fn on_conflict_increment_build_requires_check_url() {
+    let context = TestContext::new("3.12");
+
+    uv_snapshot!(context.filters(), context.publish()
+        .arg("-u")
+        .arg("dummy")
+        .arg("-p")
+        .arg("dummy")
+        .arg("--publish-url")
+        .arg("https://test.pypi.org/legacy/")
+        .arg("--on-conflict")
+        .arg("increment-build")
+        .arg(dummy_wheel()), @"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    Publishing 1 file to https://test.pypi.org/legacy/
+    error: `--on-conflict increment-build` requires `--check-url` or `--index` to query the index for existing files
+    "
+    );
+}
+
+/// `--on-conflict skip` with `--check-url` skips when file already exists on the index.
+#[tokio::test]
+async fn on_conflict_skip_existing() {
+    let context = TestContext::new("3.12");
+
+    let server = MockServer::start().await;
+
+    let filename = "ok-1.0.0-py3-none-any.whl";
+    let wheel = dummy_wheel();
+    let sha256 = format!("{:x}", Sha256::digest(fs_err::read(&wheel).unwrap()));
+
+    let simple_index = json!({
+        "files": [
+            {
+                "filename": filename,
+                "hashes": {
+                    "sha256": sha256
+                },
+                "url": format!("{}/{}", server.uri(), filename),
+            }
+        ]
+    });
+    Mock::given(method("GET"))
+        .and(path("/simple/ok/"))
+        .respond_with(ResponseTemplate::new(200).set_body_raw(
+            simple_index.to_string().into_bytes(),
+            "application/vnd.pypi.simple.v1+json",
+        ))
+        .mount(&server)
+        .await;
+
+    uv_snapshot!(context.filters(), context.publish()
+        .arg("-u")
+        .arg("dummy")
+        .arg("-p")
+        .arg("dummy")
+        .arg("--publish-url")
+        .arg(format!("{}/upload", server.uri()))
+        .arg("--check-url")
+        .arg(format!("{}/simple/", server.uri()))
+        .arg("--on-conflict")
+        .arg("skip")
+        .arg(&wheel), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Publishing 1 file to http://[LOCALHOST]/upload
+    File ok-1.0.0-py3-none-any.whl already exists, skipping
+    "
+    );
+}
+
+/// `--on-conflict skip` skips files with different content (hash mismatch).
+#[tokio::test]
+async fn on_conflict_skip_hash_mismatch() {
+    let context = TestContext::new("3.12");
+
+    let server = MockServer::start().await;
+
+    let filename = "ok-1.0.0-py3-none-any.whl";
+
+    let simple_index = json!({
+        "files": [
+            {
+                "filename": filename,
+                "hashes": {
+                    "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                },
+                "url": format!("{}/{}", server.uri(), filename),
+            }
+        ]
+    });
+    Mock::given(method("GET"))
+        .and(path("/simple/ok/"))
+        .respond_with(ResponseTemplate::new(200).set_body_raw(
+            simple_index.to_string().into_bytes(),
+            "application/vnd.pypi.simple.v1+json",
+        ))
+        .mount(&server)
+        .await;
+
+    uv_snapshot!(context.filters(), context.publish()
+        .arg("-u")
+        .arg("dummy")
+        .arg("-p")
+        .arg("dummy")
+        .arg("--publish-url")
+        .arg(format!("{}/upload", server.uri()))
+        .arg("--check-url")
+        .arg(format!("{}/simple/", server.uri()))
+        .arg("--on-conflict")
+        .arg("skip")
+        .arg(dummy_wheel()), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Publishing 1 file to http://[LOCALHOST]/upload
+    File ok-1.0.0-py3-none-any.whl already exists (different content), skipping
+    "
+    );
+}
+
+/// `--on-conflict fail` errors on hash mismatch (default behavior).
+#[tokio::test]
+async fn on_conflict_fail_hash_mismatch() {
+    let context = TestContext::new("3.12");
+
+    let server = MockServer::start().await;
+
+    let filename = "ok-1.0.0-py3-none-any.whl";
+
+    let simple_index = json!({
+        "files": [
+            {
+                "filename": filename,
+                "hashes": {
+                    "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                },
+                "url": format!("{}/{}", server.uri(), filename),
+            }
+        ]
+    });
+    Mock::given(method("GET"))
+        .and(path("/simple/ok/"))
+        .respond_with(ResponseTemplate::new(200).set_body_raw(
+            simple_index.to_string().into_bytes(),
+            "application/vnd.pypi.simple.v1+json",
+        ))
+        .mount(&server)
+        .await;
+
+    uv_snapshot!(context.filters(), context.publish()
+        .arg("-u")
+        .arg("dummy")
+        .arg("-p")
+        .arg("dummy")
+        .arg("--publish-url")
+        .arg(format!("{}/upload", server.uri()))
+        .arg("--check-url")
+        .arg(format!("{}/simple/", server.uri()))
+        .arg("--on-conflict")
+        .arg("fail")
+        .arg(dummy_wheel()), @"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    Publishing 1 file to http://[LOCALHOST]/upload
+    error: Local file and index file do not match for ok-1.0.0-py3-none-any.whl. Local: sha256=79f0b33e6ce1e09eaa1784c8eee275dfe84d215d9c65c652f07c18e85fdaac5f, Remote: sha256=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
     "
     );
 }
