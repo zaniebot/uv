@@ -115,93 +115,80 @@ impl<'a> Planner<'a> {
                 match installed_dists.as_slice() {
                     [] => {}
                     [installed] => {
-                        let source = RequirementSource::from(dist);
-                        match RequirementSatisfaction::check(installed, &source) {
-                            RequirementSatisfaction::Mismatch => {
-                                debug!(
-                                    "Requirement installed, but mismatched:\n  Installed: {installed:?}\n  Requested: {source:?}"
-                                );
-                            }
-                            RequirementSatisfaction::Satisfied => {
-                                // Check if the package has match-runtime build dependencies that may have changed
-                                if let Some(build_requirements) =
-                                    extra_build_requires.get(dist.name())
-                                {
-                                    // Check if any match-runtime dependencies have changed versions
-                                    let mut needs_rebuild = false;
-
-                                    for req in build_requirements {
-                                        if req.match_runtime {
-                                            // The requirement has match_runtime, so req.requirement.source contains
-                                            // the exact version from the current resolution
-
-                                            // Check what's currently in the resolution for this dependency
-                                            let dep_in_resolution = self
-                                                .resolution
-                                                .distributions()
-                                                .find(|d| d.name() == &req.requirement.name);
-
-                                            if let Some(dep_dist) = dep_in_resolution {
-                                                // Get what's currently installed for this dependency
-                                                // Use the snapshot to avoid issues with modified site_packages
-                                                let installed_deps = site_packages_snapshot
-                                                    .get_packages(&req.requirement.name);
-
-                                                if installed_deps.is_empty() {
-                                                    // The dependency isn't installed yet, so we need to rebuild
-                                                    debug!(
-                                                        "Match-runtime dependency {} not installed, marking {} for reinstall",
-                                                        req.requirement.name, installed
-                                                    );
-                                                    needs_rebuild = true;
-                                                    break;
-                                                }
-
-                                                // Check if any installed version matches what we need now
-                                                let source_from_resolution =
-                                                    RequirementSource::from(dep_dist);
-                                                let satisfied =
-                                                    installed_deps.iter().any(|installed_dep| {
-                                                        matches!(
-                                                            RequirementSatisfaction::check(
-                                                                installed_dep,
-                                                                &source_from_resolution
-                                                            ),
-                                                            RequirementSatisfaction::Satisfied
-                                                        )
-                                                    });
-
-                                                if !satisfied {
-                                                    debug!(
-                                                        "Match-runtime dependency {} has changed version, marking {} for reinstall",
-                                                        req.requirement.name, installed
-                                                    );
-                                                    needs_rebuild = true;
-                                                    break;
-                                                }
-                                            }
-                                        }
-                                    }
-
-                                    if needs_rebuild {
-                                        reinstalls.push(installed.clone());
-                                    } else {
-                                        debug!("Requirement already installed: {installed}");
-                                        continue;
-                                    }
-                                } else {
+                        // Check if the package has match-runtime build dependencies that have changed
+                        // Do this BEFORE checking if the package is satisfied
+                        let needs_rebuild_for_match_runtime = if let Some(build_requirements) = extra_build_requires.get(dist.name()) {
+                            build_requirements.iter().any(|req| {
+                                if !req.match_runtime {
+                                    return false;
+                                }
+                                
+                                // Check what's currently in the resolution for this dependency
+                                let Some(dep_dist) = self.resolution.distributions()
+                                    .find(|d| d.name() == &req.requirement.name) else {
+                                    return false;
+                                };
+                                
+                                // Get what's currently installed for this dependency
+                                let installed_deps = site_packages_snapshot.get_packages(&req.requirement.name);
+                                
+                                if installed_deps.is_empty() {
+                                    debug!(
+                                        "Match-runtime dependency {} not installed, marking {} for reinstall",
+                                        req.requirement.name, installed
+                                    );
+                                    return true;
+                                }
+                                
+                                // Check if any installed version matches what we need now
+                                let source_from_resolution = RequirementSource::from(dep_dist);
+                                let satisfied = installed_deps.iter().any(|installed_dep| {
+                                    matches!(
+                                        RequirementSatisfaction::check(installed_dep, &source_from_resolution),
+                                        RequirementSatisfaction::Satisfied
+                                    )
+                                });
+                                
+                                if !satisfied {
+                                    debug!(
+                                        "Match-runtime dependency {} has changed version, marking {} for reinstall",
+                                        req.requirement.name, installed
+                                    );
+                                    return true;
+                                }
+                                
+                                false
+                            })
+                        } else {
+                            false
+                        };
+                        
+                        if needs_rebuild_for_match_runtime {
+                            reinstalls.push(installed.clone());
+                        } else {
+                            // Only check satisfaction if we don't need to rebuild for match-runtime
+                            let source = RequirementSource::from(dist);
+                            match RequirementSatisfaction::check(installed, &source) {
+                                RequirementSatisfaction::Mismatch => {
+                                    debug!(
+                                        "Requirement installed, but mismatched:\n  Installed: {installed:?}\n  Requested: {source:?}"
+                                    );
+                                    reinstalls.push(installed.clone());
+                                }
+                                RequirementSatisfaction::Satisfied => {
                                     debug!("Requirement already installed: {installed}");
                                     continue;
                                 }
-                            }
-                            RequirementSatisfaction::OutOfDate => {
-                                debug!("Requirement installed, but not fresh: {installed}");
-                            }
-                            RequirementSatisfaction::CacheInvalid => {
-                                // Already logged
+                                RequirementSatisfaction::OutOfDate => {
+                                    debug!("Requirement installed, but not fresh: {installed}");
+                                    reinstalls.push(installed.clone());
+                                }
+                                RequirementSatisfaction::CacheInvalid => {
+                                    // Already logged
+                                    reinstalls.push(installed.clone());
+                                }
                             }
                         }
-                        reinstalls.push(installed.clone());
                     }
                     // We reinstall installed distributions with multiple versions because
                     // we do not want to keep multiple incompatible versions but removing
