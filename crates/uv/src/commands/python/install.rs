@@ -9,7 +9,8 @@ use anyhow::{Context, Error, Result};
 use futures::{StreamExt, join};
 use indexmap::IndexSet;
 use itertools::Itertools;
-use owo_colors::{AnsiColors, OwoColorize};
+
+use owo_colors::OwoColorize;
 use rustc_hash::{FxHashMap, FxHashSet};
 use tokio::sync::mpsc;
 use tracing::{debug, trace, warn};
@@ -17,7 +18,9 @@ use tracing::{debug, trace, warn};
 use uv_cache::Cache;
 use uv_client::BaseClientBuilder;
 use uv_configuration::Concurrency;
-use uv_errors::write_error_chain;
+use uv_errors::{
+    ErrorChainLevel, ErrorChainOptions, write_error_chain, write_error_chain_with_options,
+};
 use uv_fs::Simplified;
 use uv_platform::{Arch, Libc};
 use uv_preview::{Preview, PreviewFeature};
@@ -917,39 +920,35 @@ async fn perform_install(
                     write_error_chain(
                         err.context(format!("Failed to install {key}")).as_ref(),
                         printer.stderr(),
-                        "error",
-                        AnsiColors::Red,
                     )?;
                 }
                 InstallErrorKind::Bin => {
-                    let (level, color) = match bin {
-                        None => ("warning", AnsiColors::Yellow),
+                    let level = match bin {
+                        None => ErrorChainLevel::Warning,
                         Some(false) => continue,
-                        Some(true) => ("error", AnsiColors::Red),
+                        Some(true) => ErrorChainLevel::Error,
                     };
 
-                    write_error_chain(
+                    write_error_chain_with_options(
                         err.context(format!("Failed to install executable for {key}"))
                             .as_ref(),
                         printer.stderr(),
-                        level,
-                        color,
+                        &ErrorChainOptions::default().level(level),
                     )?;
                 }
                 InstallErrorKind::Registry => {
-                    let (level, color) = match registry {
-                        None => ("warning", AnsiColors::Yellow),
+                    let level = match registry {
+                        None => ErrorChainLevel::Warning,
                         Some(false) => continue,
-                        Some(true) => ("error", AnsiColors::Red),
+                        Some(true) => ErrorChainLevel::Error,
                     };
 
                     trace!("Error trace: {err:?}");
-                    write_error_chain(
+                    write_error_chain_with_options(
                         err.context(format!("Failed to create registry entry for {key}"))
                             .as_ref(),
                         printer.stderr(),
-                        level,
-                        color,
+                        &ErrorChainOptions::default().level(level),
                     )?;
                 }
             }

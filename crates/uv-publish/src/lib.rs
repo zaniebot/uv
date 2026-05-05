@@ -2149,7 +2149,7 @@ mod tests {
         let err = mock_server_upload(&mock_server).await.unwrap_err();
 
         let mut capture = String::new();
-        write_error_chain(&err, &mut capture, "error", AnsiColors::Red).unwrap();
+        write_error_chain(&err, &mut capture).unwrap();
 
         let capture = capture.replace(&mock_server.uri(), "[SERVER]");
         let capture = anstream::adapter::strip_str(&capture);
@@ -2177,7 +2177,7 @@ mod tests {
         let err = mock_server_upload(&mock_server).await.unwrap_err();
 
         let mut capture = String::new();
-        write_error_chain(&err, &mut capture, "error", AnsiColors::Red).unwrap();
+        write_error_chain(&err, &mut capture).unwrap();
 
         let capture = capture.replace(&mock_server.uri(), "[SERVER]");
         let capture = anstream::adapter::strip_str(&capture);
@@ -2210,7 +2210,7 @@ mod tests {
         let err = mock_server_upload(&mock_server).await.unwrap_err();
 
         let mut capture = String::new();
-        write_error_chain(&err, &mut capture, "error", AnsiColors::Red).unwrap();
+        write_error_chain(&err, &mut capture).unwrap();
 
         let capture = capture.replace(&mock_server.uri(), "[SERVER]");
         let capture = anstream::adapter::strip_str(&capture);
@@ -2246,7 +2246,7 @@ mod tests {
         let err = mock_server_upload(&mock_server).await.unwrap_err();
 
         let mut capture = String::new();
-        write_error_chain(&err, &mut capture, "error", AnsiColors::Red).unwrap();
+        write_error_chain(&err, &mut capture).unwrap();
 
         let capture = capture.replace(&mock_server.uri(), "[SERVER]");
         let capture = anstream::adapter::strip_str(&capture);

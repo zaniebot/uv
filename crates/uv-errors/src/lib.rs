@@ -5,7 +5,7 @@ use std::error::Error;
 use std::fmt;
 use std::iter;
 
-use owo_colors::{DynColor, OwoColorize};
+use owo_colors::{AnsiColors, OwoColorize};
 
 use wrap::{get_wrap_width, wrap_text};
 
@@ -109,57 +109,175 @@ impl fmt::Display for HintPrefix {
     }
 }
 
-/// Format an error or warning chain with custom level and color.
+/// The severity level for an error chain.
+///
+/// Determines the label text and color used for the level prefix and
+/// "Caused by" labels.
+#[derive(Debug, Clone, Copy, Default)]
+pub enum ErrorChainLevel {
+    /// Red `error:` prefix.
+    #[default]
+    Error,
+    /// Yellow `warning:` prefix.
+    Warning,
+}
+
+impl ErrorChainLevel {
+    /// The label text for this level.
+    fn label(self) -> &'static str {
+        match self {
+            Self::Error => "error",
+            Self::Warning => "warning",
+        }
+    }
+
+    /// The color for this level.
+    fn color(self) -> AnsiColors {
+        match self {
+            Self::Error => AnsiColors::Red,
+            Self::Warning => AnsiColors::Yellow,
+        }
+    }
+}
+
+/// Options for formatting error chains via [`write_error_chain_with_options`].
+///
+/// Use the builder methods to customize the output. Defaults to
+/// [`ErrorChainLevel::Error`], no hints, and automatic terminal width detection.
+///
+/// # Example
+///
+/// ```
+/// use uv_errors::{ErrorChainLevel, ErrorChainOptions};
+///
+/// let _options = ErrorChainOptions::default()
+///     .level(ErrorChainLevel::Warning)
+///     .width(80);
+/// ```
+pub struct ErrorChainOptions<'a> {
+    /// The severity level (determines label text and color).
+    level: ErrorChainLevel,
+    /// Hints to render after the error chain.
+    ///
+    /// Each hint is displayed on its own line, prefixed with `hint:`.
+    /// Callers are responsible for extracting hints from the error
+    /// (e.g., via `hints_for_error` in the diagnostics layer).
+    hints: Hints<'a>,
+    /// Override the terminal width for wrapping (primarily for testing).
+    width_override: Option<usize>,
+}
+
+impl Default for ErrorChainOptions<'_> {
+    fn default() -> Self {
+        Self {
+            level: ErrorChainLevel::default(),
+            hints: Hints::none(),
+            width_override: None,
+        }
+    }
+}
+
+impl<'a> ErrorChainOptions<'a> {
+    /// Set the severity level (default: [`ErrorChainLevel::Error`]).
+    #[must_use]
+    pub fn level(mut self, level: ErrorChainLevel) -> Self {
+        self.level = level;
+        self
+    }
+
+    /// Set hints to render after the error chain.
+    #[must_use]
+    pub fn hints(mut self, hints: Hints<'a>) -> Self {
+        self.hints = hints;
+        self
+    }
+
+    /// Override the terminal width for wrapping (default: auto-detect).
+    #[must_use]
+    pub fn width(mut self, width: usize) -> Self {
+        self.width_override = Some(width);
+        self
+    }
+}
+
+/// Format an error chain with default settings (`"error"` level, red, no hints).
 ///
 /// # Example
 ///
 /// ```text
 /// error: Failed to install app
 ///   Caused by: Failed to install dependency
-///   Caused by: Error writing failed `/home/ferris/deps/foo`: Permission denied
+///   Caused by: Permission denied
 /// ```
+pub fn write_error_chain(err: &dyn Error, stream: impl fmt::Write) -> fmt::Result {
+    write_error_chain_with_options(err, stream, &ErrorChainOptions::default())
+}
+
+/// Format an error chain with hints (`"error"` level, red).
+///
+/// Shortcut for the common case of rendering an error with pre-extracted hints.
+///
+/// # Example
+///
+/// ```text
+/// error: No solution found when resolving dependencies
+///   Caused by: package `foo` was not found
+///
+/// hint: Packages were unavailable because the network was disabled.
+/// ```
+pub fn write_error_chain_with_hints(
+    err: &dyn Error,
+    stream: impl fmt::Write,
+    hints: Hints<'_>,
+) -> fmt::Result {
+    write_error_chain_with_options(err, stream, &ErrorChainOptions::default().hints(hints))
+}
+
+/// Format a warning chain with default settings (`"warning"` level, yellow, no hints).
+///
+/// # Example
 ///
 /// ```text
 /// warning: Failed to create registry entry for Python 3.12
 ///   Caused by: Security policy forbids chaining registry entries
 /// ```
-pub fn write_error_chain(
-    err: &dyn Error,
-    stream: impl fmt::Write,
-    level: impl AsRef<str>,
-    color: impl DynColor + Copy,
-) -> fmt::Result {
-    write_error_chain_with_hints(err, stream, level, color, &Hints::none(), None)
+pub fn write_warning_chain(err: &dyn Error, stream: impl fmt::Write) -> fmt::Result {
+    write_error_chain_with_options(
+        err,
+        stream,
+        &ErrorChainOptions::default().level(ErrorChainLevel::Warning),
+    )
 }
 
-/// Format an error chain with hints appended at the end.
+/// Format an error chain with the given [`ErrorChainOptions`].
 ///
-/// Each hint is rendered on its own line, prefixed with the styled `hint:` label.
+/// # Example
 ///
-/// `width_override` allows callers to override the terminal width for wrapping
-/// (primarily for testing). Pass `None` for automatic detection.
-pub fn write_error_chain_with_hints(
+/// ```text
+/// warning: Failed to create registry entry for Python 3.12
+///   Caused by: Security policy forbids chaining registry entries
+///
+/// hint: Try running with administrator privileges.
+/// ```
+pub fn write_error_chain_with_options(
     err: &dyn Error,
     mut stream: impl fmt::Write,
-    level: impl AsRef<str>,
-    color: impl DynColor + Copy,
-    hints: &Hints<'_>,
-    width_override: Option<usize>,
+    options: &ErrorChainOptions<'_>,
 ) -> fmt::Result {
-    let width = get_wrap_width(width_override);
+    let width = get_wrap_width(options.width_override);
 
     // Write main error message.
     let main_msg = err.to_string();
     let wrapped_main = wrap_text(&main_msg, width, "", "");
+    let color = options.level.color();
     writeln!(
         &mut stream,
         "{}{} {}",
-        level.as_ref().color(color).bold(),
+        options.level.label().color(color).bold(),
         ":".bold(),
         wrapped_main.trim()
     )?;
 
-    // Write cause chain.
     for source in iter::successors(err.source(), |&err| err.source()) {
         let msg = source.to_string();
         let padding = "  ";
@@ -191,7 +309,7 @@ pub fn write_error_chain_with_hints(
     }
 
     // Write hints.
-    for hint in hints.iter() {
+    for hint in options.hints.iter() {
         writeln!(&mut stream, "\n{HintPrefix} {hint}")?;
     }
 
@@ -204,7 +322,6 @@ mod tests {
     use anyhow::anyhow;
     use indoc::indoc;
     use insta::assert_snapshot;
-    use owo_colors::AnsiColors;
 
     #[test]
     fn test_error_wrapping_with_columns() {
@@ -223,13 +340,10 @@ mod tests {
 
         let error = Outer { source: Inner };
         let mut output = String::new();
-        write_error_chain_with_hints(
+        write_error_chain_with_options(
             &error,
             &mut output,
-            "error",
-            AnsiColors::Red,
-            &Hints::none(),
-            Some(80),
+            &ErrorChainOptions::default().width(80),
         )
         .unwrap();
         let output = anstream::adapter::strip_str(&output);
@@ -257,7 +371,7 @@ mod tests {
 
         let error = Outer { source: Inner };
         let mut output = String::new();
-        write_error_chain(&error, &mut output, "error", AnsiColors::Red).unwrap();
+        write_error_chain(&error, &mut output).unwrap();
         let output = anstream::adapter::strip_str(&output);
 
         assert_snapshot!(output, @r"
@@ -276,13 +390,10 @@ mod tests {
 
         let error = LongWord;
         let mut output = String::new();
-        write_error_chain_with_hints(
+        write_error_chain_with_options(
             &error,
             &mut output,
-            "error",
-            AnsiColors::Red,
-            &Hints::none(),
-            Some(50),
+            &ErrorChainOptions::default().width(50),
         )
         .unwrap();
         let output = anstream::adapter::strip_str(&output);
@@ -302,13 +413,10 @@ mod tests {
 
         let error = VeryLongWord;
         let mut output = String::new();
-        write_error_chain_with_hints(
+        write_error_chain_with_options(
             &error,
             &mut output,
-            "error",
-            AnsiColors::Red,
-            &Hints::none(),
-            Some(40),
+            &ErrorChainOptions::default().width(40),
         )
         .unwrap();
         let output = anstream::adapter::strip_str(&output);
@@ -343,13 +451,10 @@ mod tests {
             source: MiddleError { source: DeepError },
         };
         let mut output = String::new();
-        write_error_chain_with_hints(
+        write_error_chain_with_options(
             &error,
             &mut output,
-            "error",
-            AnsiColors::Red,
-            &Hints::none(),
-            Some(60),
+            &ErrorChainOptions::default().width(60),
         )
         .unwrap();
         let output = anstream::adapter::strip_str(&output);
@@ -368,13 +473,10 @@ mod tests {
 
         let error = SpecialChars;
         let mut output = String::new();
-        write_error_chain_with_hints(
+        write_error_chain_with_options(
             &error,
             &mut output,
-            "error",
-            AnsiColors::Red,
-            &Hints::none(),
-            Some(50),
+            &ErrorChainOptions::default().width(50),
         )
         .unwrap();
         let output = anstream::adapter::strip_str(&output);
@@ -396,15 +498,7 @@ mod tests {
         .collect();
 
         let mut rendered = String::new();
-        write_error_chain_with_hints(
-            err.as_ref(),
-            &mut rendered,
-            "error",
-            AnsiColors::Red,
-            &hints,
-            None,
-        )
-        .unwrap();
+        write_error_chain_with_hints(err.as_ref(), &mut rendered, hints).unwrap();
         let rendered = anstream::adapter::strip_str(&rendered);
 
         assert_snapshot!(rendered, @r"
@@ -428,7 +522,7 @@ mod tests {
             .context("Failed to download Python 3.12");
 
         let mut rendered = String::new();
-        write_error_chain(err.as_ref(), &mut rendered, "error", AnsiColors::Red).unwrap();
+        write_error_chain(err.as_ref(), &mut rendered).unwrap();
         let rendered = anstream::adapter::strip_str(&rendered);
 
         assert_snapshot!(rendered, @r"

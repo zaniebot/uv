@@ -1,5 +1,5 @@
 use itertools::{Either, Itertools};
-use owo_colors::AnsiColors;
+
 use regex::Regex;
 use reqwest_retry::policies::ExponentialBackoff;
 use rustc_hash::{FxBuildHasher, FxHashSet};
@@ -1580,13 +1580,7 @@ pub(crate) async fn find_best_python_installation(
                 let error = anyhow::Error::from(error).context(format!(
                     "A managed Python download is available for {request}, but an error occurred when attempting to download it."
                 ));
-                uv_errors::write_error_chain(
-                    error.as_ref(),
-                    &mut error_chain,
-                    "warning",
-                    AnsiColors::Yellow,
-                )
-                .unwrap();
+                uv_errors::write_warning_chain(error.as_ref(), &mut error_chain).unwrap();
                 anstream::eprint!("{}", error_chain);
                 previous_fetch_failed = true;
             }
