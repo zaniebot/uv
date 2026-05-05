@@ -16,65 +16,62 @@ env:
   RUSTUP_MAX_RETRIES: 10
 
 jobs:
-  # Test in a Gentoo-like environment to catch downstream packaging regressions.
-  # This simulates the portage sandbox environment where HOME from /etc/passwd
-  # differs from the test harness's temp directory and may not be writable.
+  # Test with an unwritable HOME to catch downstream packaging regressions.
+  # This simulates environments like Gentoo's portage sandbox where the HOME
+  # from /etc/passwd differs from the test harness's temp directory and is
+  # not writable. This catches bugs where uv reads HOME from /etc/passwd
+  # instead of respecting the environment variable.
   # See: https://github.com/astral-sh/uv/issues/17509
-  gentoo:
-    timeout-minutes: 60
+  unwritable-home:
+    timeout-minutes: 15
     runs-on: depot-ubuntu-22.04-16
-    name: "cargo test on gentoo"
-    container:
-      image: gentoo/stage3:latest
+    name: "cargo test with unwritable home"
     steps:
-      - name: "Sync portage tree"
-        run: emerge-webrsync
-
-      - name: "Install system dependencies"
-        run: |
-          # Install Python versions and build tools
-          emerge --noreplace \
-            net-misc/curl \
-            dev-lang/python:3.9 \
-            dev-lang/python:3.10 \
-            dev-lang/python:3.11 \
-            dev-lang/python:3.12
-
-      - name: "Install Rust via rustup"
-        run: |
-          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain none
-          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
-
       - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
           persist-credentials: false
 
+      - uses: rui314/setup-mold@725a8794d15fc7563f59595bd9556495c0564878 # v1
+
       - name: "Install Rust toolchain"
+        run: rustup show
+
+      - uses: astral-sh/setup-uv@681c641aba71e4a1c380be3ab5e12ad51f415867 # v7.1.6
+        with:
+          version: "0.9.24"
+
+      - name: "Install required Python versions"
+        run: uv python install
+
+      - name: "Install cargo nextest"
+        uses: taiki-e/install-action@d850aa816998e5cf15f67a78c7b933f2a5033f8a # v2.63.3
+        with:
+          tool: cargo-nextest
+
+      - name: "Set up test user with unwritable home"
         run: |
-          source "$HOME/.cargo/env"
-          rustup show
+          # Create a user with a non-writable HOME directory.
+          # This simulates downstream packaging environments (like Gentoo's
+          # portage sandbox) where the system HOME is not writable.
+          sudo useradd -m -d /var/lib/downstream-test downstream_test
 
-      - name: "Set up portage-like test user"
-        run: |
-          # Create a user simulating the Gentoo portage sandbox environment.
-          # The HOME directory is intentionally non-writable to catch bugs where
-          # uv reads HOME from /etc/passwd instead of the environment variable.
-          mkdir -p /var/lib/portage/home
-          useradd -d /var/lib/portage/home -M portage_test
+          # Give test user access to the workspace, cargo, rustup, and uv
+          sudo chown -R downstream_test:downstream_test .
+          sudo cp -r ~/.cargo /var/lib/downstream-test/.cargo
+          sudo cp -r ~/.rustup /var/lib/downstream-test/.rustup
+          sudo cp -r ~/.local /var/lib/downstream-test/.local
+          sudo chown -R downstream_test:downstream_test /var/lib/downstream-test
 
-          # Give test user access to the source and cargo
-          chown -R portage_test:portage_test .
-          cp -r "$HOME/.cargo" /var/lib/portage/home/.cargo
-          cp -r "$HOME/.rustup" /var/lib/portage/home/.rustup
-          chown -R portage_test:portage_test /var/lib/portage/home/.cargo /var/lib/portage/home/.rustup
-
-          # Make the system home directory non-writable (simulating portage sandbox)
-          chmod 555 /var/lib/portage/home
+          # Now make the home directory non-writable
+          sudo chmod 555 /var/lib/downstream-test
 
       - name: "Cargo test"
+        env:
+          UV_HTTP_RETRIES: 5
+          RUST_BACKTRACE: 1
         run: |
-          su - portage_test -c '
+          sudo -u downstream_test bash -c '
             source ~/.cargo/env
-            cd "$GITHUB_WORKSPACE/crates/uv"
-            cargo test --no-fail-fast
+            cd "${{ github.workspace }}/crates/uv"
+            cargo nextest run --cargo-profile fast-build --features python-patch --profile ci-linux
           '
