@@ -48,3 +48,8 @@ uv-cache-info = { workspace = true }
 uv-cli = { workspace = true }
 anstream = { workspace = true }
 fs-err = { workspace = true }
+dotenvy = { workspace = true }
+console = { workspace = true }
+uv-static = { workspace = true }
+miette = { workspace = true }
+uv-console = { workspace = true }

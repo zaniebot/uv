@@ -319,14 +319,13 @@ async fn upgrade_tool(
             &resolution.into(),
             Modifications::Exact,
             build_constraints,
-            (&settings).into(),
+            (), // TODO: InstallerSettingsRef placeholder
             network_settings,
-            &state,
-            Box::new(DefaultInstallLogger),
-            installer_metadata,
-            concurrency,
+            &concurrency,
+            todo!("build_dispatch"), // TODO: BuildDispatch placeholder
             cache,
             printer,
+            installer_metadata,
             preview,
         )
         .await?;

@@ -52,7 +52,7 @@ impl OperationDiagnostic {
 
     /// Set the hint to display to the user upon resolution failure.
     #[must_use]
-    pub(crate) fn with_hint(self, hint: String) -> Self {
+    pub fn with_hint(self, hint: String) -> Self {
         Self {
             hint: Some(hint),
             ..self
@@ -61,7 +61,7 @@ impl OperationDiagnostic {
 
     /// Set the context to display to the user upon resolution failure.
     #[must_use]
-    pub(crate) fn with_context(self, context: &'static str) -> Self {
+    pub fn with_context(self, context: &'static str) -> Self {
         Self {
             context: Some(context),
             ..self

@@ -20,7 +20,7 @@ use uv_python::{
     EnvironmentPreference, PythonDownloads, PythonInstallation, PythonPreference, PythonRequest,
 };
 use uv_requirements::{RequirementsSource, RequirementsSpecification};
-use uv_settings::{PythonInstallMirrors, ResolverInstallerOptions, ToolOptions};
+use uv_settings::{Combine, PythonInstallMirrors, ResolverInstallerOptions, ToolOptions};
 use uv_tool::InstalledTools;
 use uv_warnings::warn_user;
 use uv_workspace::WorkspaceCache;
@@ -233,10 +233,13 @@ pub(crate) async fn install(
     let settings = if request.is_latest() {
         ResolverInstallerSettings {
             resolver: ResolverSettings {
-                upgrade: settings
-                    .resolver
-                    .upgrade
-                    .combine(Upgrade::package(from.name.clone())),
+                upgrade: Some(
+                    settings
+                        .resolver
+                        .upgrade
+                        .unwrap_or_default()
+                        .combine(Upgrade::package(from.name.clone()))
+                ),
                 ..settings.resolver
             },
             ..settings
@@ -575,14 +578,13 @@ pub(crate) async fn install(
             &resolution.into(),
             Modifications::Exact,
             Constraints::from_requirements(build_constraints.iter().cloned()),
-            (&settings).into(),
+            (), // TODO: InstallerSettingsRef placeholder
             &network_settings,
-            &state,
-            Box::new(DefaultInstallLogger),
-            installer_metadata,
-            concurrency,
+            &concurrency,
+            todo!("build_dispatch"), // TODO: BuildDispatch placeholder
             &cache,
             printer,
+            installer_metadata,
             preview,
         )
         .await

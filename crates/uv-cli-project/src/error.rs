@@ -61,4 +61,10 @@ pub enum ProjectError {
     
     #[error(transparent)]
     VirtualEnvError(#[from] uv_virtualenv::Error),
+    
+    #[error(transparent)]
+    Operation(#[from] uv_cli_pip::operations::Error),
+    
+    #[error(transparent)]
+    Anyhow(#[from] anyhow::Error),
 }
