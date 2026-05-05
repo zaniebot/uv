@@ -11423,7 +11423,7 @@ fn sync_read_only_venv_directory() -> Result<()> {
     // Ensure the parent is read-only, to prevent deletion of the virtual environment
     fs_err::set_permissions(&project_dir, std::fs::Permissions::from_mode(0o555))?;
 
-    uv_snapshot!(context.filters(), context.sync().current_dir(&project_dir), @r"
+    uv_snapshot!(context.filters(), context.sync().arg("-vv").current_dir(&project_dir), @r"
     success: false
     exit_code: 2
     ----- stdout -----
