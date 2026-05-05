@@ -7,7 +7,7 @@ use uv_static::EnvVars;
 
 pub use crate::discovery::{
     DiscoveredInstallation, EnvironmentPreference, Error as DiscoveryError, IncompatibilityReason,
-    IncompatiblePythonExecutable, PythonDownloads, PythonNotFound, PythonPreference, PythonRequest,
+    IncompatiblePython, PythonDownloads, PythonNotFound, PythonPreference, PythonRequest,
     PythonSource, PythonVariant, VersionRequest, find_python_installations,
     satisfies_python_preference,
 };
