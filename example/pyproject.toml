@@ -1,0 +1,9 @@
+[project]
+name = "example"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13.2"
+dependencies = [
+    "anyio>=4.9.0 ; python_full_version < '3.14'",
+]
