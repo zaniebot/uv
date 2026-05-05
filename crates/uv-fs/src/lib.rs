@@ -953,43 +953,46 @@ impl LockedFile {
 
     #[cfg(target_os = "macos")]
     fn blocking_process_macos(path: &Path) -> Option<String> {
-        // Use lsof to find which process has the file open
-        // lsof -F p <path> outputs: p<pid>
-        let output = std::process::Command::new("lsof")
-            .arg("-F")
-            .arg("p")
-            .arg(path)
-            .output()
-            .ok()?;
+        use std::os::unix::fs::MetadataExt;
 
-        if !output.status.success() {
-            return None;
-        }
+        // Get the inode of the lock file
+        let metadata = path.metadata().ok()?;
+        let inode = metadata.ino();
 
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        let pid = stdout
-            .lines()
-            .find_map(|line| line.strip_prefix('p'))?
-            .to_string();
+        // Get all running processes
+        let pids = libproc::processes::pids().ok()?;
 
-        // Use ps to get the full command line
-        let ps_output = std::process::Command::new("ps")
-            .arg("-p")
-            .arg(&pid)
-            .arg("-o")
-            .arg("command=")
-            .output()
-            .ok()?;
+        // Check each process to see if it has the lock file open
+        for pid in pids {
+            // Get list of file descriptors for this process
+            if let Ok(fds) = libproc::file_info::pidfdinfo_list(pid) {
+                for fd_info in fds {
+                    // Get the vnode info for this file descriptor
+                    if let Ok(vnode_info) = libproc::file_info::pidfdinfo::<libproc::file_info::ProcFDInfoVNode>(pid, fd_info.proc_fd) {
+                        // Check if the inode matches
+                        if vnode_info.pvi.vi_stat.vst_ino == inode {
+                            // Found the process! Get its path and name
+                            if let Ok(exe_path) = libproc::proc_pid::pidpath(pid) {
+                                // Get just the executable name from the path
+                                let exe_name = std::path::Path::new(&exe_path)
+                                    .file_name()
+                                    .and_then(|n| n.to_str())
+                                    .unwrap_or(&exe_path);
 
-        if ps_output.status.success() {
-            let command = String::from_utf8_lossy(&ps_output.stdout).trim().to_string();
-            if !command.is_empty() {
-                return Some(format!("`{}` (PID {})", command, pid));
+                                return Some(format!("`{}` (PID {})", exe_name, pid));
+                            }
+                            // Fallback to process name
+                            if let Ok(name) = libproc::proc_pid::name(pid) {
+                                return Some(format!("{} (PID {})", name, pid));
+                            }
+                            return Some(format!("PID {}", pid));
+                        }
+                    }
+                }
             }
         }
 
-        // Fallback to just PID if ps fails
-        Some(format!("PID {}", pid))
+        None
     }
 }
 
