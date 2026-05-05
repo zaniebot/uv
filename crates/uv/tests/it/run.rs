@@ -3441,6 +3441,30 @@ fn run_isolated_python_version() -> Result<()> {
     Ok(())
 }
 
+#[test]
+fn run_native_tls_alias_warns_when_client_is_built() -> Result<()> {
+    let context = uv_test::test_context!("3.12");
+
+    let output = context
+        .run()
+        .arg("--native-tls")
+        .arg("--no-python-downloads")
+        .arg("python")
+        .arg("-c")
+        .arg("print('ok')")
+        .output()?;
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(output.status.success(), "{}", stderr);
+    assert!(
+        stderr.contains("The `--native-tls` flag is deprecated; use `--system-certs` instead."),
+        "{}",
+        stderr
+    );
+
+    Ok(())
+}
+
 /// Ignore the existing project when executing with `--no-project`.
 #[test]
 fn run_no_project() -> Result<()> {

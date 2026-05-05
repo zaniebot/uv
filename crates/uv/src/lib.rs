@@ -113,6 +113,11 @@ async fn run(mut cli: Cli) -> Result<ExitStatus> {
     // Load environment variables not handled by Clap
     let environment = EnvironmentOptions::new()?;
 
+    // `--native-tls` and `--no-native-tls` are deprecated aliases for
+    // `--system-certs` and `--no-system-certs`.
+    let warn_on_deprecated_native_tls =
+        cli.top_level.global_args.native_tls || cli.top_level.global_args.no_native_tls;
+
     // Validate that the project directory exists if explicitly provided via --project, except for
     // `uv init`, which creates the project directory (separate deprecation).
     let skip_project_validation = matches!(
@@ -255,6 +260,7 @@ async fn run(mut cli: Cli) -> Result<ExitStatus> {
             let client_builder = BaseClientBuilder::new(
                 settings.network_settings.connectivity,
                 settings.network_settings.system_certs,
+                warn_on_deprecated_native_tls,
                 settings.network_settings.allow_insecure_host,
                 settings.preview,
                 settings.network_settings.read_timeout,
@@ -557,6 +563,7 @@ async fn run(mut cli: Cli) -> Result<ExitStatus> {
     let client_builder = BaseClientBuilder::new(
         globals.network_settings.connectivity,
         globals.network_settings.system_certs,
+        warn_on_deprecated_native_tls,
         globals.network_settings.allow_insecure_host.clone(),
         globals.preview,
         globals.network_settings.read_timeout,

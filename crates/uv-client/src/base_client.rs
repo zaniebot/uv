@@ -91,6 +91,7 @@ pub struct BaseClientBuilder<'a> {
     preview: Preview,
     allow_insecure_host: Vec<TrustedHost>,
     system_certs: bool,
+    warn_on_deprecated_native_tls: bool,
     retries: u32,
     pub connectivity: Connectivity,
     markers: Option<&'a MarkerEnvironment>,
@@ -163,6 +164,7 @@ impl Default for BaseClientBuilder<'_> {
             preview: Preview::default(),
             allow_insecure_host: vec![],
             system_certs: false,
+            warn_on_deprecated_native_tls: false,
             connectivity: Connectivity::Online,
             retries: DEFAULT_RETRIES,
             markers: None,
@@ -191,6 +193,7 @@ impl<'a> BaseClientBuilder<'a> {
     pub fn new(
         connectivity: Connectivity,
         system_certs: bool,
+        warn_on_deprecated_native_tls: bool,
         allow_insecure_host: Vec<TrustedHost>,
         preview: Preview,
         read_timeout: Duration,
@@ -201,6 +204,7 @@ impl<'a> BaseClientBuilder<'a> {
             preview,
             allow_insecure_host,
             system_certs,
+            warn_on_deprecated_native_tls,
             retries,
             connectivity,
             read_timeout,
@@ -394,6 +398,10 @@ impl<'a> BaseClientBuilder<'a> {
                 self.connect_timeout.as_secs(),
                 self.read_timeout.as_secs()
             );
+        }
+
+        if self.warn_on_deprecated_native_tls {
+            warn_user_once!("The `--native-tls` flag is deprecated; use `--system-certs` instead.");
         }
 
         // Use the custom client if provided, otherwise create a new one
