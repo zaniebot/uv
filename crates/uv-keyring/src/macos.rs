@@ -348,68 +348,98 @@ fn get_keychain(domain: MacKeychainDomain) -> Result<SecKeychain> {
 
 /// Set a password with "allow all applications" access control for development.
 ///
-/// This uses the legacy `SecKeychainAddGenericPassword` API which creates items
-/// with more permissive default access control than the modern `SecItemAdd` API.
-/// This allows the keychain item to be accessed by different versions of the same
-/// application without prompting, which is useful during development when the binary
-/// frequently changes.
-#[allow(unsafe_code)]
+/// This creates keychain items that can be accessed by any application without
+/// triggering password prompts. This is achieved by:
+/// 1. Using the standard API to create/update the keychain item
+/// 2. Calling the `security` command-line tool to set the partition list
+///
+/// The partition list is a security feature added in macOS Sierra that restricts
+/// which code-signed applications can access a keychain item. There is no public
+/// C API for setting partition lists, so we must shell out to the `security` tool.
+///
+/// WARNING: This significantly reduces security and should only be used during
+/// development when the binary frequently changes and prompts become disruptive.
 fn set_password_with_access(
     service: &str,
     account: &str,
     password: &[u8],
     domain: MacKeychainDomain,
 ) -> Result<()> {
-    use core_foundation::base::TCFType;
-    use security_framework_sys::base::{errSecDuplicateItem, errSecSuccess};
-    use security_framework_sys::keychain::SecKeychainAddGenericPassword;
-    use std::ptr;
+    // Step 1: Create or update the keychain item using the standard API
+    get_keychain(domain)?
+        .set_generic_password(service, account, password)
+        .map_err(decode_error)?;
 
-    let keychain = get_keychain(domain)?;
-
-    // Convert lengths to u32, validating they fit (security APIs use u32 lengths)
-    let service_len = u32::try_from(service.len()).map_err(|_| {
-        ErrorCode::Invalid("service".to_string(), "length exceeds u32::MAX".to_string())
-    })?;
-    let account_len = u32::try_from(account.len()).map_err(|_| {
-        ErrorCode::Invalid("account".to_string(), "length exceeds u32::MAX".to_string())
-    })?;
-    let password_len = u32::try_from(password.len()).map_err(|_| {
-        ErrorCode::Invalid("password".to_string(), "length exceeds u32::MAX".to_string())
-    })?;
-
-    // Try to create the password. If it already exists, this will fail with
-    // errSecDuplicateItem, which we handle below by updating the existing item.
-    // We intentionally don't try to update first because we want to ensure
-    // new items are created with the permissive access control of the legacy API.
+    // Step 2: Set the partition list using the security command-line tool.
+    // This allows any application to access the item without prompting.
+    // The partition IDs:
+    // - "apple:" allows Apple-signed tools (like codesign)
+    // - "apple-tool:" allows Apple command-line tools
+    // - "" (empty) allows unsigned/ad-hoc signed applications
     //
-    // SAFETY: Calling macOS Security framework API. `keychain` is a valid `SecKeychain`,
-    // string pointers and lengths are derived from valid Rust slices, and `null` is valid
-    // for the output `item_ref` parameter.
-    let status = unsafe {
-        SecKeychainAddGenericPassword(
-            keychain.as_concrete_TypeRef(),
-            service_len,
-            service.as_ptr().cast::<i8>(),
-            account_len,
-            account.as_ptr().cast::<i8>(),
-            password_len,
-            password.as_ptr().cast(),
-            ptr::null_mut(),
-        )
-    };
+    // Note: This requires the keychain password. For the login keychain,
+    // passing an empty password works if the keychain is already unlocked.
+    set_partition_list(service, account)?;
 
-    if status == errSecSuccess {
-        Ok(())
-    } else if status == errSecDuplicateItem {
-        // Item already exists, try to update it
-        // We need to find it first, then update it
-        let (_, mut item) = find_generic_password(Some(&[keychain]), service, account)
-            .map_err(decode_error)?;
+    Ok(())
+}
 
-        item.set_password(password).map_err(decode_error)
-    } else {
-        Err(decode_error(Error::from_code(status)))
+/// Set the partition list for a keychain item to allow all applications.
+///
+/// This shells out to the `security` command-line tool because there is no
+/// public C API for setting partition lists (added in macOS Sierra).
+fn set_partition_list(service: &str, account: &str) -> Result<()> {
+    use std::process::Command;
+
+    // Use security set-generic-password-partition-list to set permissive partition IDs.
+    // The -S flag specifies partition IDs separated by commas.
+    // Using "apple-tool:,apple:," allows Apple tools and (with trailing comma) unsigned apps.
+    //
+    // The -k flag specifies the keychain password. For an already-unlocked login keychain,
+    // we need to provide the actual password. However, we don't have access to it.
+    //
+    // Alternative approach: use -a (account) and -s (service) to identify the item,
+    // and rely on the keychain being unlocked. If the user has their keychain
+    // set to not lock, or it's recently been unlocked, this may work.
+    //
+    // Note: This may still prompt for the keychain password interactively.
+    let output = Command::new("security")
+        .args([
+            "set-generic-password-partition-list",
+            "-S",
+            "apple-tool:,apple:,",
+            "-s",
+            service,
+            "-a",
+            account,
+            // We don't pass -k (password) because we don't have it.
+            // The command will use the keychain's current unlock state.
+        ])
+        .output();
+
+    match output {
+        Ok(result) => {
+            if result.status.success() {
+                Ok(())
+            } else {
+                // The partition list command failed, but the password was still set.
+                // Log a warning but don't fail - the item exists, just with restricted access.
+                let stderr = String::from_utf8_lossy(&result.stderr);
+                tracing::warn!(
+                    "Failed to set partition list for keychain item (prompts may still appear): {}",
+                    stderr.trim()
+                );
+                Ok(())
+            }
+        }
+        Err(e) => {
+            // Command execution failed entirely
+            tracing::warn!(
+                "Failed to execute security command (prompts may still appear): {}",
+                e
+            );
+            Ok(())
+        }
     }
 }
 

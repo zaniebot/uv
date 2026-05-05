@@ -6271,6 +6271,7 @@ dependencies = [
  "async-trait",
  "byteorder",
  "core-foundation 0.10.1",
+ "core-foundation-sys",
  "doc-comment",
  "env_logger",
  "fastrand",
