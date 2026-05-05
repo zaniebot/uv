@@ -78,6 +78,47 @@ impl LockResult {
     }
 }
 
+fn unused_transitive_source_message(requirement: &Requirement) -> String {
+    let scope = match requirement.origin.as_ref() {
+        Some(RequirementOrigin::Extra(_, Some(project_name), extra)) => {
+            format!(" scoped to extra `{extra}` in package `{project_name}`")
+        }
+        Some(RequirementOrigin::Extra(_, None, extra)) => {
+            format!(" scoped to extra `{extra}`")
+        }
+        Some(RequirementOrigin::Group(_, Some(project_name), group)) => {
+            format!(" scoped to dependency group `{group}` in package `{project_name}`")
+        }
+        Some(RequirementOrigin::Group(_, None, group)) => {
+            format!(" scoped to dependency group `{group}`")
+        }
+        Some(RequirementOrigin::Project(_, project_name)) => {
+            format!(" in package `{project_name}`")
+        }
+        Some(RequirementOrigin::Workspace) => " in the workspace root".to_string(),
+        Some(RequirementOrigin::File(path)) => {
+            format!(" in script `{}`", path.display())
+        }
+        None => String::new(),
+    };
+
+    format!(
+        "Source entry for `{}`{scope} did not apply to any resolved dependency.",
+        requirement.name
+    )
+}
+
+fn warn_for_unused_transitive_sources(requirements: &[Requirement]) {
+    let mut warnings = BTreeSet::new();
+    for requirement in requirements {
+        warnings.insert(unused_transitive_source_message(requirement));
+    }
+
+    for warning in warnings {
+        warn_user_once!("{warning}");
+    }
+}
+
 /// Resolve the project requirements into a lockfile.
 pub(crate) async fn lock(
     project_dir: &Path,
@@ -1024,6 +1065,13 @@ async fn do_lock(
 
             let previous = validated_existing_lock.map(ValidatedLock::into_lock);
             let lock = lock.with_manifest(manifest);
+
+            let unused_transitive_sources = lock.unused_transitive_sources(
+                target.install_path(),
+                packages,
+                &transitive_source_overlays,
+            )?;
+            warn_for_unused_transitive_sources(&unused_transitive_sources);
 
             if previous.as_ref().is_some_and(|previous| *previous == lock) {
                 Ok(LockResult::Unchanged(lock))

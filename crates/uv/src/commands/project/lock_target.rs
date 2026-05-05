@@ -41,16 +41,42 @@ impl<'lock> From<&'lock Pep723Script> for LockTarget<'lock> {
     }
 }
 
-#[derive(Debug, Default)]
-struct DirectDependencyContexts {
-    base: BTreeSet<PackageName>,
-    extras: BTreeSet<(PackageName, ExtraName)>,
-    groups: BTreeSet<(PackageName, GroupName)>,
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+struct DirectDependencyContextKey {
+    package: PackageName,
+    extra: Option<ExtraName>,
+    group: Option<GroupName>,
 }
 
+impl DirectDependencyContextKey {
+    fn new(package: &PackageName, extra: Option<&ExtraName>, group: Option<&GroupName>) -> Self {
+        Self {
+            package: package.clone(),
+            extra: extra.cloned(),
+            group: group.cloned(),
+        }
+    }
+}
+
+#[derive(Debug, Default)]
+struct DirectDependencyContexts(BTreeMap<DirectDependencyContextKey, MarkerTree>);
+
 impl DirectDependencyContexts {
+    fn insert(
+        &mut self,
+        requirement: &uv_pep508::Requirement<VerbatimParsedUrl>,
+        extra: Option<&ExtraName>,
+        group: Option<&GroupName>,
+    ) {
+        let key = DirectDependencyContextKey::new(&requirement.name, extra, group);
+        self.0
+            .entry(key)
+            .and_modify(|marker| marker.or(requirement.marker))
+            .or_insert(requirement.marker);
+    }
+
     fn insert_base(&mut self, requirement: &uv_pep508::Requirement<VerbatimParsedUrl>) {
-        self.base.insert(requirement.name.clone());
+        self.insert(requirement, None, None);
     }
 
     fn insert_extra(
@@ -58,8 +84,7 @@ impl DirectDependencyContexts {
         requirement: &uv_pep508::Requirement<VerbatimParsedUrl>,
         extra: &ExtraName,
     ) {
-        self.extras
-            .insert((requirement.name.clone(), extra.clone()));
+        self.insert(requirement, Some(extra), None);
     }
 
     fn insert_group(
@@ -67,8 +92,7 @@ impl DirectDependencyContexts {
         requirement: &uv_pep508::Requirement<VerbatimParsedUrl>,
         group: &GroupName,
     ) {
-        self.groups
-            .insert((requirement.name.clone(), group.clone()));
+        self.insert(requirement, None, Some(group));
     }
 
     /// Populate direct dependency contexts from a `pyproject.toml`'s project table and dependency
@@ -119,18 +143,21 @@ impl DirectDependencyContexts {
         Ok(())
     }
 
-    fn is_direct(
+    fn uncovered_marker(
         &self,
         package: &PackageName,
         extra: Option<&ExtraName>,
         group: Option<&GroupName>,
-    ) -> bool {
-        match (extra, group) {
-            (Some(extra), None) => self.extras.contains(&(package.clone(), extra.clone())),
-            (None, Some(group)) => self.groups.contains(&(package.clone(), group.clone())),
-            (None, None) => self.base.contains(package),
-            (Some(_), Some(_)) => false,
-        }
+        marker: MarkerTree,
+    ) -> MarkerTree {
+        let key = DirectDependencyContextKey::new(package, extra, group);
+        let Some(direct_marker) = self.0.get(&key) else {
+            return marker;
+        };
+
+        let mut uncovered_marker = marker;
+        uncovered_marker.and(direct_marker.negate());
+        uncovered_marker
     }
 }
 
@@ -184,10 +211,6 @@ fn collect_workspace_project_transitive_source_overlays(
         };
 
         for (extra, group) in source_scopes(package_sources) {
-            if direct_contexts.is_direct(&package, extra.as_ref(), group.as_ref()) {
-                continue;
-            }
-
             let origin = if let Some(extra) = &extra {
                 RequirementOrigin::Extra(project_path.clone(), project_name.clone(), extra.clone())
             } else if let Some(group) = &group {
@@ -199,42 +222,49 @@ fn collect_workspace_project_transitive_source_overlays(
             };
 
             let requirement_name = package.clone();
-            lowered_constraints.extend(
-                LoweredRequirement::from_requirement(
-                    uv_pep508::Requirement {
-                        name: package.clone(),
-                        extras: Box::default(),
-                        marker: MarkerTree::TRUE,
-                        version_or_url: None,
-                        origin: Some(origin),
-                    },
-                    project_name.as_ref(),
-                    project_root,
-                    project_sources,
-                    project_indexes,
+            let lowered = LoweredRequirement::from_requirement(
+                uv_pep508::Requirement {
+                    name: package.clone(),
+                    extras: Box::default(),
+                    marker: MarkerTree::TRUE,
+                    version_or_url: None,
+                    origin: Some(origin),
+                },
+                project_name.as_ref(),
+                project_root,
+                project_sources,
+                project_indexes,
+                extra.as_ref(),
+                group.as_ref(),
+                locations,
+                workspace,
+                None,
+                credentials_cache,
+            )
+            .map(move |requirement| match requirement {
+                Ok(requirement) => Ok(requirement.into_inner()),
+                Err(err) => Err(uv_distribution::MetadataError::LoweringError(
+                    requirement_name.clone(),
+                    Box::new(err),
+                )),
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
+            lowered_constraints.extend(lowered.into_iter().filter_map(|mut requirement| {
+                requirement.marker = direct_contexts.uncovered_marker(
+                    &package,
                     extra.as_ref(),
                     group.as_ref(),
-                    locations,
-                    workspace,
-                    None,
-                    credentials_cache,
-                )
-                .map(move |requirement| match requirement {
-                    Ok(requirement) => Ok(requirement.into_inner()),
-                    Err(err) => Err(uv_distribution::MetadataError::LoweringError(
-                        requirement_name.clone(),
-                        Box::new(err),
-                    )),
-                })
-                .collect::<Result<Vec<_>, _>>()?,
-            );
+                    requirement.marker,
+                );
+
+                (!requirement.marker.is_false() && !is_noop_constraint(&requirement))
+                    .then_some(requirement)
+            }));
         }
     }
 
-    Ok(lowered_constraints
-        .into_iter()
-        .filter(|requirement| !is_noop_constraint(requirement))
-        .collect())
+    Ok(lowered_constraints)
 }
 
 impl<'lock> LockTarget<'lock> {
@@ -792,9 +822,6 @@ impl<'lock> LockTarget<'lock> {
                         if group.is_some() {
                             continue;
                         }
-                        if direct_contexts.is_direct(package, extra.as_ref(), None) {
-                            continue;
-                        }
 
                         let origin = if let Some(extra) = &extra {
                             RequirementOrigin::Extra(script.path.clone(), None, extra.clone())
@@ -803,32 +830,40 @@ impl<'lock> LockTarget<'lock> {
                         };
 
                         let requirement_name = package.clone();
-                        overlays.extend(
-                            LoweredRequirement::from_non_workspace_requirement(
-                                uv_pep508::Requirement {
-                                    name: package.clone(),
-                                    extras: Box::default(),
-                                    marker: MarkerTree::TRUE,
-                                    version_or_url: None,
-                                    origin: Some(origin),
-                                },
-                                script.path.parent().unwrap(),
-                                sources_map,
-                                indexes,
-                                locations,
-                                credentials_cache,
-                            )
-                            .map(move |requirement| match requirement {
-                                Ok(requirement) => Ok(requirement.into_inner()),
-                                Err(err) => Err(uv_distribution::MetadataError::LoweringError(
-                                    requirement_name.clone(),
-                                    Box::new(err),
-                                )),
-                            })
-                            .collect::<Result<Vec<_>, _>>()?
-                            .into_iter()
-                            .filter(|requirement| !is_noop_constraint(requirement)),
-                        );
+                        let lowered = LoweredRequirement::from_non_workspace_requirement(
+                            uv_pep508::Requirement {
+                                name: package.clone(),
+                                extras: Box::default(),
+                                marker: MarkerTree::TRUE,
+                                version_or_url: None,
+                                origin: Some(origin),
+                            },
+                            script.path.parent().unwrap(),
+                            sources_map,
+                            indexes,
+                            locations,
+                            credentials_cache,
+                        )
+                        .map(move |requirement| match requirement {
+                            Ok(requirement) => Ok(requirement.into_inner()),
+                            Err(err) => Err(uv_distribution::MetadataError::LoweringError(
+                                requirement_name.clone(),
+                                Box::new(err),
+                            )),
+                        })
+                        .collect::<Result<Vec<_>, _>>()?;
+
+                        overlays.extend(lowered.into_iter().filter_map(|mut requirement| {
+                            requirement.marker = direct_contexts.uncovered_marker(
+                                package,
+                                extra.as_ref(),
+                                None,
+                                requirement.marker,
+                            );
+
+                            (!requirement.marker.is_false() && !is_noop_constraint(&requirement))
+                                .then_some(requirement)
+                        }));
                     }
                 }
 

@@ -2533,6 +2533,38 @@ fn lock_project_with_transitive_group_sources_shared_indirect_dep_marker_forks()
     Ok(())
 }
 
+/// A late-discovered group-scoped transitive source should still determine the selected package
+/// source for a shared dependency.
+#[test]
+fn lock_project_with_late_group_transitive_source_for_selected_package() -> Result<()> {
+    let context = uv_test::test_context!("3.12");
+
+    context.temp_dir.child("pyproject.toml").write_str(
+        r#"
+        [project]
+        name = "project"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        dependencies = ["anyio==3.7.0"]
+
+        [dependency-groups]
+        dev = ["requests==2.31.0"]
+
+        [tool.uv.sources]
+        idna = { url = "https://files.pythonhosted.org/packages/d7/77/ff688d1504cdc4db2a938e2b7b9adee5dd52e34efbd2431051efc9984de9/idna-3.2-py3-none-any.whl", group = "dev" }
+        "#,
+    )?;
+
+    context.lock().assert().success();
+
+    let lock = context.read("uv.lock");
+    assert!(lock.contains(
+        "name = \"idna\"\nversion = \"3.2\"\nsource = { url = \"https://files.pythonhosted.org/packages/d7/77/ff688d1504cdc4db2a938e2b7b9adee5dd52e34efbd2431051efc9984de9/idna-3.2-py3-none-any.whl\" }"
+    ));
+
+    Ok(())
+}
+
 /// Lock a project where two conflicting groups each have a group-scoped transitive source override
 /// for the same package, targeting different URLs.
 #[test]
@@ -4667,6 +4699,45 @@ fn lock_root_and_workspace_member_with_disjoint_transitive_source_markers() -> R
     let lock = context.read("uv.lock");
     assert!(lock.contains("idna-3.2-py3-none-any.whl"));
     assert!(lock.contains("idna-3.3-py3-none-any.whl"));
+    assert!(lock.contains("marker = \"sys_platform == 'darwin'\""));
+    assert!(lock.contains("marker = \"sys_platform != 'darwin'\""));
+
+    Ok(())
+}
+
+/// A marker-limited direct dependency should not suppress a transitive source overlay for the same
+/// package in disjoint environments.
+#[test]
+fn lock_project_with_marker_limited_direct_dependency_and_transitive_source_overlay() -> Result<()>
+{
+    let context = uv_test::test_context!("3.12");
+
+    context.temp_dir.child("pyproject.toml").write_str(
+        r#"
+        [project]
+        name = "project"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        dependencies = [
+            "idna==3.3 ; sys_platform == 'darwin'",
+            "anyio==3.7.0",
+        ]
+
+        [tool.uv.sources]
+        idna = { url = "https://files.pythonhosted.org/packages/04/a2/d918dcd22354d8958fe113e1a3630137e0fc8b44859ade3063982eacd2a4/idna-3.3-py3-none-any.whl", marker = "sys_platform != 'darwin'" }
+        "#,
+    )?;
+
+    context.lock().assert().success();
+
+    let lock = context.read("uv.lock");
+    assert!(lock.matches("name = \"idna\"").count() >= 2);
+    assert!(lock.contains(
+        "name = \"idna\"\nversion = \"3.3\"\nsource = { registry = \"https://pypi.org/simple\" }"
+    ));
+    assert!(lock.contains(
+        "source = { url = \"https://files.pythonhosted.org/packages/04/a2/d918dcd22354d8958fe113e1a3630137e0fc8b44859ade3063982eacd2a4/idna-3.3-py3-none-any.whl\" }"
+    ));
     assert!(lock.contains("marker = \"sys_platform == 'darwin'\""));
     assert!(lock.contains("marker = \"sys_platform != 'darwin'\""));
 
@@ -26196,6 +26267,7 @@ fn lock_multiple_index_with_absent_extra() -> Result<()> {
 
     ----- stderr -----
     Resolved 3 packages in [TIME]
+    warning: Source entry for `jinja2` scoped to extra `cu118` in package `project` did not apply to any resolved dependency.
     "#);
 
     Ok(())
@@ -26277,6 +26349,80 @@ fn lock_multiple_index_with_absent_group() -> Result<()> {
 
     ----- stderr -----
     Resolved 3 packages in [TIME]
+    warning: Source entry for `jinja2` scoped to dependency group `cu118` in package `project` did not apply to any resolved dependency.
+    "#);
+
+    Ok(())
+}
+
+/// A scoped source that matches no direct dependency in its extra should warn after resolution.
+#[test]
+fn lock_warns_for_unused_extra_scoped_direct_source_due_to_markers() -> Result<()> {
+    let context = uv_test::test_context!("3.12");
+
+    context.temp_dir.child("pyproject.toml").write_str(
+        r#"
+        [project]
+        name = "project"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        dependencies = []
+
+        [project.optional-dependencies]
+        cpu = ["anyio==3.7.0 ; sys_platform == 'darwin'"]
+
+        [tool.uv.sources]
+        anyio = [
+            { url = "https://files.pythonhosted.org/packages/68/fe/7ce1926952c8a403b35029e194555558514b365ad77d75125f521a2bec62/anyio-3.7.0-py3-none-any.whl", extra = "cpu", marker = "sys_platform != 'darwin'" },
+        ]
+        "#,
+    )?;
+
+    uv_snapshot!(context.filters(), context.lock(), @r#"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Resolved 4 packages in [TIME]
+    warning: Source entry for `anyio` scoped to extra `cpu` in package `project` did not apply to any resolved dependency.
+    "#);
+
+    Ok(())
+}
+
+/// A scoped source that matches no direct or transitive dependency should warn after resolution
+/// instead of silently becoming a no-op.
+#[test]
+fn lock_warns_for_unused_group_scoped_transitive_source() -> Result<()> {
+    let context = uv_test::test_context!("3.12");
+
+    context.temp_dir.child("pyproject.toml").write_str(
+        r#"
+        [project]
+        name = "project"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        dependencies = ["sniffio==1.3.1"]
+
+        [dependency-groups]
+        lint = ["sniffio==1.3.1"]
+
+        [tool.uv.sources]
+        idna = [
+            { url = "https://files.pythonhosted.org/packages/d7/77/ff688d1504cdc4db2a938e2b7b9adee5dd52e34efbd2431051efc9984de9/idna-3.2-py3-none-any.whl", group = "lint" },
+        ]
+        "#,
+    )?;
+
+    uv_snapshot!(context.filters(), context.lock(), @r#"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Resolved 2 packages in [TIME]
+    warning: Source entry for `idna` scoped to dependency group `lint` in package `project` did not apply to any resolved dependency.
     "#);
 
     Ok(())

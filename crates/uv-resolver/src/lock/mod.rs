@@ -2189,6 +2189,47 @@ impl Lock {
         }
     }
 
+    /// Return any transitive source overlays that did not match a resolved dependency.
+    pub fn unused_transitive_sources(
+        &self,
+        root: &Path,
+        packages: &BTreeMap<PackageName, WorkspaceMember>,
+        transitive_sources: &[Requirement],
+    ) -> Result<Vec<Requirement>, LockError> {
+        let workspace_members = packages.keys().cloned().collect::<BTreeSet<_>>();
+        let normalized_transitive_sources = transitive_sources
+            .iter()
+            .cloned()
+            .map(|requirement| self.normalize_transitive_source_requirement(requirement, root))
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let mut unused = Vec::new();
+        for requirement in normalized_transitive_sources {
+            let Some(origin) = requirement.origin.as_ref() else {
+                continue;
+            };
+
+            let reachable =
+                self.collect_reachable_packages_for_origin(root, origin, &workspace_members)?;
+            let used = reachable.into_iter().any(|(package_id, package_marker)| {
+                let package = self.find_by_id(package_id);
+                if package.name() != &requirement.name {
+                    return false;
+                }
+
+                let mut overlap = package_marker;
+                overlap.and(requirement.marker);
+                !overlap.is_false()
+            });
+
+            if !used {
+                unused.push(requirement);
+            }
+        }
+
+        Ok(unused)
+    }
+
     /// Returns the supported environments that were used to generate this
     /// lock.
     ///
