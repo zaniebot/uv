@@ -24,13 +24,14 @@ project are called _indirect_ or _transitive dependencies_.
 
 To help demonstrate the resolution process, consider the following dependencies:
 
-<!-- prettier-ignore -->
+{/* prettier-ignore-start */}
 - The project depends on `foo` and `bar`.
 - `foo` has one version, 1.0.0:
     - `foo 1.0.0` depends on `lib>=1.0.0`.
 - `bar` has one version, 1.0.0:
     - `bar 1.0.0` depends on `lib>=2.0.0`.
 - `lib` has two versions, 1.0.0 and 2.0.0. Both versions have no dependencies.
+{/* prettier-ignore-end */}
 
 In this example, the resolver must find a set of package versions which satisfies the project
 requirements. Since there is only one version of both `foo` and `bar`, those will be used. The
