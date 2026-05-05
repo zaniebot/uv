@@ -277,6 +277,7 @@ modifications */
 /* Bold the active nav link for accessibility */
 .md-nav--primary .md-nav__item .md-nav__link--active {
   font-weight: bold;
+  color: var(--flare);
 }
 
 /* Styling for the custom header */
