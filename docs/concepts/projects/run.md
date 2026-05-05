@@ -1,3 +1,7 @@
+---
+description: Running scripts and commands within uv project environments using uv run
+---
+
 # Running commands in projects
 
 When working on a project, it is installed into the virtual environment at `.venv`. This environment

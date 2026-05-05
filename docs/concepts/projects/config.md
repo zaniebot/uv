@@ -1,3 +1,7 @@
+---
+description: Configuring uv projects including Python version requirements, entry points, and build settings
+---
+
 # Configuring projects
 
 ## Python version requirement

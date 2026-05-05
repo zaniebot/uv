@@ -1,3 +1,7 @@
+---
+description: Understanding uv's automatic locking and syncing for consistent project dependencies
+---
+
 # Locking and syncing
 
 Locking is the process of resolving your project's dependencies into a

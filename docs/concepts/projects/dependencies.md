@@ -1,3 +1,7 @@
+---
+description: Managing project dependencies with uv, including adding packages and configuring dependency sources
+---
+
 # Managing dependencies
 
 ## Dependency fields

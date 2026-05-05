@@ -1,3 +1,7 @@
+---
+description: Building Python project distributions with uv for sharing and publishing packages
+---
+
 # Building distributions
 
 To distribute your project to others (e.g., to upload it to an index like PyPI), you'll need to

@@ -1,3 +1,7 @@
+---
+description: Organizing multi-package Python projects with uv workspaces for consistent dependency management
+---
+
 # Using workspaces
 
 Inspired by the [Cargo](https://doc.rust-lang.org/cargo/reference/workspaces.html) concept of the
