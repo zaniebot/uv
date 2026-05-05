@@ -304,7 +304,7 @@ pub(crate) async fn sync(
                     return diagnostics::OperationDiagnostic::native_tls(
                         client_builder.is_native_tls(),
                     )
-                    .report(err)
+                    .report(err, printer)
                     .map_or(Ok(ExitStatus::Failure), |err| Err(err.into()));
                 }
                 Err(err) => return Err(err.into()),
@@ -351,7 +351,7 @@ pub(crate) async fn sync(
         Ok(result) => Outcome::Success(result),
         Err(ProjectError::Operation(err)) => {
             return diagnostics::OperationDiagnostic::native_tls(client_builder.is_native_tls())
-                .report(err)
+                .report(err, printer)
                 .map_or(Ok(ExitStatus::Failure), |err| Err(err.into()));
         }
         Err(ProjectError::LockMismatch(prev, cur, lock_source)) => {
@@ -424,7 +424,7 @@ pub(crate) async fn sync(
         Ok(()) => {}
         Err(ProjectError::Operation(err)) => {
             return diagnostics::OperationDiagnostic::native_tls(client_builder.is_native_tls())
-                .report(err)
+                .report(err, printer)
                 .map_or(Ok(ExitStatus::Failure), |err| Err(err.into()));
         }
         Err(err) => return Err(err.into()),

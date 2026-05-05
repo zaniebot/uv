@@ -245,7 +245,7 @@ pub(crate) async fn lock(
         }
         Err(ProjectError::Operation(err)) => {
             diagnostics::OperationDiagnostic::native_tls(client_builder.is_native_tls())
-                .report(err)
+                .report(err, printer)
                 .map_or(Ok(ExitStatus::Failure), |err| Err(err.into()))
         }
         Err(err) => Err(err.into()),

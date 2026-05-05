@@ -1,23 +1,28 @@
-use anstream::println;
+use std::fmt::Write;
+
 use anyhow::Context;
 use owo_colors::OwoColorize;
 
 use uv_fs::Simplified;
 use uv_python::managed::{ManagedPythonInstallations, python_executable_dir};
 
+use crate::commands::ExitStatus;
+use crate::printer::Printer;
+
 /// Show the Python installation directory.
-pub(crate) fn dir(bin: bool) -> anyhow::Result<()> {
+pub(crate) fn dir(bin: bool, printer: Printer) -> anyhow::Result<ExitStatus> {
     if bin {
         let bin = python_executable_dir()?;
-        println!("{}", bin.simplified_display().cyan());
+        writeln!(printer.stdout(), "{}", bin.simplified_display().cyan())?;
     } else {
         let installed_toolchains = ManagedPythonInstallations::from_settings(None)
             .context("Failed to initialize toolchain settings")?;
-        println!(
+        writeln!(
+            printer.stdout(),
             "{}",
             installed_toolchains.root().simplified_display().cyan()
-        );
+        )?;
     }
 
-    Ok(())
+    Ok(ExitStatus::Success)
 }

@@ -27,6 +27,7 @@ struct TargetConfig {
     target_cxx: Option<String>,
 }
 
+#[allow(clippy::disallowed_methods, reason = "dev tool uses println! for output")]
 pub(crate) async fn main(args: &Args) -> Result<()> {
     let reference_string = generate().await?;
     let filename = "generated_mappings.rs";

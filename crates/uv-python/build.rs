@@ -1,3 +1,5 @@
+#![allow(clippy::disallowed_methods, reason = "build scripts need println! for cargo directives")]
+
 #[allow(clippy::disallowed_types)]
 use std::fs::{File, FileTimes};
 use std::io::Write;

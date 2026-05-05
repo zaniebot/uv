@@ -482,7 +482,7 @@ async fn print_frozen_version(
         Ok(result) => result.into_lock(),
         Err(ProjectError::Operation(err)) => {
             return diagnostics::OperationDiagnostic::native_tls(client_builder.is_native_tls())
-                .report(err)
+                .report(err, printer)
                 .map_or(Ok(ExitStatus::Failure), |err| Err(err.into()));
         }
         Err(err) => return Err(err.into()),
@@ -624,7 +624,7 @@ async fn lock_and_sync(
         Ok(result) => result.into_lock(),
         Err(ProjectError::Operation(err)) => {
             return diagnostics::OperationDiagnostic::native_tls(client_builder.is_native_tls())
-                .report(err)
+                .report(err, printer)
                 .map_or(Ok(ExitStatus::Failure), |err| Err(err.into()));
         }
         Err(err) => return Err(err.into()),
@@ -683,7 +683,7 @@ async fn lock_and_sync(
         Ok(()) => {}
         Err(ProjectError::Operation(err)) => {
             return diagnostics::OperationDiagnostic::native_tls(client_builder.is_native_tls())
-                .report(err)
+                .report(err, printer)
                 .map_or(Ok(ExitStatus::Failure), |err| Err(err.into()));
         }
         Err(err) => return Err(err.into()),

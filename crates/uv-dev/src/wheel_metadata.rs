@@ -19,6 +19,7 @@ pub(crate) struct WheelMetadataArgs {
     cache_args: CacheArgs,
 }
 
+#[allow(clippy::disallowed_methods, reason = "dev tool uses println! for output")]
 pub(crate) async fn wheel_metadata(
     args: WheelMetadataArgs,
     environment: EnvironmentOptions,

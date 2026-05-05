@@ -1,3 +1,5 @@
+#![allow(clippy::disallowed_methods, reason = "dev tool uses println! for output")]
+
 use std::env;
 use std::path::PathBuf;
 use std::process::ExitCode;

@@ -1,4 +1,4 @@
-#![allow(clippy::print_stdout)]
+#![allow(clippy::disallowed_methods, reason = "standalone test binary uses println! for output")]
 
 use globset::GlobSetBuilder;
 use std::env::args;

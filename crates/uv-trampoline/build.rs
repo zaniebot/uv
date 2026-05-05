@@ -1,3 +1,5 @@
+#![allow(clippy::disallowed_methods, reason = "build scripts need println! for cargo directives")]
+
 // This embeds a "manifest" - a special XML document - into our built binary.
 // The main things it does is tell Windows that we want to use the magic
 // utf8 codepage, so we can use the *A versions of Windows API functions and

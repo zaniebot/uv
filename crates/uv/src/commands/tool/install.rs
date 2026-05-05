@@ -489,7 +489,7 @@ pub(crate) async fn install(
                 return diagnostics::OperationDiagnostic::native_tls(
                     client_builder.is_native_tls(),
                 )
-                .report(err)
+                .report(err, printer)
                 .map_or(Ok(ExitStatus::Failure), |err| Err(err.into()));
             }
             Err(err) => return Err(err.into()),
@@ -552,7 +552,7 @@ pub(crate) async fn install(
                         return diagnostics::OperationDiagnostic::native_tls(
                             client_builder.is_native_tls(),
                         )
-                        .report(err)
+                        .report(err, printer)
                         .map_or(Ok(ExitStatus::Failure), |err| Err(err.into()));
                     };
 
@@ -583,7 +583,7 @@ pub(crate) async fn install(
                             return diagnostics::OperationDiagnostic::native_tls(
                                 client_builder.is_native_tls(),
                             )
-                            .report(err)
+                            .report(err, printer)
                             .map_or(Ok(ExitStatus::Failure), |err| Err(err.into()));
                         }
                         Err(err) => return Err(err.into()),
@@ -628,7 +628,7 @@ pub(crate) async fn install(
                 return diagnostics::OperationDiagnostic::native_tls(
                     client_builder.is_native_tls(),
                 )
-                .report(err)
+                .report(err, printer)
                 .map_or(Ok(ExitStatus::Failure), |err| Err(err.into()));
             }
             Err(err) => return Err(err.into()),

@@ -67,4 +67,9 @@ disallowed-methods = [
   { path = "tokio::fs::symlink", allow-invalid = true },
   { path = "tokio::fs::symlink_dir", allow-invalid = true },
   { path = "tokio::fs::symlink_file", allow-invalid = true },
+  # Disallow direct printing - use Printer abstraction in commands
+  { path = "std::println", allow-invalid = true },
+  { path = "std::eprintln", allow-invalid = true },
+  { path = "std::print", allow-invalid = true },
+  { path = "std::eprint", allow-invalid = true },
 ]

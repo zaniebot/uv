@@ -303,13 +303,13 @@ pub(crate) async fn run(
                     format!("uvx {rest}").green()
                 ))
                 .with_context("tool")
-                .report(err)
+                .report(err, printer)
                 .map_or(Ok(ExitStatus::Failure), |err| Err(err.into()));
             }
 
             return diagnostics::OperationDiagnostic::native_tls(client_builder.is_native_tls())
                 .with_context("tool")
-                .report(err)
+                .report(err, printer)
                 .map_or(Ok(ExitStatus::Failure), |err| Err(err.into()));
         }
         Err(ProjectError::Requirements(err)) => {

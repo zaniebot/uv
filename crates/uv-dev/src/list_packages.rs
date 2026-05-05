@@ -15,6 +15,7 @@ pub(crate) struct ListPackagesArgs {
     cache_args: CacheArgs,
 }
 
+#[allow(clippy::disallowed_methods, reason = "dev tool uses println! for output")]
 pub(crate) async fn list_packages(
     args: ListPackagesArgs,
     environment: EnvironmentOptions,

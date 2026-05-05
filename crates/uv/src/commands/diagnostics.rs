@@ -1,3 +1,4 @@
+use std::fmt::Write;
 use std::str::FromStr;
 use std::sync::{Arc, LazyLock};
 
@@ -13,6 +14,7 @@ use uv_pep440::Version;
 use uv_resolver::SentinelRange;
 
 use crate::commands::pip;
+use crate::printer::Printer;
 
 static SUGGESTIONS: LazyLock<FxHashMap<PackageName, PackageName>> = LazyLock::new(|| {
     let suggestions: Vec<(String, String)> =
@@ -71,7 +73,7 @@ impl OperationDiagnostic {
     /// Attempt to report an error with rich diagnostic context.
     ///
     /// Returns `Some` if the error was not handled.
-    pub(crate) fn report(self, err: pip::operations::Error) -> Option<pip::operations::Error> {
+    pub(crate) fn report(self, err: pip::operations::Error, printer: Printer) -> Option<pip::operations::Error> {
         match err {
             pip::operations::Error::Resolve(uv_resolver::ResolveError::NoSolution(err)) => {
                 if let Some(context) = self.context {
@@ -137,7 +139,7 @@ impl OperationDiagnostic {
                 None
             }
             pip::operations::Error::OutdatedEnvironment => {
-                anstream::eprintln!("{}", err);
+                let _ = writeln!(printer.stderr(), "{}", err);
                 None
             }
             err => Some(err),

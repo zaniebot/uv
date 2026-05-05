@@ -97,7 +97,7 @@ fn run() -> std::io::Result<ExitStatus> {
     match exec_spawn(&mut cmd)? {}
 }
 
-#[allow(clippy::print_stderr)]
+#[allow(clippy::disallowed_methods, reason = "binary entrypoint error handling")]
 fn main() -> ExitCode {
     let result = run();
     match result {

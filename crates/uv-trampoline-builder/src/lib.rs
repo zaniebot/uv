@@ -482,7 +482,7 @@ pub fn windows_python_launcher(
 }
 
 #[cfg(all(test, windows))]
-#[allow(clippy::print_stdout)]
+#[allow(clippy::disallowed_methods, reason = "test module uses println! for debugging")]
 mod test {
     use std::io::Write;
     use std::path::Path;

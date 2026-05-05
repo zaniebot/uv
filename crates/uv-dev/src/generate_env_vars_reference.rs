@@ -16,6 +16,7 @@ pub(crate) struct Args {
     pub(crate) mode: Mode,
 }
 
+#[allow(clippy::disallowed_methods, reason = "dev tool uses println! for output")]
 pub(crate) fn main(args: &Args) -> anyhow::Result<()> {
     let reference_string = generate();
     let filename = "environment.md";
