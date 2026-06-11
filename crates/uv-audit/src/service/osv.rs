@@ -46,6 +46,11 @@ pub enum Error {
         #[source]
         err: reqwest_middleware::Error,
     },
+    /// An error when OSV returns a different number of results than queries.
+    #[error(
+        "OSV returned an unexpected number of batch results: expected {expected}, received {received}"
+    )]
+    UnexpectedBatchResultCount { expected: usize, received: usize },
 }
 
 /// Package specification for OSV queries.
@@ -314,6 +319,13 @@ impl Osv {
                 .await
                 .map_err(reqwest_middleware::Error::Reqwest)?;
 
+            if batch_response.results.len() != pending.len() {
+                return Err(Error::UnexpectedBatchResultCount {
+                    expected: pending.len(),
+                    received: batch_response.results.len(),
+                });
+            }
+
             let mut next_pending = Vec::new();
             for ((dep, _), batch_result) in pending.iter().zip(batch_response.results.iter()) {
                 let ids = result_map.entry(dep).or_default();
@@ -516,8 +528,7 @@ mod tests {
     use crate::service::osv::{Filter, RangeType};
     use crate::types::{Dependency, Finding};
 
-    use super::Event;
-    use super::Osv;
+    use super::{Error, Event, Osv};
 
     /// Create a [`CachedClient`] suitable for tests (no retries, no cache).
     fn test_client() -> CachedClient {
@@ -526,6 +537,52 @@ mod tests {
                 .build()
                 .expect("Failed to build test client"),
         )
+    }
+
+    async fn query_identifiers_with_batch_result_count(result_count: usize) -> Error {
+        let server = MockServer::start().await;
+
+        Mock::given(method("POST"))
+            .and(path("/v1/querybatch"))
+            .and(body_json(json!({
+                "queries": [
+                    {
+                        "package": { "name": "package-a", "ecosystem": "PyPI" },
+                        "version": "1.0.0",
+                    },
+                    {
+                        "package": { "name": "package-b", "ecosystem": "PyPI" },
+                        "version": "2.0.0",
+                    }
+                ]
+            })))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "results": vec![json!({}); result_count]
+            })))
+            .mount(&server)
+            .await;
+
+        let osv = Osv::new(
+            test_client(),
+            Some(DisplaySafeUrl::parse(&server.uri()).expect("test server URL should be valid")),
+            Concurrency::default(),
+            Cache::temp().expect("temporary cache should be available"),
+        );
+
+        let dependencies = vec![
+            Dependency::new(
+                PackageName::from_str("package-a").expect("package name should be valid"),
+                Version::from_str("1.0.0").expect("version should be valid"),
+            ),
+            Dependency::new(
+                PackageName::from_str("package-b").expect("package name should be valid"),
+                Version::from_str("2.0.0").expect("version should be valid"),
+            ),
+        ];
+
+        osv.query_identifiers(&dependencies, Filter::All)
+            .await
+            .expect_err("unexpected batch result count should fail")
     }
 
     #[test]
@@ -648,6 +705,20 @@ mod tests {
             1,
             "Expected one querybatch request"
         );
+    }
+
+    #[tokio::test]
+    async fn test_query_identifiers_rejects_missing_batch_results() {
+        let err = query_identifiers_with_batch_result_count(1).await;
+
+        insta::assert_snapshot!(err, @"OSV returned an unexpected number of batch results: expected 2, received 1");
+    }
+
+    #[tokio::test]
+    async fn test_query_identifiers_rejects_extra_batch_results() {
+        let err = query_identifiers_with_batch_result_count(3).await;
+
+        insta::assert_snapshot!(err, @"OSV returned an unexpected number of batch results: expected 2, received 3");
     }
 
     /// Ensure that `query_batch` returns the correct findings for a batch of dependencies
