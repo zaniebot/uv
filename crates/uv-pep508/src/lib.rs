@@ -617,7 +617,7 @@ fn parse_extras_cursor<T: Pep508Url>(
                         "Expected either `,` (separating extras) or `]` (ending the extras section), found `{other}`"
                     )),
                     start: pos,
-                    len: 1,
+                    len: other.len_utf8(),
                     input: cursor.to_string(),
                 });
             }
@@ -674,6 +674,16 @@ fn parse_extras_cursor<T: Pep508Url>(
                 });
             }
             _ => {}
+        }
+        if let Some(last @ ('-' | '_' | '.')) = buffer.chars().last() {
+            return Err(Pep508Error {
+                message: Pep508ErrorSource::String(format!(
+                    "Extra name must end with an alphanumeric character, not `{last}`"
+                )),
+                start: cursor.pos() - last.len_utf8(),
+                len: last.len_utf8(),
+                input: cursor.to_string(),
+            });
         }
         // wsp* after the identifier
         cursor.eat_whitespace();
@@ -1321,6 +1331,46 @@ mod tests {
     }
 
     #[test]
+    fn error_extras_illegal_end() {
+        assert_snapshot!(
+            parse_pep508_err("foo[bar-]"),
+            @"
+        Extra name must end with an alphanumeric character, not `-`
+        foo[bar-]
+               ^
+        "
+        );
+        assert_snapshot!(
+            parse_pep508_err("foo[bar_]"),
+            @"
+        Extra name must end with an alphanumeric character, not `_`
+        foo[bar_]
+               ^
+        "
+        );
+        assert_snapshot!(
+            parse_pep508_err("foo[bar.]"),
+            @"
+        Extra name must end with an alphanumeric character, not `.`
+        foo[bar.]
+               ^
+        "
+        );
+    }
+
+    #[test]
+    fn error_unicode_after_extra() {
+        assert_snapshot!(
+            parse_pep508_err("foo[bar α]"),
+            @"
+        Expected either `,` (separating extras) or `]` (ending the extras section), found `α`
+        foo[bar α]
+                ^
+        "
+        );
+    }
+
+    #[test]
     fn error_extras1() {
         let numpy = Requirement::<Url>::from_str("black[d]").unwrap();
         assert_eq!(*numpy.extras, [ExtraName::from_str("d").unwrap()]);
@@ -1455,6 +1505,13 @@ mod tests {
     #[test]
     fn name_and_marker() {
         Requirement::<Url>::from_str(r#"numpy; sys_platform == "win32" or (os_name == "linux" and implementation_name == 'cpython')"#).unwrap();
+    }
+
+    #[test]
+    fn reversed_compatible_release_string_marker() {
+        let requirement = Requirement::<Url>::from_str(r#"foo; "3" ~= sys_platform"#).unwrap();
+
+        assert_eq!(requirement.to_string(), "foo");
     }
 
     #[test]
@@ -1676,6 +1733,17 @@ mod tests {
         name; python_version == 3.10
                                 ^^^^
         "
+        );
+    }
+
+    #[test]
+    fn error_non_ascii_after_marker() {
+        assert_snapshot!(
+            Requirement::<VerbatimUrl>::from_str(r#"foo; python_version == "3.12" α"#)
+                .unwrap_err()
+                .message
+                .to_string(),
+            @"Unexpected character 'α', expected 'and', 'or' or end of input"
         );
     }
 
