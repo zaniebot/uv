@@ -23,7 +23,7 @@ use tokio_util::io::ReaderStream;
 use tracing::{Level, debug, enabled, trace, warn};
 use url::Url;
 
-use uv_auth::{Credentials, PyxTokenStore, Realm};
+use uv_auth::{Credentials, InvalidCredentialsError, PyxTokenStore, Realm};
 use uv_cache::{Cache, Refresh};
 use uv_client::{
     BaseClient, ClientBuildError, DEFAULT_MAX_REDIRECTS, MetadataFormat, OwnedArchive,
@@ -47,6 +47,8 @@ use crate::trusted_publishing::{
 
 #[derive(Error, Debug)]
 pub enum PublishError {
+    #[error(transparent)]
+    InvalidCredentials(#[from] InvalidCredentialsError),
     #[error("The publish path is not a valid glob pattern: `{0}`")]
     Pattern(String, #[source] PatternError),
     /// [`GlobError`] is a wrapped io error.
@@ -105,6 +107,8 @@ pub enum PublishError {
 /// Failure to get the metadata for a specific file.
 #[derive(Error, Debug)]
 pub enum PublishPrepareError {
+    #[error(transparent)]
+    InvalidCredentials(#[from] InvalidCredentialsError),
     #[error(transparent)]
     Io(#[from] io::Error),
     #[error("Failed to read metadata")]
@@ -674,7 +678,7 @@ pub async fn validate(
             client,
             credentials,
             form_metadata,
-        );
+        )?;
 
         let response = request.send().await.map_err(|err| {
             PublishError::Validate(
@@ -764,7 +768,7 @@ pub async fn upload_two_phase(
         client,
         credentials,
         form_metadata,
-    );
+    )?;
 
     let response = reserve_request.send().await.map_err(|err| {
         PublishError::Reserve(
@@ -923,7 +927,7 @@ pub async fn upload_two_phase(
         client,
         credentials,
         form_metadata,
-    );
+    )?;
 
     let response = finalize_request.send().await.map_err(|err| {
         PublishError::Finalize(
@@ -1387,12 +1391,12 @@ async fn build_upload_request<'a>(
         Credentials::Basic { password, .. } => {
             if password.is_some() {
                 debug!("Using HTTP Basic authentication");
-                request = request.header(AUTHORIZATION, credentials.to_header_value());
+                request = request.header(AUTHORIZATION, credentials.to_header_value()?);
             }
         }
         Credentials::Bearer { .. } => {
             debug!("Using Bearer token authentication");
-            request = request.header(AUTHORIZATION, credentials.to_header_value());
+            request = request.header(AUTHORIZATION, credentials.to_header_value()?);
         }
     }
 
@@ -1406,7 +1410,7 @@ fn build_metadata_request<'a>(
     client: &'a BaseClient,
     credentials: &Credentials,
     form_metadata: &FormMetadata,
-) -> RequestBuilder<'a> {
+) -> Result<RequestBuilder<'a>, InvalidCredentialsError> {
     let mut form = reqwest::multipart::Form::new();
     for (key, value) in form_metadata.iter() {
         form = form.text(*key, value.clone());
@@ -1442,16 +1446,16 @@ fn build_metadata_request<'a>(
         Credentials::Basic { password, .. } => {
             if password.is_some() {
                 debug!("Using HTTP Basic authentication");
-                request = request.header(AUTHORIZATION, credentials.to_header_value());
+                request = request.header(AUTHORIZATION, credentials.to_header_value()?);
             }
         }
         Credentials::Bearer { .. } => {
             debug!("Using Bearer token authentication");
-            request = request.header(AUTHORIZATION, credentials.to_header_value());
+            request = request.header(AUTHORIZATION, credentials.to_header_value()?);
         }
     }
 
-    request
+    Ok(request)
 }
 
 /// Log response information and map response to an error variant if not successful.

@@ -21,7 +21,7 @@ use crate::{
     AccessToken, CredentialsCache, KeyringProvider,
     cache::FetchUrl,
     credentials::{
-        Authentication, AuthenticationError, Credentials, CredentialsFromUrlError, Username,
+        Authentication, AuthenticationError, Credentials, CredentialsFromRequestError, Username,
     },
     index::{AuthPolicy, Indexes},
     realm::Realm,
@@ -38,8 +38,8 @@ impl From<AuthenticationError> for Error {
     }
 }
 
-impl From<CredentialsFromUrlError> for Error {
-    fn from(err: CredentialsFromUrlError) -> Self {
+impl From<CredentialsFromRequestError> for Error {
+    fn from(err: CredentialsFromRequestError) -> Self {
         Self::middleware(err)
     }
 }
