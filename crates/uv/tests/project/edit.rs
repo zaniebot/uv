@@ -14185,10 +14185,9 @@ async fn add_redirect_cross_origin() -> Result<()> {
     Ok(())
 }
 
-/// If uv receives a 302 redirect to a cross-origin server with credentials
-/// in the location, use those credentials for the redirect request.
+/// Reject credentials in a redirect location.
 #[tokio::test]
-async fn add_redirect_cross_origin_credentials_in_location() -> Result<()> {
+async fn add_redirect_credentials_in_location() -> Result<()> {
     let context = uv_test::test_context!("3.12");
     let proxy = crate::pypi_proxy::start().await;
     let filters = context
@@ -14222,17 +14221,13 @@ async fn add_redirect_cross_origin_credentials_in_location() -> Result<()> {
     let redirect_url = Url::parse(&redirect_server.uri())?;
 
     uv_snapshot!(filters, context.add().arg("--default-index").arg(redirect_url.as_str()).arg("anyio"), @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    Resolved 4 packages in [TIME]
-    Prepared 3 packages in [TIME]
-    Installed 3 packages in [TIME]
-     + anyio==4.3.0
-     + idna==3.6
-     + sniffio==1.3.1
+    error: Failed to fetch: `http://[LOCALHOST]/anyio/`
+      Caused by: Invalid HTTP 302 Found 'Location' value: credentials are not allowed
     "
     );
 
