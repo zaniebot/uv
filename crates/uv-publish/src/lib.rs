@@ -39,7 +39,7 @@ use uv_pypi_types::{HashAlgorithm, HashDigest, Metadata23, MetadataError};
 use uv_redacted::{DisplaySafeUrl, DisplaySafeUrlError};
 use uv_warnings::warn_user;
 
-use crate::trusted_publishing::pypi::PyPIPublishingService;
+use crate::trusted_publishing::pypi::{PyPIPublishingService, is_official_registry};
 use crate::trusted_publishing::pyx::PyxPublishingService;
 use crate::trusted_publishing::{
     TrustedPublishingError, TrustedPublishingService, TrustedPublishingToken,
@@ -435,11 +435,14 @@ pub async fn check_trusted_publishing(
                 PyxPublishingService::new(registry, client)
                     .get_token()
                     .await
-            } else {
+            } else if is_official_registry(registry) {
                 debug!("Using trusted publishing flow for PyPI");
                 PyPIPublishingService::new(registry, client)
                     .get_token()
                     .await
+            } else {
+                debug!("Skipping automatic trusted publishing for an unrecognized registry");
+                return Ok(TrustedPublishResult::Skipped);
             };
 
             match token {
