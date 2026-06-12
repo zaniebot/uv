@@ -14118,16 +14118,18 @@ async fn add_auth_policy_never_with_url_credentials() -> Result<()> {
     ----- stdout -----
 
     ----- stderr -----
-    error: Failed to fetch: `http://[LOCALHOST]/basic-auth/files/packages/14/fd/2f20c40b45e4fb4324834aea24bd4afdf1143390242c0b33774da0e2e34f/anyio-4.3.0-py3-none-any.whl`
-      Caused by: HTTP status client error (401 Unauthorized) for url (http://[LOCALHOST]/basic-auth/files/packages/14/fd/2f20c40b45e4fb4324834aea24bd4afdf1143390242c0b33774da0e2e34f/anyio-4.3.0-py3-none-any.whl)
+    error: Failed to fetch: `http://[LOCALHOST]/basic-auth/simple/anyio/`
+      Caused by: Credentials are not allowed for http://public:****@[LOCALHOST]/basic-auth/simple/anyio/ because authentication is disabled
     "
     );
+
+    assert!(proxy.received_requests().await.is_empty());
 
     Ok(())
 }
 
-/// In authentication "never", client errors that are configured to be ignored should allow the
-/// resolver to try another version.
+/// In authentication "never", URL credentials are rejected before sending a request even when
+/// client errors are configured to be ignored.
 #[tokio::test]
 async fn add_auth_policy_never_with_url_credentials_ignored() -> Result<()> {
     let context = uv_test::test_context!("3.12");
@@ -14154,18 +14156,16 @@ async fn add_auth_policy_never_with_url_credentials_ignored() -> Result<()> {
 
     uv_snapshot!(context.filters(), context.add().arg("anyio"), @"
     success: false
-    exit_code: 1
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-      × No solution found when resolving dependencies:
-      ╰─▶ Because only anyio==4.3.0 is available and anyio==4.3.0 could not be fetched from the network (`401 Unauthorized`), we can conclude that all versions of anyio cannot be used.
-          And because your project depends on anyio, we can conclude that your project's requirements are unsatisfiable.
-
-    hint: Metadata for `anyio` (v4.3.0) could not be fetched; the server returned: `401 Unauthorized`
-    hint: If you want to add the package regardless of the failed resolution, provide the `--frozen` flag to skip locking and syncing
+    error: Failed to fetch: `http://[LOCALHOST]/basic-auth/simple/anyio/`
+      Caused by: Credentials are not allowed for http://public:****@[LOCALHOST]/basic-auth/simple/anyio/ because authentication is disabled
     "
     );
+
+    assert!(proxy.received_requests().await.is_empty());
 
     Ok(())
 }
