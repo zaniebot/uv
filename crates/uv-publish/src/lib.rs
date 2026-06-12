@@ -1387,17 +1387,12 @@ async fn build_upload_request<'a>(
             "application/json;q=0.9, text/plain;q=0.8, text/html;q=0.7",
         );
 
-    match credentials {
-        Credentials::Basic { password, .. } => {
-            if password.is_some() {
-                debug!("Using HTTP Basic authentication");
-                request = request.header(AUTHORIZATION, credentials.to_header_value()?);
-            }
-        }
-        Credentials::Bearer { .. } => {
-            debug!("Using Bearer token authentication");
-            request = request.header(AUTHORIZATION, credentials.to_header_value()?);
-        }
+    if credentials.password().is_some() {
+        debug!("Using HTTP Basic authentication");
+        request = request.header(AUTHORIZATION, credentials.to_header_value()?);
+    } else if credentials.is_bearer() {
+        debug!("Using Bearer token authentication");
+        request = request.header(AUTHORIZATION, credentials.to_header_value()?);
     }
 
     Ok((request, idx))
@@ -1442,17 +1437,12 @@ fn build_metadata_request<'a>(
             "application/json;q=0.9, text/plain;q=0.8, text/html;q=0.7",
         );
 
-    match credentials {
-        Credentials::Basic { password, .. } => {
-            if password.is_some() {
-                debug!("Using HTTP Basic authentication");
-                request = request.header(AUTHORIZATION, credentials.to_header_value()?);
-            }
-        }
-        Credentials::Bearer { .. } => {
-            debug!("Using Bearer token authentication");
-            request = request.header(AUTHORIZATION, credentials.to_header_value()?);
-        }
+    if credentials.password().is_some() {
+        debug!("Using HTTP Basic authentication");
+        request = request.header(AUTHORIZATION, credentials.to_header_value()?);
+    } else if credentials.is_bearer() {
+        debug!("Using Bearer token authentication");
+        request = request.header(AUTHORIZATION, credentials.to_header_value()?);
     }
 
     Ok(request)
@@ -1598,7 +1588,7 @@ mod tests {
             &registry,
             &client,
             client.retry_policy(),
-            &Credentials::basic(Some("ferris".to_string()), Some("F3RR!S".to_string())),
+            &Credentials::basic(Some("ferris".to_string()), Some("F3RR!S".to_string())).unwrap(),
             None,
             &download_concurrency,
             Arc::new(DummyReporter),
@@ -2007,7 +1997,7 @@ mod tests {
             &group,
             &DisplaySafeUrl::parse("https://example.org/upload").unwrap(),
             &client,
-            &Credentials::basic(Some("ferris".to_string()), Some("F3RR!S".to_string())),
+            &Credentials::basic(Some("ferris".to_string()), Some("F3RR!S".to_string())).unwrap(),
             &form_metadata,
             Arc::new(DummyReporter),
         )
@@ -2170,7 +2160,7 @@ mod tests {
             &group,
             &DisplaySafeUrl::parse("https://example.org/upload").unwrap(),
             &client,
-            &Credentials::basic(Some("ferris".to_string()), Some("F3RR!S".to_string())),
+            &Credentials::basic(Some("ferris".to_string()), Some("F3RR!S".to_string())).unwrap(),
             &form_metadata,
             Arc::new(DummyReporter),
         )

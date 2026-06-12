@@ -584,7 +584,7 @@ async fn gather_credentials(
         }
     }
 
-    let credentials = Credentials::basic(username, password);
+    let credentials = Credentials::basic(username, password)?;
 
     Ok((publish_url, credentials))
 }
