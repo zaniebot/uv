@@ -23,7 +23,7 @@ use tokio_util::io::ReaderStream;
 use tracing::{Level, debug, enabled, trace, warn};
 use url::Url;
 
-use uv_auth::{Credentials, PyxTokenStore, Realm};
+use uv_auth::{Credentials, InvalidCredentialsError, PyxTokenStore, Realm};
 use uv_cache::{Cache, Refresh};
 use uv_client::{
     BaseClient, ClientBuildError, DEFAULT_MAX_REDIRECTS, MetadataFormat, OwnedArchive,
@@ -47,6 +47,8 @@ use crate::trusted_publishing::{
 
 #[derive(Error, Debug)]
 pub enum PublishError {
+    #[error(transparent)]
+    InvalidCredentials(#[from] InvalidCredentialsError),
     #[error("The publish path is not a valid glob pattern: `{0}`")]
     Pattern(String, #[source] PatternError),
     /// [`GlobError`] is a wrapped io error.
@@ -105,6 +107,8 @@ pub enum PublishError {
 /// Failure to get the metadata for a specific file.
 #[derive(Error, Debug)]
 pub enum PublishPrepareError {
+    #[error(transparent)]
+    InvalidCredentials(#[from] InvalidCredentialsError),
     #[error(transparent)]
     Io(#[from] io::Error),
     #[error("Failed to read metadata")]
@@ -674,7 +678,7 @@ pub async fn validate(
             client,
             credentials,
             form_metadata,
-        );
+        )?;
 
         let response = request.send().await.map_err(|err| {
             PublishError::Validate(
@@ -764,7 +768,7 @@ pub async fn upload_two_phase(
         client,
         credentials,
         form_metadata,
-    );
+    )?;
 
     let response = reserve_request.send().await.map_err(|err| {
         PublishError::Reserve(
@@ -923,7 +927,7 @@ pub async fn upload_two_phase(
         client,
         credentials,
         form_metadata,
-    );
+    )?;
 
     let response = finalize_request.send().await.map_err(|err| {
         PublishError::Finalize(
@@ -1383,17 +1387,12 @@ async fn build_upload_request<'a>(
             "application/json;q=0.9, text/plain;q=0.8, text/html;q=0.7",
         );
 
-    match credentials {
-        Credentials::Basic { password, .. } => {
-            if password.is_some() {
-                debug!("Using HTTP Basic authentication");
-                request = request.header(AUTHORIZATION, credentials.to_header_value());
-            }
-        }
-        Credentials::Bearer { .. } => {
-            debug!("Using Bearer token authentication");
-            request = request.header(AUTHORIZATION, credentials.to_header_value());
-        }
+    if credentials.password().is_some() {
+        debug!("Using HTTP Basic authentication");
+        request = request.header(AUTHORIZATION, credentials.to_header_value()?);
+    } else if credentials.is_bearer() {
+        debug!("Using Bearer token authentication");
+        request = request.header(AUTHORIZATION, credentials.to_header_value()?);
     }
 
     Ok((request, idx))
@@ -1406,7 +1405,7 @@ fn build_metadata_request<'a>(
     client: &'a BaseClient,
     credentials: &Credentials,
     form_metadata: &FormMetadata,
-) -> RequestBuilder<'a> {
+) -> Result<RequestBuilder<'a>, InvalidCredentialsError> {
     let mut form = reqwest::multipart::Form::new();
     for (key, value) in form_metadata.iter() {
         form = form.text(*key, value.clone());
@@ -1438,20 +1437,15 @@ fn build_metadata_request<'a>(
             "application/json;q=0.9, text/plain;q=0.8, text/html;q=0.7",
         );
 
-    match credentials {
-        Credentials::Basic { password, .. } => {
-            if password.is_some() {
-                debug!("Using HTTP Basic authentication");
-                request = request.header(AUTHORIZATION, credentials.to_header_value());
-            }
-        }
-        Credentials::Bearer { .. } => {
-            debug!("Using Bearer token authentication");
-            request = request.header(AUTHORIZATION, credentials.to_header_value());
-        }
+    if credentials.password().is_some() {
+        debug!("Using HTTP Basic authentication");
+        request = request.header(AUTHORIZATION, credentials.to_header_value()?);
+    } else if credentials.is_bearer() {
+        debug!("Using Bearer token authentication");
+        request = request.header(AUTHORIZATION, credentials.to_header_value()?);
     }
 
-    request
+    Ok(request)
 }
 
 /// Log response information and map response to an error variant if not successful.
@@ -1594,7 +1588,7 @@ mod tests {
             &registry,
             &client,
             client.retry_policy(),
-            &Credentials::basic(Some("ferris".to_string()), Some("F3RR!S".to_string())),
+            &Credentials::basic(Some("ferris".to_string()), Some("F3RR!S".to_string())).unwrap(),
             None,
             &download_concurrency,
             Arc::new(DummyReporter),
@@ -2003,7 +1997,7 @@ mod tests {
             &group,
             &DisplaySafeUrl::parse("https://example.org/upload").unwrap(),
             &client,
-            &Credentials::basic(Some("ferris".to_string()), Some("F3RR!S".to_string())),
+            &Credentials::basic(Some("ferris".to_string()), Some("F3RR!S".to_string())).unwrap(),
             &form_metadata,
             Arc::new(DummyReporter),
         )
@@ -2166,7 +2160,7 @@ mod tests {
             &group,
             &DisplaySafeUrl::parse("https://example.org/upload").unwrap(),
             &client,
-            &Credentials::basic(Some("ferris".to_string()), Some("F3RR!S".to_string())),
+            &Credentials::basic(Some("ferris".to_string()), Some("F3RR!S".to_string())).unwrap(),
             &form_metadata,
             Arc::new(DummyReporter),
         )

@@ -1,6 +1,6 @@
 pub use access_token::AccessToken;
 pub use cache::CredentialsCache;
-pub use credentials::{Credentials, CredentialsFromUrlError, Username};
+pub use credentials::{Credentials, CredentialsFromUrlError, InvalidCredentialsError, Username};
 pub use index::{AuthPolicy, Index, Indexes};
 pub use keyring::KeyringProvider;
 pub use middleware::AuthMiddleware;
