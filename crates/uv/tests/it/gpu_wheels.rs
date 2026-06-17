@@ -3,7 +3,7 @@ use assert_fs::{fixture::PathChild, prelude::FileWriteStr};
 
 use uv_test::uv_snapshot;
 
-const EXCLUDE_NEWER: &str = "2026-02-01T00:00:00Z";
+const EXCLUDE_NEWER: &str = "2026-06-18T00:00:00Z";
 
 /// Resolve PyTorch3D and its matching PyTorch build from Astral's public GPU index.
 #[test]
@@ -27,13 +27,14 @@ fn pytorch3d_cuda_128_public_index() -> Result<()> {
         .arg("--no-deps")
         .arg("--no-header")
         .arg("--no-annotate"), @"
-    success: false
-    exit_code: 2
+    success: true
+    exit_code: 0
     ----- stdout -----
+    pytorch3d==0.7.9+cu.12.8.torch.2.10.cu12.8torch2.10.0cxx11abitrue
+    torch==2.10.0+cu128
 
     ----- stderr -----
-    error: Failed to fetch: `https://wheels.astralhosted.com/simple/cu128/pytorch3d/`
-      Caused by: Run `uv auth login pyx.dev` to authenticate uv with pyx
+    Resolved 2 packages in [TIME]
     ");
 
     Ok(())

@@ -431,10 +431,14 @@ impl Middleware for AuthMiddleware {
             .pyx_token_store
             .as_ref()
             .is_some_and(|token_store| token_store.is_known_url(request.url()));
+        let requires_eager_authentication = self
+            .pyx_token_store
+            .as_ref()
+            .is_some_and(|token_store| token_store.requires_eager_authentication(request.url()));
 
         let must_authenticate = self.only_authenticated
             || (match auth_policy {
-                    AuthPolicy::Auto => is_known_url,
+                    AuthPolicy::Auto => requires_eager_authentication,
                     AuthPolicy::Always => true,
                     AuthPolicy::Never => false,
                 }

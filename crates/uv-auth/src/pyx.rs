@@ -25,6 +25,9 @@ const PYX_DEFAULT_API_URL: &str = "https://api.pyx.dev";
 /// The default pyx CDN domain.
 const PYX_DEFAULT_CDN_DOMAIN: &str = "astralhosted.com";
 
+/// The public pyx CDN host.
+const PYX_PUBLIC_CDN_HOST: &str = "wheels.astralhosted.com";
+
 /// Retrieve the pyx API key from the environment variable, or return `None`.
 fn read_pyx_api_key() -> Option<String> {
     std::env::var(EnvVars::PYX_API_KEY)
@@ -539,6 +542,14 @@ impl PyxTokenStore {
         is_known_url(url, &self.api, &self.cdn)
     }
 
+    /// Returns `true` if the given URL should be authenticated before making a request.
+    ///
+    /// Public CDN URLs remain known to the token store so authentication can be retried if an
+    /// anonymous request fails, but they do not require eager authentication.
+    pub fn requires_eager_authentication(&self, url: &Url) -> bool {
+        requires_eager_authentication(url, &self.api, &self.cdn)
+    }
+
     /// Returns `true` if the URL is on a "known" domain (i.e., the same domain as the API or CDN).
     ///
     /// Like [`is_known_url`](Self::is_known_url), but also returns `true` if the API is on the
@@ -643,6 +654,10 @@ fn is_known_url(url: &Url, api: &DisplaySafeUrl, cdn: &str) -> bool {
     false
 }
 
+fn requires_eager_authentication(url: &Url, api: &DisplaySafeUrl, cdn: &str) -> bool {
+    is_known_url(url, api, cdn) && url.domain() != Some(PYX_PUBLIC_CDN_HOST)
+}
+
 fn is_known_domain(url: &Url, api: &DisplaySafeUrl, cdn: &str) -> bool {
     // Determine whether the URL matches the API domain.
     if let Some(domain) = url.domain() {
@@ -726,6 +741,33 @@ mod tests {
         // Similar but not matching domain.
         assert!(!is_known_url(
             &Url::parse("https://badastralhosted.com/packages/").unwrap(),
+            &api_url,
+            cdn_domain
+        ));
+    }
+
+    #[test]
+    fn test_requires_eager_authentication() {
+        let api_url = DisplaySafeUrl::parse("https://api.pyx.dev").unwrap();
+        let cdn_domain = "astralhosted.com";
+
+        assert!(requires_eager_authentication(
+            &Url::parse("https://api.pyx.dev/simple/").unwrap(),
+            &api_url,
+            cdn_domain
+        ));
+        assert!(requires_eager_authentication(
+            &Url::parse("https://files.astralhosted.com/packages/").unwrap(),
+            &api_url,
+            cdn_domain
+        ));
+        assert!(!requires_eager_authentication(
+            &Url::parse("https://wheels.astralhosted.com/simple/cu128/").unwrap(),
+            &api_url,
+            cdn_domain
+        ));
+        assert!(!requires_eager_authentication(
+            &Url::parse("https://wheels.astralhosted.com/artifacts/sha256/package.whl").unwrap(),
             &api_url,
             cdn_domain
         ));
