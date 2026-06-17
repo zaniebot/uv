@@ -13,6 +13,8 @@ mod branching_urls;
 ))]
 mod ecosystem;
 
+mod gpu_wheels;
+
 mod help;
 
 mod network;
