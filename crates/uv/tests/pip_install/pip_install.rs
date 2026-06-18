@@ -99,6 +99,88 @@ fn empty_requirements_txt() -> Result<()> {
     Ok(())
 }
 
+/// Compile all RECORD-owned sources, including already-installed distributions.
+#[test]
+fn compile_bytecode_from_installed_records() {
+    let context = uv_test::test_context!("3.12");
+
+    uv_snapshot!(context.pip_install()
+        .arg("sniffio==1.3.1"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Resolved 1 package in [TIME]
+    Prepared 1 package in [TIME]
+    Installed 1 package in [TIME]
+     + sniffio==1.3.1
+    "
+    );
+
+    uv_snapshot!(context.pip_install()
+        .arg("anyio==3.7.1")
+        .arg("--compile-bytecode")
+        .env(EnvVars::UV_CONCURRENT_INSTALLS, "1"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Resolved 3 packages in [TIME]
+    Prepared 2 packages in [TIME]
+    Installed 2 packages in [TIME]
+    Bytecode compiled 50 files in [TIME]
+     + anyio==3.7.1
+     + idna==3.6
+    "
+    );
+
+    for package in ["anyio", "idna", "sniffio"] {
+        assert!(
+            context
+                .site_packages()
+                .join(package)
+                .join("__pycache__")
+                .join("__init__.cpython-312.pyc")
+                .exists()
+        );
+    }
+}
+
+#[test]
+#[cfg(unix)]
+fn compile_bytecode_from_symlinked_records() {
+    let context = uv_test::test_context!("3.12");
+
+    uv_snapshot!(context.pip_install()
+        .arg("sniffio==1.3.1")
+        .arg("--compile-bytecode")
+        .arg("--link-mode")
+        .arg("symlink"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Resolved 1 package in [TIME]
+    Prepared 1 package in [TIME]
+    Installed 1 package in [TIME]
+    Bytecode compiled 5 files in [TIME]
+     + sniffio==1.3.1
+    "
+    );
+
+    assert!(
+        context
+            .site_packages()
+            .join("sniffio")
+            .join("__pycache__")
+            .join("__init__.cpython-312.pyc")
+            .exists()
+    );
+}
+
 #[test]
 fn missing_pyproject_toml() {
     let context = uv_test::test_context!("3.12");

@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::collections::BTreeSet;
 use std::io::stdout;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -66,8 +67,9 @@ pub(crate) use tool::upgrade::upgrade as tool_upgrade;
 use uv_cache::Cache;
 use uv_configuration::Concurrency;
 pub(crate) use uv_console::human_readable_bytes;
-use uv_fs::{CWD, Simplified};
-use uv_installer::compile_tree;
+use uv_fs::{CWD, Simplified, normalize_path_under};
+use uv_install_wheel::read_record;
+use uv_installer::{SitePackages, compile_files};
 use uv_python::PythonEnvironment;
 use uv_scripts::Pep723Script;
 pub(crate) use venv::venv;
@@ -257,30 +259,159 @@ pub(super) async fn compile_bytecode(
     printer: Printer,
 ) -> anyhow::Result<()> {
     let start = std::time::Instant::now();
-    let mut files = 0;
-    for site_packages in venv.site_packages() {
-        let site_packages = CWD.join(site_packages);
-        if !site_packages.exists() {
+    let files = python_source_files_from_records(venv)?;
+    let files = compile_files(&files, venv.python_executable(), concurrency, cache.root())
+        .await
+        .context("Failed to bytecode-compile installed packages")?;
+
+    write_bytecode_summary(files, start, printer)?;
+    Ok(())
+}
+
+/// Return all Python source files owned by installed wheel distributions.
+fn python_source_files_from_records(venv: &PythonEnvironment) -> anyhow::Result<Vec<PathBuf>> {
+    let layout = venv.interpreter().layout();
+    let site_packages_roots = [
+        CWD.join(&layout.scheme.purelib),
+        CWD.join(&layout.scheme.platlib),
+    ];
+    let site_packages = SitePackages::from_environment(venv)?;
+    let mut files = BTreeSet::new();
+
+    // Include unowned top-level sources such as virtualenv's `_virtualenv.py` without recursively
+    // walking the environment.
+    for site_packages_root in &site_packages_roots {
+        let entries = match fs_err::read_dir(site_packages_root) {
+            Ok(entries) => entries,
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => continue,
+            Err(err) => {
+                return Err(err).with_context(|| {
+                    format!(
+                        "Failed to read site-packages directory: `{}`",
+                        site_packages_root.user_display()
+                    )
+                });
+            }
+        };
+        for entry in entries {
+            let path = entry?.path();
+            if path.extension().is_some_and(|extension| extension == "py") && path.is_file() {
+                files.insert(path);
+            }
+        }
+    }
+
+    for distribution in site_packages.iter() {
+        let dist_info = distribution.install_path();
+        if dist_info
+            .extension()
+            .is_none_or(|extension| extension != "dist-info")
+        {
             debug!(
-                "Skipping non-existent site-packages directory: {}",
-                site_packages.display()
+                "Skipping installed distribution without RECORD metadata: {}",
+                distribution
             );
             continue;
         }
-        files += compile_tree(
-            &site_packages,
-            venv.python_executable(),
-            concurrency,
-            cache.root(),
-        )
-        .await
-        .with_context(|| {
+
+        let record_root = dist_info.parent().with_context(|| {
             format!(
-                "Failed to bytecode-compile Python file in: {}",
-                site_packages.user_display()
+                "Invalid installed distribution path: `{}`",
+                dist_info.user_display()
             )
         })?;
+        let record_path = dist_info.join("RECORD");
+        let record_file = match fs_err::File::open(&record_path) {
+            Ok(record_file) => record_file,
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
+                debug!(
+                    "Skipping installed distribution without RECORD: {}",
+                    distribution
+                );
+                continue;
+            }
+            Err(err) => {
+                return Err(err)
+                    .with_context(|| format!("Failed to read `{}`", record_path.user_display()));
+            }
+        };
+        let record = read_record(record_file)
+            .with_context(|| format!("Failed to read `{}`", record_path.user_display()))?;
+
+        for entry in record {
+            let Some(path) =
+                python_source_path_from_record(record_root, &entry.path, &site_packages_roots)
+            else {
+                continue;
+            };
+            if path.is_file() {
+                files.insert(path);
+            }
+        }
     }
+
+    Ok(files.into_iter().collect())
+}
+
+/// Resolve a Python source path from an installed `RECORD` entry.
+fn python_source_path_from_record(
+    record_root: &Path,
+    entry: &str,
+    site_packages: &[PathBuf],
+) -> Option<PathBuf> {
+    let path = Path::new(entry);
+    if path.extension().is_none_or(|extension| extension != "py") {
+        return None;
+    }
+
+    let path = record_root.join(path);
+    site_packages
+        .iter()
+        .find_map(|site_packages| normalize_path_under(&path, site_packages))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::python_source_path_from_record;
+    use std::path::{Path, PathBuf};
+
+    #[test]
+    fn record_python_sources_stay_in_site_packages() {
+        let record_root = Path::new("venv/purelib");
+        let site_packages = [PathBuf::from("venv/purelib"), PathBuf::from("venv/platlib")];
+
+        assert_eq!(
+            python_source_path_from_record(record_root, "package/__init__.py", &site_packages),
+            Some(PathBuf::from("venv/purelib/package/__init__.py"))
+        );
+        assert_eq!(
+            python_source_path_from_record(
+                record_root,
+                "../platlib/package/module.py",
+                &site_packages,
+            ),
+            Some(PathBuf::from("venv/platlib/package/module.py"))
+        );
+        assert_eq!(
+            python_source_path_from_record(record_root, "../scripts/tool.py", &site_packages),
+            None
+        );
+        assert_eq!(
+            python_source_path_from_record(record_root, "/outside.py", &site_packages),
+            None
+        );
+        assert_eq!(
+            python_source_path_from_record(record_root, "package/data.txt", &site_packages),
+            None
+        );
+    }
+}
+
+fn write_bytecode_summary(
+    files: usize,
+    start: std::time::Instant,
+    printer: Printer,
+) -> std::fmt::Result {
     let s = if files == 1 { "" } else { "s" };
     writeln!(
         printer.stderr(),
@@ -291,8 +422,7 @@ pub(super) async fn compile_bytecode(
             format!("in {}", elapsed(start.elapsed())).dimmed()
         )
         .dimmed()
-    )?;
-    Ok(())
+    )
 }
 
 /// A multicasting writer that writes to both the standard output and an output file, if present.
