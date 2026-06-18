@@ -947,9 +947,10 @@ fn request_into_redirect(
     let mut headers = HeaderMap::new();
     std::mem::swap(req.headers_mut(), &mut headers);
 
-    let cross_host = redirect_url.host_str() != original_req_url.host_str()
+    let cross_origin = redirect_url.scheme() != original_req_url.scheme()
+        || redirect_url.host_str() != original_req_url.host_str()
         || redirect_url.port_or_known_default() != original_req_url.port_or_known_default();
-    if cross_host {
+    if cross_origin {
         if cross_origin_credentials_policy == CrossOriginCredentialsPolicy::Secure {
             debug!("Received a cross-origin redirect. Removing sensitive headers.");
             headers.remove(AUTHORIZATION);
@@ -1261,6 +1262,51 @@ mod tests {
                 request_into_redirect(request, &response, CrossOriginCredentialsPolicy::Secure)?
                     .unwrap();
             assert!(!redirect_request.headers().contains_key(AUTHORIZATION));
+        }
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_redirect_removes_sensitive_headers_on_scheme_change() -> Result<()> {
+        for status in &[301, 302, 303, 307, 308] {
+            let server = MockServer::start().await;
+            let redirect_url = server.uri().replacen("http://", "https://", 1);
+            Mock::given(method("GET"))
+                .respond_with(
+                    ResponseTemplate::new(*status)
+                        .insert_header("location", format!("{redirect_url}/redirect")),
+                )
+                .mount(&server)
+                .await;
+
+            let request = Client::new()
+                .get(server.uri())
+                .basic_auth("username", Some("password"))
+                .header(COOKIE, "session=secret")
+                .header(PROXY_AUTHORIZATION, "Basic secret")
+                .header(WWW_AUTHENTICATE, "Basic realm=\"secret\"")
+                .build()
+                .unwrap();
+
+            for header in [AUTHORIZATION, COOKIE, PROXY_AUTHORIZATION, WWW_AUTHENTICATE] {
+                assert!(request.headers().contains_key(header));
+            }
+
+            let response = Client::builder()
+                .redirect(reqwest::redirect::Policy::none())
+                .build()
+                .unwrap()
+                .execute(request.try_clone().unwrap())
+                .await
+                .unwrap();
+
+            let redirect_request =
+                request_into_redirect(request, &response, CrossOriginCredentialsPolicy::Secure)?
+                    .unwrap();
+            for header in [AUTHORIZATION, COOKIE, PROXY_AUTHORIZATION, WWW_AUTHENTICATE] {
+                assert!(!redirect_request.headers().contains_key(header));
+            }
         }
 
         Ok(())
