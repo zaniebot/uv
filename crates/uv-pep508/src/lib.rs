@@ -1255,6 +1255,29 @@ mod tests {
     }
 
     #[test]
+    fn mixed_case_url_schemes() -> Result<(), String> {
+        let urls = [
+            "https://example.com/example.whl",
+            "HTTPS://example.com/example.whl",
+            "file:///example.whl",
+            "FiLe:///example.whl",
+            "git+https://example.com/example.git",
+            "GIT+HTTPS://example.com/example.git",
+        ];
+
+        for url in urls {
+            let requirement = Requirement::<VerbatimUrl>::from_str(&format!("example @ {url}"))
+                .map_err(|err| err.to_string())?;
+            let Some(VersionOrUrl::Url(parsed_url)) = requirement.version_or_url else {
+                return Err("expected a direct URL requirement".to_string());
+            };
+            assert_eq!(parsed_url.given(), Some(url));
+        }
+
+        Ok(())
+    }
+
+    #[test]
     #[cfg(all(unix, feature = "non-pep508-extensions"))]
     fn direct_url_extras() {
         let numpy = crate::UnnamedRequirement::<VerbatimUrl>::from_str(
