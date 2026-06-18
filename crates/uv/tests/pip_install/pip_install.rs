@@ -130,7 +130,7 @@ fn compile_bytecode_from_installed_records() {
     Resolved 3 packages in [TIME]
     Prepared 2 packages in [TIME]
     Installed 2 packages in [TIME]
-    Bytecode compiled 50 files in [TIME]
+    Bytecode compiled 51 files in [TIME]
      + anyio==3.7.1
      + idna==3.6
     "

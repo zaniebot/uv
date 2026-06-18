@@ -1,13 +1,15 @@
 use std::borrow::Cow;
-use std::collections::BTreeSet;
+use std::cell::RefCell;
 use std::io::stdout;
 use std::path::{Path, PathBuf};
+use std::rc::Rc;
 use std::time::Duration;
 use std::{fmt::Write, process::ExitCode};
 
 use anstream::AutoStream;
 use anyhow::{Context, bail};
 use owo_colors::OwoColorize;
+use rustc_hash::FxHashSet;
 use tracing::debug;
 use uv_warnings::warn_user;
 
@@ -68,8 +70,8 @@ use uv_cache::Cache;
 use uv_configuration::Concurrency;
 pub(crate) use uv_console::human_readable_bytes;
 use uv_fs::{CWD, Simplified, normalize_path_under};
-use uv_install_wheel::read_record;
-use uv_installer::{SitePackages, compile_files};
+use uv_install_wheel::read_record_iter;
+use uv_installer::compile_files;
 use uv_python::PythonEnvironment;
 use uv_scripts::Pep723Script;
 pub(crate) use venv::venv;
@@ -260,7 +262,7 @@ pub(super) async fn compile_bytecode(
 ) -> anyhow::Result<()> {
     let start = std::time::Instant::now();
     let files = python_source_files_from_records(venv)?;
-    let files = compile_files(&files, venv.python_executable(), concurrency, cache.root())
+    let files = compile_files(files, venv.python_executable(), concurrency, cache.root())
         .await
         .context("Failed to bytecode-compile installed packages")?;
 
@@ -268,18 +270,24 @@ pub(super) async fn compile_bytecode(
     Ok(())
 }
 
+type PythonSourceFileIterator = Box<dyn Iterator<Item = anyhow::Result<PathBuf>>>;
+
 /// Return all Python source files owned by installed wheel distributions.
-fn python_source_files_from_records(venv: &PythonEnvironment) -> anyhow::Result<Vec<PathBuf>> {
+fn python_source_files_from_records(
+    venv: &PythonEnvironment,
+) -> anyhow::Result<impl Iterator<Item = anyhow::Result<PathBuf>>> {
     let layout = venv.interpreter().layout();
-    let site_packages_roots = [
+    let mut site_packages_roots = Vec::with_capacity(2);
+    for site_packages_root in [
         CWD.join(&layout.scheme.purelib),
         CWD.join(&layout.scheme.platlib),
-    ];
-    let site_packages = SitePackages::from_environment(venv)?;
-    let mut files = BTreeSet::new();
-
-    // Include unowned top-level sources such as virtualenv's `_virtualenv.py` without recursively
-    // walking the environment.
+    ] {
+        if !site_packages_roots.contains(&site_packages_root) {
+            site_packages_roots.push(site_packages_root);
+        }
+    }
+    let mut records = Vec::new();
+    let mut top_level_sources = Vec::new();
     for site_packages_root in &site_packages_roots {
         let entries = match fs_err::read_dir(site_packages_root) {
             Ok(entries) => entries,
@@ -296,61 +304,81 @@ fn python_source_files_from_records(venv: &PythonEnvironment) -> anyhow::Result<
         for entry in entries {
             let path = entry?.path();
             if path.extension().is_some_and(|extension| extension == "py") && path.is_file() {
-                files.insert(path);
+                top_level_sources.push(path);
+            } else if path
+                .extension()
+                .is_some_and(|extension| extension == "dist-info")
+            {
+                records.push((site_packages_root.clone(), path));
             }
         }
     }
 
-    for distribution in site_packages.iter() {
-        let dist_info = distribution.install_path();
-        if dist_info
-            .extension()
-            .is_none_or(|extension| extension != "dist-info")
-        {
-            debug!(
-                "Skipping installed distribution without RECORD metadata: {}",
-                distribution
-            );
-            continue;
-        }
-
-        let record_root = dist_info.parent().with_context(|| {
-            format!(
-                "Invalid installed distribution path: `{}`",
-                dist_info.user_display()
+    let owned_top_level_sources = Rc::new(RefCell::new(FxHashSet::default()));
+    let record_sources = records.into_iter().flat_map({
+        let site_packages_roots = site_packages_roots.clone();
+        let owned_top_level_sources = Rc::clone(&owned_top_level_sources);
+        move |(record_root, dist_info)| {
+            python_source_files_from_record(
+                record_root,
+                &dist_info,
+                site_packages_roots.clone(),
+                Rc::clone(&owned_top_level_sources),
             )
-        })?;
-        let record_path = dist_info.join("RECORD");
-        let record_file = match fs_err::File::open(&record_path) {
-            Ok(record_file) => record_file,
-            Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
-                debug!(
-                    "Skipping installed distribution without RECORD: {}",
-                    distribution
-                );
-                continue;
-            }
-            Err(err) => {
-                return Err(err)
-                    .with_context(|| format!("Failed to read `{}`", record_path.user_display()));
-            }
-        };
-        let record = read_record(record_file)
-            .with_context(|| format!("Failed to read `{}`", record_path.user_display()))?;
-
-        for entry in record {
-            let Some(path) =
-                python_source_path_from_record(record_root, &entry.path, &site_packages_roots)
-            else {
-                continue;
-            };
-            if path.is_file() {
-                files.insert(path);
-            }
         }
-    }
+    });
+    let unowned_top_level_sources = top_level_sources.into_iter().filter_map(move |path| {
+        (!owned_top_level_sources.borrow().contains(&path)).then_some(Ok(path))
+    });
 
-    Ok(files.into_iter().collect())
+    Ok(record_sources.chain(unowned_top_level_sources))
+}
+
+fn python_source_files_from_record(
+    record_root: PathBuf,
+    dist_info: &Path,
+    site_packages_roots: Vec<PathBuf>,
+    owned_top_level_sources: Rc<RefCell<FxHashSet<PathBuf>>>,
+) -> PythonSourceFileIterator {
+    let record_path = dist_info.join("RECORD");
+    let record_file = match fs_err::File::open(&record_path) {
+        Ok(record_file) => record_file,
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
+            debug!(
+                "Skipping installed distribution without RECORD: {}",
+                dist_info.user_display()
+            );
+            return Box::new(std::iter::empty());
+        }
+        Err(err) => {
+            return Box::new(std::iter::once(Err(err).with_context(|| {
+                format!("Failed to read `{}`", record_path.user_display())
+            })));
+        }
+    };
+
+    Box::new(read_record_iter(record_file).filter_map(move |entry| {
+        let entry =
+            match entry {
+                Ok(entry) => entry,
+                Err(err) => {
+                    return Some(Err(err).with_context(|| {
+                        format!("Failed to read `{}`", record_path.user_display())
+                    }));
+                }
+            };
+        let path = python_source_path_from_record(&record_root, &entry.path, &site_packages_roots)?;
+        if !path.is_file() {
+            return None;
+        }
+        if site_packages_roots
+            .iter()
+            .any(|site_packages_root| path.parent() == Some(site_packages_root.as_path()))
+        {
+            owned_top_level_sources.borrow_mut().insert(path.clone());
+        }
+        Some(Ok(path))
+    }))
 }
 
 /// Resolve a Python source path from an installed `RECORD` entry.
