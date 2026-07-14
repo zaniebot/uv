@@ -47,7 +47,7 @@ pub(crate) async fn init(
     name: Option<PackageName>,
     package: InitPackaging,
     init_kind: InitKind,
-    bare: bool,
+    bare: InitMode,
     description: Option<String>,
     no_description: bool,
     vcs: Option<VersionControlSystem>,
@@ -167,7 +167,7 @@ pub(crate) async fn init(
             .await?;
 
             // Create the `README.md` if it does not already exist.
-            if !no_readme && !bare {
+            if !no_readme && matches!(bare, InitMode::Full) {
                 let readme = path.join("README.md");
                 if !readme.exists() {
                     fs_err::write(readme, String::new())?;
@@ -200,7 +200,7 @@ pub(crate) async fn init(
 #[expect(clippy::fn_params_excessive_bools)]
 async fn init_script(
     script_path: &Path,
-    bare: bool,
+    bare: InitMode,
     python: Option<String>,
     install_mirrors: PythonInstallMirrors,
     client_builder: &BaseClientBuilder<'_>,
@@ -273,7 +273,13 @@ async fn init_script(
         fs_err::tokio::create_dir_all(parent).await?;
     }
 
-    Pep723Script::create(script_path, requires_python.specifiers(), content, bare).await?;
+    Pep723Script::create(
+        script_path,
+        requires_python.specifiers(),
+        content,
+        matches!(bare, InitMode::Bare),
+    )
+    .await?;
 
     Ok(())
 }
@@ -286,7 +292,7 @@ async fn init_project(
     // TODO(konsti): Remove when stabilizing.
     package: InitPackaging,
     project_kind: InitProjectKind,
-    bare: bool,
+    bare: InitMode,
     description: Option<String>,
     no_description: bool,
     vcs: Option<VersionControlSystem>,
@@ -746,6 +752,22 @@ impl InitPackaging {
     }
 }
 
+/// Whether to initialize a bare or full project.
+#[derive(Debug, Copy, Clone)]
+pub(crate) enum InitMode {
+    /// Initialize only the required project files.
+    Bare,
+    /// Initialize the full project scaffold.
+    Full,
+}
+
+impl InitMode {
+    /// Determine the [`InitMode`] setting based on the command-line arguments.
+    pub(crate) fn from_args(bare: bool) -> Self {
+        if bare { Self::Bare } else { Self::Full }
+    }
+}
+
 /// The kind of Python project to initialize (either an application or a library).
 #[derive(Debug, Copy, Clone, Default)]
 pub(crate) enum InitProjectKind {
@@ -780,7 +802,7 @@ impl InitProjectKind {
         requires_python: &RequiresPython,
         description: Option<&str>,
         no_description: bool,
-        bare: bool,
+        bare: InitMode,
         vcs: Option<VersionControlSystem>,
         build_backend: Option<ProjectBuildBackend>,
         author_from: Option<AuthorFrom>,
@@ -826,7 +848,7 @@ impl InitProjectKind {
         requires_python: &RequiresPython,
         description: Option<&str>,
         no_description: bool,
-        bare: bool,
+        bare: InitMode,
         vcs: Option<VersionControlSystem>,
         build_backend: Option<ProjectBuildBackend>,
         author_from: Option<AuthorFrom>,
@@ -856,13 +878,13 @@ impl InitProjectKind {
             author.as_ref(),
             description,
             no_description,
-            no_readme || bare,
+            no_readme || matches!(bare, InitMode::Bare),
         );
 
         // Include additional project configuration for packaged applications
         if matches!(package, InitPackaging::Packaged) {
             // Since it'll be packaged, we can add a `[project.scripts]` entry
-            if !bare {
+            if matches!(bare, InitMode::Full) {
                 pyproject.push('\n');
                 pyproject.push_str(&pyproject_project_scripts(name, name.as_str(), "main"));
             }
@@ -873,7 +895,7 @@ impl InitProjectKind {
             pyproject.push_str(&pyproject_build_system(name, build_backend));
             pyproject_build_backend_prerequisites(name, path, build_backend)?;
 
-            if !bare {
+            if matches!(bare, InitMode::Full) {
                 // Generate `src` files
                 generate_package_scripts(name, path, build_backend, false)?;
             }
@@ -882,7 +904,7 @@ impl InitProjectKind {
             // (This isn't intended to be a particularly special or magical filename, just nice)
             // TODO(zanieb): Only create `main.py` if there are no other Python files?
             let main_py = path.join("main.py");
-            if !main_py.try_exists()? && !bare {
+            if !main_py.try_exists()? && matches!(bare, InitMode::Full) {
                 fs_err::write(
                     path.join("main.py"),
                     indoc::formatdoc! {r#"
@@ -909,7 +931,7 @@ impl InitProjectKind {
         requires_python: &RequiresPython,
         description: Option<&str>,
         no_description: bool,
-        bare: bool,
+        bare: InitMode,
         vcs: Option<VersionControlSystem>,
         build_backend: Option<ProjectBuildBackend>,
         author_from: Option<AuthorFrom>,
@@ -935,7 +957,7 @@ impl InitProjectKind {
             author.as_ref(),
             description,
             no_description,
-            no_readme || bare,
+            no_readme || matches!(bare, InitMode::Bare),
         );
 
         // Always include a build system if the project is packaged.
@@ -947,7 +969,7 @@ impl InitProjectKind {
         fs_err::write(path.join("pyproject.toml"), pyproject)?;
 
         // Generate `src` files
-        if !bare {
+        if matches!(bare, InitMode::Full) {
             generate_package_scripts(name, path, build_backend, true)?;
         }
 
@@ -962,7 +984,7 @@ impl InitProjectKind {
         requires_python: &RequiresPython,
         description: Option<&str>,
         no_description: bool,
-        bare: bool,
+        bare: InitMode,
         vcs: Option<VersionControlSystem>,
         build_backend: Option<ProjectBuildBackend>,
         author_from: Option<AuthorFrom>,
@@ -1009,7 +1031,7 @@ impl InitProjectKind {
             author.as_ref(),
             description,
             no_description,
-            no_readme || bare,
+            no_readme || matches!(bare, InitMode::Bare),
         );
 
         match self {
@@ -1050,7 +1072,7 @@ impl InitProjectKind {
                 // (This isn't intended to be a particularly special or magical filename, just nice)
                 // TODO(zanieb): Only create `main.py` if there are no other Python files?
                 let main_py = path.join("main.py");
-                if !main_py.try_exists()? && !bare {
+                if !main_py.try_exists()? && matches!(bare, InitMode::Full) {
                     fs_err::write(path.join("main.py"), main_contents)?;
                 }
             }
