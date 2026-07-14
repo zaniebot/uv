@@ -661,18 +661,13 @@ fn python_find_venv() {
     ");
 
     // Unless, `--no-system` is included
-    // TODO(zanieb): Report this as a bug upstream — this should be allowed.
     uv_snapshot!(context.filters(), context.python_find().arg("--no-system").env(EnvVars::UV_SYSTEM_PYTHON, "1"), @"
-    success: false
-    exit_code: 2
+    success: true
+    exit_code: 0
     ----- stdout -----
+    [VENV]/[BIN]/[PYTHON]
 
     ----- stderr -----
-    error: the argument '--no-system' cannot be used with '--system'
-
-    Usage: uv python find --cache-dir [CACHE_DIR] [REQUEST]
-
-    For more information, try '--help'.
     ");
 
     // We should find virtual environments from a child directory
