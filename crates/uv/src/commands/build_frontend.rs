@@ -98,6 +98,15 @@ pub(crate) enum Error {
     InvalidBuiltWheelFilename(#[source] uv_distribution_filename::WheelFilenameError),
     #[error("The source distribution declares version {0}, but the wheel declares version {1}")]
     VersionMismatch(Version, Version),
+    #[error(
+        "Refusing to clear output directory `{}` because it contains the build source `{}`",
+        output_dir.simplified_display(),
+        source_dir.simplified_display()
+    )]
+    ClearSource {
+        output_dir: PathBuf,
+        source_dir: PathBuf,
+    },
 }
 
 impl Hint for Error {
@@ -394,6 +403,37 @@ async fn build_impl(
         vec![AnnotatedSource::from(src)]
     };
 
+    let output_dir = if let Some(output_dir) = output_dir {
+        std::path::absolute(output_dir)?
+    } else if let Ok(workspace) = workspace.as_ref() {
+        workspace.install_path().join("dist")
+    } else {
+        let source = packages
+            .first()
+            .ok_or_else(|| anyhow::anyhow!("No packages found to build"))?;
+        match &source.source {
+            Source::Directory(source_dir) => source_dir.join("dist"),
+            Source::File(_) => source.directory().to_path_buf(),
+        }
+    };
+
+    // Validate every source before clearing the shared output directory. Workspace packages are
+    // built concurrently, so clearing from an individual build can remove another package's
+    // source (or its freshly built artifacts).
+    if clear && output_dir.exists() {
+        if let Some(source) = packages
+            .iter()
+            .find(|source| is_path_within(source.directory(), &output_dir))
+        {
+            return Err(anyhow::Error::from(Error::ClearSource {
+                output_dir,
+                source_dir: source.directory().to_path_buf(),
+            })
+            .context(format!("Failed to build `{source}`")));
+        }
+        fs_err::remove_dir_all(&output_dir)?;
+    }
+
     // Build backends can include arbitrary files from the source directory in the distribution.
     // Warn if the active cache is within the source since cache contents may be included in the
     // build.
@@ -412,7 +452,7 @@ async fn build_impl(
     let results: Vec<_> = futures::future::join_all(packages.into_iter().map(|source| {
         let future = build_package(
             source.clone(),
-            output_dir,
+            &output_dir,
             python_request,
             install_mirrors.clone(),
             no_config,
@@ -428,7 +468,6 @@ async fn build_impl(
             build_logs,
             gitignore,
             force_pep517,
-            clear,
             build_constraints,
             build_constraints_from_workspace,
             build_isolation,
@@ -488,7 +527,7 @@ async fn build_impl(
 #[expect(clippy::fn_params_excessive_bools)]
 async fn build_package(
     source: AnnotatedSource<'_>,
-    output_dir: Option<&Path>,
+    output_dir: &Path,
     python_request: Option<&str>,
     install_mirrors: PythonInstallMirrors,
     no_config: bool,
@@ -504,7 +543,6 @@ async fn build_package(
     build_logs: bool,
     gitignore: bool,
     force_pep517: bool,
-    clear: bool,
     build_constraints: &[RequirementsSource],
     build_constraints_from_workspace: &[Requirement],
     build_isolation: &BuildIsolation,
@@ -525,24 +563,6 @@ async fn build_package(
     config_settings_package: &PackageConfigSettings,
     preview: Preview,
 ) -> Result<Vec<BuildMessage>, Error> {
-    let output_dir = if let Some(output_dir) = output_dir {
-        Cow::Owned(std::path::absolute(output_dir)?)
-    } else {
-        if let Ok(workspace) = workspace {
-            Cow::Owned(workspace.install_path().join("dist"))
-        } else {
-            match &source.source {
-                Source::Directory(src) => Cow::Owned(src.join("dist")),
-                Source::File(src) => Cow::Borrowed(src.parent().unwrap()),
-            }
-        }
-    };
-
-    // Clear the output directory if requested
-    if clear && output_dir.exists() {
-        fs_err::remove_dir_all(&*output_dir)?;
-    }
-
     // (1) Explicit request from user
     let mut interpreter_request = python_request.map(PythonRequest::parse);
 
@@ -673,7 +693,7 @@ async fn build_package(
         preview,
     );
 
-    prepare_output_directory(&output_dir, gitignore).await?;
+    prepare_output_directory(output_dir, gitignore).await?;
 
     // Determine the build plan.
     let plan = BuildPlan::determine(&source, sdist, wheel).map_err(Error::BuildPlan)?;
@@ -733,7 +753,7 @@ async fn build_package(
             if list {
                 let sdist_list = build_sdist(
                     source.path(),
-                    &output_dir,
+                    output_dir,
                     build_action,
                     &source,
                     printer,
@@ -750,7 +770,7 @@ async fn build_package(
             }
             let sdist_build = build_sdist(
                 source.path(),
-                &output_dir,
+                output_dir,
                 build_action.force_build(),
                 &source,
                 printer,
@@ -782,7 +802,7 @@ async fn build_package(
 
             let wheel_build = build_wheel(
                 &extracted,
-                &output_dir,
+                output_dir,
                 build_action,
                 &source,
                 printer,
@@ -801,7 +821,7 @@ async fn build_package(
         BuildPlan::Sdist => {
             let sdist_build = build_sdist(
                 source.path(),
-                &output_dir,
+                output_dir,
                 build_action,
                 &source,
                 printer,
@@ -819,7 +839,7 @@ async fn build_package(
         BuildPlan::Wheel => {
             let wheel_build = build_wheel(
                 source.path(),
-                &output_dir,
+                output_dir,
                 build_action,
                 &source,
                 printer,
@@ -838,7 +858,7 @@ async fn build_package(
         BuildPlan::SdistAndWheel => {
             let sdist_build = build_sdist(
                 source.path(),
-                &output_dir,
+                output_dir,
                 build_action,
                 &source,
                 printer,
@@ -854,7 +874,7 @@ async fn build_package(
 
             let wheel_build = build_wheel(
                 source.path(),
-                &output_dir,
+                output_dir,
                 build_action,
                 &source,
                 printer,
@@ -877,7 +897,7 @@ async fn build_package(
             let ext = SourceDistExtension::from_path(source.path()).map_err(|err| {
                 Error::InvalidSourceDistExt(source.path().user_display().to_string(), err)
             })?;
-            let temp_dir = tempfile::tempdir_in(&output_dir)?;
+            let temp_dir = tempfile::tempdir_in(output_dir)?;
             uv_extract::stream::archive(source.path().display(), reader, ext, temp_dir.path())
                 .await?;
 
@@ -898,7 +918,7 @@ async fn build_package(
 
             let wheel_build = build_wheel(
                 &extracted,
-                &output_dir,
+                output_dir,
                 build_action,
                 &source,
                 printer,
