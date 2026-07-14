@@ -4981,6 +4981,25 @@ fn run_remote_pep723_script() {
     ");
 }
 
+/// URL schemes are case-insensitive, so uppercase remote scripts must not be spawned locally.
+#[test]
+fn run_remote_script_uppercase_scheme_offline() {
+    let context = uv_test::test_context!("3.12");
+
+    for url in ["HTTPS://example.com/main.py", "Http://example.com/main.py"] {
+        context
+            .run()
+            .arg("--offline")
+            .arg(url)
+            .assert()
+            .failure()
+            .stderr(
+                predicate::str::contains("Network connectivity is disabled")
+                    .and(predicate::str::contains("Failed to spawn").not()),
+            );
+    }
+}
+
 #[test]
 fn run_remote_requirements_offline_redacts_credentials() -> Result<()> {
     let context = uv_test::test_context!("3.12");
