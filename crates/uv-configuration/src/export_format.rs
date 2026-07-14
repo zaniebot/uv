@@ -62,3 +62,23 @@ impl HashOutput {
         }
     }
 }
+
+/// Whether to include extras in `uv pip compile` output.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ExtrasOutput {
+    /// Include extras in the output.
+    Include,
+    /// Strip extras from the output.
+    Strip,
+}
+
+impl ExtrasOutput {
+    /// Determine the [`ExtrasOutput`] setting from the command-line arguments.
+    pub const fn from_args(include_extras: bool) -> Self {
+        if include_extras {
+            Self::Include
+        } else {
+            Self::Strip
+        }
+    }
+}

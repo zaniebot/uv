@@ -5,7 +5,7 @@ use petgraph::visit::EdgeRef;
 use petgraph::{Directed, Direction, Graph};
 use rustc_hash::{FxBuildHasher, FxHashMap};
 
-use uv_configuration::HashOutput;
+use uv_configuration::{ExtrasOutput, HashOutput};
 use uv_distribution_types::{DistributionMetadata, Name, SourceAnnotation, SourceAnnotations};
 use uv_normalize::PackageName;
 use uv_pep508::MarkerTree;
@@ -25,7 +25,7 @@ pub struct DisplayResolutionGraph<'a> {
     /// Whether to include hashes in the output.
     hash_output: HashOutput,
     /// Whether to include extras in the output (e.g., `black[colorama]`).
-    include_extras: bool,
+    extras_output: ExtrasOutput,
     /// Whether to include environment markers in the output (e.g., `black ; sys_platform == "win32"`).
     include_markers: bool,
     /// Whether to include annotations in the output, to indicate which dependency or dependencies
@@ -57,7 +57,7 @@ impl<'a> DisplayResolutionGraph<'a> {
         env: &'a ResolverEnvironment,
         no_emit_packages: &'a [PackageName],
         hash_output: HashOutput,
-        include_extras: bool,
+        extras_output: ExtrasOutput,
         include_markers: bool,
         include_annotations: bool,
         include_index_annotation: bool,
@@ -75,7 +75,7 @@ impl<'a> DisplayResolutionGraph<'a> {
             env,
             no_emit_packages,
             hash_output,
-            include_extras,
+            extras_output,
             include_markers,
             include_annotations,
             include_index_annotation,
@@ -185,7 +185,7 @@ impl std::fmt::Display for DisplayResolutionGraph<'_> {
         );
 
         // Reduce the graph, removing or combining extras for a given package.
-        let graph = if self.include_extras {
+        let graph = if matches!(self.extras_output, ExtrasOutput::Include) {
             combine_extras(&graph)
         } else {
             strip_extras(&graph)
