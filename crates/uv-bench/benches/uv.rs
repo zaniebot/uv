@@ -19,7 +19,7 @@ use uv_cache::Cache;
 use uv_client::{BaseClientBuilder, Connectivity, RegistryClientBuilder};
 use uv_distribution_filename::{SourceDistExtension, WheelFilename};
 use uv_distribution_types::Requirement;
-use uv_install_wheel::{InstallState, Layout, LinkMode};
+use uv_install_wheel::{InstallState, InstallerMetadata, Layout, LinkMode};
 use uv_preview::Preview;
 use uv_pypi_types::Scheme;
 use uv_python::PythonEnvironment;
@@ -216,7 +216,7 @@ fn install_wheel_many_files(c: &mut Criterion<WallTime>) {
                     None::<&()>,
                     None::<&()>,
                     Some("uv"),
-                    true,
+                    InstallerMetadata::Enabled,
                     LinkMode::default(),
                     &state,
                 )
