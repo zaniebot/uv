@@ -182,3 +182,23 @@ impl FindLinksOutput {
         }
     }
 }
+
+/// Whether to include build options in `uv pip compile` output.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BuildOptionsOutput {
+    /// Include build options in the output.
+    Include,
+    /// Omit build options from the output.
+    Omit,
+}
+
+impl BuildOptionsOutput {
+    /// Determine the [`BuildOptionsOutput`] setting from the command-line arguments.
+    pub const fn from_args(include_build_options: bool) -> Self {
+        if include_build_options {
+            Self::Include
+        } else {
+            Self::Omit
+        }
+    }
+}

@@ -14,10 +14,10 @@ use tracing::debug;
 use uv_cache::Cache;
 use uv_client::{BaseClientBuilder, FlatIndexClient, RegistryClientBuilder};
 use uv_configuration::{
-    AnnotationOutput, BuildIsolation, BuildOptions, Concurrency, Constraints, ExcludeDependency,
-    ExtrasOutput, ExtrasSpecification, FindLinksOutput, HashOutput, HeaderOutput, IndexStrategy,
-    IndexUrlOutput, MarkersOutput, NoBinary, NoBuild, NoSources, Override, PipCompileFormat,
-    Reinstall, Upgrade,
+    AnnotationOutput, BuildIsolation, BuildOptions, BuildOptionsOutput, Concurrency, Constraints,
+    ExcludeDependency, ExtrasOutput, ExtrasSpecification, FindLinksOutput, HashOutput,
+    HeaderOutput, IndexStrategy, IndexUrlOutput, MarkersOutput, NoBinary, NoBuild, NoSources,
+    Override, PipCompileFormat, Reinstall, Upgrade,
 };
 use uv_configuration::{KeyringProviderType, TargetTriple};
 use uv_dispatch::{BuildDispatch, SharedState};
@@ -93,7 +93,7 @@ pub(crate) async fn pip_compile(
     custom_compile_command: Option<String>,
     index_url_output: IndexUrlOutput,
     find_links_output: FindLinksOutput,
-    include_build_options: bool,
+    build_options_output: BuildOptionsOutput,
     include_marker_expression: bool,
     include_index_annotation: bool,
     index_locations: IndexLocations,
@@ -676,7 +676,7 @@ pub(crate) async fn pip_compile(
             }
 
             // If necessary, include the `--no-binary` and `--only-binary` options.
-            if include_build_options {
+            if matches!(build_options_output, BuildOptionsOutput::Include) {
                 match build_options.no_binary() {
                     NoBinary::None => {}
                     NoBinary::All => {
@@ -746,7 +746,7 @@ pub(crate) async fn pip_compile(
                     "The `--emit-find-links` option is not supported for `pylock.toml` output"
                 );
             }
-            if include_build_options {
+            if matches!(build_options_output, BuildOptionsOutput::Include) {
                 warn_user!(
                     "The `--emit-build-options` option is not supported for `pylock.toml` output"
                 );
