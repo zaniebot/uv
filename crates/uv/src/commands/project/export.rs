@@ -12,7 +12,8 @@ use rustc_hash::FxHashSet;
 use uv_cache::Cache;
 use uv_client::BaseClientBuilder;
 use uv_configuration::{
-    Concurrency, DependencyGroups, EditableMode, ExportFormat, ExtrasSpecification, InstallOptions,
+    Concurrency, DependencyGroups, EditableMode, ExportFormat, ExtrasSpecification, HashOutput,
+    InstallOptions,
 };
 use uv_distribution_types::Verbatim;
 use uv_normalize::{DefaultExtras, DefaultGroups, PackageName};
@@ -63,7 +64,7 @@ pub(crate) async fn export(
     format: Option<ExportFormat>,
     packages: ExportPackageSelection,
     prune: Vec<PackageName>,
-    hashes: bool,
+    hash_output: HashOutput,
     install_options: InstallOptions,
     output_file: Option<PathBuf>,
     extras: ExtrasSpecification,
@@ -380,7 +381,7 @@ pub(crate) async fn export(
                 &groups,
                 include_annotations,
                 editable,
-                hashes,
+                matches!(hash_output, HashOutput::Generate),
                 &install_options,
             )?;
 

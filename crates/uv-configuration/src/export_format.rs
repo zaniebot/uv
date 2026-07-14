@@ -43,7 +43,7 @@ pub enum PipCompileFormat {
     PylockToml,
 }
 
-/// Whether to generate hashes for `uv pip compile` output.
+/// Whether to generate hashes for exported output.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HashOutput {
     /// Generate and include hashes in the output.

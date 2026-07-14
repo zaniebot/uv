@@ -36,10 +36,10 @@ use uv_client::Connectivity;
 use uv_configuration::{
     BuildIsolation, BuildOptions, Concurrency, DependencyGroups, DevMode, DryRun, EditableMode,
     EnvFile, ExcludeDependency, ExportFormat, ExtrasSpecification, GitLfsSetting, HashCheckingMode,
-    IndexStrategy, InstallOptions, InstallSelection, KeyringProviderType, NoBinary, NoBuild,
-    NoSources, Override, PackageOverride, PipCompileFormat, ProjectBuildBackend, ProjectDiscovery,
-    ProxyUrl, Reinstall, RequiredVersion, TargetTriple, TrustedHost, TrustedPublishing, Upgrade,
-    VersionControlSystem,
+    HashOutput, IndexStrategy, InstallOptions, InstallSelection, KeyringProviderType, NoBinary,
+    NoBuild, NoSources, Override, PackageOverride, PipCompileFormat, ProjectBuildBackend,
+    ProjectDiscovery, ProxyUrl, Reinstall, RequiredVersion, TargetTriple, TrustedHost,
+    TrustedPublishing, Upgrade, VersionControlSystem,
 };
 use uv_distribution_types::{
     ConfigSettings, DependencyMetadata, ExtraBuildVariables, Index, IndexLocations, IndexUrl,
@@ -2767,7 +2767,7 @@ pub(crate) struct ExportSettings {
     pub(super) extras: ExtrasSpecification,
     pub(super) groups: DependencyGroups,
     pub(super) editable: Option<EditableMode>,
-    pub(super) hashes: bool,
+    pub(super) hash_output: HashOutput,
     pub(super) install_options: InstallOptions,
     pub(super) output_file: Option<PathBuf>,
     pub(super) lock_check: LockCheck,
@@ -2895,7 +2895,7 @@ impl ExportSettings {
                 flag(editable.into(), no_editable.into(), "editable"),
                 no_editable_package,
             ),
-            hashes: flag(hashes, no_hashes, "hashes").unwrap_or(true),
+            hash_output: HashOutput::from_args(flag(hashes, no_hashes, "hashes").unwrap_or(true)),
             install_options: InstallOptions::new(
                 InstallSelection::from_args(no_emit_project, only_emit_project),
                 InstallSelection::from_args(no_emit_workspace, only_emit_workspace),
