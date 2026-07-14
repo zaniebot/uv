@@ -41,7 +41,6 @@ use crate::settings::{FrozenSource, LockCheck, ResolverInstallerSettings};
 mod ty;
 
 /// Run project checks.
-#[expect(clippy::fn_params_excessive_bools)]
 pub(crate) async fn check(
     project_dir: &Path,
     ty_path: Option<PathBuf>,

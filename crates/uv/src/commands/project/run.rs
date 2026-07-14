@@ -85,7 +85,6 @@ use crate::settings::{
 };
 
 /// Run a command.
-#[expect(clippy::fn_params_excessive_bools)]
 pub(crate) async fn run(
     project_dir: &Path,
     script: Option<Pep723Item>,

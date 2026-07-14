@@ -69,7 +69,6 @@ pub(crate) fn self_version(
 }
 
 /// Read or update project version (`uv version`)
-#[expect(clippy::fn_params_excessive_bools)]
 pub(crate) async fn project_version(
     value: Option<String>,
     mut bump: Vec<VersionBumpSpec>,
