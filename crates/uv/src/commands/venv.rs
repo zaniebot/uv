@@ -24,7 +24,8 @@ use uv_install_wheel::LinkMode;
 use uv_normalize::DefaultGroups;
 use uv_preview::Preview;
 use uv_python::{
-    EnvironmentPreference, PythonDownloads, PythonInstallation, PythonPreference, PythonRequest,
+    ConfigDiscovery, EnvironmentPreference, PythonDownloads, PythonInstallation, PythonPreference,
+    PythonRequest,
 };
 use uv_resolver::{ExcludeNewer, FlatIndex};
 use uv_settings::PythonInstallMirrors;
@@ -85,8 +86,8 @@ pub(crate) async fn venv(
     on_existing: OnExisting,
     exclude_newer: ExcludeNewer,
     concurrency: Concurrency,
-    no_config: bool,
     no_project: bool,
+    config_discovery: ConfigDiscovery,
     cache: &Cache,
     workspace_cache: &WorkspaceCache,
     printer: Printer,
@@ -156,7 +157,7 @@ pub(crate) async fn venv(
         project.as_ref().map(VirtualProject::workspace),
         &groups,
         project_dir,
-        no_config,
+        config_discovery,
     )
     .await?;
 
