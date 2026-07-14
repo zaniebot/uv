@@ -1,13 +1,16 @@
 use anyhow::{Result, anyhow};
 use assert_cmd::prelude::*;
 use assert_fs::{fixture::ChildPath, prelude::*};
+use async_compression::tokio::write::ZstdEncoder;
 use indoc::{formatdoc, indoc};
 use insta::assert_snapshot;
 use predicates::prelude::predicate;
 use serde_json::json;
+use sha2::{Digest, Sha256};
 #[cfg(feature = "test-git")]
 use std::process::Command;
 use tempfile::tempdir_in;
+use tokio::io::AsyncWriteExt;
 use url::Url;
 use wiremock::matchers::{basic_auth, body_string_contains, method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -16354,6 +16357,182 @@ async fn sync_zstd_wheel() -> Result<()> {
     Installed 1 package in [TIME]
      + basic-package==0.1.0
     ");
+
+    Ok(())
+}
+
+/// Heal the RECORD of a zstd-compressed wheel that contains a tar hardlink.
+#[tokio::test]
+async fn sync_zstd_wheel_hardlink_record_size() -> Result<()> {
+    let context = uv_test::test_context!("3.13");
+    let server = MockServer::start().await;
+
+    let victim = venv_bin_path(&context.venv).join("victim");
+    let linked_victim = venv_bin_path(&context.venv).join("linked-victim");
+    fs_err::write(&victim, "I should not be deleted")?;
+    fs_err::write(&linked_victim, "I should not be deleted")?;
+    let (traversal, linked_traversal) = if cfg!(windows) {
+        ("../../Scripts/victim", "../../Scripts/linked-victim")
+    } else {
+        ("../../../bin/victim", "../../../bin/linked-victim")
+    };
+
+    let mut tar = tokio_tar::Builder::new_non_terminated(ZstdEncoder::new(Vec::new()));
+    let contents = "VALUE = 1\n";
+    let record = formatdoc! {"
+        basic_package/__init__.py,,
+        basic_package-0.1.0.dist-info/METADATA,,
+        basic_package-0.1.0.dist-info/WHEEL,,
+        basic_package-0.1.0.dist-info/RECORD,,
+        {traversal},,
+        {linked_traversal},,
+    "};
+    for (path, contents) in [
+        ("basic_package/__init__.py", contents),
+        (
+            "basic_package-0.1.0.dist-info/METADATA",
+            "Metadata-Version: 2.3\nName: basic-package\nVersion: 0.1.0\n",
+        ),
+        (
+            "basic_package-0.1.0.dist-info/WHEEL",
+            "Wheel-Version: 1.0\nRoot-Is-Purelib: true\nTag: py3-none-any\n",
+        ),
+        ("basic_package-0.1.0.dist-info/RECORD", record.as_str()),
+    ] {
+        let mut header = tokio_tar::Header::new_gnu();
+        header.set_path(path)?;
+        header.set_size(contents.len() as u64);
+        header.set_mode(0o644);
+        header.set_cksum();
+        tar.append(&header, contents.as_bytes()).await?;
+    }
+
+    let mut header = tokio_tar::Header::new_gnu();
+    header.set_entry_type(tokio_tar::EntryType::Link);
+    header.set_path("basic_package/linked.py")?;
+    header.set_link_name("basic_package/__init__.py")?;
+    header.set_size(0);
+    header.set_mode(0o644);
+    header.set_cksum();
+    tar.append(&header, tokio::io::empty()).await?;
+
+    let contents = "malicious replacement";
+    let mut header = tokio_tar::Header::new_gnu();
+    header.as_mut_bytes()[..traversal.len()].copy_from_slice(traversal.as_bytes());
+    header.set_size(contents.len() as u64);
+    header.set_mode(0o644);
+    header.set_cksum();
+    tar.append(&header, contents.as_bytes()).await?;
+
+    let mut header = tokio_tar::Header::new_gnu();
+    header.set_entry_type(tokio_tar::EntryType::Link);
+    header.as_mut_bytes()[..linked_traversal.len()].copy_from_slice(linked_traversal.as_bytes());
+    header.set_link_name("basic_package/__init__.py")?;
+    header.set_size(0);
+    header.set_mode(0o644);
+    header.set_cksum();
+    tar.append(&header, tokio::io::empty()).await?;
+
+    let mut encoder = tar.into_inner().await?;
+    encoder.shutdown().await?;
+    let zstd_wheel = encoder.into_inner();
+    let zstd_hash = format!("{:x}", Sha256::digest(&zstd_wheel));
+    let zstd_size = zstd_wheel.len();
+
+    let wheel_url = format!(
+        "{}/files/basic_package-0.1.0-py3-none-any.whl",
+        server.uri()
+    );
+    Mock::given(method("GET"))
+        .and(path("/files/basic_package-0.1.0-py3-none-any.whl"))
+        .respond_with(
+            ResponseTemplate::new(200).set_body_bytes(fs_err::read(
+                context
+                    .workspace_root
+                    .join("test/links/basic_package-0.1.0-py3-none-any.whl"),
+            )?),
+        )
+        .mount(&server)
+        .await;
+    Mock::given(method("GET"))
+        .and(path("/files/basic_package-0.1.0-py3-none-any.whl.tar.zst"))
+        .respond_with(ResponseTemplate::new(200).set_body_bytes(zstd_wheel))
+        .mount(&server)
+        .await;
+    Mock::given(method("GET"))
+        .and(path("/simple/basic-package/"))
+        .respond_with(ResponseTemplate::new(200).set_body_raw(
+            json!({
+                "meta": { "api-version": "1.1" },
+                "name": "basic-package",
+                "files": [{
+                    "filename": "basic_package-0.1.0-py3-none-any.whl",
+                    "url": wheel_url,
+                    "hashes": {
+                        "sha256": "7b6229db79b5800e4e98a351b5628c1c8a944533a2d428aeeaa7275a30d4ea82"
+                    },
+                    "size": 1548,
+                    "zstd": {
+                        "hashes": { "sha256": zstd_hash },
+                        "size": zstd_size
+                    }
+                }]
+            })
+            .to_string()
+            .into_bytes(),
+            "application/vnd.pyx.simple.v1+json",
+        ))
+        .mount(&server)
+        .await;
+
+    context
+        .temp_dir
+        .child("pyproject.toml")
+        .write_str(&formatdoc! {r#"
+            [project]
+            name = "project"
+            version = "0.1.0"
+            requires-python = ">=3.13"
+            dependencies = ["basic-package"]
+
+            [tool.uv.sources]
+            basic-package = {{ index = "test-registry" }}
+
+            [[tool.uv.index]]
+            name = "test-registry"
+            url = "{}/simple"
+        "#, server.uri()})?;
+
+    context
+        .sync()
+        .env_remove(EnvVars::UV_EXCLUDE_NEWER)
+        .assert()
+        .success();
+
+    let installed_record = fs_err::read_to_string(
+        context
+            .site_packages()
+            .join("basic_package-0.1.0.dist-info/RECORD"),
+    )?;
+    assert!(
+        installed_record
+            .lines()
+            .any(|entry| entry == "basic_package/linked.py,,10"),
+        "missing hardlink size in RECORD: {installed_record}"
+    );
+    assert!(!installed_record.contains(traversal));
+    assert!(!installed_record.contains(linked_traversal));
+
+    context
+        .pip_uninstall()
+        .arg("basic-package")
+        .assert()
+        .success();
+    assert_eq!(fs_err::read_to_string(&victim)?, "I should not be deleted");
+    assert_eq!(
+        fs_err::read_to_string(&linked_victim)?,
+        "I should not be deleted"
+    );
 
     Ok(())
 }

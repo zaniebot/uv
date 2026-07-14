@@ -619,17 +619,24 @@ async fn untar_in(
             continue;
         }
 
-        // Collect file paths (excluding directories).
         let entry_type = file.header().entry_type();
-        if entry_type.is_file() || entry_type.is_hard_link() {
-            let relpath = file.path()?.into_owned();
-            let size = file.header().size()?;
-            files.push((relpath, size));
-        }
 
         // Unpack the file into the destination directory.
-        #[cfg_attr(not(unix), allow(unused_variables))]
         let unpacked_at = file.unpack_in_raw(&dst, &mut memo).await?;
+
+        // Collect file paths (excluding directories) that were unpacked successfully. Hardlink
+        // headers have no payload, so use the size of the unpacked target instead of the header.
+        if (entry_type.is_file() || entry_type.is_hard_link())
+            && let Some(path) = unpacked_at.as_deref()
+        {
+            let relpath = file.path()?.into_owned();
+            let size = if entry_type.is_hard_link() {
+                fs_err::tokio::metadata(path).await?.len()
+            } else {
+                file.header().size()?
+            };
+            files.push((relpath, size));
+        }
 
         // Preserve the executable bit.
         #[cfg(unix)]
