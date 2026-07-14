@@ -360,7 +360,13 @@ impl RequirementsTxt {
         let mut s = Scanner::new(content);
 
         let mut data = Self::default();
-        while let Some(statement) = parse_entry(&mut s, content, working_dir, requirements_txt)? {
+        while let Some(statement) = parse_entry(
+            &mut s,
+            content,
+            working_dir,
+            requirements_dir,
+            requirements_txt,
+        )? {
             match statement {
                 RequirementsTxtStatement::Requirements {
                     filename,
@@ -677,6 +683,7 @@ fn parse_entry(
     s: &mut Scanner,
     content: &str,
     working_dir: &Path,
+    requirements_dir: &Path,
     requirements_txt: &Path,
 ) -> Result<Option<RequirementsTxtStatement>, RequirementsTxtParserError> {
     // Eat all preceding whitespace, this may run us to the end of file
@@ -819,7 +826,7 @@ fn parse_entry(
             .map(Cow::Owned)
             .unwrap_or(Cow::Borrowed(given));
         let expanded = expand_env_vars(given.as_ref());
-        let url = if let Some(path) = std::path::absolute(expanded.as_ref())
+        let url = if let Some(path) = std::path::absolute(requirements_dir.join(expanded.as_ref()))
             .ok()
             .filter(|path| path.exists())
         {
