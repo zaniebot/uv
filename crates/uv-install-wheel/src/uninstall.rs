@@ -1,5 +1,5 @@
 use std::borrow::Cow;
-use std::collections::{BTreeSet, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 use std::fmt::Display;
 use std::path::{Component, Path, PathBuf};
 use std::sync::{LazyLock, Mutex, OnceLock};
@@ -44,12 +44,30 @@ pub fn uninstall_wheel(
     #[cfg(windows)]
     let itself = std::env::current_exe().ok();
 
+    let schemes = [
+        layout.scheme.data.as_path(),
+        layout.scheme.purelib.as_path(),
+        layout.scheme.platlib.as_path(),
+        layout.scheme.scripts.as_path(),
+        layout.scheme.include.as_path(),
+    ];
+    let resolved_schemes =
+        schemes.map(|scheme| fs_err::canonicalize(scheme).unwrap_or_else(|_| scheme.to_path_buf()));
+    let mut resolved_parents = HashMap::new();
+
     // Uninstall the files, keeping track of any directories that are left empty.
     let mut visited = BTreeSet::new();
     for entry in &record {
         let path = site_packages.join(&entry.path);
 
-        if !is_path_in_scheme(&entry.path, site_packages, &distribution, layout) {
+        if !is_path_in_scheme(
+            &entry.path,
+            site_packages,
+            &distribution,
+            &schemes,
+            &resolved_schemes,
+            &mut resolved_parents,
+        ) {
             continue;
         }
 
@@ -174,9 +192,12 @@ fn is_path_in_scheme(
     path: &str,
     site_packages: &Path,
     distribution: impl Display,
-    layout: &Layout,
+    schemes: &[&Path; 5],
+    resolved_schemes: &[PathBuf; 5],
+    resolved_parents: &mut HashMap<PathBuf, PathBuf>,
 ) -> bool {
-    let normalized = normalize_path(&site_packages.join(path));
+    let joined = site_packages.join(path);
+    let normalized = normalize_path(&joined);
 
     // `purelib` or `platlib` are site-packages (depending on `Root-Is-Purelib`). As
     // `.data/*` goes into the directories of `scheme`, `.dist-info` goes into site-packages
@@ -187,11 +208,18 @@ fn is_path_in_scheme(
     // `.data/data`. For a system environment, wheels are allowed to write to
     // whole system directories, for example `data` is `/usr/local` for system Python on
     // Ubuntu 24.04.
-    if normalized.starts_with(&layout.scheme.data)
-        || normalized.starts_with(&layout.scheme.purelib)
-        || normalized.starts_with(&layout.scheme.platlib)
-        || normalized.starts_with(&layout.scheme.scripts)
-        || normalized.starts_with(&layout.scheme.include)
+    if schemes.iter().any(|scheme| normalized.starts_with(scheme))
+        && joined.parent().is_some_and(|parent| {
+            // Resolve the parent, rather than the final component, so a recorded file symlink can
+            // still be unlinked without following it while directory symlinks cannot escape the
+            // environment. Most RECORD entries share a parent, so avoid resolving it repeatedly.
+            let resolved = resolved_parents
+                .entry(parent.to_path_buf())
+                .or_insert_with(|| fs_err::canonicalize(parent).unwrap_or_else(|_| normalized));
+            resolved_schemes
+                .iter()
+                .any(|scheme| resolved.starts_with(scheme))
+        })
     {
         true
     } else {
