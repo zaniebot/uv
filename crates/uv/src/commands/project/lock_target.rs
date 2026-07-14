@@ -25,6 +25,39 @@ pub(crate) enum LockTarget<'lock> {
     Script(&'lock Pep723Script),
 }
 
+/// An owned lock target for use in diagnostics.
+#[derive(Debug, Clone)]
+pub(crate) enum LockTargetKind {
+    Workspace,
+    Script(PathBuf),
+}
+
+impl LockTargetKind {
+    /// Return the filename of the lockfile, for use in user-facing messages.
+    pub(crate) fn lock_filename(&self) -> PathBuf {
+        match self {
+            Self::Workspace => PathBuf::from("uv.lock"),
+            Self::Script(script) => {
+                let mut file_name = script
+                    .file_name()
+                    .unwrap_or(script.as_os_str())
+                    .to_os_string();
+                file_name.push(".lock");
+                PathBuf::from(file_name)
+            }
+        }
+    }
+}
+
+impl From<LockTarget<'_>> for LockTargetKind {
+    fn from(target: LockTarget<'_>) -> Self {
+        match target {
+            LockTarget::Workspace(_) => Self::Workspace,
+            LockTarget::Script(script) => Self::Script(script.path.clone()),
+        }
+    }
+}
+
 impl<'lock> From<&'lock Workspace> for LockTarget<'lock> {
     fn from(workspace: &'lock Workspace) -> Self {
         Self::Workspace(workspace)
