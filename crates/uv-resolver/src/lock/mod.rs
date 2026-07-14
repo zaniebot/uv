@@ -3411,7 +3411,8 @@ impl Package {
                             GitReference::from(git.kind.clone()),
                             git.precise,
                             git.lfs,
-                        )?;
+                        )?
+                        .with_explicit_default_port(git.explicit_default_port);
 
                         // Reconstruct the PEP 508-compatible URL from the `GitSource`.
                         let url = DisplaySafeUrl::from(ParsedGitPathUrl {
@@ -3608,7 +3609,8 @@ impl Package {
                     GitReference::from(git.kind.clone()),
                     git.precise,
                     git.lfs,
-                )?;
+                )?
+                .with_explicit_default_port(git.explicit_default_port);
 
                 if let Some(install_path) = git.path.as_ref() {
                     // A direct path source can also be a wheel, so validate the extension.
@@ -4537,11 +4539,7 @@ impl Source {
             .or_else(|_| std::path::absolute(&git_dist.install_path))
             .map_err(LockErrorKind::DistributionRelativePath)?;
         Ok(Self::Git(
-            UrlString::from(locked_git_url(
-                &git_dist.git,
-                None,
-                Some(git_dist.install_path.as_path()),
-            )),
+            locked_git_url(&git_dist.git, None, Some(git_dist.install_path.as_path())),
             GitSource {
                 kind: GitSourceKind::from(git_dist.git.reference().clone()),
                 precise: git_dist.git.precise().unwrap_or_else(|| {
@@ -4550,6 +4548,7 @@ impl Source {
                 subdirectory: None,
                 path: Some(path),
                 lfs: git_dist.git.lfs(),
+                explicit_default_port: git_dist.git.explicit_default_port(),
             },
         ))
     }
@@ -4562,11 +4561,7 @@ impl Source {
             .or_else(|_| std::path::absolute(&git_dist.install_path))
             .map_err(LockErrorKind::DistributionRelativePath)?;
         Ok(Self::Git(
-            UrlString::from(locked_git_url(
-                &git_dist.git,
-                None,
-                Some(git_dist.install_path.as_path()),
-            )),
+            locked_git_url(&git_dist.git, None, Some(git_dist.install_path.as_path())),
             GitSource {
                 kind: GitSourceKind::from(git_dist.git.reference().clone()),
                 precise: git_dist.git.precise().unwrap_or_else(|| {
@@ -4575,17 +4570,14 @@ impl Source {
                 subdirectory: None,
                 path: Some(path),
                 lfs: git_dist.git.lfs(),
+                explicit_default_port: git_dist.git.explicit_default_port(),
             },
         ))
     }
 
     fn from_git_directory_source_dist(git_dist: &GitDirectorySourceDist) -> Self {
         Self::Git(
-            UrlString::from(locked_git_url(
-                &git_dist.git,
-                git_dist.subdirectory.as_deref(),
-                None,
-            )),
+            locked_git_url(&git_dist.git, git_dist.subdirectory.as_deref(), None),
             GitSource {
                 kind: GitSourceKind::from(git_dist.git.reference().clone()),
                 precise: git_dist.git.precise().unwrap_or_else(|| {
@@ -4594,6 +4586,7 @@ impl Source {
                 subdirectory: git_dist.subdirectory.clone(),
                 path: None,
                 lfs: git_dist.git.lfs(),
+                explicit_default_port: git_dist.git.explicit_default_port(),
             },
         )
     }
@@ -4795,6 +4788,7 @@ impl TryFrom<SourceWire> for Source {
         match wire {
             Registry { registry } => Ok(Self::Registry(registry.into())),
             Git { git } => {
+                let explicit_default_port = explicit_default_port(&git);
                 let url = DisplaySafeUrl::parse(&git)
                     .map_err(|err| SourceParseError::InvalidUrl {
                         given: git.clone(),
@@ -4802,14 +4796,18 @@ impl TryFrom<SourceWire> for Source {
                     })
                     .map_err(LockErrorKind::InvalidGitSourceUrl)?;
 
-                let git_source = GitSource::from_url(&url)
+                let git_source = GitSource::from_url(&url, explicit_default_port)
                     .map_err(|err| match err {
-                        GitSourceError::InvalidSha => SourceParseError::InvalidSha { given: git },
-                        GitSourceError::MissingSha => SourceParseError::MissingSha { given: git },
+                        GitSourceError::InvalidSha => {
+                            SourceParseError::InvalidSha { given: git.clone() }
+                        }
+                        GitSourceError::MissingSha => {
+                            SourceParseError::MissingSha { given: git.clone() }
+                        }
                     })
                     .map_err(LockErrorKind::InvalidGitSourceUrl)?;
 
-                Ok(Self::Git(UrlString::from(url), git_source))
+                Ok(Self::Git(UrlString::from(git), git_source))
             }
             Direct { url, subdirectory } => Ok(Self::Direct(
                 url,
@@ -4917,6 +4915,7 @@ struct GitSource {
     path: Option<PathBuf>,
     kind: GitSourceKind,
     lfs: GitLfs,
+    explicit_default_port: Option<u16>,
 }
 
 /// An error that occurs when a source string could not be parsed.
@@ -4929,7 +4928,7 @@ enum GitSourceError {
 impl GitSource {
     /// Extracts a Git source reference from the query pairs and the hash
     /// fragment in the given URL.
-    fn from_url(url: &Url) -> Result<Self, GitSourceError> {
+    fn from_url(url: &Url, explicit_default_port: Option<u16>) -> Result<Self, GitSourceError> {
         let mut kind = GitSourceKind::DefaultBranch;
         let mut subdirectory = None;
         let mut lfs = GitLfs::Disabled;
@@ -4959,6 +4958,7 @@ impl GitSource {
             path,
             kind,
             lfs,
+            explicit_default_port,
         })
     }
 }
@@ -5342,12 +5342,30 @@ impl From<GitSourceKind> for GitReference {
     }
 }
 
-/// Construct the lockfile-compatible [`DisplaySafeUrl`] for a [`GitUrl`].
-fn locked_git_url(
-    git: &GitUrl,
-    subdirectory: Option<&Path>,
-    path: Option<&Path>,
-) -> DisplaySafeUrl {
+/// Return an explicitly specified default port from a URL string.
+fn explicit_default_port(value: &str) -> Option<u16> {
+    let (scheme, remainder) = value.split_once("://")?;
+    let authority = remainder
+        .split_once(['/', '?', '#'])
+        .map_or(remainder, |(authority, _)| authority);
+    let host = authority
+        .rsplit_once('@')
+        .map_or(authority, |(_, host)| host);
+    let port = if let Some(host) = host.strip_prefix('[') {
+        host.split_once("]:").map(|(_, port)| port)
+    } else {
+        host.rsplit_once(':').map(|(_, port)| port)
+    }?;
+
+    match (scheme, port) {
+        (scheme, "80") if scheme.eq_ignore_ascii_case("http") => Some(80),
+        (scheme, "443") if scheme.eq_ignore_ascii_case("https") => Some(443),
+        _ => None,
+    }
+}
+
+/// Construct the lockfile-compatible URL for a [`GitUrl`].
+fn locked_git_url(git: &GitUrl, subdirectory: Option<&Path>, path: Option<&Path>) -> UrlString {
     let mut url = git.url().clone();
 
     // Remove the credentials.
@@ -5400,7 +5418,7 @@ fn locked_git_url(
     // Put the precise commit in the fragment.
     url.set_fragment(git.precise().as_ref().map(GitOid::to_string).as_deref());
 
-    url
+    UrlString::from(git.transport_url(&url))
 }
 
 #[derive(Clone, Debug, serde::Deserialize, PartialEq, Eq)]
@@ -6164,6 +6182,7 @@ fn normalize_requirement(
                     git.precise(),
                     git.lfs(),
                 )?
+                .with_explicit_default_port(git.explicit_default_port())
             };
 
             // Reconstruct the PEP 508 URL from the underlying data.
@@ -6208,6 +6227,7 @@ fn normalize_requirement(
                     git.precise(),
                     git.lfs(),
                 )?
+                .with_explicit_default_port(git.explicit_default_port())
             };
 
             // Reconstruct the PEP 508 URL from the underlying data.
@@ -7652,6 +7672,32 @@ source = { registry = "https://example.com/simple" }
             .dependency_selection(Some(&project_name), &dependency_name, &marker_environment)
             .expect_err("ambiguous production selection");
         insta::assert_snapshot!(error, @"found multiple packages matching production dependency `ty` for `project`");
+    }
+
+    #[test]
+    fn git_source_preserves_explicit_default_port() -> Result<(), Box<dyn std::error::Error>> {
+        for (input, port) in [
+            (
+                "https://example.com:443/pkg.git?rev=main#0123456789abcdef0123456789abcdef01234567",
+                443,
+            ),
+            (
+                "http://example.com:80/pkg.git?rev=main#0123456789abcdef0123456789abcdef01234567",
+                80,
+            ),
+        ] {
+            let source = Source::try_from(SourceWire::Git {
+                git: input.to_string(),
+            })?;
+            let Source::Git(url, git) = source else {
+                return Err("expected Git source".into());
+            };
+
+            assert_eq!(url.as_ref(), input);
+            assert_eq!(git.explicit_default_port, Some(port));
+        }
+
+        Ok(())
     }
 
     #[test]
