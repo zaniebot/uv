@@ -30,6 +30,7 @@ uv-shell = { workspace = true }
 uv-trampoline-builder = { workspace = true }
 uv-warnings = { workspace = true }
 
+blake2 = { workspace = true }
 configparser = { workspace = true }
 csv = { workspace = true }
 data-encoding = { workspace = true }
@@ -43,6 +44,7 @@ rustc-hash = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 sha2 = { workspace = true }
+sha3 = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 walkdir = { workspace = true }
