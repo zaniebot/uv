@@ -2272,6 +2272,36 @@ impl Lock {
             }
         }
 
+        // A per-index `exclude-newer` setting is not stored in the lockfile. Validate every
+        // locked artifact, including transitive packages behind immutable dependencies.
+        for package in &self.packages {
+            if let Some(indexes) = indexes
+                && let Some(index) = package.index(root)?
+                && let Some(exclude_newer) =
+                    self.options.exclude_newer.exclude_newer_package_for_index(
+                        &package.id.name,
+                        indexes.exclude_newer_for(&index),
+                    )
+                && package
+                    .sdist
+                    .iter()
+                    .map(SourceDist::upload_time)
+                    .chain(package.wheels.iter().map(|wheel| wheel.upload_time))
+                    .all(|upload_time| {
+                        upload_time.is_none_or(|upload_time| upload_time >= exclude_newer)
+                    })
+            {
+                let Some(version) = package.id.version.as_ref() else {
+                    return Ok(SatisfiesResult::MissingVersion(&package.id.name));
+                };
+                return Ok(SatisfiesResult::ExcludedNewerArtifact(
+                    &package.id.name,
+                    version,
+                    exclude_newer,
+                ));
+            }
+        }
+
         while let Some(package) = queue.pop_front() {
             // If the lockfile references an index that was not provided, we can't validate it.
             if let Source::Registry(index) = &package.id.source {
@@ -2786,6 +2816,8 @@ pub enum SatisfiesResult<'lock> {
     MissingRemoteIndex(&'lock PackageName, &'lock Version, &'lock UrlString),
     /// The lockfile referenced a local index that was not provided
     MissingLocalIndex(&'lock PackageName, &'lock Version, &'lock Path),
+    /// The lockfile contains an artifact excluded by the effective `exclude-newer` cutoff.
+    ExcludedNewerArtifact(&'lock PackageName, &'lock Version, Timestamp),
     /// A package in the lockfile contains different `requires-dist` metadata than expected.
     MismatchedPackageRequirements(
         &'lock PackageName,
