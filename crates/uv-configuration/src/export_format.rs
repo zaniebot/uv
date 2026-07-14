@@ -123,7 +123,7 @@ impl AnnotationOutput {
     }
 }
 
-/// Whether to include the header in `uv pip compile` output.
+/// Whether to include the header in exported output.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HeaderOutput {
     /// Include the header in the output.

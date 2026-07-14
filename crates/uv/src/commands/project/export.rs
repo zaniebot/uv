@@ -13,7 +13,7 @@ use uv_cache::Cache;
 use uv_client::BaseClientBuilder;
 use uv_configuration::{
     AnnotationOutput, Concurrency, DependencyGroups, EditableMode, ExportFormat,
-    ExtrasSpecification, HashOutput, InstallOptions,
+    ExtrasSpecification, HashOutput, HeaderOutput, InstallOptions,
 };
 use uv_distribution_types::Verbatim;
 use uv_normalize::{DefaultExtras, DefaultGroups, PackageName};
@@ -58,7 +58,6 @@ impl<'lock> From<&'lock ExportTarget> for LockTarget<'lock> {
 }
 
 /// Export the project's `uv.lock` in an alternate format.
-#[expect(clippy::fn_params_excessive_bools)]
 pub(crate) async fn export(
     project_dir: &Path,
     format: Option<ExportFormat>,
@@ -73,7 +72,7 @@ pub(crate) async fn export(
     lock_check: LockCheck,
     frozen: Option<FrozenSource>,
     annotation_output: AnnotationOutput,
-    include_header: bool,
+    header_output: HeaderOutput,
     include_index_url: bool,
     include_find_links: bool,
     script: Option<Pep723Script>,
@@ -385,7 +384,7 @@ pub(crate) async fn export(
                 &install_options,
             )?;
 
-            if include_header {
+            if matches!(header_output, HeaderOutput::Include) {
                 writeln!(
                     writer,
                     "{}",
@@ -451,7 +450,7 @@ pub(crate) async fn export(
                 &install_options,
             )?;
 
-            if include_header {
+            if matches!(header_output, HeaderOutput::Include) {
                 writeln!(
                     writer,
                     "{}",

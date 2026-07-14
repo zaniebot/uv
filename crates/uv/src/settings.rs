@@ -36,7 +36,7 @@ use uv_client::Connectivity;
 use uv_configuration::{
     AnnotationOutput, BuildIsolation, BuildOptions, Concurrency, DependencyGroups, DevMode, DryRun,
     EditableMode, EnvFile, ExcludeDependency, ExportFormat, ExtrasSpecification, GitLfsSetting,
-    HashCheckingMode, HashOutput, IndexStrategy, InstallOptions, InstallSelection,
+    HashCheckingMode, HashOutput, HeaderOutput, IndexStrategy, InstallOptions, InstallSelection,
     KeyringProviderType, NoBinary, NoBuild, NoSources, Override, PackageOverride, PipCompileFormat,
     ProjectBuildBackend, ProjectDiscovery, ProxyUrl, Reinstall, RequiredVersion, TargetTriple,
     TrustedHost, TrustedPublishing, Upgrade, VersionControlSystem,
@@ -2773,7 +2773,7 @@ pub(crate) struct ExportSettings {
     pub(super) lock_check: LockCheck,
     pub(super) frozen: Option<FrozenSource>,
     pub(super) annotation_output: AnnotationOutput,
-    pub(super) include_header: bool,
+    pub(super) header_output: HeaderOutput,
     pub(super) include_index_url: bool,
     pub(super) include_find_links: bool,
     pub(super) script: Option<PathBuf>,
@@ -2909,7 +2909,9 @@ impl ExportSettings {
             annotation_output: AnnotationOutput::from_args(
                 flag(annotate, no_annotate, "annotate").unwrap_or(true),
             ),
-            include_header: flag(header, no_header, "header").unwrap_or(true),
+            header_output: HeaderOutput::from_args(
+                flag(header, no_header, "header").unwrap_or(true),
+            ),
             include_index_url: flag(emit_index_url, no_emit_index_url, "emit-index-url")
                 .unwrap_or(false),
             include_find_links: flag(emit_find_links, no_emit_find_links, "emit-find-links")
