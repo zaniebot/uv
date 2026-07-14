@@ -37,8 +37,8 @@ use uv_configuration::{
     BuildIsolation, BuildOptions, Concurrency, DependencyGroups, DryRun, EditableMode, EnvFile,
     ExcludeDependency, ExportFormat, ExtrasSpecification, GitLfsSetting, HashCheckingMode,
     IndexStrategy, InstallOptions, KeyringProviderType, NoBinary, NoBuild, NoSources, Override,
-    PackageOverride, PipCompileFormat, ProjectBuildBackend, ProxyUrl, Reinstall, RequiredVersion,
-    TargetTriple, TrustedHost, TrustedPublishing, Upgrade, VersionControlSystem,
+    PackageOverride, PipCompileFormat, ProjectBuildBackend, ProjectDiscovery, ProxyUrl, Reinstall,
+    RequiredVersion, TargetTriple, TrustedHost, TrustedPublishing, Upgrade, VersionControlSystem,
 };
 use uv_distribution_types::{
     ConfigSettings, DependencyMetadata, ExtraBuildVariables, Index, IndexLocations, IndexUrl,
@@ -684,7 +684,7 @@ pub(crate) struct RunSettings {
     pub(crate) show_resolution: bool,
     pub(crate) all_packages: bool,
     pub(crate) package: Option<PackageName>,
-    pub(crate) no_project: bool,
+    pub(crate) project_discovery: ProjectDiscovery,
     pub(crate) active: Option<bool>,
     pub(crate) no_sync: bool,
     pub(crate) python: Option<String>,
@@ -842,7 +842,7 @@ impl RunSettings {
             show_resolution,
             all_packages,
             package,
-            no_project,
+            project_discovery: ProjectDiscovery::from_args(no_project),
             no_sync: no_sync.is_enabled(),
             active: flag(active, no_active, "active"),
             python: python.and_then(Maybe::into_option),
@@ -1665,7 +1665,7 @@ pub(crate) struct PythonFindSettings {
     pub(crate) request: Option<String>,
     pub(crate) show_version: bool,
     pub(crate) resolve_links: bool,
-    pub(crate) no_project: bool,
+    pub(crate) project_discovery: ProjectDiscovery,
     pub(crate) system: bool,
     pub(crate) python_downloads_json_url: Option<String>,
 }
@@ -1709,7 +1709,7 @@ impl PythonFindSettings {
             request,
             show_version,
             resolve_links,
-            no_project,
+            project_discovery: ProjectDiscovery::from_args(no_project),
             system: flag(system, no_system, "system").unwrap_or_default(),
             python_downloads_json_url,
         }
@@ -1721,7 +1721,7 @@ impl PythonFindSettings {
 pub(crate) struct PythonPinSettings {
     pub(crate) request: Option<String>,
     pub(crate) resolved: bool,
-    pub(crate) no_project: bool,
+    pub(crate) project_discovery: ProjectDiscovery,
     pub(crate) global: bool,
     pub(crate) rm: bool,
     pub(crate) install_mirrors: PythonInstallMirrors,
@@ -1758,7 +1758,7 @@ impl PythonPinSettings {
         Self {
             request,
             resolved: flag(resolved, no_resolved, "resolved").unwrap_or(false),
-            no_project,
+            project_discovery: ProjectDiscovery::from_args(no_project),
             global,
             rm,
             install_mirrors,
@@ -2945,7 +2945,7 @@ pub(crate) struct FormatSettings {
     pub(crate) extra_args: Vec<String>,
     pub(crate) version: Option<String>,
     pub(crate) exclude_newer: Option<jiff::Timestamp>,
-    pub(crate) no_project: bool,
+    pub(crate) project_discovery: ProjectDiscovery,
     pub(crate) show_version: bool,
 }
 
@@ -2975,7 +2975,7 @@ impl FormatSettings {
             exclude_newer: exclude_newer
                 .and_then(ExcludeNewerOverride::into_value)
                 .map(|value| value.timestamp()),
-            no_project,
+            project_discovery: ProjectDiscovery::from_args(no_project),
             show_version,
         }
     }
@@ -2999,7 +2999,7 @@ pub(crate) struct CheckSettings {
     pub(crate) settings: ResolverInstallerSettings,
     pub(crate) ty_version: Option<String>,
     pub(crate) show_version: bool,
-    pub(crate) no_project: bool,
+    pub(crate) project_discovery: ProjectDiscovery,
     pub(crate) malware_settings: MalwareCheckSettings,
 }
 
@@ -3099,7 +3099,7 @@ impl CheckSettings {
             settings,
             ty_version,
             show_version,
-            no_project,
+            project_discovery: ProjectDiscovery::from_args(no_project),
             malware_settings,
         }
     }
@@ -4176,7 +4176,7 @@ pub(crate) struct VenvSettings {
     pub(crate) system_site_packages: bool,
     pub(crate) relocatable: bool,
     pub(crate) no_relocatable: bool,
-    pub(crate) no_project: bool,
+    pub(crate) project_discovery: ProjectDiscovery,
     pub(crate) refresh: Refresh,
     pub(crate) settings: PipSettings,
 }
@@ -4241,7 +4241,7 @@ impl VenvSettings {
             path,
             prompt,
             system_site_packages,
-            no_project,
+            project_discovery: ProjectDiscovery::from_args(no_project),
             relocatable: relocatable.into(),
             no_relocatable: no_relocatable.into(),
             refresh: Refresh::from(refresh),

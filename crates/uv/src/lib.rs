@@ -1411,7 +1411,7 @@ pub async fn run(cli: Cli, global_initialization: GlobalInitialization) -> Resul
                 args.settings.exclude_newer,
                 globals.concurrency,
                 cli.top_level.no_config,
-                args.no_project,
+                args.project_discovery,
                 &cache,
                 &workspace_cache,
                 printer,
@@ -1927,7 +1927,7 @@ pub async fn run(cli: Cli, global_initialization: GlobalInitialization) -> Resul
                     args.request,
                     args.show_version,
                     args.resolve_links,
-                    args.no_project,
+                    args.project_discovery,
                     cli.top_level.no_config,
                     args.system,
                     globals.python_preference,
@@ -1955,7 +1955,7 @@ pub async fn run(cli: Cli, global_initialization: GlobalInitialization) -> Resul
                 args.resolved,
                 globals.python_preference,
                 globals.python_downloads,
-                args.no_project,
+                args.project_discovery,
                 args.global,
                 args.rm,
                 args.install_mirrors,
@@ -2323,7 +2323,7 @@ async fn run_project(
                 args.isolated,
                 args.all_packages,
                 args.package,
-                args.no_project,
+                args.project_discovery,
                 no_config,
                 args.extras,
                 args.groups,
@@ -2842,7 +2842,7 @@ async fn run_project(
                 workspace_cache,
                 printer,
                 globals.preview,
-                args.no_project,
+                args.project_discovery,
             ))
             .await
         }
@@ -2892,7 +2892,7 @@ async fn run_project(
                 workspace_cache,
                 printer,
                 globals.preview,
-                args.no_project,
+                args.project_discovery,
                 no_config,
                 args.malware_settings,
             ))

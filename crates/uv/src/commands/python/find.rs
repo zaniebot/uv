@@ -4,7 +4,7 @@ use std::path::Path;
 
 use uv_cache::Cache;
 use uv_client::BaseClientBuilder;
-use uv_configuration::DependencyGroupsWithDefaults;
+use uv_configuration::{DependencyGroupsWithDefaults, ProjectDiscovery};
 use uv_errors::ErrorWithHints;
 use uv_fs::Simplified;
 use uv_python::{
@@ -28,7 +28,7 @@ pub(crate) async fn find(
     request: Option<String>,
     show_version: bool,
     resolve_links: bool,
-    no_project: bool,
+    project_discovery: ProjectDiscovery,
     no_config: bool,
     system: bool,
     python_preference: PythonPreference,
@@ -44,9 +44,7 @@ pub(crate) async fn find(
         EnvironmentPreference::Any
     };
 
-    let project = if no_project {
-        None
-    } else {
+    let project = if project_discovery.enabled() {
         match VirtualProject::discover(
             project_dir,
             &DiscoveryOptions::default(),
@@ -69,6 +67,8 @@ pub(crate) async fn find(
                 None
             }
         }
+    } else {
+        None
     };
 
     // Don't enable the requires-python settings on groups
