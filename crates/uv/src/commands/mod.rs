@@ -38,7 +38,7 @@ pub(crate) use project::export::export;
 pub(crate) use project::format::format;
 pub(crate) use project::init::{
     InitDescription, InitKind, InitMode, InitPackaging, InitProjectKind, InitPythonPin, InitReadme,
-    init,
+    InitWorkspaceDiscovery, init,
 };
 pub(crate) use project::lock::lock;
 pub(crate) use project::remove::remove;
