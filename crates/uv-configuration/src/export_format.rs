@@ -163,7 +163,7 @@ impl IndexUrlOutput {
     }
 }
 
-/// Whether to include find-links locations in `uv pip compile` output.
+/// Whether to include find-links locations in exported output.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FindLinksOutput {
     /// Include find-links locations in the output.

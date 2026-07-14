@@ -13,7 +13,7 @@ use uv_cache::Cache;
 use uv_client::BaseClientBuilder;
 use uv_configuration::{
     AnnotationOutput, Concurrency, DependencyGroups, EditableMode, ExportFormat,
-    ExtrasSpecification, HashOutput, HeaderOutput, IndexUrlOutput, InstallOptions,
+    ExtrasSpecification, FindLinksOutput, HashOutput, HeaderOutput, IndexUrlOutput, InstallOptions,
 };
 use uv_distribution_types::Verbatim;
 use uv_normalize::{DefaultExtras, DefaultGroups, PackageName};
@@ -74,7 +74,7 @@ pub(crate) async fn export(
     annotation_output: AnnotationOutput,
     header_output: HeaderOutput,
     index_url_output: IndexUrlOutput,
-    include_find_links: bool,
+    find_links_output: FindLinksOutput,
     script: Option<Pep723Script>,
     python: Option<String>,
     install_mirrors: PythonInstallMirrors,
@@ -426,7 +426,7 @@ pub(crate) async fn export(
             }
 
             // If necessary, include the `--find-links` locations.
-            if include_find_links {
+            if matches!(find_links_output, FindLinksOutput::Include) {
                 for flat_index in settings.index_locations.flat_indexes() {
                     writeln!(writer, "--find-links {}", flat_index.url().verbatim())?;
                     wrote_preamble = true;

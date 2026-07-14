@@ -2806,7 +2806,7 @@ async fn run_project(
                 args.annotation_output,
                 args.header_output,
                 args.index_url_output,
-                args.include_find_links,
+                args.find_links_output,
                 script,
                 args.python,
                 args.install_mirrors,

@@ -35,11 +35,11 @@ use uv_cli::{
 use uv_client::Connectivity;
 use uv_configuration::{
     AnnotationOutput, BuildIsolation, BuildOptions, Concurrency, DependencyGroups, DevMode, DryRun,
-    EditableMode, EnvFile, ExcludeDependency, ExportFormat, ExtrasSpecification, GitLfsSetting,
-    HashCheckingMode, HashOutput, HeaderOutput, IndexStrategy, IndexUrlOutput, InstallOptions,
-    InstallSelection, KeyringProviderType, NoBinary, NoBuild, NoSources, Override, PackageOverride,
-    PipCompileFormat, ProjectBuildBackend, ProjectDiscovery, ProxyUrl, Reinstall, RequiredVersion,
-    TargetTriple, TrustedHost, TrustedPublishing, Upgrade, VersionControlSystem,
+    EditableMode, EnvFile, ExcludeDependency, ExportFormat, ExtrasSpecification, FindLinksOutput,
+    GitLfsSetting, HashCheckingMode, HashOutput, HeaderOutput, IndexStrategy, IndexUrlOutput,
+    InstallOptions, InstallSelection, KeyringProviderType, NoBinary, NoBuild, NoSources, Override,
+    PackageOverride, PipCompileFormat, ProjectBuildBackend, ProjectDiscovery, ProxyUrl, Reinstall,
+    RequiredVersion, TargetTriple, TrustedHost, TrustedPublishing, Upgrade, VersionControlSystem,
 };
 use uv_distribution_types::{
     ConfigSettings, DependencyMetadata, ExtraBuildVariables, Index, IndexLocations, IndexUrl,
@@ -2775,7 +2775,7 @@ pub(crate) struct ExportSettings {
     pub(super) annotation_output: AnnotationOutput,
     pub(super) header_output: HeaderOutput,
     pub(super) index_url_output: IndexUrlOutput,
-    pub(super) include_find_links: bool,
+    pub(super) find_links_output: FindLinksOutput,
     pub(super) script: Option<PathBuf>,
     pub(super) python: Option<String>,
     pub(super) install_mirrors: PythonInstallMirrors,
@@ -2915,8 +2915,9 @@ impl ExportSettings {
             index_url_output: IndexUrlOutput::from_args(
                 flag(emit_index_url, no_emit_index_url, "emit-index-url").unwrap_or(false),
             ),
-            include_find_links: flag(emit_find_links, no_emit_find_links, "emit-find-links")
-                .unwrap_or(false),
+            find_links_output: FindLinksOutput::from_args(
+                flag(emit_find_links, no_emit_find_links, "emit-find-links").unwrap_or(false),
+            ),
             script,
             python: python.and_then(Maybe::into_option),
             refresh: Refresh::from(refresh),
