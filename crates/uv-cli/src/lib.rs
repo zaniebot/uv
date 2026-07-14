@@ -7570,7 +7570,7 @@ pub struct ResolverArgs {
         overrides_with("no_upgrade"),
         help_heading = "Resolver options"
     )]
-    upgrade: bool,
+    pub upgrade: bool,
 
     #[arg(
         long,
@@ -7771,7 +7771,7 @@ pub struct ResolverArgs {
         value_parser = clap::builder::BoolishValueParser::new(),
         help_heading = "Resolver options",
     )]
-    no_sources: bool,
+    pub no_sources: bool,
 
     /// Don't use sources from the `tool.uv.sources` table for the specified packages [env: `UV_NO_SOURCES_PACKAGE`=]
     #[arg(long, help_heading = "Resolver options", value_delimiter = ' ')]

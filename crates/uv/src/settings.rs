@@ -60,7 +60,7 @@ use uv_settings::{
     PreviewFeaturesOption, PreviewOption, PublishOptions, PythonInstallMirrors,
     ResolverInstallerOptions, ResolverInstallerSchema, ResolverOptions,
 };
-use uv_static::EnvVars;
+use uv_static::{EnvVars, parse_boolish_environment_variable};
 use uv_torch::{AmdGpuArchitecture, TorchMode};
 use uv_warnings::warn_user_once;
 use uv_workspace::pyproject::{DependencyType, ExtraBuildDependencies, OverrideDependency};
@@ -667,6 +667,30 @@ fn resolve_lock_check(flag: Flag) -> LockCheck {
     }
 }
 
+/// Check resolution-policy conflicts after environment-derived lock flags are resolved.
+fn check_resolution_policy_conflicts(locked: Flag, frozen: Flag, upgrade: bool, no_sources: bool) {
+    check_conflicts(locked, frozen);
+
+    if upgrade {
+        let upgrade = Flag::from_cli("upgrade");
+        check_conflicts(locked, upgrade);
+        check_conflicts(frozen, upgrade);
+    }
+    if no_sources {
+        let no_sources = if parse_boolish_environment_variable(EnvVars::UV_NO_SOURCES)
+            .is_ok_and(|value| value == Some(true))
+        {
+            Flag::Enabled {
+                source: FlagSource::Env(EnvVars::UV_NO_SOURCES),
+                name: "no-sources",
+            }
+        } else {
+            Flag::from_cli("no-sources")
+        };
+        check_conflicts(frozen, no_sources);
+    }
+}
+
 /// The resolved settings to use for a `run` invocation.
 #[derive(Debug, Clone)]
 pub(crate) struct RunSettings {
@@ -764,8 +788,7 @@ impl RunSettings {
         let frozen = resolve_flag(frozen, "frozen", environment.frozen);
         let no_sync = resolve_flag(no_sync, "no-sync", environment.no_sync);
 
-        // Check for conflicts between locked and frozen.
-        check_conflicts(locked, frozen);
+        check_resolution_policy_conflicts(locked, frozen, installer.upgrade, installer.no_sources);
 
         let (dev, no_dev) = resolve_flag_pair(
             dev,
@@ -1845,6 +1868,12 @@ impl SyncSettings {
             .map(|fs| fs.install_mirrors.clone())
             .unwrap_or_default();
 
+        // Resolve flags from CLI and environment variables before consuming installer arguments.
+        let locked = resolve_flag(locked, "locked", environment.locked);
+        let frozen = resolve_flag(frozen, "frozen", environment.frozen);
+
+        check_resolution_policy_conflicts(locked, frozen, installer.upgrade, installer.no_sources);
+
         let settings = ResolverInstallerSettings::combine(
             resolver_installer_options(installer, build),
             filesystem,
@@ -1857,13 +1886,6 @@ impl SyncSettings {
         } else {
             DryRun::from_args(dry_run)
         };
-
-        // Resolve flags from CLI and environment variables.
-        let locked = resolve_flag(locked, "locked", environment.locked);
-        let frozen = resolve_flag(frozen, "frozen", environment.frozen);
-
-        // Check for conflicts between locked and frozen.
-        check_conflicts(locked, frozen);
 
         let (dev, no_dev) = resolve_flag_pair(
             dev,
@@ -2030,6 +2052,9 @@ impl LockSettings {
 
         // Check for conflicts between locked and frozen.
         check_conflicts(locked, frozen);
+        if resolver.upgrade {
+            check_conflicts(locked, Flag::from_cli("upgrade"));
+        }
 
         let lock_check = if check {
             LockCheck::Enabled(LockCheckSource::Check)
@@ -2136,6 +2161,9 @@ impl MetadataSettings {
 
         // Check for conflicts between locked and frozen.
         check_conflicts(locked, frozen);
+        if resolver.upgrade {
+            check_conflicts(locked, Flag::from_cli("upgrade"));
+        }
 
         let malware_settings = MalwareCheckSettings::from(&environment);
 
@@ -2358,8 +2386,7 @@ impl AddSettings {
         let frozen = resolve_flag(frozen, "frozen", environment.frozen);
         let no_sync = resolve_flag(no_sync, "no-sync", environment.no_sync);
 
-        // Check for conflicts between locked and frozen.
-        check_conflicts(locked, frozen);
+        check_resolution_policy_conflicts(locked, frozen, installer.upgrade, installer.no_sources);
 
         // Check for conflicts between no_sync and frozen.
         check_conflicts(no_sync, frozen);
@@ -2521,8 +2548,7 @@ impl RemoveSettings {
         let frozen = resolve_flag(frozen, "frozen", environment.frozen);
         let no_sync = resolve_flag(no_sync, "no-sync", environment.no_sync);
 
-        // Check for conflicts between locked and frozen.
-        check_conflicts(locked, frozen);
+        check_resolution_policy_conflicts(locked, frozen, installer.upgrade, installer.no_sources);
 
         // Check for conflicts between no_sync and frozen.
         check_conflicts(no_sync, frozen);
@@ -2608,8 +2634,7 @@ impl VersionSettings {
         let frozen = resolve_flag(frozen, "frozen", environment.frozen);
         let no_sync = resolve_flag(no_sync, "no-sync", environment.no_sync);
 
-        // Check for conflicts between locked and frozen.
-        check_conflicts(locked, frozen);
+        check_resolution_policy_conflicts(locked, frozen, installer.upgrade, installer.no_sources);
 
         // Check for conflicts between no_sync and frozen.
         check_conflicts(no_sync, frozen);
@@ -2704,8 +2729,7 @@ impl TreeSettings {
         let locked = resolve_flag(locked, "locked", environment.locked);
         let frozen = resolve_flag(frozen, "frozen", environment.frozen);
 
-        // Check for conflicts between locked and frozen.
-        check_conflicts(locked, frozen);
+        check_resolution_policy_conflicts(locked, frozen, resolver.upgrade, resolver.no_sources);
 
         let (dev, no_dev) = resolve_flag_pair(
             dev,
@@ -2848,8 +2872,7 @@ impl ExportSettings {
         let locked = resolve_flag(locked, "locked", environment.locked);
         let frozen = resolve_flag(frozen_cli, "frozen", environment.frozen);
 
-        // Check for conflicts between locked and frozen.
-        check_conflicts(locked, frozen);
+        check_resolution_policy_conflicts(locked, frozen, resolver.upgrade, resolver.no_sources);
 
         let (dev, no_dev) = resolve_flag_pair(
             dev,
@@ -3045,7 +3068,7 @@ impl CheckSettings {
         let frozen = resolve_flag(frozen, "frozen", environment.frozen);
         let no_sync = resolve_flag(no_sync, "no-sync", environment.no_sync);
         let isolated = resolve_flag(isolated, "isolated", environment.isolated).is_enabled();
-        check_conflicts(locked, frozen);
+        check_resolution_policy_conflicts(locked, frozen, installer.upgrade, installer.no_sources);
 
         let (dev, no_dev) = resolve_flag_pair(
             dev,
@@ -3166,8 +3189,7 @@ impl AuditSettings {
         let locked = resolve_flag(locked, "locked", environment.locked);
         let frozen = resolve_flag(frozen, "frozen", environment.frozen);
 
-        // Check for conflicts between locked and frozen.
-        check_conflicts(locked, frozen);
+        check_resolution_policy_conflicts(locked, frozen, resolver.upgrade, resolver.no_sources);
 
         Self {
             extras: ExtrasSpecification::from_args(

@@ -6315,6 +6315,57 @@ fn no_install_env_var_conflicts() -> Result<()> {
     Ok(())
 }
 
+/// Environment-derived lock policy flags should retain the conflicts of their CLI equivalents.
+#[test]
+fn lock_policy_env_var_conflicts() {
+    let context = uv_test::test_context!("3.12");
+
+    uv_snapshot!(context.filters(), context.sync().arg("--upgrade").env(EnvVars::UV_FROZEN, "1"), @"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    error: the argument `UV_FROZEN` (environment variable) cannot be used with `--upgrade`
+    ");
+
+    uv_snapshot!(context.filters(), context.sync().arg("--upgrade").env(EnvVars::UV_LOCKED, "1"), @"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    error: the argument `UV_LOCKED` (environment variable) cannot be used with `--upgrade`
+    ");
+
+    uv_snapshot!(context.filters(), context.sync().arg("--no-sources").env(EnvVars::UV_FROZEN, "1"), @"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    error: the argument `UV_FROZEN` (environment variable) cannot be used with `--no-sources`
+    ");
+
+    uv_snapshot!(context.filters(), context.sync().env(EnvVars::UV_FROZEN, "1").env(EnvVars::UV_NO_SOURCES, "1"), @"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    error: the argument `UV_FROZEN` (environment variable) cannot be used with `UV_NO_SOURCES` (environment variable)
+    ");
+
+    uv_snapshot!(context.filters(), context.sync().arg("--no-sources").env(EnvVars::UV_FROZEN, "1").env(EnvVars::UV_NO_SOURCES, "0"), @"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    error: the argument `UV_FROZEN` (environment variable) cannot be used with `--no-sources`
+    ");
+}
+
 /// Avoid syncing the target package when `--no-install-package` is provided.
 #[test]
 fn no_install_package() -> Result<()> {
