@@ -5182,6 +5182,23 @@ fn run_with_env_file() -> Result<()> {
     ----- stderr -----
     ");
 
+    let env_file_directory = context.temp_dir.child("path with spaces");
+    env_file_directory.create_dir_all()?;
+    let env_file = env_file_directory.child(".file");
+    env_file.write_str("THE_EMPIRE_VARIABLE=palpatine\n")?;
+
+    uv_snapshot!(context.filters(), context.run().arg("--env-file").arg(env_file.path()).arg("test.py"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    palpatine
+    None
+    None
+    None
+
+    ----- stderr -----
+    ");
+
     context.temp_dir.child(".file").write_str(indoc! { "
         UV_PYTHON_SEARCH_PATH=.no-python
         THE_EMPIRE_VARIABLE=palpatine

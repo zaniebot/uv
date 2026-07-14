@@ -15,7 +15,7 @@ use uv_cache::{Cache, Refresh};
 use uv_cache_info::Timestamp;
 use uv_cli::ExternalCommand;
 use uv_client::{BaseClientBuilder, RegistryClientBuilder};
-use uv_configuration::{Concurrency, Constraints, GitLfsSetting, TargetTriple};
+use uv_configuration::{Concurrency, Constraints, EnvFile, GitLfsSetting, TargetTriple};
 use uv_distribution::LoweredExtraBuildDependencies;
 use uv_distribution_types::InstalledDist;
 use uv_distribution_types::{
@@ -119,8 +119,7 @@ pub(crate) async fn run(
     cache: Cache,
     workspace_cache: WorkspaceCache,
     printer: Printer,
-    env_file: Vec<PathBuf>,
-    no_env_file: bool,
+    env_file: EnvFile,
     preview: Preview,
 ) -> anyhow::Result<ExitStatus> {
     /// Whether or not a path looks like a Python script based on the file extension.
@@ -135,11 +134,7 @@ pub(crate) async fn run(
         );
     }
 
-    let env_file_environment = if no_env_file {
-        Vec::new()
-    } else {
-        read_env_files(env_file.iter())?
-    };
+    let env_file_environment = read_env_files(env_file.iter())?;
 
     let Some(command) = command else {
         // When a command isn't provided, we'll show a brief help including available tools
