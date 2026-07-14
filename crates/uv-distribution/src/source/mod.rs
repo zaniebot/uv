@@ -3514,7 +3514,9 @@ fn validate_filename(filename: &WheelFilename, metadata: &ResolutionMetadata) ->
         });
     }
 
-    if metadata.version != filename.version {
+    if metadata.version != filename.version
+        && metadata.version != filename.version.clone().without_local()
+    {
         return Err(Error::WheelFilenameVersionMismatch {
             metadata: metadata.version.clone(),
             filename: filename.version.clone(),
@@ -3724,4 +3726,10 @@ fn read_wheel_metadata(
     let dist_info = read_archive_metadata(filename, reader)
         .map_err(|err| Error::WheelMetadata(wheel.to_path_buf(), Box::new(err)))?;
     Ok(ResolutionMetadata::parse_metadata(&dist_info)?)
+}
+
+/// Validate that a built wheel's filename matches its embedded metadata.
+pub fn validate_wheel_metadata(filename: &WheelFilename, wheel: &Path) -> Result<(), Error> {
+    let metadata = read_wheel_metadata(filename, wheel)?;
+    validate_filename(filename, &metadata)
 }

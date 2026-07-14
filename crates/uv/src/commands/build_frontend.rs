@@ -96,6 +96,8 @@ pub(crate) enum Error {
     InvalidBuiltSourceDistFilename(#[source] uv_distribution_filename::SourceDistFilenameError),
     #[error("The built wheel has an invalid filename")]
     InvalidBuiltWheelFilename(#[source] uv_distribution_filename::WheelFilenameError),
+    #[error("Failed to validate the built wheel")]
+    InvalidBuiltWheelMetadata(#[source] uv_distribution::Error),
     #[error("The source distribution declares version {0}, but the wheel declares version {1}")]
     VersionMismatch(Version, Version),
 }
@@ -1155,6 +1157,16 @@ async fn build_wheel(
             }
         }
     };
+    if let BuildMessage::Build {
+        normalized_filename: DistFilename::WheelFilename(filename),
+        raw_filename,
+        output_dir,
+    } = &build_message
+        && !uv_flags::contains(uv_flags::EnvironmentFlags::SKIP_WHEEL_FILENAME_CHECK)
+    {
+        uv_distribution::validate_wheel_metadata(filename, &output_dir.join(raw_filename))
+            .map_err(Error::InvalidBuiltWheelMetadata)?;
+    }
     if let Some(expected) = version {
         let actual = build_message.normalized_filename().version();
         if expected != actual {

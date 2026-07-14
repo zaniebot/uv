@@ -2666,6 +2666,110 @@ fn build_version_mismatch() -> Result<()> {
     Ok(())
 }
 
+/// A backend must not return a wheel whose metadata disagrees with its filename.
+#[test]
+fn build_wheel_metadata_mismatch() -> Result<()> {
+    let context = uv_test::test_context!("3.12");
+    let project = context.temp_dir.child("project");
+    project.child("pyproject.toml").write_str(indoc! {r#"
+        [build-system]
+        requires = []
+        build-backend = "backend"
+        backend-path = ["."]
+    "#})?;
+    project.child("backend.py").write_str(indoc! {r#"
+        from pathlib import Path
+        from zipfile import ZipFile
+
+        def build_wheel(wheel_directory, config_settings=None, metadata_directory=None):
+            filename = "alpha-1.0.0-py3-none-any.whl"
+            with ZipFile(Path(wheel_directory, filename), "w") as wheel:
+                wheel.writestr(
+                    "alpha-1.0.0.dist-info/METADATA",
+                    "Metadata-Version: 2.1\nName: other\nVersion: 9.0.0\n",
+                )
+            return filename
+    "#})?;
+
+    uv_snapshot!(context.filters(), context.build().arg("--wheel").current_dir(&project), @"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    Building wheel...
+    error: Failed to build `[TEMP_DIR]/project`
+      Caused by: Failed to validate the built wheel
+      Caused by: Package metadata name `other` does not match `alpha` from the wheel filename
+    ");
+
+    // Preserve the compatibility escape hatch for known-bad third-party wheels.
+    uv_snapshot!(context.filters(), context.build().arg("--wheel").env(EnvVars::UV_SKIP_WHEEL_FILENAME_CHECK, "1").current_dir(&project), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Building wheel...
+    Successfully built dist/alpha-1.0.0-py3-none-any.whl
+    ");
+
+    fs_err::remove_dir_all(project.child("__pycache__"))?;
+    project.child("backend.py").write_str(indoc! {r#"
+        from pathlib import Path
+        from zipfile import ZipFile
+
+        def build_wheel(wheel_directory, config_settings=None, metadata_directory=None):
+            filename = "alpha-1.0.0-py3-none-any.whl"
+            with ZipFile(Path(wheel_directory, filename), "w") as wheel:
+                wheel.writestr(
+                    "alpha-1.0.0.dist-info/METADATA",
+                    "Metadata-Version: 2.1\nName: alpha\nVersion: 9.0.0\n",
+                )
+            return filename
+    "#})?;
+
+    uv_snapshot!(context.filters(), context.build().arg("--wheel").current_dir(&project), @"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    Building wheel...
+    error: Failed to build `[TEMP_DIR]/project`
+      Caused by: Failed to validate the built wheel
+      Caused by: Package metadata version `9.0.0` does not match `1.0.0` from the wheel filename
+    ");
+
+    // A filename may include a local version that is omitted from the embedded metadata.
+    fs_err::remove_dir_all(project.child("__pycache__"))?;
+    project.child("backend.py").write_str(indoc! {r#"
+        from pathlib import Path
+        from zipfile import ZipFile
+
+        def build_wheel(wheel_directory, config_settings=None, metadata_directory=None):
+            filename = "alpha-1.0.0+local-py3-none-any.whl"
+            with ZipFile(Path(wheel_directory, filename), "w") as wheel:
+                wheel.writestr(
+                    "alpha-1.0.0.dist-info/METADATA",
+                    "Metadata-Version: 2.1\nName: alpha\nVersion: 1.0.0\n",
+                )
+            return filename
+    "#})?;
+
+    uv_snapshot!(context.filters(), context.build().arg("--wheel").current_dir(&project), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Building wheel...
+    Successfully built dist/alpha-1.0.0+local-py3-none-any.whl
+    ");
+
+    Ok(())
+}
+
 #[cfg(unix)] // Symlinks aren't universally available on windows.
 #[test]
 fn build_with_symlink() -> Result<()> {
