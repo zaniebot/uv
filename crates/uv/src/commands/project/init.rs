@@ -45,7 +45,7 @@ pub(crate) async fn init(
     project_dir: &Path,
     explicit_path: Option<PathBuf>,
     name: Option<PackageName>,
-    package: bool,
+    package: InitPackaging,
     init_kind: InitKind,
     bare: bool,
     description: Option<String>,
@@ -212,7 +212,7 @@ async fn init_script(
     no_readme: bool,
     author_from: Option<AuthorFrom>,
     pin_python: bool,
-    package: bool,
+    package: InitPackaging,
     config_discovery: ConfigDiscovery,
 ) -> Result<()> {
     if no_workspace {
@@ -224,7 +224,7 @@ async fn init_script(
     if author_from.is_some() {
         warn_user_once!("`--author-from` is a no-op for Python scripts, which are standalone");
     }
-    if package {
+    if matches!(package, InitPackaging::Packaged) {
         warn_user_once!("`--package` is a no-op for Python scripts, which are standalone");
     }
 
@@ -284,7 +284,7 @@ async fn init_project(
     path: &Path,
     name: &PackageName,
     // TODO(konsti): Remove when stabilizing.
-    package: bool,
+    package: InitPackaging,
     project_kind: InitProjectKind,
     bare: bool,
     description: Option<String>,
@@ -726,6 +726,26 @@ pub(crate) enum InitKind {
     Script,
 }
 
+/// Whether to initialize a packaged or virtual project.
+#[derive(Debug, Copy, Clone)]
+pub(crate) enum InitPackaging {
+    /// Initialize a packaged project.
+    Packaged,
+    /// Initialize a virtual project.
+    Virtual,
+}
+
+impl InitPackaging {
+    /// Determine the [`InitPackaging`] setting based on the command-line arguments.
+    pub(crate) fn from_args(package: bool) -> Self {
+        if package {
+            Self::Packaged
+        } else {
+            Self::Virtual
+        }
+    }
+}
+
 /// The kind of Python project to initialize (either an application or a library).
 #[derive(Debug, Copy, Clone, Default)]
 pub(crate) enum InitProjectKind {
@@ -753,7 +773,6 @@ pub(crate) enum InitProjectKind {
 impl InitProjectKind {
     /// Initialize this project kind at the target path.
     // TODO(konsti): Remove when stabilizing packaged-init.
-    #[expect(clippy::fn_params_excessive_bools)]
     fn init_old(
         self,
         name: &PackageName,
@@ -766,7 +785,7 @@ impl InitProjectKind {
         build_backend: Option<ProjectBuildBackend>,
         author_from: Option<AuthorFrom>,
         no_readme: bool,
-        package: bool,
+        package: InitPackaging,
     ) -> Result<()> {
         match self {
             Self::ApplicationOld => Self::init_application_old(
@@ -801,7 +820,6 @@ impl InitProjectKind {
 
     /// Initialize a Python application at the target path.
     // TODO(konsti): Remove when stabilizing packaged-init.
-    #[expect(clippy::fn_params_excessive_bools)]
     fn init_application_old(
         name: &PackageName,
         path: &Path,
@@ -813,7 +831,7 @@ impl InitProjectKind {
         build_backend: Option<ProjectBuildBackend>,
         author_from: Option<AuthorFrom>,
         no_readme: bool,
-        package: bool,
+        package: InitPackaging,
     ) -> Result<()> {
         fs_err::create_dir_all(path)?;
 
@@ -823,7 +841,7 @@ impl InitProjectKind {
 
         // Do not fill in `authors` for non-packaged applications unless explicitly requested.
         let author_from = author_from.unwrap_or_else(|| {
-            if package {
+            if matches!(package, InitPackaging::Packaged) {
                 AuthorFrom::default()
             } else {
                 AuthorFrom::None
@@ -842,7 +860,7 @@ impl InitProjectKind {
         );
 
         // Include additional project configuration for packaged applications
-        if package {
+        if matches!(package, InitPackaging::Packaged) {
             // Since it'll be packaged, we can add a `[project.scripts]` entry
             if !bare {
                 pyproject.push('\n');
@@ -885,7 +903,6 @@ impl InitProjectKind {
 
     /// Initialize a library project at the target path.
     // TODO(konsti): Remove when stabilizing packaged-init.
-    #[expect(clippy::fn_params_excessive_bools)]
     fn init_library_old(
         name: &PackageName,
         path: &Path,
@@ -897,9 +914,9 @@ impl InitProjectKind {
         build_backend: Option<ProjectBuildBackend>,
         author_from: Option<AuthorFrom>,
         no_readme: bool,
-        package: bool,
+        package: InitPackaging,
     ) -> Result<()> {
-        if !package {
+        if matches!(package, InitPackaging::Virtual) {
             return Err(anyhow!("Library projects must be packaged"));
         }
 
@@ -938,7 +955,6 @@ impl InitProjectKind {
     }
 
     /// Initialize this project kind at the target path.
-    #[expect(clippy::fn_params_excessive_bools)]
     fn init(
         self,
         name: &PackageName,
@@ -951,7 +967,7 @@ impl InitProjectKind {
         build_backend: Option<ProjectBuildBackend>,
         author_from: Option<AuthorFrom>,
         no_readme: bool,
-        package: bool,
+        package: InitPackaging,
     ) -> Result<()> {
         // TODO(konsti): Remove when stabilizing.
         if matches!(self, Self::ApplicationOld | Self::LibraryOld) {
