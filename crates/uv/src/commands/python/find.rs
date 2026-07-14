@@ -8,7 +8,8 @@ use uv_configuration::{DependencyGroupsWithDefaults, ProjectDiscovery};
 use uv_errors::ErrorWithHints;
 use uv_fs::Simplified;
 use uv_python::{
-    EnvironmentPreference, PythonDownloads, PythonInstallation, PythonPreference, PythonRequest,
+    ConfigDiscovery, EnvironmentPreference, PythonDownloads, PythonInstallation, PythonPreference,
+    PythonRequest,
 };
 use uv_scripts::Pep723ItemRef;
 use uv_settings::PythonInstallMirrors;
@@ -29,7 +30,7 @@ pub(crate) async fn find(
     show_version: bool,
     resolve_links: bool,
     project_discovery: ProjectDiscovery,
-    no_config: bool,
+    config_discovery: ConfigDiscovery,
     environment_preference: EnvironmentPreference,
     python_preference: PythonPreference,
     python_downloads_json_url: Option<&str>,
@@ -76,7 +77,7 @@ pub(crate) async fn find(
         project.as_ref().map(VirtualProject::workspace),
         &groups,
         project_dir,
-        no_config,
+        config_discovery,
     )
     .await?;
 
@@ -137,7 +138,7 @@ pub(crate) async fn find_script(
     client_builder: &BaseClientBuilder<'_>,
     python_preference: PythonPreference,
     python_downloads: PythonDownloads,
-    no_config: bool,
+    config_discovery: ConfigDiscovery,
     cache: &Cache,
     printer: Printer,
 ) -> Result<ExitStatus> {
@@ -149,7 +150,7 @@ pub(crate) async fn find_script(
         python_downloads,
         &PythonInstallMirrors::default(),
         false,
-        no_config,
+        config_discovery,
         Some(false),
         cache,
         printer,

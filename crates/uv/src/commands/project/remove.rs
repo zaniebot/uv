@@ -17,7 +17,7 @@ use uv_install_wheel::InstallerMetadata;
 use uv_normalize::PackageName;
 use uv_normalize::{DEV_DEPENDENCIES, DefaultExtras, DefaultGroups};
 use uv_preview::Preview;
-use uv_python::{PythonDownloads, PythonPreference, PythonRequest};
+use uv_python::{ConfigDiscovery, PythonDownloads, PythonPreference, PythonRequest};
 use uv_scripts::{Pep723Metadata, Pep723Script};
 use uv_settings::{MalwareCheckSettings, PythonInstallMirrors};
 use uv_warnings::warn_user_once;
@@ -58,7 +58,7 @@ pub(crate) async fn remove(
     python_downloads: PythonDownloads,
     installer_metadata: InstallerMetadata,
     concurrency: Concurrency,
-    no_config: bool,
+    config_discovery: ConfigDiscovery,
     cache: &Cache,
     printer: Printer,
     preview: Preview,
@@ -231,7 +231,7 @@ pub(crate) async fn remove(
                     Some(project.workspace()),
                     &groups,
                     project_dir,
-                    no_config,
+                    config_discovery,
                 )
                 .await?;
                 let interpreter = ProjectInterpreter::discover(
@@ -262,7 +262,7 @@ pub(crate) async fn remove(
                     python_preference,
                     python_downloads,
                     no_sync,
-                    no_config,
+                    config_discovery,
                     active,
                     cache,
                     DryRun::Disabled,
@@ -284,7 +284,7 @@ pub(crate) async fn remove(
                 python_downloads,
                 &install_mirrors,
                 no_sync,
-                no_config,
+                config_discovery,
                 active,
                 cache,
                 printer,
