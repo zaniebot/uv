@@ -5045,8 +5045,9 @@ impl PublishSettings {
                 .publish_url
                 .combine(publish_url)
                 .unwrap_or_else(|| DisplaySafeUrl::parse(PYPI_PUBLISH_URL).unwrap()),
-            trusted_publishing: trusted_publishing
-                .combine(args.trusted_publishing)
+            trusted_publishing: args
+                .trusted_publishing
+                .combine(trusted_publishing)
                 .unwrap_or_default(),
             keyring_provider: args
                 .keyring_provider
@@ -5161,6 +5162,39 @@ fn parse_failure(name: &str, expected: &str) -> ! {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn publish_settings_cli_trusted_publishing_overrides_configuration() {
+        let settings = PublishSettings::resolve(
+            PublishArgs {
+                files: Vec::new(),
+                index: None,
+                username: None,
+                password: None,
+                token: None,
+                trusted_publishing: Some(TrustedPublishing::Never),
+                keyring_provider: None,
+                publish_url: None,
+                check_url: None,
+                skip_existing: false,
+                dry_run: false,
+                no_attestations: false,
+                direct: false,
+            },
+            Some(
+                Options {
+                    publish: PublishOptions {
+                        trusted_publishing: Some(TrustedPublishing::Always),
+                        ..PublishOptions::default()
+                    },
+                    ..Options::default()
+                }
+                .into(),
+            ),
+        );
+
+        assert_eq!(settings.trusted_publishing, TrustedPublishing::Never);
+    }
 
     #[test]
     fn upgrade_settings_target_only_requested_package() -> anyhow::Result<()> {
