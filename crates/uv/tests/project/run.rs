@@ -483,7 +483,7 @@ fn run_pep723_script() -> Result<()> {
       ╰─▶ Because there are no versions of add and you require add, we can conclude that your requirements are unsatisfiable.
     ");
 
-    // If the script contains an unclosed PEP 723 tag, we should error.
+    // If the script contains an unclosed PEP 723 tag, we should ignore it.
     let test_script = context.temp_dir.child("main.py");
     test_script.write_str(indoc! { r#"
         # /// script
@@ -494,17 +494,47 @@ fn run_pep723_script() -> Result<()> {
 
         # ///
 
-        import iniconfig
+        print("Hello, world!")
+       "#
+    })?;
+
+    uv_snapshot!(context.filters(), context.run().arg("--no-project").arg("main.py"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    Hello, world!
+
+    ----- stderr -----
+    ");
+
+    // If a valid PEP 723 tag follows an unclosed tag, we should use the valid tag.
+    let test_script = context.temp_dir.child("main.py");
+    test_script.write_str(indoc! { r#"
+        # /// script
+        # dependencies = [
+        #   "ignored",
+        # ]
+
+        pass
+
+        # /// script
+        # dependencies = [
+        #   "add",
+        # ]
+        # ///
+
+        print("Hello, world!")
        "#
     })?;
 
     uv_snapshot!(context.filters(), context.run().arg("--no-project").arg("main.py"), @"
     success: false
-    exit_code: 2
+    exit_code: 1
     ----- stdout -----
 
     ----- stderr -----
-    error: An opening tag (`# /// script`) was found without a closing tag (`# ///`). Ensure that every line between the opening and closing tags (including empty lines) starts with a leading `#`.
+      × No solution found when resolving script dependencies:
+      ╰─▶ Because there are no versions of add and you require add, we can conclude that your requirements are unsatisfiable.
     ");
 
     // Regression test for: <https://github.com/astral-sh/uv/issues/18617>
