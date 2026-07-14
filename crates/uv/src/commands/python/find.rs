@@ -30,7 +30,7 @@ pub(crate) async fn find(
     resolve_links: bool,
     no_project: bool,
     no_config: bool,
-    system: bool,
+    environment_preference: EnvironmentPreference,
     python_preference: PythonPreference,
     python_downloads_json_url: Option<&str>,
     client_builder: &BaseClientBuilder<'_>,
@@ -38,12 +38,6 @@ pub(crate) async fn find(
     workspace_cache: &WorkspaceCache,
     printer: Printer,
 ) -> Result<ExitStatus> {
-    let environment_preference = if system {
-        EnvironmentPreference::OnlySystem
-    } else {
-        EnvironmentPreference::Any
-    };
-
     let project = if no_project {
         None
     } else {
