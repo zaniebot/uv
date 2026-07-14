@@ -1,5 +1,6 @@
 use indexmap::IndexMap;
 use itertools::Itertools;
+use regex::Regex;
 use serde::{Deserialize, Deserializer};
 use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet, Bound};
@@ -8,6 +9,7 @@ use std::fmt::Display;
 use std::fmt::Write;
 use std::path::{Path, PathBuf};
 use std::str::{self, FromStr};
+use std::sync::LazyLock;
 use tracing::{debug, trace, warn};
 use uv_warnings::warn_user_once;
 use version_ranges::Ranges;
@@ -80,6 +82,8 @@ pub enum ValidationError {
         "Script entry point name `{0}` must include a non-dot character and consist only of letters, numbers, dots, underscores and dashes"
     )]
     InvalidScriptName(String),
+    #[error("Entrypoint object reference {0:?} must be a valid Python object reference")]
+    InvalidEntryPointObjectReference(String),
     #[error("Use `project.scripts` instead of `project.entry-points.console_scripts`")]
     ReservedScripts,
     #[error("Use `project.gui-scripts` instead of `project.entry-points.gui_scripts`")]
@@ -931,12 +935,97 @@ impl PyProjectToml {
                 );
             }
 
-            // TODO(konsti): Validate that the object references are valid Python identifiers.
+            if !valid_entry_point_object_reference(object_reference) {
+                return Err(ValidationError::InvalidEntryPointObjectReference(
+                    object_reference.clone(),
+                ));
+            }
+
             let _ = writeln!(writer, "{name} = {object_reference}");
         }
         writer.push('\n');
         Ok(())
     }
+}
+
+/// Validate a Python object reference, including the deprecated extra syntax.
+fn valid_entry_point_object_reference(object_reference: &str) -> bool {
+    static PYTHON_IDENTIFIER: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r"^[_\p{XID_Start}]\p{XID_Continue}*$").expect("valid Python identifier regex")
+    });
+
+    let object_reference = object_reference.trim_end();
+    let object_reference =
+        if let Some((object_reference, extras)) = object_reference.split_once('[') {
+            let Some(extras) = extras.strip_suffix(']') else {
+                return false;
+            };
+            if extras
+                .split(',')
+                .any(|extra| ExtraName::from_str(extra.trim()).is_err())
+            {
+                return false;
+            }
+            object_reference.trim_end()
+        } else {
+            object_reference
+        };
+
+    let (module, object) = object_reference
+        .split_once(':')
+        .map_or((object_reference, None), |(module, object)| {
+            (module.trim_end(), Some(object.trim_start()))
+        });
+
+    module
+        .split('.')
+        .all(|part| PYTHON_IDENTIFIER.is_match(part) && !is_python_keyword(part))
+        && object.is_none_or(|object| {
+            object
+                .split('.')
+                .all(|part| PYTHON_IDENTIFIER.is_match(part) && !is_python_keyword(part))
+        })
+}
+
+fn is_python_keyword(value: &str) -> bool {
+    matches!(
+        value,
+        "False"
+            | "None"
+            | "True"
+            | "and"
+            | "as"
+            | "assert"
+            | "async"
+            | "await"
+            | "break"
+            | "class"
+            | "continue"
+            | "def"
+            | "del"
+            | "elif"
+            | "else"
+            | "except"
+            | "finally"
+            | "for"
+            | "from"
+            | "global"
+            | "if"
+            | "import"
+            | "in"
+            | "is"
+            | "lambda"
+            | "nonlocal"
+            | "not"
+            | "or"
+            | "pass"
+            | "raise"
+            | "return"
+            | "try"
+            | "while"
+            | "with"
+            | "yield"
+    )
 }
 
 /// The `[project]` section of a pyproject.toml as specified in
@@ -2017,6 +2106,62 @@ mod tests {
         "#
         });
         assert_snapshot!(script_error(&contents), @"Entrypoint groups must consist of letters and numbers separated by dots, invalid group: a@b");
+    }
+
+    #[test]
+    fn valid_entry_point_object_references() {
+        let contents = extend_project(indoc! {r#"
+            [project.entry-points."project.plugins"]
+            one = "project:plugin [extra]   "
+            two = "cafe\u0301:handler"
+            three = "project.module"
+            four = "módulo:acción"
+        "#});
+        let pyproject_toml: PyProjectToml = toml::from_str(&contents).unwrap();
+
+        assert_eq!(
+            pyproject_toml.to_entry_points().unwrap().unwrap(),
+            "[project.plugins]\nfour = módulo:acción\none = project:plugin [extra]   \nthree = project.module\ntwo = cafe\u{301}:handler\n\n"
+        );
+    }
+
+    #[test]
+    fn invalid_entry_point_object_references() {
+        let errors = [
+            "project-name:plugin",
+            "project:plugin-name",
+            "1project:plugin",
+            "project:1plugin",
+            "project\u{b2}:plugin",
+            "project:plugin\u{b2}",
+            "project..module:plugin",
+            "project:plugin..handler",
+            "class:plugin",
+            "project:class",
+        ]
+        .into_iter()
+        .map(|object_reference| {
+            let contents = extend_project(&formatdoc! {r#"
+                [project.entry-points."project.plugins"]
+                plugin = {object_reference:?}
+            "#});
+            script_error(&contents)
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+
+        assert_snapshot!(errors, @r#"
+        Entrypoint object reference "project-name:plugin" must be a valid Python object reference
+        Entrypoint object reference "project:plugin-name" must be a valid Python object reference
+        Entrypoint object reference "1project:plugin" must be a valid Python object reference
+        Entrypoint object reference "project:1plugin" must be a valid Python object reference
+        Entrypoint object reference "project²:plugin" must be a valid Python object reference
+        Entrypoint object reference "project:plugin²" must be a valid Python object reference
+        Entrypoint object reference "project..module:plugin" must be a valid Python object reference
+        Entrypoint object reference "project:plugin..handler" must be a valid Python object reference
+        Entrypoint object reference "class:plugin" must be a valid Python object reference
+        Entrypoint object reference "project:class" must be a valid Python object reference
+        "#);
     }
 
     #[test]
