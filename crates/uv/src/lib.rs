@@ -33,7 +33,7 @@ use uv_cli::{
     WorkspaceCommand, WorkspaceNamespace, compat::CompatArgs,
 };
 use uv_client::BaseClientBuilder;
-use uv_configuration::{DryRun, InstallSelection, min_stack_size};
+use uv_configuration::{DryRun, HashOutput, InstallSelection, min_stack_size};
 use uv_flags::EnvironmentFlags;
 use uv_fs::{CWD, Simplified, normalize_path};
 #[cfg(feature = "self-update")]
@@ -791,7 +791,7 @@ pub async fn run(cli: Cli, global_initialization: GlobalInitialization) -> Resul
                 args.settings.fork_strategy,
                 args.settings.dependency_mode,
                 args.settings.upgrade,
-                args.settings.generate_hashes,
+                HashOutput::from_args(args.settings.generate_hashes),
                 args.settings.no_emit_package,
                 args.settings.no_strip_extras,
                 args.settings.no_strip_markers,

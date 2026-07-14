@@ -5,6 +5,7 @@ use petgraph::visit::EdgeRef;
 use petgraph::{Directed, Direction, Graph};
 use rustc_hash::{FxBuildHasher, FxHashMap};
 
+use uv_configuration::HashOutput;
 use uv_distribution_types::{DistributionMetadata, Name, SourceAnnotation, SourceAnnotations};
 use uv_normalize::PackageName;
 use uv_pep508::MarkerTree;
@@ -22,7 +23,7 @@ pub struct DisplayResolutionGraph<'a> {
     /// The packages to exclude from the output.
     no_emit_packages: &'a [PackageName],
     /// Whether to include hashes in the output.
-    show_hashes: bool,
+    hash_output: HashOutput,
     /// Whether to include extras in the output (e.g., `black[colorama]`).
     include_extras: bool,
     /// Whether to include environment markers in the output (e.g., `black ; sys_platform == "win32"`).
@@ -55,7 +56,7 @@ impl<'a> DisplayResolutionGraph<'a> {
         underlying: &'a ResolverOutput,
         env: &'a ResolverEnvironment,
         no_emit_packages: &'a [PackageName],
-        show_hashes: bool,
+        hash_output: HashOutput,
         include_extras: bool,
         include_markers: bool,
         include_annotations: bool,
@@ -73,7 +74,7 @@ impl<'a> DisplayResolutionGraph<'a> {
             resolution: underlying,
             env,
             no_emit_packages,
-            show_hashes,
+            hash_output,
             include_extras,
             include_markers,
             include_annotations,
@@ -216,7 +217,7 @@ impl std::fmt::Display for DisplayResolutionGraph<'_> {
 
             // Display the distribution hashes, if any.
             let mut has_hashes = false;
-            if self.show_hashes {
+            if matches!(self.hash_output, HashOutput::Generate) {
                 for hash in node.hashes {
                     has_hashes = true;
                     line.push_str(" \\\n");

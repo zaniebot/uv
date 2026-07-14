@@ -42,3 +42,23 @@ pub enum PipCompileFormat {
     #[cfg_attr(feature = "clap", clap(name = "pylock.toml", alias = "pylock-toml"))]
     PylockToml,
 }
+
+/// Whether to generate hashes for `uv pip compile` output.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HashOutput {
+    /// Generate and include hashes in the output.
+    Generate,
+    /// Omit hashes from the output.
+    Omit,
+}
+
+impl HashOutput {
+    /// Determine the [`HashOutput`] setting from the command-line arguments.
+    pub const fn from_args(generate_hashes: bool) -> Self {
+        if generate_hashes {
+            Self::Generate
+        } else {
+            Self::Omit
+        }
+    }
+}

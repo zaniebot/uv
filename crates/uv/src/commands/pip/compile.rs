@@ -15,7 +15,8 @@ use uv_cache::Cache;
 use uv_client::{BaseClientBuilder, FlatIndexClient, RegistryClientBuilder};
 use uv_configuration::{
     BuildIsolation, BuildOptions, Concurrency, Constraints, ExcludeDependency, ExtrasSpecification,
-    IndexStrategy, NoBinary, NoBuild, NoSources, Override, PipCompileFormat, Reinstall, Upgrade,
+    HashOutput, IndexStrategy, NoBinary, NoBuild, NoSources, Override, PipCompileFormat,
+    Reinstall, Upgrade,
 };
 use uv_configuration::{KeyringProviderType, TargetTriple};
 use uv_dispatch::{BuildDispatch, SharedState};
@@ -82,7 +83,7 @@ pub(crate) async fn pip_compile(
     fork_strategy: ForkStrategy,
     dependency_mode: DependencyMode,
     upgrade: Upgrade,
-    generate_hashes: bool,
+    hash_output: HashOutput,
     no_emit_packages: Vec<PackageName>,
     include_extras: bool,
     include_markers: bool,
@@ -411,7 +412,9 @@ pub(crate) async fn pip_compile(
 
     // Generate, but don't enforce hashes for the requirements. PEP 751 _requires_ a hash to be
     // present, but otherwise, we omit them by default.
-    let hasher = if generate_hashes || matches!(format, PipCompileFormat::PylockToml) {
+    let hasher = if matches!(hash_output, HashOutput::Generate)
+        || matches!(format, PipCompileFormat::PylockToml)
+    {
         HashStrategy::Generate(HashGeneration::All)
     } else {
         HashStrategy::None
@@ -713,7 +716,7 @@ pub(crate) async fn pip_compile(
                     &resolution,
                     &resolver_env,
                     &no_emit_packages,
-                    generate_hashes,
+                    hash_output,
                     include_extras,
                     include_markers || universal,
                     include_annotations,
