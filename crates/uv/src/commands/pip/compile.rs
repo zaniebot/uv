@@ -15,8 +15,9 @@ use uv_cache::Cache;
 use uv_client::{BaseClientBuilder, FlatIndexClient, RegistryClientBuilder};
 use uv_configuration::{
     AnnotationOutput, BuildIsolation, BuildOptions, Concurrency, Constraints, ExcludeDependency,
-    ExtrasOutput, ExtrasSpecification, HashOutput, HeaderOutput, IndexStrategy, IndexUrlOutput,
-    MarkersOutput, NoBinary, NoBuild, NoSources, Override, PipCompileFormat, Reinstall, Upgrade,
+    ExtrasOutput, ExtrasSpecification, FindLinksOutput, HashOutput, HeaderOutput, IndexStrategy,
+    IndexUrlOutput, MarkersOutput, NoBinary, NoBuild, NoSources, Override, PipCompileFormat,
+    Reinstall, Upgrade,
 };
 use uv_configuration::{KeyringProviderType, TargetTriple};
 use uv_dispatch::{BuildDispatch, SharedState};
@@ -91,7 +92,7 @@ pub(crate) async fn pip_compile(
     header_output: HeaderOutput,
     custom_compile_command: Option<String>,
     index_url_output: IndexUrlOutput,
-    include_find_links: bool,
+    find_links_output: FindLinksOutput,
     include_build_options: bool,
     include_marker_expression: bool,
     include_index_annotation: bool,
@@ -625,7 +626,7 @@ pub(crate) async fn pip_compile(
                 "#    {}",
                 cmd(
                     index_url_output,
-                    include_find_links,
+                    find_links_output,
                     custom_compile_command
                 )
             )
@@ -667,7 +668,7 @@ pub(crate) async fn pip_compile(
             }
 
             // If necessary, include the `--find-links` locations.
-            if include_find_links {
+            if matches!(find_links_output, FindLinksOutput::Include) {
                 for flat_index in index_locations.flat_indexes() {
                     writeln!(writer, "--find-links {}", flat_index.url().verbatim())?;
                     wrote_preamble = true;
@@ -740,7 +741,7 @@ pub(crate) async fn pip_compile(
                     "The `--emit-index-url` option is not supported for `pylock.toml` output"
                 );
             }
-            if include_find_links {
+            if matches!(find_links_output, FindLinksOutput::Include) {
                 warn_user!(
                     "The `--emit-find-links` option is not supported for `pylock.toml` output"
                 );
@@ -805,7 +806,7 @@ pub(crate) async fn pip_compile(
 /// Format the uv command used to generate the output file.
 fn cmd(
     index_url_output: IndexUrlOutput,
-    include_find_links: bool,
+    find_links_output: FindLinksOutput,
     custom_compile_command: Option<String>,
 ) -> String {
     if let Some(cmd_str) = custom_compile_command {
@@ -847,7 +848,7 @@ fn cmd(
             }
 
             // Skip any `--find-links` URLs, unless requested.
-            if !include_find_links {
+            if matches!(find_links_output, FindLinksOutput::Omit) {
                 // Always skip the `--find-links` and mark the next item to be skipped
                 if arg == "--find-links" || arg == "-f" {
                     *skip_next = Some(true);

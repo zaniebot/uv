@@ -162,3 +162,23 @@ impl IndexUrlOutput {
         }
     }
 }
+
+/// Whether to include find-links locations in `uv pip compile` output.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FindLinksOutput {
+    /// Include find-links locations in the output.
+    Include,
+    /// Omit find-links locations from the output.
+    Omit,
+}
+
+impl FindLinksOutput {
+    /// Determine the [`FindLinksOutput`] setting from the command-line arguments.
+    pub const fn from_args(include_find_links: bool) -> Self {
+        if include_find_links {
+            Self::Include
+        } else {
+            Self::Omit
+        }
+    }
+}

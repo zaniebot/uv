@@ -34,8 +34,8 @@ use uv_cli::{
 };
 use uv_client::BaseClientBuilder;
 use uv_configuration::{
-    AnnotationOutput, DryRun, ExtrasOutput, HashOutput, HeaderOutput, IndexUrlOutput,
-    InstallSelection, MarkersOutput, min_stack_size,
+    AnnotationOutput, DryRun, ExtrasOutput, FindLinksOutput, HashOutput, HeaderOutput,
+    IndexUrlOutput, InstallSelection, MarkersOutput, min_stack_size,
 };
 use uv_flags::EnvironmentFlags;
 use uv_fs::{CWD, Simplified, normalize_path};
@@ -802,7 +802,7 @@ pub async fn run(cli: Cli, global_initialization: GlobalInitialization) -> Resul
                 HeaderOutput::from_args(!args.settings.no_header),
                 args.settings.custom_compile_command,
                 IndexUrlOutput::from_args(args.settings.emit_index_url),
-                args.settings.emit_find_links,
+                FindLinksOutput::from_args(args.settings.emit_find_links),
                 args.settings.emit_build_options,
                 args.settings.emit_marker_expression,
                 args.settings.emit_index_annotation,
