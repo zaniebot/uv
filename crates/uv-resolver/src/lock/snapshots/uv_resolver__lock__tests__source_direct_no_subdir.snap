@@ -42,6 +42,7 @@ Ok(
                     {},
                 ),
             },
+            indexes: [],
         },
         packages: [
             Package {

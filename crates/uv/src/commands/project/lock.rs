@@ -1028,6 +1028,7 @@ async fn do_lock(
             )?
             .with_manifest(manifest)
             .with_conflicts(conflicts)
+            .with_index_locations(index_locations, target.install_path())?
             .with_required_environments(lock_required_environments.into_markers());
 
             if previous.as_ref().is_some_and(|previous| *previous == lock) {
@@ -1101,6 +1102,13 @@ impl ValidatedLock {
                 "Ignoring existing lockfile due to change in fork strategy: `{}` vs. `{}`",
                 lock.fork_strategy().cyan(),
                 options.fork_strategy.cyan()
+            );
+            return Ok(Self::Unusable(lock));
+        }
+        if !lock.satisfies_index_locations(index_locations, install_path)? {
+            let _ = writeln!(
+                printer.stderr(),
+                "Ignoring existing lockfile due to change in index configuration"
             );
             return Ok(Self::Unusable(lock));
         }
