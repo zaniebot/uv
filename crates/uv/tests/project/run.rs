@@ -3176,6 +3176,28 @@ fn run_requirements_txt() -> Result<()> {
     Ok(())
 }
 
+#[test]
+fn run_with_requirements_comma_path() -> Result<()> {
+    let context = uv_test::test_context!("3.12");
+    let requirements_dir = context.temp_dir.child("has,comma");
+    requirements_dir.create_dir_all()?;
+    let requirements = requirements_dir.child("requirements.txt");
+    requirements.write_str("")?;
+
+    context
+        .run()
+        .arg("--no-project")
+        .arg("--with-requirements")
+        .arg(requirements.path())
+        .arg("python")
+        .arg("-c")
+        .arg("pass")
+        .assert()
+        .success();
+
+    Ok(())
+}
+
 /// Ignore and warn when (e.g.) the `--index-url` argument is a provided `requirements.txt`.
 #[test]
 fn run_requirements_txt_arguments() -> Result<()> {
