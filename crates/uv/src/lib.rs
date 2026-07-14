@@ -33,7 +33,9 @@ use uv_cli::{
     WorkspaceCommand, WorkspaceNamespace, compat::CompatArgs,
 };
 use uv_client::BaseClientBuilder;
-use uv_configuration::{DryRun, ExtrasOutput, HashOutput, InstallSelection, min_stack_size};
+use uv_configuration::{
+    DryRun, ExtrasOutput, HashOutput, InstallSelection, MarkersOutput, min_stack_size,
+};
 use uv_flags::EnvironmentFlags;
 use uv_fs::{CWD, Simplified, normalize_path};
 #[cfg(feature = "self-update")]
@@ -794,7 +796,7 @@ pub async fn run(cli: Cli, global_initialization: GlobalInitialization) -> Resul
                 HashOutput::from_args(args.settings.generate_hashes),
                 args.settings.no_emit_package,
                 ExtrasOutput::from_args(args.settings.no_strip_extras),
-                args.settings.no_strip_markers,
+                MarkersOutput::from_args(args.settings.no_strip_markers),
                 !args.settings.no_annotate,
                 !args.settings.no_header,
                 args.settings.custom_compile_command,

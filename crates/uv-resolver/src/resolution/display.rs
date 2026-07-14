@@ -5,7 +5,7 @@ use petgraph::visit::EdgeRef;
 use petgraph::{Directed, Direction, Graph};
 use rustc_hash::{FxBuildHasher, FxHashMap};
 
-use uv_configuration::{ExtrasOutput, HashOutput};
+use uv_configuration::{ExtrasOutput, HashOutput, MarkersOutput};
 use uv_distribution_types::{DistributionMetadata, Name, SourceAnnotation, SourceAnnotations};
 use uv_normalize::PackageName;
 use uv_pep508::MarkerTree;
@@ -27,7 +27,7 @@ pub struct DisplayResolutionGraph<'a> {
     /// Whether to include extras in the output (e.g., `black[colorama]`).
     extras_output: ExtrasOutput,
     /// Whether to include environment markers in the output (e.g., `black ; sys_platform == "win32"`).
-    include_markers: bool,
+    markers_output: MarkersOutput,
     /// Whether to include annotations in the output, to indicate which dependency or dependencies
     /// requested each package.
     include_annotations: bool,
@@ -58,7 +58,7 @@ impl<'a> DisplayResolutionGraph<'a> {
         no_emit_packages: &'a [PackageName],
         hash_output: HashOutput,
         extras_output: ExtrasOutput,
-        include_markers: bool,
+        markers_output: MarkersOutput,
         include_annotations: bool,
         include_index_annotation: bool,
         annotation_style: AnnotationStyle,
@@ -76,7 +76,7 @@ impl<'a> DisplayResolutionGraph<'a> {
             no_emit_packages,
             hash_output,
             extras_output,
-            include_markers,
+            markers_output,
             include_annotations,
             include_index_annotation,
             annotation_style,
@@ -212,7 +212,10 @@ impl std::fmt::Display for DisplayResolutionGraph<'_> {
         for (index, node) in nodes {
             // Display the node itself.
             let mut line = node
-                .to_requirements_txt(&self.resolution.requires_python, self.include_markers)
+                .to_requirements_txt(
+                    &self.resolution.requires_python,
+                    matches!(self.markers_output, MarkersOutput::Include),
+                )
                 .to_string();
 
             // Display the distribution hashes, if any.

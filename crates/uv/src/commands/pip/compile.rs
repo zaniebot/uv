@@ -15,7 +15,7 @@ use uv_cache::Cache;
 use uv_client::{BaseClientBuilder, FlatIndexClient, RegistryClientBuilder};
 use uv_configuration::{
     BuildIsolation, BuildOptions, Concurrency, Constraints, ExcludeDependency, ExtrasSpecification,
-    ExtrasOutput, HashOutput, IndexStrategy, NoBinary, NoBuild, NoSources, Override,
+    ExtrasOutput, HashOutput, IndexStrategy, MarkersOutput, NoBinary, NoBuild, NoSources, Override,
     PipCompileFormat, Reinstall, Upgrade,
 };
 use uv_configuration::{KeyringProviderType, TargetTriple};
@@ -86,7 +86,7 @@ pub(crate) async fn pip_compile(
     hash_output: HashOutput,
     no_emit_packages: Vec<PackageName>,
     extras_output: ExtrasOutput,
-    include_markers: bool,
+    markers_output: MarkersOutput,
     include_annotations: bool,
     include_header: bool,
     custom_compile_command: Option<String>,
@@ -718,7 +718,11 @@ pub(crate) async fn pip_compile(
                     &no_emit_packages,
                     hash_output,
                     extras_output,
-                    include_markers || universal,
+                    if universal {
+                        MarkersOutput::Include
+                    } else {
+                        markers_output
+                    },
                     include_annotations,
                     include_index_annotation,
                     annotation_style,

@@ -82,3 +82,23 @@ impl ExtrasOutput {
         }
     }
 }
+
+/// Whether to include environment markers in `uv pip compile` output.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MarkersOutput {
+    /// Include environment markers in the output.
+    Include,
+    /// Strip environment markers from the output.
+    Strip,
+}
+
+impl MarkersOutput {
+    /// Determine the [`MarkersOutput`] setting from the command-line arguments.
+    pub const fn from_args(include_markers: bool) -> Self {
+        if include_markers {
+            Self::Include
+        } else {
+            Self::Strip
+        }
+    }
+}
