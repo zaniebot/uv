@@ -8,7 +8,7 @@ use uv_cache::Cache;
 use uv_client::BaseClientBuilder;
 use uv_configuration::{
     Concurrency, DependencyGroups, DependencyGroupsWithDefaults, DryRun, ExtrasSpecification,
-    InstallOptions,
+    InstallOptions, ProjectDiscovery,
 };
 use uv_normalize::{DEV_DEPENDENCIES, DefaultExtras, PackageName};
 use uv_preview::{Preview, PreviewFeature};
@@ -65,7 +65,7 @@ pub(crate) async fn check(
     workspace_cache: &WorkspaceCache,
     printer: Printer,
     preview: Preview,
-    no_project: bool,
+    project_discovery: ProjectDiscovery,
     no_config: bool,
     malware_settings: MalwareCheckSettings,
 ) -> Result<ExitStatus> {
@@ -77,7 +77,7 @@ pub(crate) async fn check(
     }
 
     // Discover the project.
-    let project = if no_project || script.is_some() {
+    let project = if !project_discovery.enabled() || script.is_some() {
         None
     } else {
         match VirtualProject::discover(
@@ -104,7 +104,7 @@ pub(crate) async fn check(
         }
     };
 
-    if no_project {
+    if !project_discovery.enabled() {
         for flag in extras.history().as_flags_pretty() {
             warn_user!("`{flag}` has no effect when used alongside `--no-project`");
         }

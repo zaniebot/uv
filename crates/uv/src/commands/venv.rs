@@ -12,7 +12,7 @@ use uv_cache::Cache;
 use uv_client::{BaseClientBuilder, FlatIndexClient, RegistryClientBuilder};
 use uv_configuration::{
     BuildOptions, Concurrency, Constraints, DependencyGroups, DryRun, IndexStrategy,
-    KeyringProviderType, NoBinary, NoBuild, NoSources,
+    KeyringProviderType, NoBinary, NoBuild, NoSources, ProjectDiscovery,
 };
 use uv_dispatch::{BuildDispatch, SharedState};
 use uv_distribution_types::{
@@ -86,16 +86,14 @@ pub(crate) async fn venv(
     exclude_newer: ExcludeNewer,
     concurrency: Concurrency,
     no_config: bool,
-    no_project: bool,
+    project_discovery: ProjectDiscovery,
     cache: &Cache,
     workspace_cache: &WorkspaceCache,
     printer: Printer,
     relocatable: bool,
     preview: Preview,
 ) -> Result<ExitStatus> {
-    let project = if no_project {
-        None
-    } else {
+    let project = if project_discovery.enabled() {
         match VirtualProject::discover(
             project_dir,
             &DiscoveryOptions::default(),
@@ -122,6 +120,8 @@ pub(crate) async fn venv(
                 None
             }
         }
+    } else {
+        None
     };
 
     // Only use the project environment path if we're invoked from the root with no explicit path.
