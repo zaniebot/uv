@@ -40,7 +40,6 @@ use crate::{
 use windows::Win32::Foundation::{APPMODEL_ERROR_NO_PACKAGE, ERROR_CANT_ACCESS_FILE, WIN32_ERROR};
 
 /// A Python executable and its associated platform markers.
-#[expect(clippy::struct_excessive_bools)]
 #[derive(Debug, Clone)]
 pub struct Interpreter {
     platform: Platform,
@@ -60,9 +59,8 @@ pub struct Interpreter {
     target: Option<Target>,
     prefix: Option<Prefix>,
     pointer_size: PointerSize,
-    gil_disabled: bool,
     real_executable: PathBuf,
-    debug_enabled: bool,
+    variant: PythonVariant,
 }
 
 impl Interpreter {
@@ -84,8 +82,12 @@ impl Interpreter {
             manylinux_compatible: info.manylinux_compatible,
             sys_prefix: info.sys_prefix,
             pointer_size: info.pointer_size,
-            gil_disabled: info.gil_disabled,
-            debug_enabled: info.debug_enabled,
+            variant: match (info.gil_disabled, info.debug_enabled) {
+                (true, true) => PythonVariant::FreethreadedDebug,
+                (true, false) => PythonVariant::Freethreaded,
+                (false, true) => PythonVariant::Debug,
+                (false, false) => PythonVariant::Default,
+            },
             sys_base_prefix: info.sys_base_prefix,
             sys_base_executable: info.sys_base_executable,
             sys_executable: info.sys_executable,
@@ -215,17 +217,7 @@ impl Interpreter {
     }
 
     pub fn variant(&self) -> PythonVariant {
-        if self.gil_disabled() {
-            if self.debug_enabled() {
-                PythonVariant::FreethreadedDebug
-            } else {
-                PythonVariant::Freethreaded
-            }
-        } else if self.debug_enabled() {
-            PythonVariant::Debug
-        } else {
-            PythonVariant::default()
-        }
+        self.variant
     }
 
     /// Return the [`Arch`] reported by the interpreter platform tags.
@@ -253,8 +245,8 @@ impl Interpreter {
                 self.implementation_tuple(),
                 TagsOptions {
                     manylinux_compatible: self.manylinux_compatible,
-                    gil_disabled: self.gil_disabled,
-                    debug_enabled: self.debug_enabled,
+                    gil_disabled: self.gil_disabled(),
+                    debug_enabled: self.debug_enabled(),
                     is_cross: false,
                 },
             )?;
@@ -532,13 +524,19 @@ impl Interpreter {
     /// freethreading Python is incompatible with earlier native modules, re-introducing
     /// abiflags with a `t` flag. <https://peps.python.org/pep-0703/#build-configuration-changes>
     pub fn gil_disabled(&self) -> bool {
-        self.gil_disabled
+        matches!(
+            self.variant,
+            PythonVariant::Freethreaded | PythonVariant::FreethreadedDebug
+        )
     }
 
     /// Return whether this is a debug build of Python, as specified by the sysconfig var
     /// `Py_DEBUG`.
     pub fn debug_enabled(&self) -> bool {
-        self.debug_enabled
+        matches!(
+            self.variant,
+            PythonVariant::Debug | PythonVariant::FreethreadedDebug
+        )
     }
 
     /// Return the `--target` directory for this interpreter, if any.
@@ -1329,6 +1327,7 @@ fn python_home(interpreter: &Path) -> Option<PathBuf> {
 mod tests {
     use std::str::FromStr;
 
+    use anyhow::Result;
     use fs_err as fs;
     use indoc::{formatdoc, indoc};
     use tempfile::tempdir;
@@ -1336,11 +1335,11 @@ mod tests {
     use uv_cache::Cache;
     use uv_pep440::Version;
 
-    use crate::Interpreter;
+    use crate::{Interpreter, PythonVariant};
 
     #[tokio::test]
-    async fn test_cache_invalidation() {
-        let mock_dir = tempdir().unwrap();
+    async fn test_cache_invalidation() -> Result<()> {
+        let mock_dir = tempdir()?;
         let mocked_interpreter = mock_dir.path().join("python");
         let json = indoc! {r##"
         {
@@ -1401,7 +1400,7 @@ mod tests {
         }
     "##};
 
-        let cache = Cache::temp().unwrap().init().await.unwrap();
+        let cache = Cache::temp()?.init().await?;
 
         fs::write(
             &mocked_interpreter,
@@ -1409,31 +1408,75 @@ mod tests {
         #!/bin/sh
         echo '{json}'
         "},
-        )
-        .unwrap();
+        )?;
 
         fs::set_permissions(
             &mocked_interpreter,
             std::os::unix::fs::PermissionsExt::from_mode(0o770),
-        )
-        .unwrap();
-        let interpreter = Interpreter::query(&mocked_interpreter, &cache).unwrap();
+        )?;
+        let interpreter = Interpreter::query(&mocked_interpreter, &cache)?;
         assert_eq!(
             interpreter.markers.python_version().version,
-            Version::from_str("3.12").unwrap()
+            Version::from_str("3.12")?
         );
+        assert_eq!(interpreter.variant(), PythonVariant::Freethreaded);
+        assert!(interpreter.gil_disabled());
+        assert!(!interpreter.debug_enabled());
+        let json = json
+            .replace("3.12", "3.13")
+            .replace("\"gil_disabled\": true", "\"gil_disabled\": false")
+            .replace("\"debug_enabled\": false", "\"debug_enabled\": true");
         fs::write(
             &mocked_interpreter,
             formatdoc! {r"
         #!/bin/sh
-        echo '{}'
-        ", json.replace("3.12", "3.13")},
-        )
-        .unwrap();
-        let interpreter = Interpreter::query(&mocked_interpreter, &cache).unwrap();
+        echo '{json}'
+        "},
+        )?;
+        let interpreter = Interpreter::query(&mocked_interpreter, &cache)?;
         assert_eq!(
             interpreter.markers.python_version().version,
-            Version::from_str("3.13").unwrap()
+            Version::from_str("3.13")?
         );
+        assert_eq!(interpreter.variant(), PythonVariant::Debug);
+        assert!(!interpreter.gil_disabled());
+        assert!(interpreter.debug_enabled());
+
+        for (index, (gil_disabled, debug_enabled, variant)) in [
+            (false, false, PythonVariant::Default),
+            (true, true, PythonVariant::FreethreadedDebug),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let mocked_interpreter = mock_dir.path().join(format!("python-{index}"));
+            let json = json
+                .replace(
+                    "\"gil_disabled\": false",
+                    &format!("\"gil_disabled\": {gil_disabled}"),
+                )
+                .replace(
+                    "\"debug_enabled\": true",
+                    &format!("\"debug_enabled\": {debug_enabled}"),
+                );
+            fs::write(
+                &mocked_interpreter,
+                formatdoc! {r"
+            #!/bin/sh
+            echo '{json}'
+            "},
+            )?;
+            fs::set_permissions(
+                &mocked_interpreter,
+                std::os::unix::fs::PermissionsExt::from_mode(0o770),
+            )?;
+
+            let interpreter = Interpreter::query(&mocked_interpreter, &cache)?;
+            assert_eq!(interpreter.variant(), variant);
+            assert_eq!(interpreter.gil_disabled(), gil_disabled);
+            assert_eq!(interpreter.debug_enabled(), debug_enabled);
+        }
+
+        Ok(())
     }
 }
