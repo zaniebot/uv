@@ -3290,12 +3290,7 @@ fn install_git_private_https_pat_not_authorized() {
     // A revoked token
     let token = "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";
 
-    // TODO(john): We need this filter because we are displaying the token when
-    // an underlying process error message is being displayed. We should actually
-    // mask it.
-    let context = context
-        .with_filter((token, "***"))
-        .with_filter(("`.*/git fetch (.*)`", "`git fetch $1`"));
+    let context = context.with_filter(("`.*/git fetch (.*)`", "`git fetch $1`"));
 
     // We provide a username otherwise (since the token is invalid), the git cli will prompt for a password
     // and hang the test
@@ -3310,7 +3305,7 @@ fn install_git_private_https_pat_not_authorized() {
       × Failed to download and build `uv-private-pypackage @ git+https://git:****@github.com/astral-test/uv-private-pypackage`
       ├─▶ Git operation failed
       ├─▶ failed to clone into: [CACHE_DIR]/git-v0/db/8401f5508e3e612d
-      ╰─▶ process didn't exit successfully: `git fetch --force --update-head-ok 'https://git:***@github.com/astral-test/uv-private-pypackage' '+HEAD:refs/remotes/origin/HEAD'` (exit status: 128)
+      ╰─▶ process didn't exit successfully: `git fetch --force --update-head-ok 'https://git:****@github.com/astral-test/uv-private-pypackage' '+HEAD:refs/remotes/origin/HEAD'` (exit status: 128)
           --- stderr
           remote: Invalid username or token. Password authentication is not supported for Git operations.
           fatal: Authentication failed for 'https://github.com/astral-test/uv-private-pypackage/'
@@ -13531,6 +13526,57 @@ fn pep_751_install_path_wheel() -> Result<()> {
     Checked 1 package in [TIME]
     "
     );
+
+    Ok(())
+}
+
+#[test]
+fn pep_751_prefers_path_over_url() -> Result<()> {
+    let context = uv_test::test_context!("3.13");
+
+    for wheel in [
+        "ok-1.0.0-py3-none-any.whl",
+        "basic_package-0.1.0-py3-none-any.whl",
+    ] {
+        fs::copy(
+            context.workspace_root.join("test/links").join(wheel),
+            context.temp_dir.child(wheel),
+        )?;
+    }
+
+    context.temp_dir.child("pylock.toml").write_str(
+        r#"
+        lock-version = "1.0"
+        created-by = "uv"
+
+        [[packages]]
+        name = "ok"
+        version = "1.0.0"
+        archive = { path = "ok-1.0.0-py3-none-any.whl", url = "https://example.invalid/ok-1.0.0.tar.gz", hashes = { sha256 = "79f0b33e6ce1e09eaa1784c8eee275dfe84d215d9c65c652f07c18e85fdaac5f" } }
+
+        [[packages]]
+        name = "basic-package"
+        version = "0.1.0"
+        wheels = [{ path = "basic_package-0.1.0-py3-none-any.whl", url = "https://example.invalid/basic_package-0.1.0-py3-none-any.whl", hashes = { sha256 = "7b6229db79b5800e4e98a351b5628c1c8a944533a2d428aeeaa7275a30d4ea82" } }]
+        "#,
+    )?;
+
+    uv_snapshot!(context.filters(), context.pip_install()
+        .arg("--preview")
+        .arg("--offline")
+        .arg("--no-build")
+        .arg("-r")
+        .arg("pylock.toml"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Prepared 2 packages in [TIME]
+    Installed 2 packages in [TIME]
+     + basic-package==0.1.0
+     + ok==1.0.0 (from file://[TEMP_DIR]/ok-1.0.0-py3-none-any.whl)
+    ");
 
     Ok(())
 }
