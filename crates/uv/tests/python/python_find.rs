@@ -1,3 +1,4 @@
+use anyhow::Result;
 use assert_cmd::assert::OutputAssertExt;
 use assert_fs::prelude::{FileTouch, PathChild};
 use assert_fs::{fixture::FileWriteStr, prelude::PathCreateDir};
@@ -789,6 +790,36 @@ fn python_find_venv() {
         ----- stderr -----
         ");
     }
+}
+
+#[cfg(unix)]
+#[test]
+fn python_find_venv_with_sitecustomize_output() -> Result<()> {
+    let context = uv_test::test_context!("3.12")
+        .with_filtered_python_names()
+        .with_filtered_virtualenv_bin();
+    fs_err::write(
+        context.site_packages().join("sitecustomize.py"),
+        indoc! {r#"
+            import atexit
+            import sys
+
+            sys.stdout.reconfigure(newline="\r\n")
+            sys.stdout.write("sitecustomize prefix without newline")
+            atexit.register(print, "sitecustomize output at exit")
+        "#},
+    )?;
+
+    uv_snapshot!(context.filters(), context.python_find(), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    [VENV]/[BIN]/[PYTHON]
+
+    ----- stderr -----
+    ");
+
+    Ok(())
 }
 
 #[cfg(unix)]
