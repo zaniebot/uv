@@ -52,7 +52,7 @@ use uv_workspace::{DiscoveryOptions, Workspace, WorkspaceCache};
 
 use crate::commands::pip::EnvironmentValidation;
 use crate::commands::{
-    ExitStatus, ParsedRunCommand, RunCommand, ScriptPath, ToolRunCommand, UvError,
+    ExitStatus, ParsedRunCommand, RunCommand, ScriptPath, SyncMode, ToolRunCommand, UvError,
 };
 use crate::printer::Printer;
 use crate::settings::{
@@ -2322,7 +2322,7 @@ async fn run_project(
                 args.lock_check,
                 args.frozen,
                 args.active,
-                args.no_sync,
+                SyncMode::from_no_sync(args.no_sync),
                 args.isolated,
                 args.all_packages,
                 args.package,
@@ -2582,7 +2582,7 @@ async fn run_project(
                 args.lock_check,
                 args.frozen,
                 args.active,
-                args.no_sync,
+                SyncMode::from_no_sync(args.no_sync),
                 InstallSelection::from_args(args.no_install_project, args.only_install_project),
                 InstallSelection::from_args(args.no_install_workspace, args.only_install_workspace),
                 InstallSelection::from_args(args.no_install_local, args.only_install_local),
@@ -2704,7 +2704,7 @@ async fn run_project(
                 args.lock_check,
                 args.frozen,
                 args.active,
-                args.no_sync,
+                SyncMode::from_no_sync(args.no_sync),
                 args.python,
                 args.install_mirrors,
                 args.settings,
@@ -2872,7 +2872,7 @@ async fn run_project(
                 args.ty_path,
                 args.lock_check,
                 args.frozen,
-                args.no_sync,
+                SyncMode::from_no_sync(args.no_sync),
                 args.isolated,
                 args.extras,
                 args.groups,
