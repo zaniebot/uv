@@ -356,8 +356,10 @@ impl PyxTokenStore {
             let digest = uv_cache_key::cache_digest(&api_key);
             match fs_err::tokio::read(self.subdirectory.join(format!("{digest}.json"))).await {
                 Ok(data) => {
-                    let access_token =
-                        AccessToken::from(String::from_utf8(data).expect("Invalid UTF-8"));
+                    let access_token = AccessToken::from(
+                        String::from_utf8(data)
+                            .map_err(|err| io::Error::new(io::ErrorKind::InvalidData, err))?,
+                    );
                     Ok(Some(PyxTokens::ApiKey(PyxApiKeyTokens {
                         access_token,
                         api_key,
@@ -675,6 +677,36 @@ fn matches_domain(url: &Url, domain: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn test_read_invalid_utf8_api_key_token() {
+        let directory = tempfile::tempdir().unwrap();
+        let api_key = "test-api-key";
+        let digest = uv_cache_key::cache_digest(&api_key);
+        fs_err::tokio::write(directory.path().join(format!("{digest}.json")), [0xff])
+            .await
+            .unwrap();
+        let store = PyxTokenStore {
+            root: directory.path().to_path_buf(),
+            subdirectory: directory.path().to_path_buf(),
+            api: DisplaySafeUrl::parse("https://api.pyx.dev").unwrap(),
+            cdn: SmallString::from("astralhosted.com"),
+        };
+
+        let result = temp_env::async_with_vars(
+            [
+                (EnvVars::PYX_API_KEY, Some(api_key)),
+                (EnvVars::UV_API_KEY, None::<&str>),
+            ],
+            async { store.read().await },
+        )
+        .await;
+
+        assert!(
+            matches!(result, Err(TokenStoreError::Io(err)) if err.kind() == io::ErrorKind::InvalidData),
+            "expected InvalidData I/O error for an invalid UTF-8 API key token"
+        );
+    }
 
     #[test]
     fn test_is_known_url() {
