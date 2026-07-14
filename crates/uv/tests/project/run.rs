@@ -3236,6 +3236,40 @@ fn run_requirements_txt_arguments() -> Result<()> {
     Ok(())
 }
 
+#[test]
+fn run_pep723_requirements_respects_requires_python() -> Result<()> {
+    let context = uv_test::test_context_with_versions!(&["3.11", "3.12"]);
+    let requirements = context.temp_dir.child("requirements.py");
+    requirements.write_str(indoc! {r#"
+        # /// script
+        # requires-python = "<3.12"
+        # dependencies = []
+        # ///
+    "#})?;
+
+    // An incompatible `.python-version` must not override the script requirement.
+    context
+        .temp_dir
+        .child(PYTHON_VERSION_FILENAME)
+        .write_str("3.12")?;
+
+    uv_snapshot!(context.filters(), context.run()
+        .arg("--with-requirements")
+        .arg(requirements.path())
+        .arg("python")
+        .arg("-c")
+        .arg("import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    3.11
+
+    ----- stderr -----
+    ");
+
+    Ok(())
+}
+
 /// Ensure that we can import from the root project when layering `--with` requirements.
 #[test]
 fn run_editable() -> Result<()> {
