@@ -35,8 +35,8 @@ use uv_cli::{
 use uv_client::BaseClientBuilder;
 use uv_configuration::{
     AnnotationOutput, BuildOptionsOutput, DryRun, ExtrasOutput, FindLinksOutput, HashOutput,
-    HeaderOutput, IndexAnnotationOutput, IndexUrlOutput, InstallSelection, MarkerExpressionOutput,
-    MarkersOutput, min_stack_size,
+    HeaderOutput, IndexAnnotationOutput, IndexUrlOutput, MarkerExpressionOutput, MarkersOutput,
+    min_stack_size,
 };
 use uv_flags::EnvironmentFlags;
 use uv_fs::{CWD, Simplified, normalize_path};
@@ -2589,9 +2589,9 @@ async fn run_project(
                 args.frozen,
                 args.active,
                 SyncMode::from_no_sync(args.no_sync),
-                InstallSelection::from_args(args.no_install_project, args.only_install_project),
-                InstallSelection::from_args(args.no_install_workspace, args.only_install_workspace),
-                InstallSelection::from_args(args.no_install_local, args.only_install_local),
+                args.install_project,
+                args.install_workspace,
+                args.install_local,
                 args.no_install_package,
                 args.only_install_package,
                 requirements,
