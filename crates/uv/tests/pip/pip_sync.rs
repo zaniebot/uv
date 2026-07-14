@@ -4705,6 +4705,21 @@ fn require_hashes_repeated_hash_multiple_files() -> Result<()> {
 fn require_hashes_at_least_one() -> Result<()> {
     let context = uv_test::test_context!("3.12");
 
+    // An MD5 digest alone must not satisfy integrity-enforced installs.
+    let requirements_txt = context.temp_dir.child("requirements-md5.txt");
+    requirements_txt.write_str("anyio==4.0.0 --hash=md5:420d85e19168705cdf0223621b18831a")?;
+
+    uv_snapshot!(context.pip_sync()
+        .arg(requirements_txt.path())
+        .arg("--require-hashes"), @"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    error: In `--require-hashes` mode, all requirements must have a hash, but none were provided for: anyio==4.0.0
+    ");
+
     // Request `anyio` with a `sha256` hash.
     let requirements_txt = context.temp_dir.child("requirements.txt");
     requirements_txt

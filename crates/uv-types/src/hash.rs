@@ -12,7 +12,7 @@ use uv_distribution_types::{
 };
 use uv_normalize::PackageName;
 use uv_pep440::Version;
-use uv_pypi_types::{HashDigest, HashDigests, HashError, ResolverMarkerEnvironment};
+use uv_pypi_types::{HashAlgorithm, HashDigest, HashDigests, HashError, ResolverMarkerEnvironment};
 use uv_redacted::DisplaySafeUrl;
 
 #[derive(Debug, Default, Clone)]
@@ -184,6 +184,10 @@ impl HashStrategy {
                 merge_digests(&mut digests, fragment_hashes.iter(), requirement)?;
             }
 
+            if mode.is_require() {
+                digests.retain(|digest| digest.algorithm() != HashAlgorithm::Md5);
+            }
+
             if digests.is_empty() {
                 continue;
             }
@@ -229,6 +233,10 @@ impl HashStrategy {
                 .collect::<Result<Vec<_>, _>>()?;
             if let Some(fragment_hashes) = requirement.hashes().map(HashDigests::from) {
                 merge_digests(&mut digests, fragment_hashes.iter(), requirement)?;
+            }
+
+            if mode.is_require() {
+                digests.retain(|digest| digest.algorithm() != HashAlgorithm::Md5);
             }
 
             let digests = if let Some(constraint) = constraint_hashes.remove(&id) {
