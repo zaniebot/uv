@@ -25,6 +25,18 @@ use crate::commands::reporters::LatestVersionReporter;
 use crate::printer::Printer;
 use crate::settings::ResolverInstallerSettings;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ToolListMode {
+    All,
+    Outdated,
+}
+
+impl From<bool> for ToolListMode {
+    fn from(outdated: bool) -> Self {
+        if outdated { Self::Outdated } else { Self::All }
+    }
+}
+
 /// List installed tools.
 #[expect(clippy::fn_params_excessive_bools)]
 pub(crate) async fn list(
@@ -33,7 +45,7 @@ pub(crate) async fn list(
     show_with: bool,
     show_extras: bool,
     show_python: bool,
-    outdated: bool,
+    mode: ToolListMode,
     args: ResolverInstallerOptions,
     filesystem: ResolverInstallerOptions,
     client_builder: BaseClientBuilder<'_>,
@@ -114,7 +126,7 @@ pub(crate) async fn list(
     }
 
     // Determine the latest version for each tool when `--outdated` is requested.
-    let latest: FxHashMap<PackageName, Option<DistFilename>> = if outdated
+    let latest: FxHashMap<PackageName, Option<DistFilename>> = if mode == ToolListMode::Outdated
         && !valid_tools.is_empty()
     {
         let download_concurrency = concurrency.downloads_semaphore.clone();
@@ -185,7 +197,7 @@ pub(crate) async fn list(
 
     for (name, tool, tool_env, version) in valid_tools {
         // If `--outdated` is set, skip tools that are up-to-date.
-        if outdated {
+        if mode == ToolListMode::Outdated {
             let is_outdated = latest
                 .get(&name)
                 .and_then(Option::as_ref)
@@ -254,7 +266,7 @@ pub(crate) async fn list(
             })
             .unwrap_or_default();
 
-        let latest_version = if outdated {
+        let latest_version = if mode == ToolListMode::Outdated {
             latest
                 .get(&name)
                 .and_then(Option::as_ref)
