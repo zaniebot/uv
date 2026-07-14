@@ -102,3 +102,23 @@ impl MarkersOutput {
         }
     }
 }
+
+/// Whether to include dependency annotations in `uv pip compile` output.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AnnotationOutput {
+    /// Include dependency annotations in the output.
+    Include,
+    /// Omit dependency annotations from the output.
+    Omit,
+}
+
+impl AnnotationOutput {
+    /// Determine the [`AnnotationOutput`] setting from the command-line arguments.
+    pub const fn from_args(include_annotations: bool) -> Self {
+        if include_annotations {
+            Self::Include
+        } else {
+            Self::Omit
+        }
+    }
+}

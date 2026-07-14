@@ -5,7 +5,7 @@ use petgraph::visit::EdgeRef;
 use petgraph::{Directed, Direction, Graph};
 use rustc_hash::{FxBuildHasher, FxHashMap};
 
-use uv_configuration::{ExtrasOutput, HashOutput, MarkersOutput};
+use uv_configuration::{AnnotationOutput, ExtrasOutput, HashOutput, MarkersOutput};
 use uv_distribution_types::{DistributionMetadata, Name, SourceAnnotation, SourceAnnotations};
 use uv_normalize::PackageName;
 use uv_pep508::MarkerTree;
@@ -30,7 +30,7 @@ pub struct DisplayResolutionGraph<'a> {
     markers_output: MarkersOutput,
     /// Whether to include annotations in the output, to indicate which dependency or dependencies
     /// requested each package.
-    include_annotations: bool,
+    annotation_output: AnnotationOutput,
     /// Whether to include indexes in the output, to indicate which index was used for each package.
     include_index_annotation: bool,
     /// The style of annotation comments, used to indicate the dependencies that requested each
@@ -59,7 +59,7 @@ impl<'a> DisplayResolutionGraph<'a> {
         hash_output: HashOutput,
         extras_output: ExtrasOutput,
         markers_output: MarkersOutput,
-        include_annotations: bool,
+        annotation_output: AnnotationOutput,
         include_index_annotation: bool,
         annotation_style: AnnotationStyle,
     ) -> Self {
@@ -77,7 +77,7 @@ impl<'a> DisplayResolutionGraph<'a> {
             hash_output,
             extras_output,
             markers_output,
-            include_annotations,
+            annotation_output,
             include_index_annotation,
             annotation_style,
         }
@@ -88,7 +88,7 @@ impl<'a> DisplayResolutionGraph<'a> {
 impl std::fmt::Display for DisplayResolutionGraph<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // Determine the annotation sources for each package.
-        let sources = if self.include_annotations {
+        let sources = if matches!(self.annotation_output, AnnotationOutput::Include) {
             let mut sources = SourceAnnotations::default();
 
             for requirement in self.resolution.requirements.iter().filter(|requirement| {
@@ -234,7 +234,7 @@ impl std::fmt::Display for DisplayResolutionGraph<'_> {
 
             // If enabled, include annotations to indicate the dependencies that requested each
             // package (e.g., `# via mypy`).
-            if self.include_annotations {
+            if matches!(self.annotation_output, AnnotationOutput::Include) {
                 // Display all dependents (i.e., all packages that depend on the current package).
                 let dependents = {
                     let mut dependents = graph
