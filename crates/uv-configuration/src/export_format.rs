@@ -142,3 +142,23 @@ impl HeaderOutput {
         }
     }
 }
+
+/// Whether to include index URLs in `uv pip compile` output.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum IndexUrlOutput {
+    /// Include index URLs in the output.
+    Include,
+    /// Omit index URLs from the output.
+    Omit,
+}
+
+impl IndexUrlOutput {
+    /// Determine the [`IndexUrlOutput`] setting from the command-line arguments.
+    pub const fn from_args(include_index_url: bool) -> Self {
+        if include_index_url {
+            Self::Include
+        } else {
+            Self::Omit
+        }
+    }
+}

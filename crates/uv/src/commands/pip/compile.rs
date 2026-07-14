@@ -15,8 +15,8 @@ use uv_cache::Cache;
 use uv_client::{BaseClientBuilder, FlatIndexClient, RegistryClientBuilder};
 use uv_configuration::{
     AnnotationOutput, BuildIsolation, BuildOptions, Concurrency, Constraints, ExcludeDependency,
-    ExtrasOutput, ExtrasSpecification, HashOutput, HeaderOutput, IndexStrategy, MarkersOutput,
-    NoBinary, NoBuild, NoSources, Override, PipCompileFormat, Reinstall, Upgrade,
+    ExtrasOutput, ExtrasSpecification, HashOutput, HeaderOutput, IndexStrategy, IndexUrlOutput,
+    MarkersOutput, NoBinary, NoBuild, NoSources, Override, PipCompileFormat, Reinstall, Upgrade,
 };
 use uv_configuration::{KeyringProviderType, TargetTriple};
 use uv_dispatch::{BuildDispatch, SharedState};
@@ -90,7 +90,7 @@ pub(crate) async fn pip_compile(
     annotation_output: AnnotationOutput,
     header_output: HeaderOutput,
     custom_compile_command: Option<String>,
-    include_index_url: bool,
+    index_url_output: IndexUrlOutput,
     include_find_links: bool,
     include_build_options: bool,
     include_marker_expression: bool,
@@ -624,7 +624,7 @@ pub(crate) async fn pip_compile(
             format!(
                 "#    {}",
                 cmd(
-                    include_index_url,
+                    index_url_output,
                     include_find_links,
                     custom_compile_command
                 )
@@ -652,7 +652,7 @@ pub(crate) async fn pip_compile(
             let mut wrote_preamble = false;
 
             // If necessary, include the `--index-url` and `--extra-index-url` locations.
-            if include_index_url {
+            if matches!(index_url_output, IndexUrlOutput::Include) {
                 if let Some(index) = index_locations.default_index() {
                     writeln!(writer, "--index-url {}", index.url().verbatim())?;
                     wrote_preamble = true;
@@ -735,7 +735,7 @@ pub(crate) async fn pip_compile(
                     "The `--emit-marker-expression` option is not supported for `pylock.toml` output"
                 );
             }
-            if include_index_url {
+            if matches!(index_url_output, IndexUrlOutput::Include) {
                 warn_user!(
                     "The `--emit-index-url` option is not supported for `pylock.toml` output"
                 );
@@ -804,7 +804,7 @@ pub(crate) async fn pip_compile(
 
 /// Format the uv command used to generate the output file.
 fn cmd(
-    include_index_url: bool,
+    index_url_output: IndexUrlOutput,
     include_find_links: bool,
     custom_compile_command: Option<String>,
 ) -> String {
@@ -822,7 +822,7 @@ fn cmd(
             }
 
             // Skip any index URLs, unless requested.
-            if !include_index_url {
+            if matches!(index_url_output, IndexUrlOutput::Omit) {
                 if arg.starts_with("--extra-index-url=")
                     || arg.starts_with("--index-url=")
                     || arg.starts_with("-i=")
