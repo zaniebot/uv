@@ -1867,6 +1867,58 @@ impl Lock {
             ));
         }
 
+        // The metadata can remain unchanged even if a resolved edge is removed or narrowed in
+        // the lockfile. Verify that every production, optional, and group requirement is still
+        // covered by an edge with the expected extras and marker. Sources can legitimately be
+        // replaced by overrides, so source identity is not part of this generic edge check.
+        if let Some(requirement) = self.uncovered_dependency(
+            &package.metadata.requires_dist,
+            &package.dependencies,
+            None,
+            package,
+        ) {
+            return Ok(SatisfiesResult::MismatchedPackageDependencies(
+                &package.id.name,
+                package.id.version.as_ref(),
+                requirement,
+            ));
+        }
+
+        for extra in package.metadata.provides_extra.iter() {
+            let dependencies = package
+                .optional_dependencies
+                .get(extra)
+                .map_or(&[][..], Vec::as_slice);
+            if let Some(requirement) = self.uncovered_dependency(
+                &package.metadata.requires_dist,
+                dependencies,
+                Some(extra),
+                package,
+            ) {
+                return Ok(SatisfiesResult::MismatchedPackageDependencies(
+                    &package.id.name,
+                    package.id.version.as_ref(),
+                    requirement,
+                ));
+            }
+        }
+
+        for (group, requirements) in &package.metadata.dependency_groups {
+            let dependencies = package
+                .dependency_groups
+                .get(group)
+                .map_or(&[][..], Vec::as_slice);
+            if let Some(requirement) =
+                self.uncovered_dependency(requirements, dependencies, None, package)
+            {
+                return Ok(SatisfiesResult::MismatchedPackageDependencies(
+                    &package.id.name,
+                    package.id.version.as_ref(),
+                    requirement,
+                ));
+            }
+        }
+
         // Validate the `dependency-groups` metadata.
         let expected: BTreeMap<GroupName, BTreeSet<Requirement>> = dependency_groups
             .into_iter()
@@ -1911,6 +1963,57 @@ impl Lock {
         }
 
         Ok(SatisfiesResult::Satisfied)
+    }
+
+    /// Return the first requirement whose marker is not covered by matching dependency edges.
+    fn uncovered_dependency(
+        &self,
+        requirements: &BTreeSet<Requirement>,
+        dependencies: &[Dependency],
+        extra: Option<&ExtraName>,
+        package: &Package,
+    ) -> Option<Requirement> {
+        let package_marker =
+            package
+                .fork_markers
+                .iter()
+                .fold(MarkerTree::FALSE, |mut marker, fork| {
+                    marker.or(fork.pep508());
+                    marker
+                });
+
+        for requirement in requirements {
+            let mut required = self
+                .requires_python
+                .simplify_markers(requirement.marker)
+                .simplify_extras_with(|candidate| extra.is_some_and(|extra| extra == candidate));
+            if !package.fork_markers.is_empty() {
+                required.and(package_marker);
+            }
+            if required.is_false() {
+                continue;
+            }
+
+            let mut covered = MarkerTree::FALSE;
+            for dependency in dependencies {
+                if dependency.package_id.name != requirement.name
+                    || !requirement
+                        .extras
+                        .iter()
+                        .all(|extra| dependency.extra.contains(extra))
+                {
+                    continue;
+                }
+                covered.or(dependency.complexified_marker.pep508());
+            }
+
+            required.implies(covered);
+            if !required.is_true() {
+                return Some(requirement.clone());
+            }
+        }
+
+        None
     }
 
     /// Check whether the lock matches the project structure, requirements and configuration.
@@ -2807,6 +2910,8 @@ pub enum SatisfiesResult<'lock> {
         BTreeMap<GroupName, BTreeSet<Requirement>>,
         BTreeMap<GroupName, BTreeSet<Requirement>>,
     ),
+    /// A package requirement is not covered by the resolved dependency edges in the lockfile.
+    MismatchedPackageDependencies(&'lock PackageName, Option<&'lock Version>, Requirement),
     /// The lockfile is missing a version.
     MissingVersion(&'lock PackageName),
 }
