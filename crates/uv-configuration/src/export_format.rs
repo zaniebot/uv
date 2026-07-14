@@ -222,3 +222,23 @@ impl MarkerExpressionOutput {
         }
     }
 }
+
+/// Whether to include index annotations in `uv pip compile` output.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum IndexAnnotationOutput {
+    /// Include index annotations in the output.
+    Include,
+    /// Omit index annotations from the output.
+    Omit,
+}
+
+impl IndexAnnotationOutput {
+    /// Determine the [`IndexAnnotationOutput`] setting from the command-line arguments.
+    pub const fn from_args(include_index_annotation: bool) -> Self {
+        if include_index_annotation {
+            Self::Include
+        } else {
+            Self::Omit
+        }
+    }
+}

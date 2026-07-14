@@ -35,8 +35,8 @@ use uv_cli::{
 use uv_client::BaseClientBuilder;
 use uv_configuration::{
     AnnotationOutput, BuildOptionsOutput, DryRun, ExtrasOutput, FindLinksOutput, HashOutput,
-    HeaderOutput, IndexUrlOutput, InstallSelection, MarkerExpressionOutput, MarkersOutput,
-    min_stack_size,
+    HeaderOutput, IndexAnnotationOutput, IndexUrlOutput, InstallSelection, MarkerExpressionOutput,
+    MarkersOutput, min_stack_size,
 };
 use uv_flags::EnvironmentFlags;
 use uv_fs::{CWD, Simplified, normalize_path};
@@ -806,7 +806,7 @@ pub async fn run(cli: Cli, global_initialization: GlobalInitialization) -> Resul
                 FindLinksOutput::from_args(args.settings.emit_find_links),
                 BuildOptionsOutput::from_args(args.settings.emit_build_options),
                 MarkerExpressionOutput::from_args(args.settings.emit_marker_expression),
-                args.settings.emit_index_annotation,
+                IndexAnnotationOutput::from_args(args.settings.emit_index_annotation),
                 args.settings.index_locations,
                 args.settings.index_strategy,
                 args.settings.torch_backend,

@@ -5,7 +5,9 @@ use petgraph::visit::EdgeRef;
 use petgraph::{Directed, Direction, Graph};
 use rustc_hash::{FxBuildHasher, FxHashMap};
 
-use uv_configuration::{AnnotationOutput, ExtrasOutput, HashOutput, MarkersOutput};
+use uv_configuration::{
+    AnnotationOutput, ExtrasOutput, HashOutput, IndexAnnotationOutput, MarkersOutput,
+};
 use uv_distribution_types::{DistributionMetadata, Name, SourceAnnotation, SourceAnnotations};
 use uv_normalize::PackageName;
 use uv_pep508::MarkerTree;
@@ -32,7 +34,7 @@ pub struct DisplayResolutionGraph<'a> {
     /// requested each package.
     annotation_output: AnnotationOutput,
     /// Whether to include indexes in the output, to indicate which index was used for each package.
-    include_index_annotation: bool,
+    index_annotation_output: IndexAnnotationOutput,
     /// The style of annotation comments, used to indicate the dependencies that requested each
     /// package.
     annotation_style: AnnotationStyle,
@@ -51,7 +53,6 @@ impl<'a> DisplayResolutionGraph<'a> {
     /// output contain non-empty conflicting groups. That is, when using `uv
     /// pip compile`, specifying conflicts is not supported because their
     /// conditional logic cannot be encoded into a `requirements.txt`.
-    #[expect(clippy::fn_params_excessive_bools)]
     pub fn new(
         underlying: &'a ResolverOutput,
         env: &'a ResolverEnvironment,
@@ -60,7 +61,7 @@ impl<'a> DisplayResolutionGraph<'a> {
         extras_output: ExtrasOutput,
         markers_output: MarkersOutput,
         annotation_output: AnnotationOutput,
-        include_index_annotation: bool,
+        index_annotation_output: IndexAnnotationOutput,
         annotation_style: AnnotationStyle,
     ) -> Self {
         for fork_marker in &underlying.fork_markers {
@@ -78,7 +79,7 @@ impl<'a> DisplayResolutionGraph<'a> {
             extras_output,
             markers_output,
             annotation_output,
-            include_index_annotation,
+            index_annotation_output,
             annotation_style,
         }
     }
@@ -316,7 +317,7 @@ impl std::fmt::Display for DisplayResolutionGraph<'_> {
 
             // If enabled, include indexes to indicate which index was used for each package (e.g.,
             // `# from https://pypi.org/simple`).
-            if self.include_index_annotation {
+            if matches!(self.index_annotation_output, IndexAnnotationOutput::Include) {
                 if let Some(index) = node.dist.index() {
                     let url = index.without_credentials();
                     writeln!(f, "{}", format!("    # from {url}").green())?;

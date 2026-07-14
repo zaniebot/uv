@@ -16,8 +16,8 @@ use uv_client::{BaseClientBuilder, FlatIndexClient, RegistryClientBuilder};
 use uv_configuration::{
     AnnotationOutput, BuildIsolation, BuildOptions, BuildOptionsOutput, Concurrency, Constraints,
     ExcludeDependency, ExtrasOutput, ExtrasSpecification, FindLinksOutput, HashOutput,
-    HeaderOutput, IndexStrategy, IndexUrlOutput, MarkerExpressionOutput, MarkersOutput, NoBinary,
-    NoBuild, NoSources, Override, PipCompileFormat, Reinstall, Upgrade,
+    HeaderOutput, IndexAnnotationOutput, IndexStrategy, IndexUrlOutput, MarkerExpressionOutput,
+    MarkersOutput, NoBinary, NoBuild, NoSources, Override, PipCompileFormat, Reinstall, Upgrade,
 };
 use uv_configuration::{KeyringProviderType, TargetTriple};
 use uv_dispatch::{BuildDispatch, SharedState};
@@ -62,7 +62,6 @@ use crate::commands::{ExitStatus, OutputWriter, diagnostics};
 use crate::printer::Printer;
 
 /// Resolve a set of requirements into a set of pinned versions.
-#[expect(clippy::fn_params_excessive_bools)]
 pub(crate) async fn pip_compile(
     requirements: &[RequirementsSource],
     constraints: &[RequirementsSource],
@@ -95,7 +94,7 @@ pub(crate) async fn pip_compile(
     find_links_output: FindLinksOutput,
     build_options_output: BuildOptionsOutput,
     marker_expression_output: MarkerExpressionOutput,
-    include_index_annotation: bool,
+    index_annotation_output: IndexAnnotationOutput,
     index_locations: IndexLocations,
     index_strategy: IndexStrategy,
     torch_backend: Option<TorchMode>,
@@ -624,11 +623,7 @@ pub(crate) async fn pip_compile(
             "{}",
             format!(
                 "#    {}",
-                cmd(
-                    index_url_output,
-                    find_links_output,
-                    custom_compile_command
-                )
+                cmd(index_url_output, find_links_output, custom_compile_command)
             )
             .green()
         )?;
@@ -725,7 +720,7 @@ pub(crate) async fn pip_compile(
                         markers_output
                     },
                     annotation_output,
-                    include_index_annotation,
+                    index_annotation_output,
                     annotation_style,
                 )
             )?;
@@ -751,7 +746,7 @@ pub(crate) async fn pip_compile(
                     "The `--emit-build-options` option is not supported for `pylock.toml` output"
                 );
             }
-            if include_index_annotation {
+            if matches!(index_annotation_output, IndexAnnotationOutput::Include) {
                 warn_user!(
                     "The `--emit-index-annotation` option is not supported for `pylock.toml` output"
                 );
