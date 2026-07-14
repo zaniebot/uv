@@ -5,9 +5,7 @@ use petgraph::visit::EdgeRef;
 use petgraph::{Directed, Direction, Graph};
 use rustc_hash::{FxBuildHasher, FxHashMap};
 
-use uv_configuration::{
-    AnnotationOutput, ExtrasOutput, HashOutput, IndexAnnotationOutput, MarkersOutput,
-};
+use uv_configuration::OutputFlags;
 use uv_distribution_types::{DistributionMetadata, Name, SourceAnnotation, SourceAnnotations};
 use uv_normalize::PackageName;
 use uv_pep508::MarkerTree;
@@ -24,17 +22,8 @@ pub struct DisplayResolutionGraph<'a> {
     env: &'a ResolverEnvironment,
     /// The packages to exclude from the output.
     no_emit_packages: &'a [PackageName],
-    /// Whether to include hashes in the output.
-    hash_output: HashOutput,
-    /// Whether to include extras in the output (e.g., `black[colorama]`).
-    extras_output: ExtrasOutput,
-    /// Whether to include environment markers in the output (e.g., `black ; sys_platform == "win32"`).
-    markers_output: MarkersOutput,
-    /// Whether to include annotations in the output, to indicate which dependency or dependencies
-    /// requested each package.
-    annotation_output: AnnotationOutput,
-    /// Whether to include indexes in the output, to indicate which index was used for each package.
-    index_annotation_output: IndexAnnotationOutput,
+    /// The optional content to include in the output.
+    output_flags: OutputFlags,
     /// The style of annotation comments, used to indicate the dependencies that requested each
     /// package.
     annotation_style: AnnotationStyle,
@@ -57,11 +46,7 @@ impl<'a> DisplayResolutionGraph<'a> {
         underlying: &'a ResolverOutput,
         env: &'a ResolverEnvironment,
         no_emit_packages: &'a [PackageName],
-        hash_output: HashOutput,
-        extras_output: ExtrasOutput,
-        markers_output: MarkersOutput,
-        annotation_output: AnnotationOutput,
-        index_annotation_output: IndexAnnotationOutput,
+        output_flags: OutputFlags,
         annotation_style: AnnotationStyle,
     ) -> Self {
         for fork_marker in &underlying.fork_markers {
@@ -75,11 +60,7 @@ impl<'a> DisplayResolutionGraph<'a> {
             resolution: underlying,
             env,
             no_emit_packages,
-            hash_output,
-            extras_output,
-            markers_output,
-            annotation_output,
-            index_annotation_output,
+            output_flags,
             annotation_style,
         }
     }
@@ -89,7 +70,7 @@ impl<'a> DisplayResolutionGraph<'a> {
 impl std::fmt::Display for DisplayResolutionGraph<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // Determine the annotation sources for each package.
-        let sources = if matches!(self.annotation_output, AnnotationOutput::Include) {
+        let sources = if self.output_flags.contains(OutputFlags::ANNOTATIONS) {
             let mut sources = SourceAnnotations::default();
 
             for requirement in self.resolution.requirements.iter().filter(|requirement| {
@@ -186,7 +167,7 @@ impl std::fmt::Display for DisplayResolutionGraph<'_> {
         );
 
         // Reduce the graph, removing or combining extras for a given package.
-        let graph = if matches!(self.extras_output, ExtrasOutput::Include) {
+        let graph = if self.output_flags.contains(OutputFlags::EXTRAS) {
             combine_extras(&graph)
         } else {
             strip_extras(&graph)
@@ -215,13 +196,13 @@ impl std::fmt::Display for DisplayResolutionGraph<'_> {
             let mut line = node
                 .to_requirements_txt(
                     &self.resolution.requires_python,
-                    matches!(self.markers_output, MarkersOutput::Include),
+                    self.output_flags.contains(OutputFlags::MARKERS),
                 )
                 .to_string();
 
             // Display the distribution hashes, if any.
             let mut has_hashes = false;
-            if matches!(self.hash_output, HashOutput::Generate) {
+            if self.output_flags.contains(OutputFlags::HASHES) {
                 for hash in node.hashes {
                     has_hashes = true;
                     line.push_str(" \\\n");
@@ -235,7 +216,7 @@ impl std::fmt::Display for DisplayResolutionGraph<'_> {
 
             // If enabled, include annotations to indicate the dependencies that requested each
             // package (e.g., `# via mypy`).
-            if matches!(self.annotation_output, AnnotationOutput::Include) {
+            if self.output_flags.contains(OutputFlags::ANNOTATIONS) {
                 // Display all dependents (i.e., all packages that depend on the current package).
                 let dependents = {
                     let mut dependents = graph
@@ -317,7 +298,7 @@ impl std::fmt::Display for DisplayResolutionGraph<'_> {
 
             // If enabled, include indexes to indicate which index was used for each package (e.g.,
             // `# from https://pypi.org/simple`).
-            if matches!(self.index_annotation_output, IndexAnnotationOutput::Include) {
+            if self.output_flags.contains(OutputFlags::INDEX_ANNOTATION) {
                 if let Some(index) = node.dist.index() {
                     let url = index.without_credentials();
                     writeln!(f, "{}", format!("    # from {url}").green())?;

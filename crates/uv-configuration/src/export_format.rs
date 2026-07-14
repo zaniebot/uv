@@ -43,6 +43,33 @@ pub enum PipCompileFormat {
     PylockToml,
 }
 
+bitflags::bitflags! {
+    /// The optional content to include in exported output.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+    pub struct OutputFlags: u16 {
+        /// Include distribution hashes.
+        const HASHES = 1 << 0;
+        /// Include extras in requirements.
+        const EXTRAS = 1 << 1;
+        /// Include environment markers in requirements.
+        const MARKERS = 1 << 2;
+        /// Include dependency annotations.
+        const ANNOTATIONS = 1 << 3;
+        /// Include the generated-file header.
+        const HEADER = 1 << 4;
+        /// Include index URLs.
+        const INDEX_URL = 1 << 5;
+        /// Include find-links locations.
+        const FIND_LINKS = 1 << 6;
+        /// Include build options.
+        const BUILD_OPTIONS = 1 << 7;
+        /// Include the marker expression.
+        const MARKER_EXPRESSION = 1 << 8;
+        /// Include index annotations.
+        const INDEX_ANNOTATION = 1 << 9;
+    }
+}
+
 /// Whether to generate hashes for exported output.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HashOutput {
@@ -59,46 +86,6 @@ impl HashOutput {
             Self::Generate
         } else {
             Self::Omit
-        }
-    }
-}
-
-/// Whether to include extras in `uv pip compile` output.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ExtrasOutput {
-    /// Include extras in the output.
-    Include,
-    /// Strip extras from the output.
-    Strip,
-}
-
-impl ExtrasOutput {
-    /// Determine the [`ExtrasOutput`] setting from the command-line arguments.
-    pub const fn from_args(include_extras: bool) -> Self {
-        if include_extras {
-            Self::Include
-        } else {
-            Self::Strip
-        }
-    }
-}
-
-/// Whether to include environment markers in `uv pip compile` output.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum MarkersOutput {
-    /// Include environment markers in the output.
-    Include,
-    /// Strip environment markers from the output.
-    Strip,
-}
-
-impl MarkersOutput {
-    /// Determine the [`MarkersOutput`] setting from the command-line arguments.
-    pub const fn from_args(include_markers: bool) -> Self {
-        if include_markers {
-            Self::Include
-        } else {
-            Self::Strip
         }
     }
 }
@@ -176,66 +163,6 @@ impl FindLinksOutput {
     /// Determine the [`FindLinksOutput`] setting from the command-line arguments.
     pub const fn from_args(include_find_links: bool) -> Self {
         if include_find_links {
-            Self::Include
-        } else {
-            Self::Omit
-        }
-    }
-}
-
-/// Whether to include build options in `uv pip compile` output.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum BuildOptionsOutput {
-    /// Include build options in the output.
-    Include,
-    /// Omit build options from the output.
-    Omit,
-}
-
-impl BuildOptionsOutput {
-    /// Determine the [`BuildOptionsOutput`] setting from the command-line arguments.
-    pub const fn from_args(include_build_options: bool) -> Self {
-        if include_build_options {
-            Self::Include
-        } else {
-            Self::Omit
-        }
-    }
-}
-
-/// Whether to include the marker expression in `uv pip compile` output.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum MarkerExpressionOutput {
-    /// Include the marker expression in the output.
-    Include,
-    /// Omit the marker expression from the output.
-    Omit,
-}
-
-impl MarkerExpressionOutput {
-    /// Determine the [`MarkerExpressionOutput`] setting from the command-line arguments.
-    pub const fn from_args(include_marker_expression: bool) -> Self {
-        if include_marker_expression {
-            Self::Include
-        } else {
-            Self::Omit
-        }
-    }
-}
-
-/// Whether to include index annotations in `uv pip compile` output.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum IndexAnnotationOutput {
-    /// Include index annotations in the output.
-    Include,
-    /// Omit index annotations from the output.
-    Omit,
-}
-
-impl IndexAnnotationOutput {
-    /// Determine the [`IndexAnnotationOutput`] setting from the command-line arguments.
-    pub const fn from_args(include_index_annotation: bool) -> Self {
-        if include_index_annotation {
             Self::Include
         } else {
             Self::Omit
