@@ -472,6 +472,7 @@ impl From<IndexArgs> for PipOptions {
             extra_index_url,
             no_index,
             find_links,
+            find_links_env,
         } = args;
 
         Self {
@@ -484,7 +485,7 @@ impl From<IndexArgs> for PipOptions {
                     .collect()
             }),
             no_index: if no_index { Some(true) } else { None },
-            find_links: find_links.map(|find_links| {
+            find_links: find_links.or(find_links_env).map(|find_links| {
                 find_links
                     .into_iter()
                     .filter_map(Maybe::into_option)
@@ -550,12 +551,15 @@ pub fn resolver_options(
         } else {
             None
         },
-        find_links: index_args.find_links.map(|find_links| {
-            find_links
-                .into_iter()
-                .filter_map(Maybe::into_option)
-                .collect()
-        }),
+        find_links: index_args
+            .find_links
+            .or(index_args.find_links_env)
+            .map(|find_links| {
+                find_links
+                    .into_iter()
+                    .filter_map(Maybe::into_option)
+                    .collect()
+            }),
         upgrade: Upgrade::from_args(
             flag(upgrade, no_upgrade, "no-upgrade"),
             upgrade_package.into_iter().map(Requirement::from).collect(),
@@ -679,12 +683,15 @@ pub fn resolver_installer_options_with_indexes(
         } else {
             None
         },
-        find_links: index_args.find_links.map(|find_links| {
-            find_links
-                .into_iter()
-                .filter_map(Maybe::into_option)
-                .collect()
-        }),
+        find_links: index_args
+            .find_links
+            .or(index_args.find_links_env)
+            .map(|find_links| {
+                find_links
+                    .into_iter()
+                    .filter_map(Maybe::into_option)
+                    .collect()
+            }),
         upgrade: Upgrade::from_args(
             flag(upgrade, no_upgrade, "upgrade"),
             upgrade_package.into_iter().map(Requirement::from).collect(),
