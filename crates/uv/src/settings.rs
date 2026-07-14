@@ -54,7 +54,7 @@ use uv_python::{Prefix, PythonDownloads, PythonPreference, PythonVersion, Target
 use uv_redacted::DisplaySafeUrl;
 use uv_resolver::{
     AnnotationStyle, DependencyMode, ExcludeNewer, ExcludeNewerOverride, ExcludeNewerPackage,
-    ForkStrategy, PrereleaseMode, ResolutionMode, TreeDedupe, TreeDirection,
+    ForkStrategy, PrereleaseMode, ResolutionMode, TreeDedupe, TreeDirection, TreeOptions,
 };
 use uv_settings::{
     Combine, EnvironmentOptions, FilesystemOptions, MalwareCheckSettings, Options, PipOptions,
@@ -2651,13 +2651,10 @@ pub(crate) struct TreeSettings {
     pub(super) frozen: Option<FrozenSource>,
     pub(super) universal: bool,
     pub(super) format: TreeFormat,
-    pub(super) depth: u8,
     pub(super) prune: Vec<PackageName>,
     pub(super) package: Vec<PackageName>,
-    pub(super) dedupe: TreeDedupe,
-    pub(super) direction: TreeDirection,
+    pub(super) tree: TreeOptions,
     pub(super) outdated: bool,
-    pub(super) show_sizes: bool,
     #[expect(dead_code)]
     pub(super) script: Option<PathBuf>,
     pub(super) python_version: Option<PythonVersion>,
@@ -2736,13 +2733,16 @@ impl TreeSettings {
             frozen: resolve_frozen(frozen),
             universal,
             format,
-            depth: tree.depth,
             prune: tree.prune,
             package: tree.package,
-            dedupe: TreeDedupe::from_args(tree.no_dedupe),
-            direction: TreeDirection::from_args(tree.invert),
+            tree: TreeOptions {
+                depth: tree.depth.into(),
+                dedupe: TreeDedupe::from_args(tree.no_dedupe),
+                direction: TreeDirection::from_args(tree.invert),
+                show_version_specifiers: false,
+                show_sizes: tree.show_sizes,
+            },
             outdated: tree.outdated,
-            show_sizes: tree.show_sizes,
             script,
             python_version,
             python_platform,
@@ -3967,12 +3967,9 @@ impl PipShowSettings {
 /// The resolved settings to use for a `pip tree` invocation.
 #[derive(Debug, Clone)]
 pub(crate) struct PipTreeSettings {
-    pub(crate) show_version_specifiers: bool,
-    pub(crate) depth: u8,
     pub(crate) prune: Vec<PackageName>,
     pub(crate) package: Vec<PackageName>,
-    pub(crate) dedupe: TreeDedupe,
-    pub(crate) direction: TreeDirection,
+    pub(crate) tree: TreeOptions,
     pub(crate) outdated: bool,
     pub(crate) settings: PipSettings,
 }
@@ -3997,12 +3994,15 @@ impl PipTreeSettings {
         } = args;
 
         Self {
-            show_version_specifiers,
-            depth: tree.depth,
             prune: tree.prune,
-            dedupe: TreeDedupe::from_args(tree.no_dedupe),
-            direction: TreeDirection::from_args(tree.invert),
             package: tree.package,
+            tree: TreeOptions {
+                depth: tree.depth.into(),
+                dedupe: TreeDedupe::from_args(tree.no_dedupe),
+                direction: TreeDirection::from_args(tree.invert),
+                show_version_specifiers,
+                show_sizes: false,
+            },
             outdated: tree.outdated,
             settings: PipSettings::combine(
                 PipOptions {

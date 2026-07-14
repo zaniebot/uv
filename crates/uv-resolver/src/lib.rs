@@ -12,7 +12,7 @@ pub use lock::{
     DependencySelection, Installable, Lock, LockError, LockVersion, Metadata, Package, PackageMap,
     PylockToml, PylockTomlError, PylockTomlErrorKind, RequirementsTxtExport, ResolverManifest,
     SatisfiesResult, SelectedDependency, TreeDedupe, TreeDirection, TreeDisplay, TreeJsonTarget,
-    VERSION, cyclonedx_json,
+    TreeOptions, VERSION, cyclonedx_json,
 };
 pub use manifest::Manifest;
 pub use options::{Flexibility, Options, OptionsBuilder};

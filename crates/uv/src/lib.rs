@@ -1214,12 +1214,9 @@ pub async fn run(cli: Cli, global_initialization: GlobalInitialization) -> Resul
             let cache = cache.init().await?;
 
             commands::pip_tree(
-                args.show_version_specifiers,
-                args.depth,
                 &args.prune,
                 &args.package,
-                args.dedupe,
-                args.direction,
+                args.tree,
                 args.outdated,
                 args.settings.prerelease,
                 args.settings.index_locations,
@@ -2744,13 +2741,10 @@ async fn run_project(
                 args.frozen,
                 args.universal,
                 args.format,
-                args.depth,
                 args.prune,
                 args.package,
-                args.dedupe,
-                args.direction,
+                args.tree,
                 args.outdated,
-                args.show_sizes,
                 args.python_version,
                 args.python_platform,
                 args.python,

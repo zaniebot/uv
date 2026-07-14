@@ -65,7 +65,7 @@ pub use crate::lock::export::{
 };
 pub use crate::lock::installable::Installable;
 pub use crate::lock::map::PackageMap;
-pub use crate::lock::tree::{TreeDedupe, TreeDirection, TreeDisplay, TreeJsonTarget};
+pub use crate::lock::tree::{TreeDedupe, TreeDirection, TreeDisplay, TreeJsonTarget, TreeOptions};
 use crate::resolution::{AnnotatedDist, ResolutionGraphNode};
 use crate::universal_marker::{ConflictMarker, UniversalMarker};
 use crate::{
