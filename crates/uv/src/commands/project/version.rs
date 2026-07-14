@@ -78,7 +78,7 @@ pub(crate) async fn project_version(
     project_dir: &Path,
     package: Option<PackageName>,
     explicit_project: bool,
-    dry_run: bool,
+    dry_run: DryRun,
     lock_check: LockCheck,
     frozen: Option<FrozenSource>,
     active: Option<bool>,
@@ -329,7 +329,7 @@ pub(crate) async fn project_version(
     };
 
     // Update the toml and lock
-    let status = if dry_run {
+    let status = if dry_run.enabled() {
         ExitStatus::Success
     } else if let Some(new_version) = &new_version {
         let project = update_project(
