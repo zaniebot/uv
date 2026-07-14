@@ -1104,6 +1104,15 @@ impl ValidatedLock {
             );
             return Ok(Self::Unusable(lock));
         }
+        if lock.index_strategy() != options.index_strategy {
+            let _ = writeln!(
+                printer.stderr(),
+                "Ignoring existing lockfile due to change in index strategy: `{}` vs. `{}`",
+                lock.index_strategy().cyan(),
+                options.index_strategy.cyan()
+            );
+            return Ok(Self::Unusable(lock));
+        }
         if let Some(change) = lock.exclude_newer().compare(&options.exclude_newer) {
             // If a relative value is used, we won't invalidate on every tick of the clock unless
             // the span duration changed or some other operation causes a new resolution

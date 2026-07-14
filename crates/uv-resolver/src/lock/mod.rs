@@ -21,7 +21,7 @@ use url::Url;
 use uv_cache_key::RepositoryUrl;
 use uv_configuration::{
     BuildOptions, Constraints, DependencyGroupsWithDefaults, ExcludeDependency,
-    ExtrasSpecificationWithDefaults, InstallTarget, Override, PackageOverride,
+    ExtrasSpecificationWithDefaults, IndexStrategy, InstallTarget, Override, PackageOverride,
 };
 use uv_distribution::{DistributionDatabase, FlatRequiresDist, RequiresDist};
 use uv_distribution_filename::{
@@ -567,6 +567,7 @@ impl Lock {
             prerelease_mode: resolution.options.prerelease_mode,
             fork_strategy: resolution.options.fork_strategy,
             exclude_newer: resolution.options.exclude_newer.clone(),
+            index_strategy: resolution.options.index_strategy,
         };
         // Canonicalize the top-level fork markers to match what is persisted in
         // `uv.lock`. In particular, conflict-only fork markers can serialize to
@@ -843,6 +844,11 @@ impl Lock {
     /// Returns the exclude newer setting used to generate this lock.
     pub fn exclude_newer(&self) -> &ExcludeNewer {
         &self.options.exclude_newer
+    }
+
+    /// Returns the index strategy used to generate this lock.
+    pub fn index_strategy(&self) -> IndexStrategy {
+        self.options.index_strategy
     }
 
     /// Returns the conflicting groups that were used to generate this lock.
@@ -1485,6 +1491,12 @@ impl Lock {
                 options_table.insert(
                     "fork-strategy",
                     value(self.options.fork_strategy.to_string()),
+                );
+            }
+            if self.options.index_strategy != IndexStrategy::default() {
+                options_table.insert(
+                    "index-strategy",
+                    value(self.options.index_strategy.to_string()),
                 );
             }
             let exclude_newer = &self.options.exclude_newer;
@@ -2822,6 +2834,8 @@ struct ResolverOptions {
     fork_strategy: ForkStrategy,
     /// The [`ExcludeNewer`] setting used to generate this lock.
     exclude_newer: ExcludeNewer,
+    /// The [`IndexStrategy`] used to generate this lock.
+    index_strategy: IndexStrategy,
 }
 
 /// The serialized resolver options in the lockfile.
@@ -2837,6 +2851,9 @@ struct ResolverOptionsWire {
     /// The [`ForkStrategy`] used to generate this lock.
     #[serde(default)]
     fork_strategy: ForkStrategy,
+    /// The [`IndexStrategy`] used to generate this lock.
+    #[serde(default)]
+    index_strategy: IndexStrategy,
     /// The [`ExcludeNewer`] setting used to generate this lock.
     #[serde(flatten)]
     exclude_newer: ExcludeNewerWire,
@@ -3098,6 +3115,7 @@ impl TryFrom<LockWire> for Lock {
             prerelease_mode: options_wire.prerelease_mode,
             fork_strategy: options_wire.fork_strategy,
             exclude_newer: options_wire.exclude_newer.into(),
+            index_strategy: options_wire.index_strategy,
         };
         let lock = Self::new(
             wire.version,

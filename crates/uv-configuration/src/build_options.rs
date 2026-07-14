@@ -342,6 +342,16 @@ pub enum IndexStrategy {
     UnsafeBestMatch,
 }
 
+impl Display for IndexStrategy {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::FirstIndex => f.write_str("first-index"),
+            Self::UnsafeFirstMatch => f.write_str("unsafe-first-match"),
+            Self::UnsafeBestMatch => f.write_str("unsafe-best-match"),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::str::FromStr;
