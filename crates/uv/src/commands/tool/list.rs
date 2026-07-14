@@ -37,10 +37,22 @@ impl From<bool> for ToolListMode {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ToolListPaths {
+    Show,
+    Hide,
+}
+
+impl From<bool> for ToolListPaths {
+    fn from(show_paths: bool) -> Self {
+        if show_paths { Self::Show } else { Self::Hide }
+    }
+}
+
 /// List installed tools.
 #[expect(clippy::fn_params_excessive_bools)]
 pub(crate) async fn list(
-    show_paths: bool,
+    paths: ToolListPaths,
     show_version_specifiers: bool,
     show_with: bool,
     show_extras: bool,
@@ -276,7 +288,7 @@ pub(crate) async fn list(
             String::new()
         };
 
-        if show_paths {
+        if paths == ToolListPaths::Show {
             writeln!(
                 printer.stdout(),
                 "{} ({})",
@@ -299,7 +311,7 @@ pub(crate) async fn list(
 
         // Output tool entrypoints
         for entrypoint in tool.entrypoints() {
-            if show_paths {
+            if paths == ToolListPaths::Show {
                 writeln!(printer.stdout(), "- {}", entrypoint.to_string().cyan())?;
             } else {
                 writeln!(printer.stdout(), "- {}", entrypoint.name)?;
