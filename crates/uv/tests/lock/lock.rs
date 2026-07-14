@@ -3,6 +3,8 @@ use anyhow::Result;
 use assert_cmd::assert::OutputAssertExt;
 use assert_fs::prelude::*;
 use indoc::{formatdoc, indoc};
+#[cfg(feature = "test-universal")]
+use insta::allow_duplicates;
 use insta::assert_snapshot;
 #[cfg(feature = "test-universal")]
 use url::Url;
@@ -27490,6 +27492,23 @@ fn lock_transitive_git() -> Result<()> {
     Resolved 6 packages in [TIME]
     ");
 
+    // Git sources are buildable, so `--no-binary-package` must not invalidate the lock. The
+    // inverse policy must invalidate it even when the Git dependency is transitive.
+    context
+        .lock()
+        .arg("--locked")
+        .arg("--no-binary-package")
+        .arg("d")
+        .assert()
+        .success();
+    context
+        .lock()
+        .arg("--locked")
+        .arg("--no-build-package")
+        .arg("d")
+        .assert()
+        .failure();
+
     // Install from the lockfile.
     uv_snapshot!(context.filters(), context.sync().arg("--frozen"), @"
     success: true
@@ -29894,6 +29913,110 @@ fn lock_no_build_static_metadata() -> Result<()> {
     Installed 1 package in [TIME]
      + iniconfig==2.0.0
     ");
+
+    Ok(())
+}
+
+/// Changing the build policy must invalidate a lock that only contains a forbidden artifact.
+#[cfg(feature = "test-universal")]
+#[test]
+fn lock_build_policy_invalidates_unusable_artifacts() -> Result<()> {
+    allow_duplicates! {
+        for (scenario, flag) in [
+            ("wheels/only-wheels.toml", "--no-binary-package"),
+            ("wheels/no-wheels.toml", "--no-build-package"),
+            (
+                "wheels/no-wheels-with-matching-platform.toml",
+                "--no-build-package",
+            ),
+        ] {
+            let server = PackseServer::new(scenario);
+            let context = uv_test::test_context!("3.12");
+
+            context.temp_dir.child("pyproject.toml").write_str(
+                r#"
+                [project]
+                name = "project"
+                version = "0.1.0"
+                requires-python = ">=3.12"
+                dependencies = ["a==1.0.0"]
+                "#,
+            )?;
+
+            context
+                .lock()
+                .arg("--index-url")
+                .arg(server.index_url())
+                .assert()
+                .success();
+
+            let mut command = context.lock();
+            command
+                .arg("--index-url")
+                .arg(server.index_url())
+                .arg("--locked")
+                .arg(flag)
+                .arg("a");
+
+            if flag == "--no-binary-package" {
+                uv_snapshot!(context.filters(), command, @"
+        success: false
+        exit_code: 1
+        ----- stdout -----
+
+        ----- stderr -----
+          × No solution found when resolving dependencies:
+          ╰─▶ Because a==1.0.0 has no source distribution and your project depends on a==1.0.0, we can conclude that your project's requirements are unsatisfiable.
+
+        hint: A source distribution is required for `a` because using pre-built wheels is disabled for `a` (i.e., with `--no-binary-package a`)
+                ");
+            } else {
+                uv_snapshot!(context.filters(), command, @"
+        success: false
+        exit_code: 1
+        ----- stdout -----
+
+        ----- stderr -----
+          × No solution found when resolving dependencies:
+          ╰─▶ Because a==1.0.0 has no usable wheels and your project depends on a==1.0.0, we can conclude that your project's requirements are unsatisfiable.
+
+        hint: Wheels are required for `a` because building from source is disabled for `a` (i.e., with `--no-build-package a`)
+                ");
+            }
+        }
+        Ok::<(), anyhow::Error>(())
+    }?;
+
+    // The same checks must apply behind an immutable registry parent.
+    let server = PackseServer::new("wheels/transitive-artifacts.toml");
+    let context = uv_test::test_context!("3.12");
+    context.temp_dir.child("pyproject.toml").write_str(
+        r#"
+        [project]
+        name = "project"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        dependencies = ["a==1.0.0"]
+        "#,
+    )?;
+    context
+        .lock()
+        .arg("--index-url")
+        .arg(server.index_url())
+        .assert()
+        .success();
+
+    for (flag, package) in [("--no-binary-package", "b"), ("--no-build-package", "c")] {
+        context
+            .lock()
+            .arg("--index-url")
+            .arg(server.index_url())
+            .arg("--locked")
+            .arg(flag)
+            .arg(package)
+            .assert()
+            .failure();
+    }
 
     Ok(())
 }

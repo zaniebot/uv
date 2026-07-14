@@ -2177,6 +2177,21 @@ impl Lock {
                 .collect::<BTreeSet<_>>()
         });
 
+        // Validate every locked package against the current build policy. Immutable packages do
+        // not recurse through their dependencies below, so checking only the queue would miss a
+        // forbidden artifact behind an immutable parent. Require a compatible wheel when builds
+        // are disabled.
+        for package in &self.packages {
+            if (build_options.no_binary_package(&package.id.name)
+                || build_options.no_build_package(&package.id.name))
+                && package
+                    .to_dist(root, TagPolicy::Required(tags), build_options, markers)
+                    .is_err()
+            {
+                return Ok(SatisfiesResult::MismatchedBuildOptions(&package.id.name));
+            }
+        }
+
         // Add the workspace packages to the queue.
         for root_name in packages.keys() {
             let root = self
@@ -2780,6 +2795,8 @@ pub enum SatisfiesResult<'lock> {
     ),
     /// The lockfile uses different static metadata.
     MismatchedStaticMetadata(BTreeSet<StaticMetadata>, &'lock BTreeSet<StaticMetadata>),
+    /// A locked registry package has no artifact permitted by the current build policy.
+    MismatchedBuildOptions(&'lock PackageName),
     /// The lockfile is missing a workspace member.
     MissingRoot(PackageName),
     /// The lockfile referenced a remote index that was not provided
