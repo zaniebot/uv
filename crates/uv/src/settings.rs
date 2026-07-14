@@ -2764,8 +2764,7 @@ impl TreeSettings {
 #[derive(Debug, Clone)]
 pub(crate) struct ExportSettings {
     pub(super) format: Option<ExportFormat>,
-    pub(super) all_packages: bool,
-    pub(super) package: Vec<PackageName>,
+    pub(super) packages: ExportPackageSelection,
     pub(super) prune: Vec<PackageName>,
     pub(super) extras: ExtrasSpecification,
     pub(super) groups: DependencyGroups,
@@ -2871,8 +2870,7 @@ impl ExportSettings {
 
         Self {
             format,
-            all_packages,
-            package,
+            packages: ExportPackageSelection::from_args(all_packages, package),
             prune,
             extras: ExtrasSpecification::from_args(
                 extra.unwrap_or_default(),
@@ -2932,6 +2930,25 @@ impl ExportSettings {
             install_mirrors: environment
                 .install_mirrors
                 .combine(filesystem_install_mirrors),
+        }
+    }
+}
+
+/// The packages to export from a workspace.
+#[derive(Debug, Clone)]
+pub(crate) enum ExportPackageSelection {
+    /// Export all packages in the workspace.
+    All,
+    /// Export the root project or the selected packages.
+    Selected(Vec<PackageName>),
+}
+
+impl ExportPackageSelection {
+    fn from_args(all_packages: bool, package: Vec<PackageName>) -> Self {
+        if all_packages {
+            Self::All
+        } else {
+            Self::Selected(package)
         }
     }
 }
