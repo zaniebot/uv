@@ -68,7 +68,7 @@ fn pip_compile_baseline() {
         python_preference: Managed,
         python_downloads: Automatic,
         no_progress: false,
-        installer_metadata: true,
+        installer_metadata: Enabled,
     }
     CacheSettings {
         no_cache: false,
@@ -435,7 +435,7 @@ fn pip_install_baseline() {
         python_preference: Managed,
         python_downloads: Automatic,
         no_progress: false,
-        installer_metadata: true,
+        installer_metadata: Enabled,
     }
     CacheSettings {
         no_cache: false,
@@ -618,7 +618,7 @@ fn lock_baseline() {
         python_preference: Managed,
         python_downloads: Automatic,
         no_progress: false,
-        installer_metadata: true,
+        installer_metadata: Enabled,
     }
     CacheSettings {
         no_cache: false,
@@ -740,7 +740,7 @@ fn version_baseline() {
         python_preference: Managed,
         python_downloads: Automatic,
         no_progress: false,
-        installer_metadata: true,
+        installer_metadata: Enabled,
     }
     CacheSettings {
         no_cache: false,
@@ -877,7 +877,7 @@ fn tool_install_baseline() {
         python_preference: Managed,
         python_downloads: Automatic,
         no_progress: false,
-        installer_metadata: true,
+        installer_metadata: Enabled,
     }
     CacheSettings {
         no_cache: false,

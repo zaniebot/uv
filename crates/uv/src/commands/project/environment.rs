@@ -20,6 +20,7 @@ use uv_distribution_types::{
     BuiltDist, Dist, Identifier, Node, Resolution, ResolvedDist, SourceDist,
 };
 use uv_fs::PythonExt;
+use uv_install_wheel::InstallerMetadata;
 use uv_preview::Preview;
 use uv_python::{Interpreter, PythonEnvironment, canonicalize_executable};
 use uv_types::{HashStrategy, SourceTreeEditablePolicy};
@@ -143,7 +144,7 @@ impl CachedEnvironment {
         state: &PlatformState,
         resolve: Box<dyn ResolveLogger>,
         install: Box<dyn InstallLogger>,
-        installer_metadata: bool,
+        installer_metadata: InstallerMetadata,
         concurrency: &Concurrency,
         cache: &Cache,
         workspace_cache: &WorkspaceCache,
@@ -208,7 +209,7 @@ impl CachedEnvironment {
         client_builder: &BaseClientBuilder<'_>,
         state: &PlatformState,
         install: Box<dyn InstallLogger>,
-        installer_metadata: bool,
+        installer_metadata: InstallerMetadata,
         concurrency: &Concurrency,
         cache: &Cache,
         printer: Printer,
@@ -242,7 +243,7 @@ impl CachedEnvironment {
         client_builder: &BaseClientBuilder<'_>,
         state: &PlatformState,
         install: Box<dyn InstallLogger>,
-        installer_metadata: bool,
+        installer_metadata: InstallerMetadata,
         concurrency: &Concurrency,
         cache: &Cache,
         printer: Printer,

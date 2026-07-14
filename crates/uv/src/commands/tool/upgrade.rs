@@ -13,6 +13,7 @@ use uv_distribution::LoweredExtraBuildDependencies;
 use uv_distribution_types::{ExtraBuildRequires, Name, Requirement, RequirementSource};
 use uv_errors::{ErrorOptions, Hints, write_error_chain_with_options};
 use uv_fs::CWD;
+use uv_install_wheel::InstallerMetadata;
 use uv_installer::{InstallationStrategy, Planner, SitePackages};
 use uv_normalize::PackageName;
 use uv_pep440::{Operator, Version};
@@ -52,7 +53,7 @@ pub(crate) async fn upgrade(
     client_builder: BaseClientBuilder<'_>,
     python_preference: PythonPreference,
     python_downloads: PythonDownloads,
-    installer_metadata: bool,
+    installer_metadata: InstallerMetadata,
     concurrency: Concurrency,
     cache: &Cache,
     workspace_cache: &WorkspaceCache,
@@ -272,7 +273,7 @@ async fn upgrade_tool(
     cache: &Cache,
     workspace_cache: &WorkspaceCache,
     filesystem: &ResolverInstallerOptions,
-    installer_metadata: bool,
+    installer_metadata: InstallerMetadata,
     concurrency: &Concurrency,
     preview: Preview,
 ) -> Result<UpgradeReport> {
