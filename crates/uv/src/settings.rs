@@ -74,7 +74,7 @@ use crate::commands::pip::operations::Modifications;
 use crate::commands::{
     InitDescription, InitKind, InitMode, InitPackaging, InitProjectKind, InitPythonPin, InitReadme,
     InitWorkspaceDiscovery, PythonInstallDefault, PythonInstallForce, PythonReinstall,
-    PythonUpgrade, PythonUpgradeSource, ToolRunCommand,
+    PythonUpgrade, PythonUpgradeSource, ToolListOutput, ToolRunCommand,
 };
 
 /// The default publish URL.
@@ -1266,11 +1266,7 @@ impl ToolUpgradeSettings {
 /// The resolved settings to use for a `tool list` invocation.
 #[derive(Debug, Clone)]
 pub(crate) struct ToolListSettings {
-    pub(crate) show_paths: bool,
-    pub(crate) show_version_specifiers: bool,
-    pub(crate) show_with: bool,
-    pub(crate) show_extras: bool,
-    pub(crate) show_python: bool,
+    pub(crate) output: ToolListOutput,
     pub(crate) outdated: bool,
     pub(crate) args: ResolverInstallerOptions,
     pub(crate) filesystem: ResolverInstallerOptions,
@@ -1298,12 +1294,15 @@ impl ToolListSettings {
             ..ResolverInstallerOptions::default()
         };
 
+        let mut output = ToolListOutput::empty();
+        output.set(ToolListOutput::PATHS, show_paths);
+        output.set(ToolListOutput::VERSION_SPECIFIERS, show_version_specifiers);
+        output.set(ToolListOutput::WITH, show_with);
+        output.set(ToolListOutput::EXTRAS, show_extras);
+        output.set(ToolListOutput::PYTHON, show_python);
+
         Self {
-            show_paths,
-            show_version_specifiers,
-            show_with,
-            show_extras,
-            show_python,
+            output,
             outdated: flag(outdated, no_outdated, "outdated").unwrap_or(false),
             args: ResolverInstallerOptions {
                 exclude_newer,

@@ -37,41 +37,20 @@ impl From<bool> for ToolListMode {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum ToolListPaths {
-    Show,
-    Hide,
-}
-
-impl From<bool> for ToolListPaths {
-    fn from(show_paths: bool) -> Self {
-        if show_paths { Self::Show } else { Self::Hide }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum ToolListVersionSpecifiers {
-    Show,
-    Hide,
-}
-
-impl From<bool> for ToolListVersionSpecifiers {
-    fn from(show_version_specifiers: bool) -> Self {
-        if show_version_specifiers {
-            Self::Show
-        } else {
-            Self::Hide
-        }
+bitflags::bitflags! {
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+    pub(crate) struct ToolListOutput: u8 {
+        const PATHS = 1 << 0;
+        const VERSION_SPECIFIERS = 1 << 1;
+        const WITH = 1 << 2;
+        const EXTRAS = 1 << 3;
+        const PYTHON = 1 << 4;
     }
 }
 
 /// List installed tools.
 pub(crate) async fn list(
-    paths: ToolListPaths,
-    version_specifiers: ToolListVersionSpecifiers,
-    show_with: bool,
-    show_extras: bool,
-    show_python: bool,
+    output: ToolListOutput,
     mode: ToolListMode,
     args: ResolverInstallerOptions,
     filesystem: ResolverInstallerOptions,
@@ -234,7 +213,8 @@ pub(crate) async fn list(
             }
         }
 
-        let version_specifier = (version_specifiers == ToolListVersionSpecifiers::Show)
+        let version_specifier = output
+            .contains(ToolListOutput::VERSION_SPECIFIERS)
             .then(|| {
                 tool.requirements()
                     .iter()
@@ -250,7 +230,8 @@ pub(crate) async fn list(
             })
             .unwrap_or_default();
 
-        let extra_requirements = show_extras
+        let extra_requirements = output
+            .contains(ToolListOutput::EXTRAS)
             .then(|| {
                 tool.requirements()
                     .iter()
@@ -265,7 +246,7 @@ pub(crate) async fn list(
             })
             .unwrap_or_default();
 
-        let python_version = if show_python {
+        let python_version = if output.contains(ToolListOutput::PYTHON) {
             let interpreter = tool_env.environment().interpreter();
             let implementation = LenientImplementationName::from(interpreter.implementation_name());
             format!(
@@ -277,7 +258,8 @@ pub(crate) async fn list(
             String::new()
         };
 
-        let with_requirements = show_with
+        let with_requirements = output
+            .contains(ToolListOutput::WITH)
             .then(|| {
                 tool.requirements()
                     .iter()
@@ -303,7 +285,7 @@ pub(crate) async fn list(
             String::new()
         };
 
-        if paths == ToolListPaths::Show {
+        if output.contains(ToolListOutput::PATHS) {
             writeln!(
                 printer.stdout(),
                 "{} ({})",
@@ -326,7 +308,7 @@ pub(crate) async fn list(
 
         // Output tool entrypoints
         for entrypoint in tool.entrypoints() {
-            if paths == ToolListPaths::Show {
+            if output.contains(ToolListOutput::PATHS) {
                 writeln!(printer.stdout(), "- {}", entrypoint.to_string().cyan())?;
             } else {
                 writeln!(printer.stdout(), "- {}", entrypoint.name)?;
