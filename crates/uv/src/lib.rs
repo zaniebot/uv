@@ -52,7 +52,8 @@ use uv_workspace::{DiscoveryOptions, Workspace, WorkspaceCache};
 
 use crate::commands::pip::EnvironmentValidation;
 use crate::commands::{
-    ExitStatus, ParsedRunCommand, RunCommand, ScriptPath, SyncMode, ToolRunCommand, UvError,
+    ExitStatus, ParsedRunCommand, ResolutionDisplay, RunCommand, ScriptPath, SyncMode,
+    ToolRunCommand, UvError,
 };
 use crate::printer::Printer;
 use crate::settings::{
@@ -2318,7 +2319,9 @@ async fn run_project(
                 script,
                 command,
                 requirements,
-                args.show_resolution || globals.verbose > 0,
+                ResolutionDisplay::from_show_resolution(
+                    args.show_resolution || globals.verbose > 0,
+                ),
                 args.lock_check,
                 args.frozen,
                 args.active,
