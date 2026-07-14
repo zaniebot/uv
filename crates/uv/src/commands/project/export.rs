@@ -12,8 +12,8 @@ use rustc_hash::FxHashSet;
 use uv_cache::Cache;
 use uv_client::BaseClientBuilder;
 use uv_configuration::{
-    AnnotationOutput, Concurrency, DependencyGroups, EditableMode, ExportFormat,
-    ExtrasSpecification, FindLinksOutput, HashOutput, HeaderOutput, IndexUrlOutput, InstallOptions,
+    Concurrency, DependencyGroups, EditableMode, ExportFormat, ExtrasSpecification, InstallOptions,
+    OutputFlags,
 };
 use uv_distribution_types::Verbatim;
 use uv_normalize::{DefaultExtras, DefaultGroups, PackageName};
@@ -63,7 +63,7 @@ pub(crate) async fn export(
     format: Option<ExportFormat>,
     packages: ExportPackageSelection,
     prune: Vec<PackageName>,
-    hash_output: HashOutput,
+    output_flags: OutputFlags,
     install_options: InstallOptions,
     output_file: Option<PathBuf>,
     extras: ExtrasSpecification,
@@ -71,10 +71,6 @@ pub(crate) async fn export(
     editable: Option<EditableMode>,
     lock_check: LockCheck,
     frozen: Option<FrozenSource>,
-    annotation_output: AnnotationOutput,
-    header_output: HeaderOutput,
-    index_url_output: IndexUrlOutput,
-    find_links_output: FindLinksOutput,
     script: Option<Pep723Script>,
     python: Option<String>,
     install_mirrors: PythonInstallMirrors,
@@ -378,13 +374,13 @@ pub(crate) async fn export(
                 &prune,
                 &extras,
                 &groups,
-                matches!(annotation_output, AnnotationOutput::Include),
+                output_flags.contains(OutputFlags::ANNOTATIONS),
                 editable,
-                matches!(hash_output, HashOutput::Generate),
+                output_flags.contains(OutputFlags::HASHES),
                 &install_options,
             )?;
 
-            if matches!(header_output, HeaderOutput::Include) {
+            if output_flags.contains(OutputFlags::HEADER) {
                 writeln!(
                     writer,
                     "{}",
@@ -396,7 +392,7 @@ pub(crate) async fn export(
             let mut wrote_preamble = false;
 
             // If necessary, include the `--index-url` and `--extra-index-url` locations.
-            if matches!(index_url_output, IndexUrlOutput::Include) {
+            if output_flags.contains(OutputFlags::INDEX_URL) {
                 let mut seen = FxHashSet::default();
                 let mut emitted_explicit_index = false;
 
@@ -426,7 +422,7 @@ pub(crate) async fn export(
             }
 
             // If necessary, include the `--find-links` locations.
-            if matches!(find_links_output, FindLinksOutput::Include) {
+            if output_flags.contains(OutputFlags::FIND_LINKS) {
                 for flat_index in settings.index_locations.flat_indexes() {
                     writeln!(writer, "--find-links {}", flat_index.url().verbatim())?;
                     wrote_preamble = true;
@@ -445,12 +441,12 @@ pub(crate) async fn export(
                 &prune,
                 &extras,
                 &groups,
-                matches!(annotation_output, AnnotationOutput::Include),
+                output_flags.contains(OutputFlags::ANNOTATIONS),
                 editable.as_ref(),
                 &install_options,
             )?;
 
-            if matches!(header_output, HeaderOutput::Include) {
+            if output_flags.contains(OutputFlags::HEADER) {
                 writeln!(
                     writer,
                     "{}",
@@ -466,7 +462,7 @@ pub(crate) async fn export(
                 &prune,
                 &extras,
                 &groups,
-                matches!(annotation_output, AnnotationOutput::Include),
+                output_flags.contains(OutputFlags::ANNOTATIONS),
                 &install_options,
                 preview,
                 matches!(packages, ExportPackageSelection::All),

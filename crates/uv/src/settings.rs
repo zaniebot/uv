@@ -34,12 +34,12 @@ use uv_cli::{
 };
 use uv_client::Connectivity;
 use uv_configuration::{
-    AnnotationOutput, BuildIsolation, BuildOptions, Concurrency, DependencyGroups, DevMode, DryRun,
-    EditableMode, EnvFile, ExcludeDependency, ExportFormat, ExtrasSpecification, FindLinksOutput,
-    GitLfsSetting, HashCheckingMode, HashOutput, HeaderOutput, IndexStrategy, IndexUrlOutput,
-    InstallOptions, InstallSelection, KeyringProviderType, NoBinary, NoBuild, NoSources, Override,
-    PackageOverride, PipCompileFormat, ProjectBuildBackend, ProjectDiscovery, ProxyUrl, Reinstall,
-    RequiredVersion, TargetTriple, TrustedHost, TrustedPublishing, Upgrade, VersionControlSystem,
+    BuildIsolation, BuildOptions, Concurrency, DependencyGroups, DevMode, DryRun, EditableMode,
+    EnvFile, ExcludeDependency, ExportFormat, ExtrasSpecification, GitLfsSetting, HashCheckingMode,
+    IndexStrategy, InstallOptions, InstallSelection, KeyringProviderType, NoBinary, NoBuild,
+    NoSources, OutputFlags, Override, PackageOverride, PipCompileFormat, ProjectBuildBackend,
+    ProjectDiscovery, ProxyUrl, Reinstall, RequiredVersion, TargetTriple, TrustedHost,
+    TrustedPublishing, Upgrade, VersionControlSystem,
 };
 use uv_distribution_types::{
     ConfigSettings, DependencyMetadata, ExtraBuildVariables, Index, IndexLocations, IndexUrl,
@@ -2767,15 +2767,11 @@ pub(crate) struct ExportSettings {
     pub(super) extras: ExtrasSpecification,
     pub(super) groups: DependencyGroups,
     pub(super) editable: Option<EditableMode>,
-    pub(super) hash_output: HashOutput,
+    pub(super) output_flags: OutputFlags,
     pub(super) install_options: InstallOptions,
     pub(super) output_file: Option<PathBuf>,
     pub(super) lock_check: LockCheck,
     pub(super) frozen: Option<FrozenSource>,
-    pub(super) annotation_output: AnnotationOutput,
-    pub(super) header_output: HeaderOutput,
-    pub(super) index_url_output: IndexUrlOutput,
-    pub(super) find_links_output: FindLinksOutput,
     pub(super) script: Option<PathBuf>,
     pub(super) python: Option<String>,
     pub(super) install_mirrors: PythonInstallMirrors,
@@ -2866,6 +2862,28 @@ impl ExportSettings {
             Some(environment.no_editable),
         );
 
+        let mut output_flags = OutputFlags::empty();
+        output_flags.set(
+            OutputFlags::HASHES,
+            flag(hashes, no_hashes, "hashes").unwrap_or(true),
+        );
+        output_flags.set(
+            OutputFlags::ANNOTATIONS,
+            flag(annotate, no_annotate, "annotate").unwrap_or(true),
+        );
+        output_flags.set(
+            OutputFlags::HEADER,
+            flag(header, no_header, "header").unwrap_or(true),
+        );
+        output_flags.set(
+            OutputFlags::INDEX_URL,
+            flag(emit_index_url, no_emit_index_url, "emit-index-url").unwrap_or(false),
+        );
+        output_flags.set(
+            OutputFlags::FIND_LINKS,
+            flag(emit_find_links, no_emit_find_links, "emit-find-links").unwrap_or(false),
+        );
+
         Self {
             format,
             packages: ExportPackageSelection::from_args(all_packages, package),
@@ -2895,7 +2913,7 @@ impl ExportSettings {
                 flag(editable.into(), no_editable.into(), "editable"),
                 no_editable_package,
             ),
-            hash_output: HashOutput::from_args(flag(hashes, no_hashes, "hashes").unwrap_or(true)),
+            output_flags,
             install_options: InstallOptions::new(
                 InstallSelection::from_args(no_emit_project, only_emit_project),
                 InstallSelection::from_args(no_emit_workspace, only_emit_workspace),
@@ -2906,18 +2924,6 @@ impl ExportSettings {
             output_file,
             lock_check: resolve_lock_check(locked),
             frozen: resolve_frozen(frozen),
-            annotation_output: AnnotationOutput::from_args(
-                flag(annotate, no_annotate, "annotate").unwrap_or(true),
-            ),
-            header_output: HeaderOutput::from_args(
-                flag(header, no_header, "header").unwrap_or(true),
-            ),
-            index_url_output: IndexUrlOutput::from_args(
-                flag(emit_index_url, no_emit_index_url, "emit-index-url").unwrap_or(false),
-            ),
-            find_links_output: FindLinksOutput::from_args(
-                flag(emit_find_links, no_emit_find_links, "emit-find-links").unwrap_or(false),
-            ),
             script,
             python: python.and_then(Maybe::into_option),
             refresh: Refresh::from(refresh),
