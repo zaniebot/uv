@@ -198,6 +198,27 @@ impl From<bool> for PythonReinstall {
     }
 }
 
+/// Whether to replace existing Python executables.
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum PythonInstallForce {
+    /// Replace existing Python executables.
+    Enabled,
+    /// Respect existing Python executables.
+    Disabled,
+}
+
+impl PythonInstallForce {
+    fn is_enabled(self) -> bool {
+        matches!(self, Self::Enabled)
+    }
+}
+
+impl From<bool> for PythonInstallForce {
+    fn from(value: bool) -> Self {
+        if value { Self::Enabled } else { Self::Disabled }
+    }
+}
+
 /// Download and install Python versions.
 #[expect(clippy::fn_params_excessive_bools)]
 pub(crate) async fn install(
@@ -208,7 +229,7 @@ pub(crate) async fn install(
     upgrade: PythonUpgrade,
     bin: Option<bool>,
     registry: Option<bool>,
-    force: bool,
+    force: PythonInstallForce,
     python_install_mirror: Option<String>,
     pypy_install_mirror: Option<String>,
     python_downloads_json_url: Option<String>,
@@ -314,7 +335,7 @@ async fn perform_install(
     upgrade: PythonUpgrade,
     bin: Option<bool>,
     registry: Option<bool>,
-    force: bool,
+    force: PythonInstallForce,
     python_install_mirror: Option<String>,
     pypy_install_mirror: Option<String>,
     python_downloads_json_url: Option<String>,
@@ -1001,7 +1022,7 @@ fn create_bin_links(
     installation: &ManagedPythonInstallation,
     bin: &Path,
     reinstall: PythonReinstall,
-    force: bool,
+    force: PythonInstallForce,
     default: bool,
     upgradeable: bool,
     upgrade: bool,
@@ -1095,7 +1116,7 @@ fn create_bin_links(
 
                         // There's an existing executable we don't manage, require `--force`
                         if valid_link {
-                            if !force {
+                            if !force.is_enabled() {
                                 if upgrade {
                                     warn_user!(
                                         "Executable already exists at `{}` but is not managed by uv; use `uv python install {}.{}{} --force` to replace it",
@@ -1124,7 +1145,7 @@ fn create_bin_links(
                     Some(existing) if existing == installation => {
                         // The existing link points to the same installation, so we're done unless
                         // they requested we reinstall
-                        if !(reinstall.is_enabled() || force) {
+                        if !(reinstall.is_enabled() || force.is_enabled()) {
                             debug!(
                                 "Executable at `{}` is already for `{}`",
                                 target.simplified_display(),
@@ -1141,7 +1162,7 @@ fn create_bin_links(
                     Some(existing) => {
                         // The existing link points to a different installation, check if it
                         // is reasonable to replace
-                        if force {
+                        if force.is_enabled() {
                             debug!(
                                 "Replacing existing executable for `{}` at `{}` with executable for `{}` due to `--force` flag",
                                 existing.key(),
