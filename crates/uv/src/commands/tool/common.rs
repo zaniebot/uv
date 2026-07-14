@@ -22,8 +22,8 @@ use uv_distribution::{
     DistributionDatabase, LoweredExtraBuildDependencies, StaticMetadataDatabase,
 };
 use uv_distribution_types::{
-    DependencyMetadata, HashGeneration, Index, InstalledDist, Name, Requirement, RequiresPython,
-    Resolution, UnresolvedRequirement,
+    ConfigSettings, DependencyMetadata, HashGeneration, Index, InstalledDist, Name,
+    PackageConfigSettings, Requirement, RequiresPython, Resolution, UnresolvedRequirement,
 };
 use uv_errors::{ErrorWithHints, Hint, Hints};
 #[cfg(unix)]
@@ -52,6 +52,7 @@ use uv_warnings::warn_user_once;
 use uv_workspace::WorkspaceCache;
 
 use crate::commands::pip;
+use crate::commands::project::lock::config_settings_digest;
 
 /// An error raised when a tool package provides no executables.
 #[derive(Debug, Error)]
@@ -336,12 +337,19 @@ impl ToolLock {
         root: &Path,
         resolution: &ResolverOutput,
         manifest: &ResolverManifest,
+        config_setting: &ConfigSettings,
+        config_settings_package: &PackageConfigSettings,
     ) -> anyhow::Result<Self> {
         let lock = Lock::from_resolution(resolution, root, Vec::new())?;
         let manifest = manifest.clone().relative_to(root)?;
         Ok(Self {
             root: root.to_path_buf(),
-            lock: lock.with_manifest(manifest),
+            lock: lock
+                .with_manifest(manifest)
+                .with_config_settings_digest(config_settings_digest(
+                    config_setting,
+                    config_settings_package,
+                )),
         })
     }
 
@@ -517,6 +525,8 @@ impl ToolLock {
             .map(Override::Requirement)
             .collect::<Vec<_>>();
         let Self { root, lock } = self;
+        let config_settings_digest =
+            config_settings_digest(config_setting, config_settings_package);
         let validated = ValidatedLock::validate(
             lock,
             &root,
@@ -539,6 +549,7 @@ impl ToolLock {
             upgrade,
             Some(refresh),
             &options,
+            config_settings_digest.as_deref(),
             &hasher,
             state.index(),
             &database,

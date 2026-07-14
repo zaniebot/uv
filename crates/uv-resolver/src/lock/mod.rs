@@ -567,6 +567,7 @@ impl Lock {
             prerelease_mode: resolution.options.prerelease_mode,
             fork_strategy: resolution.options.fork_strategy,
             exclude_newer: resolution.options.exclude_newer.clone(),
+            config_settings_digest: None,
         };
         // Canonicalize the top-level fork markers to match what is persisted in
         // `uv.lock`. In particular, conflict-only fork markers can serialize to
@@ -843,6 +844,18 @@ impl Lock {
     /// Returns the exclude newer setting used to generate this lock.
     pub fn exclude_newer(&self) -> &ExcludeNewer {
         &self.options.exclude_newer
+    }
+
+    /// Returns the digest of the build config settings used to generate this lock.
+    pub fn config_settings_digest(&self) -> Option<&str> {
+        self.options.config_settings_digest.as_deref()
+    }
+
+    /// Set the digest of the build config settings used to generate this lock.
+    #[must_use]
+    pub fn with_config_settings_digest(mut self, digest: Option<String>) -> Self {
+        self.options.config_settings_digest = digest;
+        self
     }
 
     /// Returns the conflicting groups that were used to generate this lock.
@@ -1486,6 +1499,9 @@ impl Lock {
                     "fork-strategy",
                     value(self.options.fork_strategy.to_string()),
                 );
+            }
+            if let Some(digest) = &self.options.config_settings_digest {
+                options_table.insert("config-settings-digest", value(digest.as_str()));
             }
             let exclude_newer = &self.options.exclude_newer;
             if !exclude_newer.is_empty() {
@@ -2822,6 +2838,8 @@ struct ResolverOptions {
     fork_strategy: ForkStrategy,
     /// The [`ExcludeNewer`] setting used to generate this lock.
     exclude_newer: ExcludeNewer,
+    /// The digest of the build config settings used to generate this lock.
+    config_settings_digest: Option<String>,
 }
 
 /// The serialized resolver options in the lockfile.
@@ -2840,6 +2858,9 @@ struct ResolverOptionsWire {
     /// The [`ExcludeNewer`] setting used to generate this lock.
     #[serde(flatten)]
     exclude_newer: ExcludeNewerWire,
+    /// The digest of the build config settings used to generate this lock.
+    #[serde(default)]
+    config_settings_digest: Option<String>,
 }
 
 #[expect(clippy::struct_field_names)]
@@ -3098,6 +3119,7 @@ impl TryFrom<LockWire> for Lock {
             prerelease_mode: options_wire.prerelease_mode,
             fork_strategy: options_wire.fork_strategy,
             exclude_newer: options_wire.exclude_newer.into(),
+            config_settings_digest: options_wire.config_settings_digest,
         };
         let lock = Self::new(
             wire.version,

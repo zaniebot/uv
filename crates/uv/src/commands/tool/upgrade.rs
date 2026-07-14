@@ -383,8 +383,13 @@ async fn upgrade_tool(
             preview,
         )
         .await?;
-        let tool_lock =
-            ToolLock::from_resolution(&tool_dir, &universal_resolution, &lock_manifest)?;
+        let tool_lock = ToolLock::from_resolution(
+            &tool_dir,
+            &universal_resolution,
+            &lock_manifest,
+            &settings.resolver.config_setting,
+            &settings.resolver.config_settings_package,
+        )?;
         let resolution = tool_lock.to_resolution(
             Some(name),
             target_interpreter,

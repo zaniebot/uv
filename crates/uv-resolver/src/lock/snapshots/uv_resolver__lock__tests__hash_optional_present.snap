@@ -42,6 +42,7 @@ Ok(
                     {},
                 ),
             },
+            config_settings_digest: None,
         },
         packages: [
             Package {
