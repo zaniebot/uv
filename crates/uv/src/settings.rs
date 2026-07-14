@@ -69,7 +69,7 @@ use uv_workspace::pyproject_mut::AddBoundsKind;
 
 use crate::commands::pip::operations::Modifications;
 use crate::commands::{
-    InitKind, InitProjectKind, PythonUpgrade, PythonUpgradeSource, ToolRunCommand,
+    InitKind, InitPackaging, InitProjectKind, PythonUpgrade, PythonUpgradeSource, ToolRunCommand,
 };
 
 /// The default publish URL.
@@ -438,7 +438,7 @@ impl CacheSettings {
 pub(crate) struct InitSettings {
     pub(crate) path: Option<PathBuf>,
     pub(crate) name: Option<PackageName>,
-    pub(crate) package: bool,
+    pub(crate) package: InitPackaging,
     pub(crate) kind: InitKind,
     pub(crate) bare: bool,
     pub(crate) description: Option<String>,
@@ -579,7 +579,7 @@ impl InitSettings {
         Ok(Self {
             path,
             name,
-            package,
+            package: InitPackaging::from_args(package),
             kind,
             bare,
             description,
