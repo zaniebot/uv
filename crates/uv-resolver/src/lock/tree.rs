@@ -58,6 +58,26 @@ impl TreeDedupe {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TreeDirection {
+    Forward,
+    Inverted,
+}
+
+impl TreeDirection {
+    pub const fn from_args(invert: bool) -> Self {
+        if invert {
+            Self::Inverted
+        } else {
+            Self::Forward
+        }
+    }
+
+    pub const fn is_inverted(self) -> bool {
+        matches!(self, Self::Inverted)
+    }
+}
+
 #[derive(Debug)]
 pub struct TreeDisplay<'env> {
     /// The constructed dependency graph.
@@ -70,8 +90,8 @@ pub struct TreeDisplay<'env> {
     depth: usize,
     /// Whether to de-duplicate the displayed dependencies.
     dedupe: TreeDedupe,
-    /// Whether the graph edges have been reversed (i.e., `--invert` mode).
-    invert: bool,
+    /// The direction in which to display the dependency tree.
+    direction: TreeDirection,
     /// Whether production dependencies are included in the tree.
     prod: bool,
     /// The dependency groups included in the tree.
@@ -95,7 +115,7 @@ impl<'env> TreeDisplay<'env> {
         packages: &[PackageName],
         groups: &DependencyGroupsWithDefaults,
         dedupe: TreeDedupe,
-        invert: bool,
+        direction: TreeDirection,
         show_sizes: bool,
     ) -> Self {
         // Identify any workspace members.
@@ -429,7 +449,7 @@ impl<'env> TreeDisplay<'env> {
         }
 
         // Reverse the graph.
-        if invert {
+        if direction.is_inverted() {
             graph.reverse();
         }
 
@@ -476,7 +496,7 @@ impl<'env> TreeDisplay<'env> {
 
                 roots
             } else {
-                let mut roots = if invert {
+                let mut roots = if direction.is_inverted() {
                     // For inverted trees, find leaf packages (nodes with no incoming
                     // edges).
                     graph
@@ -507,7 +527,7 @@ impl<'env> TreeDisplay<'env> {
             latest,
             depth,
             dedupe,
-            invert,
+            direction,
             prod: groups.prod(),
             groups: groups.clone(),
             lock,
@@ -538,7 +558,7 @@ impl<'env> TreeDisplay<'env> {
         let visited_node = VisitedNode {
             package_id,
             expanded_extras: expanded_extras.clone(),
-            marker: self.invert.then_some(cursor.marker()),
+            marker: self.direction.is_inverted().then_some(cursor.marker()),
         };
 
         let line = {
@@ -606,7 +626,7 @@ impl<'env> TreeDisplay<'env> {
             line
         };
 
-        let mut dependencies = if self.invert && edge.is_some_and(Edge::is_dev) {
+        let mut dependencies = if self.direction.is_inverted() && edge.is_some_and(Edge::is_dev) {
             // A member's dependency group is activated for the root member. It is not part of the
             // member when that member is installed as another package's dependency.
             Vec::new()
@@ -618,7 +638,7 @@ impl<'env> TreeDisplay<'env> {
                     Node::Package(_) => {
                         let edge_kind = &self.graph[edge.id()];
 
-                        if self.invert {
+                        if self.direction.is_inverted() {
                             // If the path to the target requires an extra on this package, only
                             // follow consumers that activate that extra.
                             if !expanded_extras.is_empty()
@@ -759,7 +779,7 @@ impl<'env> TreeDisplay<'env> {
         package: &'env Package,
         edge: Option<&Edge<'env>>,
     ) -> BTreeSet<&'env ExtraName> {
-        if self.invert {
+        if self.direction.is_inverted() {
             // In inverted mode, an optional edge records the extra that must have been activated
             // on this package for the path to exist.
             return edge.and_then(Edge::required_extra).into_iter().collect();
@@ -823,7 +843,7 @@ impl<'env> TreeDisplay<'env> {
                         index: *root,
                         expanded_extras: self
                             .expanded_extras(self.lock.find_by_id(package_id), None),
-                        marker: if self.invert {
+                        marker: if self.direction.is_inverted() {
                             self.conflict_marker
                         } else {
                             UniversalMarker::TRUE
@@ -840,13 +860,15 @@ impl<'env> TreeDisplay<'env> {
 
         while let Some(source) = queue.pop_front() {
             let distance = distances[&source];
-            if distance >= self.depth || self.invert && source.reached_via_dependency_group {
+            if distance >= self.depth
+                || self.direction.is_inverted() && source.reached_via_dependency_group
+            {
                 continue;
             }
 
             for edge in self.graph.edges_directed(source.index, Direction::Outgoing) {
                 let edge_kind = edge.weight();
-                let marker = if self.invert {
+                let marker = if self.direction.is_inverted() {
                     // If the path to the target requires an extra on this package, only follow
                     // consumers that activate that extra.
                     if !source.expanded_extras.is_empty()
@@ -892,7 +914,8 @@ impl<'env> TreeDisplay<'env> {
                     expanded_extras: self
                         .expanded_extras(self.lock.find_by_id(package_id), Some(edge.weight())),
                     marker,
-                    reached_via_dependency_group: self.invert && edge_kind.is_dev(),
+                    reached_via_dependency_group: self.direction.is_inverted()
+                        && edge_kind.is_dev(),
                 };
                 nodes.insert(state.index);
                 edges.insert(edge.id());
@@ -1082,7 +1105,7 @@ impl JsonGraph {
             script,
             workspace,
             roots,
-            inverted: tree.invert,
+            inverted: tree.direction.is_inverted(),
             members,
             resolution,
         }
@@ -1180,7 +1203,7 @@ impl<'tree, 'env> JsonGraphBuilder<'tree, 'env> {
     }
 
     fn add_package_edge(&mut self, source: NodeIndex, target: NodeIndex, edge: &Edge<'env>) {
-        let (source, target) = if self.tree.invert {
+        let (source, target) = if self.tree.direction.is_inverted() {
             (target, source)
         } else {
             (source, target)
@@ -1211,7 +1234,9 @@ impl<'tree, 'env> JsonGraphBuilder<'tree, 'env> {
             .tree
             .graph
             .edge_references()
-            .filter(|edge| !self.tree.invert || traversal.edges.contains(&edge.id()))
+            .filter(|edge| {
+                !self.tree.direction.is_inverted() || traversal.edges.contains(&edge.id())
+            })
             .filter_map(|edge| {
                 let package = match (
                     &self.tree.graph[edge.source()],
@@ -1267,11 +1292,12 @@ impl<'tree, 'env> JsonGraphBuilder<'tree, 'env> {
         // `optional_dependencies` and `dependency_groups` advertise related nodes; they are not
         // dependency edges. Keep those relationships attached to their owner when inverting the
         // graph, and reverse only actual dependencies.
-        let (source, target) = if self.tree.invert && matches!(&link, JsonLink::Dependency(_)) {
-            (target, source)
-        } else {
-            (source, target)
-        };
+        let (source, target) =
+            if self.tree.direction.is_inverted() && matches!(&link, JsonLink::Dependency(_)) {
+                (target, source)
+            } else {
+                (source, target)
+            };
         let Some(node) = self.resolution.get_mut(&source) else {
             return;
         };
@@ -1337,7 +1363,7 @@ impl<'tree, 'env> JsonGraphBuilder<'tree, 'env> {
         for root in &self.tree.roots {
             match self.tree.graph[*root] {
                 Node::Package(package_id) => {
-                    if self.tree.invert {
+                    if self.tree.direction.is_inverted() {
                         roots.push(JsonRoot {
                             id: self.ensure_package(package_id, MetadataNodeKind::Package),
                         });
