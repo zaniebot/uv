@@ -8,6 +8,7 @@ use insta::assert_snapshot;
 use predicates::{prelude::predicate, str::contains};
 use serde_json::json;
 use std::path::Path;
+use url::Url;
 use uv_fs::copy_dir_all;
 use uv_python::PYTHON_VERSION_FILENAME;
 use uv_static::EnvVars;
@@ -3172,6 +3173,61 @@ fn run_requirements_txt() -> Result<()> {
     ----- stderr -----
     error: Cannot read both requirements file and script from stdin
     ");
+
+    Ok(())
+}
+
+/// PEP 723 files used with `--with-requirements` retain relative sources and named indexes.
+#[test]
+fn run_with_pep723_requirements_sources_and_indexes() -> Result<()> {
+    let context = uv_test::test_context!("3.12");
+    let scripts = context.temp_dir.child("scripts");
+    scripts.create_dir_all()?;
+    let links = context.temp_dir.child("links");
+    links.create_dir_all()?;
+    for wheel in [
+        "ok-1.0.0-py3-none-any.whl",
+        "tqdm-1000.0.0-py3-none-any.whl",
+    ] {
+        fs_err::copy(
+            context.workspace_root.join("test/links").join(wheel),
+            links.child(wheel),
+        )?;
+    }
+
+    let requirements = scripts.child("requirements.py");
+    requirements.write_str(&formatdoc! {r#"
+        # /// script
+        # requires-python = ">=3.12"
+        # dependencies = ["ok", "tqdm"]
+        #
+        # [[tool.uv.index]]
+        # name = "local"
+        # url = "{}"
+        # format = "flat"
+        # explicit = true
+        #
+        # [tool.uv.sources]
+        # ok = {{ path = "../links/ok-1.0.0-py3-none-any.whl" }}
+        # tqdm = {{ index = "local" }}
+        # ///
+    "#, Url::from_directory_path(links.path()).unwrap()})?;
+
+    let script = context.temp_dir.child("main.py");
+    script.write_str(indoc! {r#"
+        import importlib.metadata
+        print(importlib.metadata.version("ok"))
+        print(importlib.metadata.version("tqdm"))
+    "#})?;
+
+    context
+        .run()
+        .arg("--with-requirements")
+        .arg(requirements.path())
+        .arg(script.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("1.0.0\n1000.0.0"));
 
     Ok(())
 }

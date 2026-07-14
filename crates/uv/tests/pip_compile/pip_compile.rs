@@ -8,6 +8,7 @@ use std::process::Command;
 use std::str::FromStr;
 
 use anyhow::Result;
+use assert_cmd::assert::OutputAssertExt;
 use assert_fs::prelude::*;
 use flate2::write::GzEncoder;
 use fs_err::File;
@@ -17,6 +18,7 @@ use http::StatusCode;
 #[cfg(feature = "test-universal")]
 use indoc::formatdoc;
 use indoc::indoc;
+use predicates::prelude::*;
 use tokio_util::compat::{FuturesAsyncReadCompatExt, FuturesAsyncWriteCompatExt};
 use url::Url;
 use wiremock::matchers::{method, path};
@@ -4403,6 +4405,59 @@ fn scoped_exclude_dependency_from_script() -> Result<()> {
     ----- stderr -----
     Resolved 2 packages in [TIME]
     ");
+
+    Ok(())
+}
+
+/// PEP 723 requirements retain relative path sources and named indexes during compilation.
+#[test]
+fn pep723_requirements_sources_and_indexes() -> Result<()> {
+    let context = uv_test::test_context!("3.12");
+    let scripts = context.temp_dir.child("scripts");
+    scripts.create_dir_all()?;
+    let links = context.temp_dir.child("links");
+    links.create_dir_all()?;
+    for wheel in [
+        "ok-1.0.0-py3-none-any.whl",
+        "tqdm-1000.0.0-py3-none-any.whl",
+    ] {
+        fs_err::copy(
+            context.workspace_root.join("test/links").join(wheel),
+            links.child(wheel),
+        )?;
+    }
+
+    let script = scripts.child("requirements.py");
+    script.write_str(&format!(
+        indoc! {r#"
+        # /// script
+        # requires-python = ">=3.12"
+        # dependencies = ["ok", "tqdm"]
+        #
+        # [[tool.uv.index]]
+        # name = "local"
+        # url = "{}"
+        # format = "flat"
+        # explicit = true
+        #
+        # [tool.uv.sources]
+        # ok = {{ path = "../links/ok-1.0.0-py3-none-any.whl" }}
+        # tqdm = {{ index = "local" }}
+        # ///
+    "#},
+        Url::from_directory_path(links.path()).unwrap()
+    ))?;
+
+    context
+        .pip_compile()
+        .arg(script.path())
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("ok @ file://")
+                .and(predicate::str::contains("ok-1.0.0-py3-none-any.whl"))
+                .and(predicate::str::contains("tqdm==1000.0.0")),
+        );
 
     Ok(())
 }

@@ -40,9 +40,10 @@ use uv_client::BaseClientBuilder;
 use uv_configuration::{
     DependencyGroups, ExcludeDependency, NoBinary, NoBuild, Override, PackageOverride,
 };
+use uv_distribution::LoweredRequirement;
 use uv_distribution_types::{Index, Requirement};
 use uv_distribution_types::{
-    IndexUrl, NameRequirementSpecification, UnresolvedRequirement,
+    IndexLocations, IndexUrl, NameRequirementSpecification, UnresolvedRequirement,
     UnresolvedRequirementSpecification,
 };
 use uv_fs::{CWD, Simplified};
@@ -102,23 +103,56 @@ impl RequirementsSpecification {
     }
 
     /// Create a [`RequirementsSpecification`] from PEP 723 script metadata.
-    fn from_pep723_metadata(metadata: &Pep723Metadata) -> Self {
+    fn from_pep723_metadata(
+        metadata: &Pep723Metadata,
+        path: &Path,
+        client_builder: &BaseClientBuilder<'_>,
+    ) -> Result<Self> {
+        let tool_uv = metadata.tool.as_ref().and_then(|tool| tool.uv.as_ref());
+        let empty_sources = BTreeMap::default();
+        let sources = tool_uv
+            .and_then(|tool_uv| tool_uv.sources.as_ref())
+            .unwrap_or(&empty_sources);
+        let indexes = tool_uv
+            .and_then(|tool_uv| tool_uv.top_level.index.as_deref())
+            .unwrap_or(&[]);
+        let locations = IndexLocations::new(indexes.to_vec(), Vec::new(), false);
+        let script_dir = if path.starts_with("http://") || path.starts_with("https://") {
+            CWD.to_path_buf()
+        } else {
+            std::path::absolute(path)?
+                .parent()
+                .map(Path::to_path_buf)
+                .unwrap_or_else(|| CWD.to_path_buf())
+        };
+
         let requirements = metadata
             .dependencies
             .as_ref()
             .map(|dependencies| {
                 dependencies
                     .iter()
-                    .map(|dependency| {
-                        UnresolvedRequirementSpecification::from(Requirement::from(
+                    .flat_map(|dependency| {
+                        LoweredRequirement::from_non_workspace_requirement(
                             dependency.to_owned(),
-                        ))
+                            &script_dir,
+                            sources,
+                            indexes,
+                            &locations,
+                            client_builder.credentials_cache(),
+                        )
+                        .map(|requirement| {
+                            requirement.map(|requirement| {
+                                UnresolvedRequirementSpecification::from(requirement.into_inner())
+                            })
+                        })
                     })
-                    .collect::<Vec<UnresolvedRequirementSpecification>>()
+                    .collect::<Result<Vec<UnresolvedRequirementSpecification>, _>>()
             })
+            .transpose()?
             .unwrap_or_default();
 
-        if let Some(tool_uv) = metadata.tool.as_ref().and_then(|tool| tool.uv.as_ref()) {
+        if let Some(tool_uv) = tool_uv {
             let constraints = tool_uv
                 .constraint_dependencies
                 .as_ref()
@@ -155,7 +189,7 @@ impl RequirementsSpecification {
                 })
                 .collect();
 
-            Self {
+            Ok(Self {
                 requirements,
                 constraints,
                 override_dependencies,
@@ -197,12 +231,12 @@ impl RequirementsSpecification {
                         .unwrap_or_default(),
                 ),
                 ..Self::default()
-            }
+            })
         } else {
-            Self {
+            Ok(Self {
                 requirements,
                 ..Self::default()
-            }
+            })
         }
     }
 
@@ -323,7 +357,7 @@ impl RequirementsSpecification {
                     Err(err) => return Err(err.into()),
                 };
 
-                Self::from_pep723_metadata(&metadata)
+                Self::from_pep723_metadata(&metadata, path, client_builder)?
             }
             RequirementsSource::SetupPy(path) => {
                 if !path.is_file() {
@@ -372,7 +406,7 @@ impl RequirementsSpecification {
 
                 // Detect if it's a PEP 723 script.
                 if let Some(metadata) = Pep723Metadata::parse(content.as_bytes())? {
-                    Self::from_pep723_metadata(&metadata)
+                    Self::from_pep723_metadata(&metadata, path, client_builder)?
                 } else {
                     // If it's not a PEP 723 script, assume it's a `requirements.txt` file.
                     let requirements_txt =
