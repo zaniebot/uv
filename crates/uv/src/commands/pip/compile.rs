@@ -15,8 +15,8 @@ use uv_cache::Cache;
 use uv_client::{BaseClientBuilder, FlatIndexClient, RegistryClientBuilder};
 use uv_configuration::{
     AnnotationOutput, BuildIsolation, BuildOptions, Concurrency, Constraints, ExcludeDependency,
-    ExtrasOutput, ExtrasSpecification, HashOutput, IndexStrategy, MarkersOutput, NoBinary, NoBuild,
-    NoSources, Override, PipCompileFormat, Reinstall, Upgrade,
+    ExtrasOutput, ExtrasSpecification, HashOutput, HeaderOutput, IndexStrategy, MarkersOutput,
+    NoBinary, NoBuild, NoSources, Override, PipCompileFormat, Reinstall, Upgrade,
 };
 use uv_configuration::{KeyringProviderType, TargetTriple};
 use uv_dispatch::{BuildDispatch, SharedState};
@@ -88,7 +88,7 @@ pub(crate) async fn pip_compile(
     extras_output: ExtrasOutput,
     markers_output: MarkersOutput,
     annotation_output: AnnotationOutput,
-    include_header: bool,
+    header_output: HeaderOutput,
     custom_compile_command: Option<String>,
     include_index_url: bool,
     include_find_links: bool,
@@ -612,7 +612,7 @@ pub(crate) async fn pip_compile(
     // Write the resolved dependencies to the output channel.
     let mut writer = OutputWriter::new(!quiet || output_file.is_none(), output_file);
 
-    if include_header {
+    if matches!(header_output, HeaderOutput::Include) {
         writeln!(
             writer,
             "{}",

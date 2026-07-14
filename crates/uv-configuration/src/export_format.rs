@@ -122,3 +122,23 @@ impl AnnotationOutput {
         }
     }
 }
+
+/// Whether to include the header in `uv pip compile` output.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HeaderOutput {
+    /// Include the header in the output.
+    Include,
+    /// Omit the header from the output.
+    Omit,
+}
+
+impl HeaderOutput {
+    /// Determine the [`HeaderOutput`] setting from the command-line arguments.
+    pub const fn from_args(include_header: bool) -> Self {
+        if include_header {
+            Self::Include
+        } else {
+            Self::Omit
+        }
+    }
+}

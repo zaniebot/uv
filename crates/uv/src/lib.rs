@@ -34,8 +34,8 @@ use uv_cli::{
 };
 use uv_client::BaseClientBuilder;
 use uv_configuration::{
-    AnnotationOutput, DryRun, ExtrasOutput, HashOutput, InstallSelection, MarkersOutput,
-    min_stack_size,
+    AnnotationOutput, DryRun, ExtrasOutput, HashOutput, HeaderOutput, InstallSelection,
+    MarkersOutput, min_stack_size,
 };
 use uv_flags::EnvironmentFlags;
 use uv_fs::{CWD, Simplified, normalize_path};
@@ -799,7 +799,7 @@ pub async fn run(cli: Cli, global_initialization: GlobalInitialization) -> Resul
                 ExtrasOutput::from_args(args.settings.no_strip_extras),
                 MarkersOutput::from_args(args.settings.no_strip_markers),
                 AnnotationOutput::from_args(!args.settings.no_annotate),
-                !args.settings.no_header,
+                HeaderOutput::from_args(!args.settings.no_header),
                 args.settings.custom_compile_command,
                 args.settings.emit_index_url,
                 args.settings.emit_find_links,
