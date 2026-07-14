@@ -35,7 +35,7 @@ use crate::commands::project::{
 };
 use crate::commands::{ExitStatus, OutputWriter, diagnostics};
 use crate::printer::Printer;
-use crate::settings::{FrozenSource, LockCheck, ResolverSettings};
+use crate::settings::{ExportPackageSelection, FrozenSource, LockCheck, ResolverSettings};
 
 #[derive(Debug, Clone)]
 #[expect(clippy::large_enum_variant)]
@@ -61,8 +61,7 @@ impl<'lock> From<&'lock ExportTarget> for LockTarget<'lock> {
 pub(crate) async fn export(
     project_dir: &Path,
     format: Option<ExportFormat>,
-    all_packages: bool,
-    package: Vec<PackageName>,
+    packages: ExportPackageSelection,
     prune: Vec<PackageName>,
     hashes: bool,
     install_options: InstallOptions,
@@ -91,6 +90,11 @@ pub(crate) async fn export(
     printer: Printer,
     preview: Preview,
 ) -> Result<ExitStatus> {
+    let package = match &packages {
+        ExportPackageSelection::All => &[],
+        ExportPackageSelection::Selected(package) => package.as_slice(),
+    };
+
     // Identify the target.
     let target = if let Some(script) = script {
         ExportTarget::Script(script)
@@ -106,7 +110,7 @@ pub(crate) async fn export(
                 workspace_cache,
             )
             .await?
-        } else if let [name] = package.as_slice() {
+        } else if let [name] = package {
             VirtualProject::discover_with_package(
                 project_dir,
                 &DiscoveryOptions::default(),
@@ -124,7 +128,7 @@ pub(crate) async fn export(
             )
             .await?;
 
-            for name in &package {
+            for name in package {
                 if !project.workspace().packages().contains_key(name) {
                     return Err(anyhow::anyhow!("Package `{name}` not found in workspace"));
                 }
@@ -245,13 +249,13 @@ pub(crate) async fn export(
     // Identify the installation target.
     let target = match &target {
         ExportTarget::Project(VirtualProject::Project(project)) => {
-            if all_packages {
+            if matches!(packages, ExportPackageSelection::All) {
                 InstallTarget::Workspace {
                     workspace: project.workspace(),
                     lock: &lock,
                 }
             } else {
-                match package.as_slice() {
+                match package {
                     // By default, install the root project.
                     [] => InstallTarget::Project {
                         workspace: project.workspace(),
@@ -272,13 +276,13 @@ pub(crate) async fn export(
             }
         }
         ExportTarget::Project(VirtualProject::NonProject(workspace)) => {
-            if all_packages {
+            if matches!(packages, ExportPackageSelection::All) {
                 InstallTarget::NonProjectWorkspace {
                     workspace,
                     lock: &lock,
                 }
             } else {
-                match package.as_slice() {
+                match package {
                     // By default, install the entire workspace.
                     [] => InstallTarget::NonProjectWorkspace {
                         workspace,
@@ -465,7 +469,7 @@ pub(crate) async fn export(
                 include_annotations,
                 &install_options,
                 preview,
-                all_packages,
+                matches!(packages, ExportPackageSelection::All),
             )?;
 
             export.output_as_json_v1_5(&mut writer)?;
