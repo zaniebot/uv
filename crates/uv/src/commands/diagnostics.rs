@@ -263,6 +263,7 @@ pub(crate) fn hints_for_error(err: &anyhow::Error) -> Hints<'static> {
         collect_hint::<uv_resolver::PylockTomlError>(cause, &mut hints);
         collect_hint::<uv_python::InterpreterError>(cause, &mut hints);
         collect_hint::<uv_workspace::pyproject::SourceError>(cause, &mut hints);
+        collect_hint::<uv_workspace::pyproject_mut::Error>(cause, &mut hints);
         collect_hint::<uv_distribution::LoweringError>(cause, &mut hints);
         collect_hint::<uv_virtualenv::Error>(cause, &mut hints);
         collect_hint::<uv_client::Error>(cause, &mut hints);
