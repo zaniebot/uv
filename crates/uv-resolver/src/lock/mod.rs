@@ -2244,10 +2244,6 @@ impl Lock {
 
             for requirement in root_requirements {
                 for package in by_name.get(&requirement.name).into_iter().flatten() {
-                    if !package.id.source.is_source_tree() {
-                        continue;
-                    }
-
                     let marker = if package.fork_markers.is_empty() {
                         requirement.marker
                     } else {
@@ -2259,9 +2255,6 @@ impl Lock {
                         combined
                     };
                     if marker.is_false() {
-                        continue;
-                    }
-                    if !marker.evaluate(markers, &[]) {
                         continue;
                     }
 
@@ -2304,7 +2297,31 @@ impl Lock {
                 }
             }
 
-            // If the package is immutable, we don't need to validate it (or its dependencies).
+            // Recurse before skipping an immutable package, since it may depend on mutable local
+            // or direct URL sources that still need to be validated.
+            for dep in &package.dependencies {
+                if seen.insert(&dep.package_id) {
+                    queue.push_back(self.find_by_id(&dep.package_id));
+                }
+            }
+
+            for dependencies in package.optional_dependencies.values() {
+                for dep in dependencies {
+                    if seen.insert(&dep.package_id) {
+                        queue.push_back(self.find_by_id(&dep.package_id));
+                    }
+                }
+            }
+
+            for dependencies in package.dependency_groups.values() {
+                for dep in dependencies {
+                    if seen.insert(&dep.package_id) {
+                        queue.push_back(self.find_by_id(&dep.package_id));
+                    }
+                }
+            }
+
+            // If the package is immutable, we don't need to validate its metadata.
             if package.id.source.is_immutable() {
                 continue;
             }
@@ -2606,32 +2623,6 @@ impl Lock {
                                 }
                             }
                         }
-                    }
-                }
-            }
-
-            // Recurse.
-            for dep in &package.dependencies {
-                if seen.insert(&dep.package_id) {
-                    let dep_dist = self.find_by_id(&dep.package_id);
-                    queue.push_back(dep_dist);
-                }
-            }
-
-            for dependencies in package.optional_dependencies.values() {
-                for dep in dependencies {
-                    if seen.insert(&dep.package_id) {
-                        let dep_dist = self.find_by_id(&dep.package_id);
-                        queue.push_back(dep_dist);
-                    }
-                }
-            }
-
-            for dependencies in package.dependency_groups.values() {
-                for dep in dependencies {
-                    if seen.insert(&dep.package_id) {
-                        let dep_dist = self.find_by_id(&dep.package_id);
-                        queue.push_back(dep_dist);
                     }
                 }
             }
