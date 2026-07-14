@@ -16,8 +16,8 @@ use uv_client::{BaseClientBuilder, FlatIndexClient, RegistryClientBuilder};
 use uv_configuration::{
     AnnotationOutput, BuildIsolation, BuildOptions, BuildOptionsOutput, Concurrency, Constraints,
     ExcludeDependency, ExtrasOutput, ExtrasSpecification, FindLinksOutput, HashOutput,
-    HeaderOutput, IndexStrategy, IndexUrlOutput, MarkersOutput, NoBinary, NoBuild, NoSources,
-    Override, PipCompileFormat, Reinstall, Upgrade,
+    HeaderOutput, IndexStrategy, IndexUrlOutput, MarkerExpressionOutput, MarkersOutput, NoBinary,
+    NoBuild, NoSources, Override, PipCompileFormat, Reinstall, Upgrade,
 };
 use uv_configuration::{KeyringProviderType, TargetTriple};
 use uv_dispatch::{BuildDispatch, SharedState};
@@ -94,7 +94,7 @@ pub(crate) async fn pip_compile(
     index_url_output: IndexUrlOutput,
     find_links_output: FindLinksOutput,
     build_options_output: BuildOptionsOutput,
-    include_marker_expression: bool,
+    marker_expression_output: MarkerExpressionOutput,
     include_index_annotation: bool,
     index_locations: IndexLocations,
     index_strategy: IndexStrategy,
@@ -636,7 +636,7 @@ pub(crate) async fn pip_compile(
 
     match format {
         PipCompileFormat::RequirementsTxt => {
-            if include_marker_expression {
+            if matches!(marker_expression_output, MarkerExpressionOutput::Include) {
                 if let Some(marker_env) = resolver_env.marker_environment() {
                     let relevant_markers = resolution.marker_tree(&top_level_index, marker_env)?;
                     if let Some(relevant_markers) = relevant_markers.contents() {
@@ -731,7 +731,7 @@ pub(crate) async fn pip_compile(
             )?;
         }
         PipCompileFormat::PylockToml => {
-            if include_marker_expression {
+            if matches!(marker_expression_output, MarkerExpressionOutput::Include) {
                 warn_user!(
                     "The `--emit-marker-expression` option is not supported for `pylock.toml` output"
                 );

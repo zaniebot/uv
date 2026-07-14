@@ -202,3 +202,23 @@ impl BuildOptionsOutput {
         }
     }
 }
+
+/// Whether to include the marker expression in `uv pip compile` output.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MarkerExpressionOutput {
+    /// Include the marker expression in the output.
+    Include,
+    /// Omit the marker expression from the output.
+    Omit,
+}
+
+impl MarkerExpressionOutput {
+    /// Determine the [`MarkerExpressionOutput`] setting from the command-line arguments.
+    pub const fn from_args(include_marker_expression: bool) -> Self {
+        if include_marker_expression {
+            Self::Include
+        } else {
+            Self::Omit
+        }
+    }
+}
