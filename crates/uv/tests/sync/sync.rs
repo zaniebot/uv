@@ -2551,7 +2551,7 @@ fn sync_extra_build_dependencies_setuptools_legacy() -> Result<()> {
     ----- stderr -----
       × Failed to build `child @ file://[TEMP_DIR]/child`
       ├─▶ The build backend returned an error
-      ╰─▶ Call to `setuptools.build_meta:__legacy__.build_wheel` failed (exit status: 1)
+      ╰─▶ Call to `setuptools.build_meta:__legacy__.get_requires_for_build_wheel` failed (exit status: 1)
 
           [stderr]
           Missing `anyio` module
@@ -2657,7 +2657,7 @@ fn sync_extra_build_dependencies_setuptools() -> Result<()> {
     Resolved [N] packages in [TIME]
       × Failed to build `child @ file://[TEMP_DIR]/child`
       ├─▶ The build backend returned an error
-      ╰─▶ Call to `setuptools.build_meta.build_wheel` failed (exit status: 1)
+      ╰─▶ Call to `setuptools.build_meta.get_requires_for_build_wheel` failed (exit status: 1)
 
           [stderr]
           Missing `anyio` module
@@ -10671,7 +10671,7 @@ fn sync_derivation_chain() -> Result<()> {
     Resolved 2 packages in [TIME]
       × Failed to build `wsgiref==0.1.2`
       ├─▶ The build backend returned an error
-      ╰─▶ Call to `setuptools.build_meta:__legacy__.build_wheel` failed (exit status: 1)
+      ╰─▶ Call to `setuptools.build_meta:__legacy__.get_requires_for_build_wheel` failed (exit status: 1)
 
           [stderr]
           Traceback (most recent call last):
@@ -10735,7 +10735,7 @@ fn sync_derivation_chain_extra() -> Result<()> {
     Resolved 2 packages in [TIME]
       × Failed to build `wsgiref==0.1.2`
       ├─▶ The build backend returned an error
-      ╰─▶ Call to `setuptools.build_meta:__legacy__.build_wheel` failed (exit status: 1)
+      ╰─▶ Call to `setuptools.build_meta:__legacy__.get_requires_for_build_wheel` failed (exit status: 1)
 
           [stderr]
           Traceback (most recent call last):
@@ -10801,7 +10801,7 @@ fn sync_derivation_chain_group() -> Result<()> {
     Resolved 2 packages in [TIME]
       × Failed to build `wsgiref==0.1.2`
       ├─▶ The build backend returned an error
-      ╰─▶ Call to `setuptools.build_meta:__legacy__.build_wheel` failed (exit status: 1)
+      ╰─▶ Call to `setuptools.build_meta:__legacy__.get_requires_for_build_wheel` failed (exit status: 1)
 
           [stderr]
           Traceback (most recent call last):
