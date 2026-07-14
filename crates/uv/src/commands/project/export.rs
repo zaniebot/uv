@@ -12,8 +12,8 @@ use rustc_hash::FxHashSet;
 use uv_cache::Cache;
 use uv_client::BaseClientBuilder;
 use uv_configuration::{
-    Concurrency, DependencyGroups, EditableMode, ExportFormat, ExtrasSpecification, HashOutput,
-    InstallOptions,
+    AnnotationOutput, Concurrency, DependencyGroups, EditableMode, ExportFormat,
+    ExtrasSpecification, HashOutput, InstallOptions,
 };
 use uv_distribution_types::Verbatim;
 use uv_normalize::{DefaultExtras, DefaultGroups, PackageName};
@@ -72,7 +72,7 @@ pub(crate) async fn export(
     editable: Option<EditableMode>,
     lock_check: LockCheck,
     frozen: Option<FrozenSource>,
-    include_annotations: bool,
+    annotation_output: AnnotationOutput,
     include_header: bool,
     include_index_url: bool,
     include_find_links: bool,
@@ -379,7 +379,7 @@ pub(crate) async fn export(
                 &prune,
                 &extras,
                 &groups,
-                include_annotations,
+                matches!(annotation_output, AnnotationOutput::Include),
                 editable,
                 matches!(hash_output, HashOutput::Generate),
                 &install_options,
@@ -446,7 +446,7 @@ pub(crate) async fn export(
                 &prune,
                 &extras,
                 &groups,
-                include_annotations,
+                matches!(annotation_output, AnnotationOutput::Include),
                 editable.as_ref(),
                 &install_options,
             )?;
@@ -467,7 +467,7 @@ pub(crate) async fn export(
                 &prune,
                 &extras,
                 &groups,
-                include_annotations,
+                matches!(annotation_output, AnnotationOutput::Include),
                 &install_options,
                 preview,
                 matches!(packages, ExportPackageSelection::All),

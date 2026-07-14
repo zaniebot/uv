@@ -34,12 +34,12 @@ use uv_cli::{
 };
 use uv_client::Connectivity;
 use uv_configuration::{
-    BuildIsolation, BuildOptions, Concurrency, DependencyGroups, DevMode, DryRun, EditableMode,
-    EnvFile, ExcludeDependency, ExportFormat, ExtrasSpecification, GitLfsSetting, HashCheckingMode,
-    HashOutput, IndexStrategy, InstallOptions, InstallSelection, KeyringProviderType, NoBinary,
-    NoBuild, NoSources, Override, PackageOverride, PipCompileFormat, ProjectBuildBackend,
-    ProjectDiscovery, ProxyUrl, Reinstall, RequiredVersion, TargetTriple, TrustedHost,
-    TrustedPublishing, Upgrade, VersionControlSystem,
+    AnnotationOutput, BuildIsolation, BuildOptions, Concurrency, DependencyGroups, DevMode, DryRun,
+    EditableMode, EnvFile, ExcludeDependency, ExportFormat, ExtrasSpecification, GitLfsSetting,
+    HashCheckingMode, HashOutput, IndexStrategy, InstallOptions, InstallSelection,
+    KeyringProviderType, NoBinary, NoBuild, NoSources, Override, PackageOverride, PipCompileFormat,
+    ProjectBuildBackend, ProjectDiscovery, ProxyUrl, Reinstall, RequiredVersion, TargetTriple,
+    TrustedHost, TrustedPublishing, Upgrade, VersionControlSystem,
 };
 use uv_distribution_types::{
     ConfigSettings, DependencyMetadata, ExtraBuildVariables, Index, IndexLocations, IndexUrl,
@@ -2758,7 +2758,7 @@ impl TreeSettings {
 }
 
 /// The resolved settings to use for an `export` invocation.
-#[expect(clippy::struct_excessive_bools, dead_code)]
+#[expect(dead_code)]
 #[derive(Debug, Clone)]
 pub(crate) struct ExportSettings {
     pub(super) format: Option<ExportFormat>,
@@ -2772,7 +2772,7 @@ pub(crate) struct ExportSettings {
     pub(super) output_file: Option<PathBuf>,
     pub(super) lock_check: LockCheck,
     pub(super) frozen: Option<FrozenSource>,
-    pub(super) include_annotations: bool,
+    pub(super) annotation_output: AnnotationOutput,
     pub(super) include_header: bool,
     pub(super) include_index_url: bool,
     pub(super) include_find_links: bool,
@@ -2906,7 +2906,9 @@ impl ExportSettings {
             output_file,
             lock_check: resolve_lock_check(locked),
             frozen: resolve_frozen(frozen),
-            include_annotations: flag(annotate, no_annotate, "annotate").unwrap_or(true),
+            annotation_output: AnnotationOutput::from_args(
+                flag(annotate, no_annotate, "annotate").unwrap_or(true),
+            ),
             include_header: flag(header, no_header, "header").unwrap_or(true),
             include_index_url: flag(emit_index_url, no_emit_index_url, "emit-index-url")
                 .unwrap_or(false),

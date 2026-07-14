@@ -2803,7 +2803,7 @@ async fn run_project(
                 args.editable,
                 args.lock_check,
                 args.frozen,
-                args.include_annotations,
+                args.annotation_output,
                 args.include_header,
                 args.include_index_url,
                 args.include_find_links,

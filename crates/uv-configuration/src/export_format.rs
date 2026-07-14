@@ -103,7 +103,7 @@ impl MarkersOutput {
     }
 }
 
-/// Whether to include dependency annotations in `uv pip compile` output.
+/// Whether to include dependency annotations in exported output.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AnnotationOutput {
     /// Include dependency annotations in the output.
