@@ -1721,7 +1721,7 @@ pub async fn run(cli: Cli, global_initialization: GlobalInitialization) -> Resul
 
             commands::tool_list(
                 args.show_paths.into(),
-                args.show_version_specifiers,
+                args.show_version_specifiers.into(),
                 args.show_with,
                 args.show_extras,
                 args.show_python,

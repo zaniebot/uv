@@ -49,11 +49,26 @@ impl From<bool> for ToolListPaths {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ToolListVersionSpecifiers {
+    Show,
+    Hide,
+}
+
+impl From<bool> for ToolListVersionSpecifiers {
+    fn from(show_version_specifiers: bool) -> Self {
+        if show_version_specifiers {
+            Self::Show
+        } else {
+            Self::Hide
+        }
+    }
+}
+
 /// List installed tools.
-#[expect(clippy::fn_params_excessive_bools)]
 pub(crate) async fn list(
     paths: ToolListPaths,
-    show_version_specifiers: bool,
+    version_specifiers: ToolListVersionSpecifiers,
     show_with: bool,
     show_extras: bool,
     show_python: bool,
@@ -219,7 +234,7 @@ pub(crate) async fn list(
             }
         }
 
-        let version_specifier = show_version_specifiers
+        let version_specifier = (version_specifiers == ToolListVersionSpecifiers::Show)
             .then(|| {
                 tool.requirements()
                     .iter()
