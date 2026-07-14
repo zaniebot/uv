@@ -2805,7 +2805,7 @@ async fn run_project(
                 args.frozen,
                 args.annotation_output,
                 args.header_output,
-                args.include_index_url,
+                args.index_url_output,
                 args.include_find_links,
                 script,
                 args.python,

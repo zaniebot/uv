@@ -143,7 +143,7 @@ impl HeaderOutput {
     }
 }
 
-/// Whether to include index URLs in `uv pip compile` output.
+/// Whether to include index URLs in exported output.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum IndexUrlOutput {
     /// Include index URLs in the output.

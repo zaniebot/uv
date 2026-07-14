@@ -13,7 +13,7 @@ use uv_cache::Cache;
 use uv_client::BaseClientBuilder;
 use uv_configuration::{
     AnnotationOutput, Concurrency, DependencyGroups, EditableMode, ExportFormat,
-    ExtrasSpecification, HashOutput, HeaderOutput, InstallOptions,
+    ExtrasSpecification, HashOutput, HeaderOutput, IndexUrlOutput, InstallOptions,
 };
 use uv_distribution_types::Verbatim;
 use uv_normalize::{DefaultExtras, DefaultGroups, PackageName};
@@ -73,7 +73,7 @@ pub(crate) async fn export(
     frozen: Option<FrozenSource>,
     annotation_output: AnnotationOutput,
     header_output: HeaderOutput,
-    include_index_url: bool,
+    index_url_output: IndexUrlOutput,
     include_find_links: bool,
     script: Option<Pep723Script>,
     python: Option<String>,
@@ -396,7 +396,7 @@ pub(crate) async fn export(
             let mut wrote_preamble = false;
 
             // If necessary, include the `--index-url` and `--extra-index-url` locations.
-            if include_index_url {
+            if matches!(index_url_output, IndexUrlOutput::Include) {
                 let mut seen = FxHashSet::default();
                 let mut emitted_explicit_index = false;
 
