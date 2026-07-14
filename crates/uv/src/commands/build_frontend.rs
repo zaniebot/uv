@@ -49,7 +49,7 @@ use crate::commands::pip::operations;
 use crate::commands::project::{ProjectError, find_requires_python};
 use crate::commands::reporters::PythonDownloadReporter;
 use crate::printer::Printer;
-use crate::settings::ResolverSettings;
+use crate::settings::{BuildOutputSelection, ResolverSettings};
 
 #[derive(Debug, Error)]
 pub(crate) enum Error {
@@ -142,8 +142,7 @@ pub(crate) async fn build_frontend(
     package: Option<PackageName>,
     all_packages: bool,
     output_dir: Option<PathBuf>,
-    sdist: bool,
-    wheel: bool,
+    output: BuildOutputSelection,
     list: bool,
     build_logs: bool,
     gitignore: bool,
@@ -171,8 +170,7 @@ pub(crate) async fn build_frontend(
         package.as_ref(),
         all_packages,
         output_dir.as_deref(),
-        sdist,
-        wheel,
+        output,
         list,
         build_logs,
         gitignore,
@@ -220,8 +218,7 @@ async fn build_impl(
     package: Option<&PackageName>,
     all_packages: bool,
     output_dir: Option<&Path>,
-    sdist: bool,
-    wheel: bool,
+    output: BuildOutputSelection,
     list: bool,
     build_logs: bool,
     gitignore: bool,
@@ -440,8 +437,7 @@ async fn build_impl(
             sources.clone(),
             concurrency,
             build_options,
-            sdist,
-            wheel,
+            output,
             list,
             dependency_metadata,
             *link_mode,
@@ -516,8 +512,7 @@ async fn build_package(
     sources: NoSources,
     concurrency: &Concurrency,
     build_options: &BuildOptions,
-    sdist: bool,
-    wheel: bool,
+    output: BuildOutputSelection,
     list: bool,
     dependency_metadata: &DependencyMetadata,
     link_mode: LinkMode,
@@ -676,7 +671,7 @@ async fn build_package(
     prepare_output_directory(&output_dir, gitignore).await?;
 
     // Determine the build plan.
-    let plan = BuildPlan::determine(&source, sdist, wheel).map_err(Error::BuildPlan)?;
+    let plan = BuildPlan::determine(&source, output).map_err(Error::BuildPlan)?;
 
     // Check if the build backend is matching uv version that allows calling in the uv build backend
     // directly.
@@ -1381,18 +1376,18 @@ enum BuildPlan {
 }
 
 impl BuildPlan {
-    fn determine(source: &AnnotatedSource, sdist: bool, wheel: bool) -> Result<Self> {
+    fn determine(source: &AnnotatedSource, output: BuildOutputSelection) -> Result<Self> {
         Ok(match &source.source {
             Source::File(_) => {
                 // We're building from a file, which must be a source distribution.
-                match (sdist, wheel) {
-                    (false, true) => Self::WheelFromSdist,
-                    (false, false) => {
+                match output {
+                    BuildOutputSelection::Wheel => Self::WheelFromSdist,
+                    BuildOutputSelection::Default => {
                         return Err(anyhow::anyhow!(
                             "Pass `--wheel` explicitly to build a wheel from a source distribution"
                         ));
                     }
-                    (true, _) => {
+                    BuildOutputSelection::Sdist | BuildOutputSelection::SdistAndWheel => {
                         return Err(anyhow::anyhow!(
                             "Building an `--sdist` from a source distribution is not supported"
                         ));
@@ -1401,11 +1396,11 @@ impl BuildPlan {
             }
             Source::Directory(_) => {
                 // We're building from a directory.
-                match (sdist, wheel) {
-                    (false, false) => Self::SdistToWheel,
-                    (false, true) => Self::Wheel,
-                    (true, false) => Self::Sdist,
-                    (true, true) => Self::SdistAndWheel,
+                match output {
+                    BuildOutputSelection::Default => Self::SdistToWheel,
+                    BuildOutputSelection::Wheel => Self::Wheel,
+                    BuildOutputSelection::Sdist => Self::Sdist,
+                    BuildOutputSelection::SdistAndWheel => Self::SdistAndWheel,
                 }
             }
         })
