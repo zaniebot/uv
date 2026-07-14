@@ -178,7 +178,9 @@ pub async fn run(cli: Cli, global_initialization: GlobalInitialization) -> Resul
     //
     // If `--project` points to a `pyproject.toml` file, resolve to its parent directory,
     // since downstream code (e.g., `FilesystemOptions::find`) expects a directory.
-    let project_dir: Cow<'_, Path> = if let Some(project) = &cli.top_level.global_args.project {
+    let project_dir: Cow<'_, Path> = if matches!(&*cli.command, Commands::Pip(_)) {
+        Cow::Borrowed(&*CWD)
+    } else if let Some(project) = &cli.top_level.global_args.project {
         let path = normalize_path(std::path::absolute(project)?);
         if let Some(name) = path.file_name()
             && name == "pyproject.toml"
@@ -202,10 +204,11 @@ pub async fn run(cli: Cli, global_initialization: GlobalInitialization) -> Resul
 
     // Validate that the project directory exists if explicitly provided via --project, except for
     // `uv init`, which creates the project directory (separate deprecation).
-    let skip_project_validation = matches!(
-        &*cli.command,
-        Commands::Project(command) if matches!(**command, ProjectCommand::Init(_))
-    );
+    let skip_project_validation = matches!(&*cli.command, Commands::Pip(_))
+        || matches!(
+            &*cli.command,
+            Commands::Project(command) if matches!(**command, ProjectCommand::Init(_))
+        );
 
     if !skip_project_validation {
         if let Some(project_path) = cli.top_level.global_args.project.as_ref() {
