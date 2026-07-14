@@ -11,7 +11,7 @@ use uv_distribution_filename::WheelFilename;
 use uv_pep440::Version;
 use uv_pypi_types::{DirectUrl, Metadata10};
 
-use crate::linker::{InstallState, LinkMode, link_wheel_files};
+use crate::linker::{InstallState, LinkMode, link_wheel_files, validate_wheel_destination};
 use crate::wheel::{
     LibKind, WheelFile, dist_info_metadata, find_dist_info, install_data, parse_scripts,
     read_record, write_installer_metadata, write_record, write_script_entrypoints,
@@ -88,6 +88,15 @@ pub fn install_wheel<Cache: serde::Serialize, Build: serde::Serialize>(
     // > 1.b Check that installer is compatible with Wheel-Version. Warn if minor version is greater, abort if major version is greater.
     // > 1.c If Root-Is-Purelib == ‘true’, unpack archive into purelib (site-packages).
     // > 1.d Else unpack archive into platlib (site-packages).
+    let data_dir = wheel.join(format!("{dist_info_prefix}.data"));
+    validate_wheel_destination(&data_dir.join("data"), &layout.scheme.data)?;
+    validate_wheel_destination(&data_dir.join("scripts"), &layout.scheme.scripts)?;
+    validate_wheel_destination(
+        &data_dir.join("headers"),
+        &layout.scheme.include.join(name.as_str()),
+    )?;
+    validate_wheel_destination(&data_dir.join("purelib"), &layout.scheme.purelib)?;
+    validate_wheel_destination(&data_dir.join("platlib"), &layout.scheme.platlib)?;
     trace!(?name, "Extracting wheel files");
     link_wheel_files(link_mode, site_packages, wheel, state, filename)?;
     trace!(?name, "Extracted wheel files");
