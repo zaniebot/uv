@@ -79,7 +79,7 @@ impl Interpreter {
             markers: Box::new(info.markers),
             scheme: info.scheme,
             virtualenv: info.virtualenv,
-            manylinux_compatible: info.manylinux_compatible,
+            manylinux_compatible: info.manylinux_compatible.into(),
             sys_prefix: info.sys_prefix,
             pointer_size: info.pointer_size,
             variant: match (info.gil_disabled, info.debug_enabled) {
@@ -931,14 +931,13 @@ pub enum InterpreterInfoError {
     EmscriptenNotPyodide,
 }
 
-#[expect(clippy::struct_excessive_bools)]
 #[derive(Debug, Deserialize, Serialize, Clone)]
 struct InterpreterInfo {
     platform: Platform,
     markers: MarkerEnvironment,
     scheme: Scheme,
     virtualenv: Scheme,
-    manylinux_compatible: bool,
+    manylinux_compatible: ManylinuxCompatibility,
     sys_prefix: PathBuf,
     sys_base_exec_prefix: PathBuf,
     sys_base_prefix: PathBuf,
@@ -952,6 +951,29 @@ struct InterpreterInfo {
     pointer_size: PointerSize,
     gil_disabled: bool,
     debug_enabled: bool,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone, Copy, PartialEq, Eq)]
+#[serde(from = "bool", into = "bool")]
+enum ManylinuxCompatibility {
+    Compatible,
+    Incompatible,
+}
+
+impl From<bool> for ManylinuxCompatibility {
+    fn from(value: bool) -> Self {
+        if value {
+            Self::Compatible
+        } else {
+            Self::Incompatible
+        }
+    }
+}
+
+impl From<ManylinuxCompatibility> for bool {
+    fn from(compatibility: ManylinuxCompatibility) -> Self {
+        matches!(compatibility, ManylinuxCompatibility::Compatible)
+    }
 }
 
 impl InterpreterInfo {
@@ -1336,6 +1358,32 @@ mod tests {
     use uv_pep440::Version;
 
     use crate::{Interpreter, PythonVariant};
+
+    use super::ManylinuxCompatibility;
+
+    #[test]
+    fn test_manylinux_compatibility_serialization() -> Result<()> {
+        for (value, expected) in [
+            (true, ManylinuxCompatibility::Compatible),
+            (false, ManylinuxCompatibility::Incompatible),
+        ] {
+            let json = serde_json::to_string(&value)?;
+            assert_eq!(
+                serde_json::from_str::<ManylinuxCompatibility>(&json)?,
+                expected
+            );
+            assert_eq!(serde_json::to_string(&expected)?, json);
+
+            let msgpack = rmp_serde::to_vec(&value)?;
+            assert_eq!(
+                rmp_serde::from_slice::<ManylinuxCompatibility>(&msgpack)?,
+                expected
+            );
+            assert_eq!(rmp_serde::to_vec(&expected)?, msgpack);
+        }
+
+        Ok(())
+    }
 
     #[tokio::test]
     async fn test_cache_invalidation() -> Result<()> {
