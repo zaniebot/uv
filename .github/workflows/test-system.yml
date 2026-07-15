@@ -753,10 +753,13 @@ jobs:
 
       # TODO(zanieb): Find an alternative for this action; it uses EOL Node 20
       - uses: conda-incubator/setup-miniconda@8ee1f361103df19b6f8c8655fd3967a8ecb162d5 # v4.0.1
+        env:
+          CONDA_PLUGINS_CONDA_PYPI_PIP_WARNING: "0"
         with:
           miniconda-version: "latest"
           activate-environment: uv
           python-version: ${{ matrix.python-version }}
+          channels: defaults
 
       - name: Conda info
         shell: bash -el {0}
@@ -781,7 +784,11 @@ jobs:
 
       - name: "Validate global Python install"
         shell: bash -el {0}
-        run: python ./scripts/check_system_python.py --uv ./uv
+        run: |
+          if [ "${{ matrix.os }}" = "windows" ]; then
+            unset SSL_CERT_FILE
+          fi
+          python ./scripts/check_system_python.py --uv ./uv
 
   system-test-amazonlinux:
     timeout-minutes: 10
