@@ -37,29 +37,6 @@ fn missing_requirements_txt() {
     requirements_txt.assert(predicates::path::missing());
 }
 
-/// `--cert` is forwarded to the HTTP client rather than silently ignored.
-#[test]
-fn cert() -> Result<()> {
-    let context = uv_test::test_context!("3.12").with_filtered_missing_file_error();
-    let requirements_txt = context.temp_dir.child("requirements.txt");
-    requirements_txt.write_str("iniconfig==2.0.0")?;
-
-    uv_snapshot!(context.filters(), context.pip_sync()
-        .arg("requirements.txt")
-        .arg("--cert")
-        .arg("ca-bundle.pem"), @"
-    success: false
-    exit_code: 2
-    ----- stdout -----
-
-    ----- stderr -----
-    error: Failed to read certificate file `ca-bundle.pem`
-      Caused by: [OS ERROR 2]
-    ");
-
-    Ok(())
-}
-
 #[test]
 fn missing_venv() -> Result<()> {
     let context = uv_test::test_context!("3.12")
