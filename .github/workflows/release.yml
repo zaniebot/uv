@@ -120,7 +120,6 @@ jobs:
     uses: ./.github/workflows/build-release-binaries.yml
     with:
       plan: ${{ needs.plan.outputs.val }}
-    secrets: inherit
 
   custom-build-docker:
     needs:
@@ -130,7 +129,7 @@ jobs:
     uses: ./.github/workflows/build-docker.yml
     with:
       plan: ${{ needs.plan.outputs.val }}
-    secrets: inherit
+    secrets: inherit # zizmor: ignore[secrets-inherit] required for Docker Hub credentials
     permissions:
       "attestations": "write"
       "contents": "read"
@@ -283,7 +282,6 @@ jobs:
     uses: ./.github/workflows/publish-pypi.yml
     with:
       plan: ${{ needs.plan.outputs.val }}
-    secrets: inherit
     # publish jobs get escalated permissions
     permissions:
       "id-token": "write"
@@ -299,7 +297,6 @@ jobs:
     uses: ./.github/workflows/publish-crates.yml
     with:
       plan: ${{ needs.plan.outputs.val }}
-    secrets: inherit
     # publish jobs get escalated permissions
     permissions:
       "contents": "read"
@@ -374,7 +371,7 @@ jobs:
     uses: ./.github/workflows/publish-docs.yml
     with:
       plan: ${{ needs.plan.outputs.val }}
-    secrets: inherit
+    secrets: inherit # zizmor: ignore[secrets-inherit] required for the Astral docs token
 
   custom-publish-versions:
     needs:
@@ -384,7 +381,7 @@ jobs:
     uses: ./.github/workflows/publish-versions.yml
     with:
       plan: ${{ needs.plan.outputs.val }}
-    secrets: inherit
+    secrets: inherit # zizmor: ignore[secrets-inherit] required for the Astral versions token
 
   custom-publish-mirror:
     needs:
@@ -394,6 +391,6 @@ jobs:
     uses: ./.github/workflows/publish-mirror.yml
     with:
       plan: ${{ needs.plan.outputs.val }}
-    secrets: inherit
+    secrets: inherit # zizmor: ignore[secrets-inherit] required for R2 mirror credentials
     permissions:
       "contents": "read"
