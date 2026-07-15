@@ -4756,6 +4756,7 @@ fn setup_json_output(context: &TestContext) -> Result<()> {
     Ok(())
 }
 
+#[cfg(feature = "test-universal")]
 fn json_tree_package_names(command: &mut Command) -> Result<Vec<String>> {
     let assert = command
         .arg("--preview-features")
