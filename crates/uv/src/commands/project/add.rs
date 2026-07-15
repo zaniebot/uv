@@ -69,6 +69,7 @@ use crate::printer::Printer;
 use crate::settings::{FrozenSource, LockCheck, ResolverInstallerSettings};
 
 /// Add one or more packages to the project requirements.
+#[expect(clippy::fn_params_excessive_bools)]
 pub(crate) async fn add(
     project_dir: &Path,
     lock_check: LockCheck,
