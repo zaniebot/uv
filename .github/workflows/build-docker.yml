@@ -56,11 +56,12 @@ jobs:
           IS_LOCAL_PR: ${{ github.event.pull_request.head.repo.full_name == 'astral-sh/uv' }}
         id: plan
         run: |
+          # Use a valid PEP 440 placeholder for non-release builds; metadata-action validates disabled tags.
           if [ "${PUSH_DEV}" == "true" ] && [ "${IS_LOCAL_PR}" == "true" ]; then
             echo "login=true" >> "$GITHUB_OUTPUT"
             echo "push=true" >> "$GITHUB_OUTPUT"
             echo "push-version=false" >> "$GITHUB_OUTPUT"
-            echo "tag=sha" >> "$GITHUB_OUTPUT"
+            echo "tag=0.0.0" >> "$GITHUB_OUTPUT"
             echo "action=build and publish to uv-dev" >> "$GITHUB_OUTPUT"
           elif [ "${DRY_RUN}" == "false" ]; then
             echo "login=true" >> "$GITHUB_OUTPUT"
@@ -72,7 +73,7 @@ jobs:
             echo "login=${IS_LOCAL_PR}" >> "$GITHUB_OUTPUT"
             echo "push=false" >> "$GITHUB_OUTPUT"
             echo "push-version=false" >> "$GITHUB_OUTPUT"
-            echo "tag=dry-run" >> "$GITHUB_OUTPUT"
+            echo "tag=0.0.0" >> "$GITHUB_OUTPUT"
             echo "action=build" >> "$GITHUB_OUTPUT"
           fi
 
@@ -197,8 +198,8 @@ jobs:
           # Defining this makes sure the org.opencontainers.image.version OCI label becomes the actual release version and not the branch name
           tags: |
             type=raw,value=dry-run,enable=${{ needs.docker-plan.outputs.push == 'false' }}
-            type=pep440,pattern={{ version }},value=${{ needs.docker-plan.outputs.push-version == 'true' && needs.docker-plan.outputs.tag || '0.0.0' }},enable=${{ needs.docker-plan.outputs.push-version == 'true' }}
-            type=pep440,pattern={{ major }}.{{ minor }},value=${{ needs.docker-plan.outputs.push-version == 'true' && needs.docker-plan.outputs.tag || '0.0.0' }},enable=${{ needs.docker-plan.outputs.push-version == 'true' }}
+            type=pep440,pattern={{ version }},value=${{ needs.docker-plan.outputs.tag }},enable=${{ needs.docker-plan.outputs.push-version == 'true' }}
+            type=pep440,pattern={{ major }}.{{ minor }},value=${{ needs.docker-plan.outputs.tag }},enable=${{ needs.docker-plan.outputs.push-version == 'true' }}
             type=sha,enable=${{ inputs.push-dev }}
 
       - name: Build and push by digest
