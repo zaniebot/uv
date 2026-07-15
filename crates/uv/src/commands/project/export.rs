@@ -13,6 +13,7 @@ use uv_cache::Cache;
 use uv_client::BaseClientBuilder;
 use uv_configuration::{
     Concurrency, DependencyGroups, EditableMode, ExportFormat, ExtrasSpecification, InstallOptions,
+    OutputFlags,
 };
 use uv_distribution_types::Verbatim;
 use uv_normalize::{DefaultExtras, DefaultGroups, PackageName};
@@ -57,14 +58,13 @@ impl<'lock> From<&'lock ExportTarget> for LockTarget<'lock> {
 }
 
 /// Export the project's `uv.lock` in an alternate format.
-#[expect(clippy::fn_params_excessive_bools)]
 pub(crate) async fn export(
     project_dir: &Path,
     format: Option<ExportFormat>,
     all_packages: bool,
     package: Vec<PackageName>,
     prune: Vec<PackageName>,
-    hashes: bool,
+    output_flags: OutputFlags,
     install_options: InstallOptions,
     output_file: Option<PathBuf>,
     extras: ExtrasSpecification,
@@ -72,10 +72,6 @@ pub(crate) async fn export(
     editable: Option<EditableMode>,
     lock_check: LockCheck,
     frozen: Option<FrozenSource>,
-    include_annotations: bool,
-    include_header: bool,
-    include_index_url: bool,
-    include_find_links: bool,
     script: Option<Pep723Script>,
     python: Option<String>,
     install_mirrors: PythonInstallMirrors,
@@ -374,13 +370,13 @@ pub(crate) async fn export(
                 &prune,
                 &extras,
                 &groups,
-                include_annotations,
+                output_flags.contains(OutputFlags::ANNOTATIONS),
                 editable,
-                hashes,
+                output_flags.contains(OutputFlags::HASHES),
                 &install_options,
             )?;
 
-            if include_header {
+            if output_flags.contains(OutputFlags::HEADER) {
                 writeln!(
                     writer,
                     "{}",
@@ -392,7 +388,7 @@ pub(crate) async fn export(
             let mut wrote_preamble = false;
 
             // If necessary, include the `--index-url` and `--extra-index-url` locations.
-            if include_index_url {
+            if output_flags.contains(OutputFlags::INDEX_URL) {
                 let mut seen = FxHashSet::default();
                 let mut emitted_explicit_index = false;
 
@@ -422,7 +418,7 @@ pub(crate) async fn export(
             }
 
             // If necessary, include the `--find-links` locations.
-            if include_find_links {
+            if output_flags.contains(OutputFlags::FIND_LINKS) {
                 for flat_index in settings.index_locations.flat_indexes() {
                     writeln!(writer, "--find-links {}", flat_index.url().verbatim())?;
                     wrote_preamble = true;
@@ -441,12 +437,12 @@ pub(crate) async fn export(
                 &prune,
                 &extras,
                 &groups,
-                include_annotations,
+                output_flags.contains(OutputFlags::ANNOTATIONS),
                 editable.as_ref(),
                 &install_options,
             )?;
 
-            if include_header {
+            if output_flags.contains(OutputFlags::HEADER) {
                 writeln!(
                     writer,
                     "{}",
@@ -462,7 +458,7 @@ pub(crate) async fn export(
                 &prune,
                 &extras,
                 &groups,
-                include_annotations,
+                output_flags.contains(OutputFlags::ANNOTATIONS),
                 &install_options,
                 preview,
                 all_packages,
