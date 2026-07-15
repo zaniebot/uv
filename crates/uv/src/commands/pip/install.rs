@@ -366,7 +366,9 @@ pub(crate) async fn pip_install(
                 }
                 DefaultInstallLogger.on_check(requirements.len(), start, printer, dry_run)?;
 
-                if strict && !dry_run.enabled() {
+                if matches!(environment_validation, EnvironmentValidation::Enabled)
+                    && !dry_run.enabled()
+                {
                     operations::diagnose_environment(
                         recursive_requirements
                             .iter()
