@@ -18,6 +18,8 @@ jobs:
           version: "0.11.28"
 
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: 3.14
       - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
@@ -28,4 +30,7 @@ jobs:
           cargo dev generate-env-vars-reference
 
       - name: "Build docs"
+        env:
+          NO_MKDOCS_2_WARNING: "1"
+          DISABLE_MKDOCS_2_WARNING: "true"
         run: uv run --only-group docs mkdocs build --strict -f mkdocs.yml
