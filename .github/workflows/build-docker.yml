@@ -197,8 +197,8 @@ jobs:
           # Defining this makes sure the org.opencontainers.image.version OCI label becomes the actual release version and not the branch name
           tags: |
             type=raw,value=dry-run,enable=${{ needs.docker-plan.outputs.push == 'false' }}
-            type=pep440,pattern={{ version }},value=${{ needs.docker-plan.outputs.tag }},enable=${{ needs.docker-plan.outputs.push-version == 'true' }}
-            type=pep440,pattern={{ major }}.{{ minor }},value=${{ needs.docker-plan.outputs.tag }},enable=${{ needs.docker-plan.outputs.push-version == 'true' }}
+            type=pep440,pattern={{ version }},value=${{ needs.docker-plan.outputs.push-version == 'true' && needs.docker-plan.outputs.tag || '0.0.0' }},enable=${{ needs.docker-plan.outputs.push-version == 'true' }}
+            type=pep440,pattern={{ major }}.{{ minor }},value=${{ needs.docker-plan.outputs.push-version == 'true' && needs.docker-plan.outputs.tag || '0.0.0' }},enable=${{ needs.docker-plan.outputs.push-version == 'true' }}
             type=sha,enable=${{ inputs.push-dev }}
 
       - name: Build and push by digest
@@ -294,8 +294,10 @@ jobs:
             if [ "${PUSH_DEV}" == "true" ]; then
               TAG_PATTERNS="${TAG_PATTERNS}type=sha,suffix=-${TAG}\n"
             else
-              TAG_PATTERNS="${TAG_PATTERNS}type=pep440,pattern={{ version }},suffix=-${TAG},value=${VERSION}\n"
-              TAG_PATTERNS="${TAG_PATTERNS}type=pep440,pattern={{ major }}.{{ minor }},suffix=-${TAG},value=${VERSION}\n"
+              if [ "${PUSH_VERSION}" == "true" ]; then
+                TAG_PATTERNS="${TAG_PATTERNS}type=pep440,pattern={{ version }},suffix=-${TAG},value=${VERSION}\n"
+                TAG_PATTERNS="${TAG_PATTERNS}type=pep440,pattern={{ major }}.{{ minor }},suffix=-${TAG},value=${VERSION}\n"
+              fi
               TAG_PATTERNS="${TAG_PATTERNS}type=raw,value=${TAG}\n"
             fi
           done
@@ -312,6 +314,7 @@ jobs:
         env:
           VERSION: ${{ needs.docker-plan.outputs.tag }}
           PUSH_DEV: ${{ inputs.push-dev }}
+          PUSH_VERSION: ${{ needs.docker-plan.outputs.push-version }}
           # Use the tag from the base image we just pushed; fall back to `latest` on dry-runs
           # since the base image isn't pushed to the registry.
           UV_BASE_TAG: ${{ needs.docker-plan.outputs.push == 'true' && needs.docker-publish-base.outputs.image-version || 'latest' }}
