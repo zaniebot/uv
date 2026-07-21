@@ -518,12 +518,16 @@ async fn do_lock(
     let source_trees = vec![];
 
     // If necessary, lower the overrides and constraints.
-    let requirements = target.lower(
-        requirements,
-        index_locations,
-        sources,
-        client_builder.credentials_cache(),
-    )?;
+    let requirements = target
+        .lower(
+            requirements,
+            index_locations,
+            sources,
+            cache,
+            workspace_cache,
+            client_builder.credentials_cache(),
+        )
+        .await?;
     let overrides = {
         let mut lowered_overrides = Vec::new();
         for entry in overrides {
@@ -535,8 +539,11 @@ async fn do_lock(
                                 vec![requirement],
                                 index_locations,
                                 sources,
+                                cache,
+                                workspace_cache,
                                 client_builder.credentials_cache(),
-                            )?
+                            )
+                            .await?
                             .into_iter()
                             .map(Override::Requirement),
                     );
@@ -549,8 +556,11 @@ async fn do_lock(
                                 package.dependencies.into_vec(),
                                 index_locations,
                                 sources,
+                                cache,
+                                workspace_cache,
                                 client_builder.credentials_cache(),
-                            )?
+                            )
+                            .await?
                             .into_boxed_slice(),
                     }));
                 }
@@ -558,30 +568,41 @@ async fn do_lock(
         }
         lowered_overrides
     };
-    let constraints = target.lower(
-        constraints,
-        index_locations,
-        sources,
-        client_builder.credentials_cache(),
-    )?;
-    let build_constraints = target.lower(
-        build_constraints,
-        index_locations,
-        sources,
-        client_builder.credentials_cache(),
-    )?;
-    let dependency_groups = dependency_groups
-        .into_iter()
-        .map(|(name, group)| {
-            let requirements = target.lower(
+    let constraints = target
+        .lower(
+            constraints,
+            index_locations,
+            sources,
+            cache,
+            workspace_cache,
+            client_builder.credentials_cache(),
+        )
+        .await?;
+    let build_constraints = target
+        .lower(
+            build_constraints,
+            index_locations,
+            sources,
+            cache,
+            workspace_cache,
+            client_builder.credentials_cache(),
+        )
+        .await?;
+    let mut lowered_dependency_groups = BTreeMap::new();
+    for (name, group) in dependency_groups {
+        let requirements = target
+            .lower(
                 group.requirements,
                 index_locations,
                 sources,
+                cache,
+                workspace_cache,
                 client_builder.credentials_cache(),
-            )?;
-            Ok((name, requirements))
-        })
-        .collect::<Result<BTreeMap<_, _>, ProjectError>>()?;
+            )
+            .await?;
+        lowered_dependency_groups.insert(name, requirements);
+    }
+    let dependency_groups = lowered_dependency_groups;
 
     // Collect the conflicts.
     let mut conflicts = target.conflicts()?;
@@ -790,16 +811,28 @@ async fn do_lock(
 
     // Lower the extra build dependencies.
     let extra_build_requires = match &target {
-        LockTarget::Workspace(workspace) => LoweredExtraBuildDependencies::from_workspace(
-            extra_build_dependencies.clone(),
-            workspace,
-            index_locations,
-            sources,
-            client.credentials_cache(),
-        )?,
+        LockTarget::Workspace(workspace) => {
+            LoweredExtraBuildDependencies::from_workspace(
+                extra_build_dependencies.clone(),
+                workspace,
+                index_locations,
+                sources,
+                cache,
+                workspace_cache,
+                client.credentials_cache(),
+            )
+            .await?
+        }
         LockTarget::Script(script) => {
             // Try to get extra build dependencies from the script metadata
-            script_extra_build_requires((*script).into(), settings, client.credentials_cache())?
+            script_extra_build_requires(
+                (*script).into(),
+                settings,
+                cache,
+                workspace_cache,
+                client.credentials_cache(),
+            )
+            .await?
         }
     }
     .into_inner();
