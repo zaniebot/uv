@@ -26,8 +26,8 @@ Set `decision` to exactly one of:
   includes a failing default-branch workflow, a confirmed CI flake, or infrastructure behavior the
   repository should mitigate.
 - `duplicate` when an existing issue or pull request already tracks the same underlying failure. Put
-  the canonical open issue in the originating repository first in `related.items` when one exists so
-  the failed run can be reported as another sample.
+  the canonical open issue in `astral-sh/uv-dev` first in `related.items` when one exists so the
+  failed run can be reported as another sample.
 - `ignore` when there is nothing for maintainers to fix, including an expected compile, lint, or
   test failure caused by the pull request; a superseded or follow-on failure; or a transient
   external outage with no repository-side remediation.
@@ -35,6 +35,11 @@ Set `decision` to exactly one of:
 Explain the decision in `decision_reason`. Do not create an issue merely because a pull request is
 red. If a run contains multiple independent actionable failures, describe the most important
 untracked failure and mention the others in the body or related results.
+
+For `duplicate`, populate `comment_note` with a concise note only when this occurrence differs in a
+useful way from the tracked failure, such as an affected job, platform, error, or contributing
+factor. Leave `comment_note` empty when there is no useful difference and for `create` or `ignore`.
+Do not include `@mentions` or sensitive values.
 
 For `create`, populate `issue` with a concise, test- or symptom-specific title, a clear body, and
 exactly one label: use `ci-flake` for flaky tests or CI infrastructure, and `bug` for a
