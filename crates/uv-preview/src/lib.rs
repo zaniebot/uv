@@ -241,7 +241,8 @@ pub enum PreviewFeature {
     /// environment.
     DetectModuleConflicts = 1 << 7,
     /// Allows using `uv format`.
-    Format = 1 << 8,
+    #[preview(alias = "format")]
+    FormatCommand = 1 << 8,
     /// Enables storage of credentials in a [system-native location](../concepts/authentication/http.md#the-uv-credentials-store).
     NativeAuth = 1 << 9,
     /// Allows signing requests to configured S3-compatible endpoints.
@@ -280,7 +281,8 @@ pub enum PreviewFeature {
     /// not normalized.
     PublishRequireNormalized = 1 << 25,
     /// Allows using `uv audit`.
-    Audit = 1 << 26,
+    #[preview(alias = "audit")]
+    AuditCommand = 1 << 26,
     /// Rejects an invalid `--project` path instead of warning and continuing. Except for `uv init`,
     /// the path must already exist as a directory or point to a `pyproject.toml` file. This feature
     /// takes effect before configuration is loaded.
@@ -299,7 +301,8 @@ pub enum PreviewFeature {
     /// unless `--force` is provided.
     VenvSafeClear = 1 << 32,
     /// Allows using `uv check`.
-    Check = 1 << 33,
+    #[preview(alias = "check")]
+    CheckCommand = 1 << 33,
     /// Makes `uv init` create a packaged application with a `src/` layout, build system, and script
     /// entry point by default.
     PackagedInit = 1 << 34,
@@ -320,54 +323,6 @@ pub enum PreviewFeature {
     LockfileFormatCheck = 1 << 40,
 }
 
-impl PreviewFeature {
-    /// Returns the string representation of a single preview feature flag.
-    fn as_str(self) -> &'static str {
-        match self {
-            Self::PythonInstallDefault => "python-install-default",
-            Self::JsonOutput => "json-output",
-            Self::Pylock => "pylock",
-            Self::AddBounds => "add-bounds",
-            Self::PackageConflicts => "package-conflicts",
-            Self::ExtraBuildDependencies => "extra-build-dependencies",
-            Self::DetectModuleConflicts => "detect-module-conflicts",
-            Self::Format => "format-command",
-            Self::NativeAuth => "native-auth",
-            Self::S3Endpoint => "s3-endpoint",
-            Self::CacheSize => "cache-size",
-            Self::InitProjectFlag => "init-project-flag",
-            Self::WorkspaceMetadata => "workspace-metadata",
-            Self::WorkspaceDir => "workspace-dir",
-            Self::WorkspaceList => "workspace-list",
-            Self::SbomExport => "sbom-export",
-            Self::AuthHelper => "auth-helper",
-            Self::DirectPublish => "direct-publish",
-            Self::TargetWorkspaceDiscovery => "target-workspace-discovery",
-            Self::MetadataJson => "metadata-json",
-            Self::GcsEndpoint => "gcs-endpoint",
-            Self::AdjustUlimit => "adjust-ulimit",
-            Self::SpecialCondaEnvNames => "special-conda-env-names",
-            Self::RelocatableEnvsDefault => "relocatable-envs-default",
-            Self::PublishRequireNormalized => "publish-require-normalized",
-            Self::Audit => "audit-command",
-            Self::ProjectDirectoryMustExist => "project-directory-must-exist",
-            Self::IndexExcludeNewer => "index-exclude-newer",
-            Self::AzureEndpoint => "azure-endpoint",
-            Self::TomlBackwardsCompatibility => "toml-backwards-compatibility",
-            Self::MalwareCheck => "malware-check",
-            Self::VenvSafeClear => "venv-safe-clear",
-            Self::Check => "check-command",
-            Self::PackagedInit => "packaged-init",
-            Self::CentralizedProjectEnvs => "centralized-project-envs",
-            Self::ToolInstallLocks => "tool-install-locks",
-            Self::WorkspaceListScripts => "workspace-list-scripts",
-            Self::NoDistutilsPatch => "no-distutils-patch",
-            Self::IndexHashAlgorithm => "index-hash-algorithm",
-            Self::LockfileFormatCheck => "lockfile-format-check",
-        }
-    }
-}
-
 impl Display for PreviewFeature {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.as_str())
@@ -382,49 +337,11 @@ impl FromStr for PreviewFeature {
     type Err = PreviewFeatureParseError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(match s {
-            "python-install-default" => Self::PythonInstallDefault,
-            "json-output" => Self::JsonOutput,
-            "pylock" => Self::Pylock,
-            "add-bounds" => Self::AddBounds,
-            "package-conflicts" => Self::PackageConflicts,
-            "extra-build-dependencies" => Self::ExtraBuildDependencies,
-            "detect-module-conflicts" => Self::DetectModuleConflicts,
-            "format" | "format-command" => Self::Format,
-            "native-auth" => Self::NativeAuth,
-            "s3-endpoint" => Self::S3Endpoint,
-            "gcs-endpoint" => Self::GcsEndpoint,
-            "cache-size" => Self::CacheSize,
-            "init-project-flag" => Self::InitProjectFlag,
-            "workspace-metadata" => Self::WorkspaceMetadata,
-            "workspace-dir" => Self::WorkspaceDir,
-            "workspace-list" => Self::WorkspaceList,
-            "sbom-export" => Self::SbomExport,
-            "auth-helper" => Self::AuthHelper,
-            "direct-publish" => Self::DirectPublish,
-            "target-workspace-discovery" => Self::TargetWorkspaceDiscovery,
-            "metadata-json" => Self::MetadataJson,
-            "adjust-ulimit" => Self::AdjustUlimit,
-            "special-conda-env-names" => Self::SpecialCondaEnvNames,
-            "relocatable-envs-default" => Self::RelocatableEnvsDefault,
-            "publish-require-normalized" => Self::PublishRequireNormalized,
-            "audit" | "audit-command" => Self::Audit,
-            "project-directory-must-exist" => Self::ProjectDirectoryMustExist,
-            "index-exclude-newer" => Self::IndexExcludeNewer,
-            "azure-endpoint" => Self::AzureEndpoint,
-            "toml-backwards-compatibility" => Self::TomlBackwardsCompatibility,
-            "malware-check" => Self::MalwareCheck,
-            "venv-safe-clear" => Self::VenvSafeClear,
-            "check" | "check-command" => Self::Check,
-            "packaged-init" => Self::PackagedInit,
-            "centralized-project-envs" => Self::CentralizedProjectEnvs,
-            "tool-install-locks" => Self::ToolInstallLocks,
-            "workspace-list-scripts" => Self::WorkspaceListScripts,
-            "no-distutils-patch" => Self::NoDistutilsPatch,
-            "index-hash-algorithm" => Self::IndexHashAlgorithm,
-            "lockfile-format-check" => Self::LockfileFormatCheck,
-            _ => return Err(PreviewFeatureParseError),
-        })
+        Self::metadata()
+            .iter()
+            .find(|(feature, _, aliases)| feature.as_str() == s || aliases.contains(&s))
+            .map(|(feature, _, _)| *feature)
+            .ok_or(PreviewFeatureParseError)
     }
 }
 
@@ -587,8 +504,13 @@ mod tests {
 
     #[test]
     fn test_preview_feature_from_str() {
-        let features = PreviewFeature::from_str("python-install-default").unwrap();
-        assert_eq!(features, PreviewFeature::PythonInstallDefault);
+        for &(feature, _, aliases) in PreviewFeature::metadata() {
+            assert_eq!(PreviewFeature::from_str(feature.as_str()).unwrap(), feature);
+
+            for &alias in aliases {
+                assert_eq!(PreviewFeature::from_str(alias).unwrap(), feature);
+            }
+        }
     }
 
     #[test]
@@ -641,106 +563,6 @@ mod tests {
         // Test multiple features
         let preview = Preview::new(&[PreviewFeature::JsonOutput, PreviewFeature::Pylock]);
         assert_eq!(preview.to_string(), "json-output,pylock");
-    }
-
-    #[test]
-    fn test_preview_feature_as_str() {
-        assert_eq!(
-            PreviewFeature::PythonInstallDefault.as_str(),
-            "python-install-default"
-        );
-        assert_eq!(PreviewFeature::JsonOutput.as_str(), "json-output");
-        assert_eq!(PreviewFeature::Pylock.as_str(), "pylock");
-        assert_eq!(
-            PreviewFeature::ToolInstallLocks.as_str(),
-            "tool-install-locks"
-        );
-        assert_eq!(PreviewFeature::AddBounds.as_str(), "add-bounds");
-        assert_eq!(
-            PreviewFeature::PackageConflicts.as_str(),
-            "package-conflicts"
-        );
-        assert_eq!(
-            PreviewFeature::ExtraBuildDependencies.as_str(),
-            "extra-build-dependencies"
-        );
-        assert_eq!(
-            PreviewFeature::DetectModuleConflicts.as_str(),
-            "detect-module-conflicts"
-        );
-        assert_eq!(PreviewFeature::Format.as_str(), "format-command");
-        assert_eq!(PreviewFeature::NativeAuth.as_str(), "native-auth");
-        assert_eq!(PreviewFeature::S3Endpoint.as_str(), "s3-endpoint");
-        assert_eq!(PreviewFeature::CacheSize.as_str(), "cache-size");
-        assert_eq!(
-            PreviewFeature::InitProjectFlag.as_str(),
-            "init-project-flag"
-        );
-        assert_eq!(
-            PreviewFeature::WorkspaceMetadata.as_str(),
-            "workspace-metadata"
-        );
-        assert_eq!(PreviewFeature::WorkspaceDir.as_str(), "workspace-dir");
-        assert_eq!(PreviewFeature::WorkspaceList.as_str(), "workspace-list");
-        assert_eq!(PreviewFeature::SbomExport.as_str(), "sbom-export");
-        assert_eq!(PreviewFeature::AuthHelper.as_str(), "auth-helper");
-        assert_eq!(PreviewFeature::DirectPublish.as_str(), "direct-publish");
-        assert_eq!(
-            PreviewFeature::TargetWorkspaceDiscovery.as_str(),
-            "target-workspace-discovery"
-        );
-        assert_eq!(PreviewFeature::MetadataJson.as_str(), "metadata-json");
-        assert_eq!(PreviewFeature::GcsEndpoint.as_str(), "gcs-endpoint");
-        assert_eq!(PreviewFeature::AdjustUlimit.as_str(), "adjust-ulimit");
-        assert_eq!(
-            PreviewFeature::SpecialCondaEnvNames.as_str(),
-            "special-conda-env-names"
-        );
-        assert_eq!(
-            PreviewFeature::RelocatableEnvsDefault.as_str(),
-            "relocatable-envs-default"
-        );
-        assert_eq!(
-            PreviewFeature::PublishRequireNormalized.as_str(),
-            "publish-require-normalized"
-        );
-        assert_eq!(
-            PreviewFeature::ProjectDirectoryMustExist.as_str(),
-            "project-directory-must-exist"
-        );
-        assert_eq!(
-            PreviewFeature::IndexExcludeNewer.as_str(),
-            "index-exclude-newer"
-        );
-        assert_eq!(PreviewFeature::AzureEndpoint.as_str(), "azure-endpoint");
-        assert_eq!(
-            PreviewFeature::TomlBackwardsCompatibility.as_str(),
-            "toml-backwards-compatibility"
-        );
-        assert_eq!(PreviewFeature::MalwareCheck.as_str(), "malware-check");
-        assert_eq!(PreviewFeature::VenvSafeClear.as_str(), "venv-safe-clear");
-        assert_eq!(PreviewFeature::Audit.as_str(), "audit-command");
-        assert_eq!(PreviewFeature::Check.as_str(), "check-command");
-        assert_eq!(
-            PreviewFeature::CentralizedProjectEnvs.as_str(),
-            "centralized-project-envs"
-        );
-        assert_eq!(
-            PreviewFeature::WorkspaceListScripts.as_str(),
-            "workspace-list-scripts"
-        );
-        assert_eq!(
-            PreviewFeature::NoDistutilsPatch.as_str(),
-            "no-distutils-patch"
-        );
-        assert_eq!(
-            PreviewFeature::IndexHashAlgorithm.as_str(),
-            "index-hash-algorithm"
-        );
-        assert_eq!(
-            PreviewFeature::LockfileFormatCheck.as_str(),
-            "lockfile-format-check"
-        );
     }
 
     #[test]

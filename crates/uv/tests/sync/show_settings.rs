@@ -3193,7 +3193,7 @@ fn preview_features() {
     +            PackageConflicts,
     +            ExtraBuildDependencies,
     +            DetectModuleConflicts,
-    +            Format,
+    +            FormatCommand,
     +            NativeAuth,
     +            S3Endpoint,
     +            CacheSize,
@@ -3211,14 +3211,14 @@ fn preview_features() {
     +            SpecialCondaEnvNames,
     +            RelocatableEnvsDefault,
     +            PublishRequireNormalized,
-    +            Audit,
+    +            AuditCommand,
     +            ProjectDirectoryMustExist,
     +            IndexExcludeNewer,
     +            AzureEndpoint,
     +            TomlBackwardsCompatibility,
     +            MalwareCheck,
     +            VenvSafeClear,
-    +            Check,
+    +            CheckCommand,
     +            PackagedInit,
     +            CentralizedProjectEnvs,
     +            ToolInstallLocks,
@@ -3260,6 +3260,25 @@ fn preview_features() {
          python_downloads: Automatic,
     ...
     "
+    );
+
+    let canonical_command_features = capture_uv_snapshot!(
+        context.filters(),
+        add_shared_args(context.version())
+            .arg("--show-settings")
+            .arg("--preview-features")
+            .arg("format-command,audit-command,check-command")
+    );
+
+    // Preview feature aliases select the same settings as their canonical names.
+    diff_uv_snapshot!(
+        context.filters(),
+        &canonical_command_features,
+        add_shared_args(context.version())
+            .arg("--show-settings")
+            .arg("--preview-features")
+            .arg("format,audit,check"),
+        @""
     );
 
     diff_uv_snapshot!(
@@ -3482,7 +3501,7 @@ fn preview_precedence() -> anyhow::Result<()> {
          preview: Preview {
     -        flags: [],
     +        flags: [
-    +            Format,
+    +            FormatCommand,
     +        ],
          },
          python_preference: Managed,
@@ -3533,7 +3552,7 @@ fn preview_precedence() -> anyhow::Result<()> {
          show_settings: true,
          preview: Preview {
              flags: [
-    -            Format,
+    -            FormatCommand,
     +            Pylock,
              ],
          },
@@ -3652,7 +3671,7 @@ fn preview_features_uv_toml() -> anyhow::Result<()> {
          preview: Preview {
     -        flags: [],
     +        flags: [
-    +            Format,
+    +            FormatCommand,
     +        ],
          },
          python_preference: Managed,
@@ -3792,7 +3811,7 @@ fn preview_features_pyproject_toml() -> anyhow::Result<()> {
          preview: Preview {
     -        flags: [],
     +        flags: [
-    +            Format,
+    +            FormatCommand,
     +        ],
          },
          python_preference: Managed,
@@ -3924,7 +3943,7 @@ fn run_pep723_script_preview_features() -> anyhow::Result<()> {
          preview: Preview {
     -        flags: [],
     +        flags: [
-    +            Format,
+    +            FormatCommand,
     +        ],
          },
          python_preference: Managed,

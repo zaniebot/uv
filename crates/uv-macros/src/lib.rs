@@ -15,7 +15,7 @@ pub fn derive_options_metadata(input: TokenStream) -> TokenStream {
         .into()
 }
 
-#[proc_macro_derive(PreviewMetadata)]
+#[proc_macro_derive(PreviewMetadata, attributes(preview))]
 pub fn derive_preview_metadata(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
 
@@ -34,6 +34,20 @@ fn impl_preview_metadata(input: &DeriveInput) -> syn::Result<proc_macro2::TokenS
         ));
     };
 
+    let names = data.variants.iter().map(|variant| {
+        let variant_name = &variant.ident;
+        let mut feature_name = String::new();
+
+        for (index, character) in variant_name.to_string().chars().enumerate() {
+            if index > 0 && character.is_uppercase() {
+                feature_name.push('-');
+            }
+            feature_name.extend(character.to_lowercase());
+        }
+
+        quote! { Self::#variant_name => #feature_name }
+    });
+
     let entries = data
         .variants
         .iter()
@@ -46,15 +60,38 @@ fn impl_preview_metadata(input: &DeriveInput) -> syn::Result<proc_macro2::TokenS
                 ));
             }
 
+            let mut aliases = Vec::new();
+            for attribute in variant
+                .attrs
+                .iter()
+                .filter(|attribute| attribute.path().is_ident("preview"))
+            {
+                attribute.parse_nested_meta(|meta| {
+                    if meta.path.is_ident("alias") {
+                        aliases.push(meta.value()?.parse::<LitStr>()?);
+                        Ok(())
+                    } else {
+                        Err(meta.error("expected `alias`"))
+                    }
+                })?;
+            }
+
             let variant_name = &variant.ident;
-            Ok(quote! { (Self::#variant_name, #documentation) })
+            Ok(quote! { (Self::#variant_name, #documentation, &[#(#aliases),*]) })
         })
         .collect::<syn::Result<Vec<_>>>()?;
 
     Ok(quote! {
         impl #name {
-            /// Returns each enum variant and its documentation.
-            pub const fn metadata() -> &'static [(Self, &'static str)] {
+            /// Returns the canonical name of a single preview feature.
+            fn as_str(self) -> &'static str {
+                match self {
+                    #(#names),*
+                }
+            }
+
+            /// Returns each enum variant, its documentation, and its aliases.
+            pub const fn metadata() -> &'static [(Self, &'static str, &'static [&'static str])] {
                 &[#(#entries),*]
             }
         }
