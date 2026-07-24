@@ -1482,7 +1482,7 @@ impl Lock {
     /// Return a [`SatisfiesResult`] if the given extras do not match the [`Package`] metadata.
     fn satisfies_provides_extra<'lock>(
         &self,
-        provides_extra: Box<[ExtraName]>,
+        provides_extra: &[ExtraName],
         package: &'lock Package,
     ) -> SatisfiesResult<'lock> {
         if !self.supports_provides_extra() {
@@ -1493,7 +1493,7 @@ impl Lock {
         let actual: BTreeSet<_> = package.metadata.provides_extra.iter().collect();
 
         if expected != actual {
-            let expected = Box::into_iter(provides_extra).collect();
+            let expected = provides_extra.iter().cloned().collect();
             return SatisfiesResult::MismatchedPackageProvidesExtra(
                 &package.id.name,
                 package.id.version.as_ref(),
@@ -1592,6 +1592,37 @@ impl Lock {
         }
 
         Ok(SatisfiesResult::Satisfied)
+    }
+
+    fn record_index(
+        requirement: &Requirement,
+        remotes: &mut Option<BTreeSet<UrlString>>,
+        locals: &mut Option<BTreeSet<Box<Path>>>,
+        root: &Path,
+    ) {
+        let RequirementSource::Registry {
+            index: Some(index), ..
+        } = &requirement.source
+        else {
+            return;
+        };
+
+        match &index.url {
+            IndexUrl::Pypi(_) | IndexUrl::Url(_) => {
+                if let Some(remotes) = remotes.as_mut() {
+                    remotes.insert(UrlString::from(index.url().without_credentials().as_ref()));
+                }
+            }
+            IndexUrl::Path(url) => {
+                if let Some(locals) = locals.as_mut()
+                    && let Some(path) = url.to_file_path().ok().and_then(|path| {
+                        try_relative_to_if(&path, root, !url.was_given_absolute()).ok()
+                    })
+                {
+                    locals.insert(path.into_boxed_path());
+                }
+            }
+        }
     }
 
     /// Check whether the lock matches the project structure, requirements and configuration.
@@ -1882,29 +1913,7 @@ impl Lock {
             .collect::<Vec<_>>();
 
         for requirement in &root_requirements {
-            if let RequirementSource::Registry {
-                index: Some(index), ..
-            } = &requirement.source
-            {
-                match &index.url {
-                    IndexUrl::Pypi(_) | IndexUrl::Url(_) => {
-                        if let Some(remotes) = remotes.as_mut() {
-                            remotes.insert(UrlString::from(
-                                index.url().without_credentials().as_ref(),
-                            ));
-                        }
-                    }
-                    IndexUrl::Path(url) => {
-                        if let Some(locals) = locals.as_mut() {
-                            if let Some(path) = url.to_file_path().ok().and_then(|path| {
-                                try_relative_to_if(&path, root, !url.was_given_absolute()).ok()
-                            }) {
-                                locals.insert(path.into_boxed_path());
-                            }
-                        }
-                    }
-                }
-            }
+            Self::record_index(requirement, &mut remotes, &mut locals, root);
         }
 
         if !root_requirements.is_empty() {
@@ -2029,7 +2038,7 @@ impl Lock {
                         }
 
                         // Validate the static `provides-extras` metadata.
-                        match self.satisfies_provides_extra(metadata.provides_extra, package) {
+                        match self.satisfies_provides_extra(&metadata.provides_extra, package) {
                             SatisfiesResult::Satisfied => {}
                             result => return Ok(result),
                         }
@@ -2115,7 +2124,7 @@ impl Lock {
                     }
 
                     // Validate the `provides-extras` metadata.
-                    match self.satisfies_provides_extra(metadata.provides_extra, package) {
+                    match self.satisfies_provides_extra(&metadata.provides_extra, package) {
                         SatisfiesResult::Satisfied => {}
                         result => return Ok(result),
                     }
@@ -2154,7 +2163,7 @@ impl Lock {
                     }
 
                     // Validate that the extras are unchanged.
-                    if let SatisfiesResult::Satisfied = self.satisfies_provides_extra(metadata.provides_extra, package, ) {
+                    if let SatisfiesResult::Satisfied = self.satisfies_provides_extra(&metadata.provides_extra, package, ) {
                         debug!("Static `provides-extra` for `{}` is up-to-date", package.id);
                     } else {
                         debug!("Static `provides-extra` for `{}` is out-of-date; falling back to distribution database", package.id);
@@ -2236,7 +2245,7 @@ impl Lock {
                     }
 
                     // Validate that the extras are unchanged.
-                    match self.satisfies_provides_extra(metadata.provides_extra, package) {
+                    match self.satisfies_provides_extra(&metadata.provides_extra, package) {
                         SatisfiesResult::Satisfied => {}
                         result => return Ok(result),
                     }
@@ -2266,29 +2275,7 @@ impl Lock {
                 .iter()
                 .chain(package.metadata.dependency_groups.values().flatten())
             {
-                if let RequirementSource::Registry {
-                    index: Some(index), ..
-                } = &requirement.source
-                {
-                    match &index.url {
-                        IndexUrl::Pypi(_) | IndexUrl::Url(_) => {
-                            if let Some(remotes) = remotes.as_mut() {
-                                remotes.insert(UrlString::from(
-                                    index.url().without_credentials().as_ref(),
-                                ));
-                            }
-                        }
-                        IndexUrl::Path(url) => {
-                            if let Some(locals) = locals.as_mut() {
-                                if let Some(path) = url.to_file_path().ok().and_then(|path| {
-                                    try_relative_to_if(&path, root, !url.was_given_absolute()).ok()
-                                }) {
-                                    locals.insert(path.into_boxed_path());
-                                }
-                            }
-                        }
-                    }
-                }
+                Self::record_index(requirement, &mut remotes, &mut locals, root);
             }
 
             // Recurse.
