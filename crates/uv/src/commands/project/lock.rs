@@ -371,6 +371,10 @@ impl<'env> LockOperation<'env> {
 
     /// Perform a [`LockOperation`].
     pub(crate) async fn execute(self, target: LockTarget<'_>) -> Result<LockResult, ProjectError> {
+        if !matches!(&self.mode, LockMode::Frozen(_)) {
+            target.validate_upgrade_groups(&self.settings.upgrade)?;
+        }
+
         match self.mode {
             LockMode::Frozen(source) => {
                 // Read the existing lockfile, but don't attempt to lock the project.
@@ -951,6 +955,11 @@ async fn do_lock(
                 // Disabled builds are user policy errors. Static local projects are validated
                 // before this point, so reaching this case means validation genuinely needs
                 // metadata that cannot be obtained under `--no-build`.
+                return Err(ProjectError::Lock(err));
+            }
+            Err(ProjectError::Lock(err)) if err.is_not_pep625() => {
+                // A non-PEP 625-compliant sdist in the lockfile will also be rejected by a fresh
+                // resolve, so short-circuit rather than doing the extra work.
                 return Err(ProjectError::Lock(err));
             }
             Err(err) => {

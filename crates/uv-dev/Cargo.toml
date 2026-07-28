@@ -1,6 +1,6 @@
 [package]
 name = "uv-dev"
-version = "0.0.66"
+version = "0.0.67"
 description = "This is an internal component crate of uv"
 publish = false
 
@@ -79,7 +79,7 @@ name = "uv-dev"
 required-features = ["dev"]
 
 [features]
-default = ["performance", "uv-extract/static"]
+default = ["performance"]
 # Actually build the dev CLI.
 dev = []
 performance = ["performance-memory-allocator"]

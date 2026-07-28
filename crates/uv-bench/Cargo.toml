@@ -1,6 +1,6 @@
 [package]
 name = "uv-bench"
-version = "0.0.66"
+version = "0.0.67"
 description = "This is an internal component crate of uv"
 publish = false
 authors = { workspace = true }
@@ -69,6 +69,3 @@ tempfile = { workspace = true }
 tokio = { workspace = true }
 tokio-util = { workspace = true }
 toml = { workspace = true }
-
-[features]
-static = ["uv-extract/static"]
