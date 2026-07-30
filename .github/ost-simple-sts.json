@@ -38,7 +38,20 @@
       "environment": "automations",
       "caller_workflow": "promote-pull-request.yml",
       "on": ["workflow_dispatch"],
-      "permissions": { "contents": "write", "pull_requests": "write" },
+      "permissions": {
+        "contents": "write",
+        "pull_requests": "write",
+        "workflows": "write"
+      },
+      "targets": ["uv", "uv-dev"],
+      "installation": "automations"
+    },
+    {
+      "caller": "uv",
+      "environment": "automations",
+      "caller_workflow": "issue-triage.yml",
+      "on": ["issues", "workflow_dispatch"],
+      "permissions": { "contents": "write", "issues": "write" },
       "targets": ["uv", "uv-dev"],
       "installation": "automations"
     },
