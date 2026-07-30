@@ -61,6 +61,7 @@ use uv_warnings::warn_user_once;
 use uv_workspace::{Editability, WorkspaceMember};
 
 use crate::fork_strategy::ForkStrategy;
+pub use crate::lock::deserialize::Error as CanonicalLockError;
 pub(crate) use crate::lock::export::PylockTomlPackage;
 pub use crate::lock::export::RequirementsTxtExport;
 pub use crate::lock::export::{
@@ -73,9 +74,11 @@ use crate::resolution::{AnnotatedDist, ResolutionGraphNode};
 use crate::universal_marker::{ConflictMarker, UniversalMarker};
 use crate::{
     ExcludeNewer, ExcludeNewerOverride, ExcludeNewerPackage, ExcludeNewerSpan, ExcludeNewerValue,
-    InMemoryIndex, MetadataResponse, PrereleaseMode, ResolutionMode, ResolverOutput,
+    InMemoryIndex, MetadataResponse, Prerelease, PrereleaseMode, PrereleasePackage, ResolutionMode,
+    ResolverOutput,
 };
 
+mod deserialize;
 pub(crate) mod export;
 mod installable;
 mod map;
@@ -1082,7 +1085,7 @@ impl Lock {
 
         let options = ResolverOptions {
             resolution_mode: resolution.options.resolution_mode,
-            prerelease_mode: resolution.options.prerelease_mode,
+            prerelease: resolution.options.prerelease.clone(),
             fork_strategy: resolution.options.fork_strategy,
             exclude_newer: resolution.options.exclude_newer.clone(),
         };
@@ -1374,7 +1377,12 @@ impl Lock {
 
     /// Returns the pre-release mode used to generate this lock.
     pub fn prerelease_mode(&self) -> PrereleaseMode {
-        self.options.prerelease_mode
+        self.options.prerelease.global
+    }
+
+    /// Returns the pre-release policy used to generate this lock.
+    pub fn prerelease(&self) -> &Prerelease {
+        &self.options.prerelease
     }
 
     /// Returns the multi-version mode used to generate this lock.
@@ -1921,6 +1929,25 @@ impl Lock {
             Err((fork_markers_union, new_requires_python))
         } else {
             Ok(())
+        }
+    }
+
+    /// Parses a canonical lockfile without falling back to the general TOML parser.
+    ///
+    /// Use [`Self::from_toml`] when reading lockfiles that might not use uv's
+    /// canonical format.
+    pub fn from_canonical_toml(input: &str) -> Result<Self, CanonicalLockError> {
+        deserialize::from_str(input)
+    }
+
+    /// Parses a lockfile, using the canonical fast path when possible.
+    ///
+    /// Lockfiles not written in uv's canonical layout fall back to the general
+    /// TOML parser, preserving its compatibility and error reporting.
+    pub fn from_toml(input: &str) -> Result<Self, toml::de::Error> {
+        match Self::from_canonical_toml(input) {
+            Ok(lock) => Ok(lock),
+            Err(_) => toml::from_str(input),
         }
     }
 
@@ -3196,8 +3223,8 @@ pub enum SatisfiesResult<'lock> {
 struct ResolverOptions {
     /// The [`ResolutionMode`] used to generate this lock.
     resolution_mode: ResolutionMode,
-    /// The [`PrereleaseMode`] used to generate this lock.
-    prerelease_mode: PrereleaseMode,
+    /// The [`Prerelease`] policy used to generate this lock.
+    prerelease: Prerelease,
     /// The [`ForkStrategy`] used to generate this lock.
     fork_strategy: ForkStrategy,
     /// The [`ExcludeNewer`] setting used to generate this lock.
@@ -3211,15 +3238,33 @@ struct ResolverOptionsWire {
     /// The [`ResolutionMode`] used to generate this lock.
     #[serde(default)]
     resolution_mode: ResolutionMode,
-    /// The [`PrereleaseMode`] used to generate this lock.
-    #[serde(default)]
-    prerelease_mode: PrereleaseMode,
+    /// The [`Prerelease`] policy used to generate this lock.
+    #[serde(flatten)]
+    prerelease: PrereleaseWire,
     /// The [`ForkStrategy`] used to generate this lock.
     #[serde(default)]
     fork_strategy: ForkStrategy,
     /// The [`ExcludeNewer`] setting used to generate this lock.
     #[serde(flatten)]
     exclude_newer: ExcludeNewerWire,
+}
+
+#[derive(Clone, Debug, Default, serde::Deserialize)]
+#[serde(rename_all = "kebab-case")]
+struct PrereleaseWire {
+    #[serde(default)]
+    prerelease_mode: PrereleaseMode,
+    #[serde(default)]
+    prerelease_package: PrereleasePackage,
+}
+
+impl From<PrereleaseWire> for Prerelease {
+    fn from(wire: PrereleaseWire) -> Self {
+        Self {
+            global: wire.prerelease_mode,
+            package: wire.prerelease_package,
+        }
+    }
 }
 
 #[expect(clippy::struct_field_names)]
@@ -3475,7 +3520,7 @@ impl TryFrom<LockWire> for Lock {
         }
         let options = ResolverOptions {
             resolution_mode: options_wire.resolution_mode,
-            prerelease_mode: options_wire.prerelease_mode,
+            prerelease: options_wire.prerelease.into(),
             fork_strategy: options_wire.fork_strategy,
             exclude_newer: options_wire.exclude_newer.into(),
         };

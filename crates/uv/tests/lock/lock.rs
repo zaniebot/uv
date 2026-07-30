@@ -41,6 +41,53 @@ fn lock_without_package_metadata(lock: &str) -> Result<toml_edit::DocumentMut> {
 
 #[cfg(feature = "test-universal")]
 #[test]
+fn lock_preserves_noncanonical_lock() -> Result<()> {
+    let context = uv_test::test_context!("3.12");
+
+    context.temp_dir.child("pyproject.toml").write_str(indoc! {
+        r#"
+        [project]
+        name = "project"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        "#
+    })?;
+
+    context.lock().arg("--offline").assert().success();
+
+    let noncanonical_lock = indoc! {
+        r"
+        version = 1
+        revision = 3
+        requires-python = '>=3.12'
+
+        [options]
+        exclude-newer = '2024-03-25T00:00:00Z'
+
+        [[package]]
+        name = 'project'
+        version = '0.1.0'
+        source = { virtual = '.' }
+        "
+    };
+    context
+        .temp_dir
+        .child("uv.lock")
+        .write_str(noncanonical_lock)?;
+
+    context
+        .lock()
+        .arg("--locked")
+        .arg("--offline")
+        .assert()
+        .success();
+    assert_eq!(context.read("uv.lock"), noncanonical_lock);
+
+    Ok(())
+}
+
+#[cfg(feature = "test-universal")]
+#[test]
 fn lock_wheel_registry() -> Result<()> {
     let context = uv_test::test_context!("3.12");
 
@@ -9772,6 +9819,90 @@ fn lock_explicit_prerelease_mode() -> Result<()> {
     exit_code: 0 (success)
     ----- stderr -----
     Resolved 1 package in [TIME]
+    ");
+
+    Ok(())
+}
+
+/// Merge package-specific pre-release policies from project configuration and the CLI, and persist
+/// the effective policies in the lockfile.
+#[cfg(feature = "test-universal")]
+#[test]
+fn lock_prerelease_package_configuration() -> Result<()> {
+    let context = uv_test::test_context!("3.12");
+
+    context
+        .temp_dir
+        .child("pyproject.toml")
+        .write_str(indoc! {r#"
+        [project]
+        name = "project"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+
+        [tool.uv]
+        prerelease = "disallow"
+        prerelease-package = { bar = "explicit", foo = "allow" }
+    "#})?;
+
+    uv_snapshot!(context.filters(), context.lock()
+        .env_remove(EnvVars::UV_EXCLUDE_NEWER)
+        .arg("--prerelease-package")
+        .arg("foo=if-necessary-or-explicit")
+        .arg("--prerelease-package")
+        .arg("baz=allow"), @"
+    exit_code: 0 (success)
+    ----- stderr -----
+    warning: The `if-necessary-or-explicit` pre-release mode is deprecated and will be removed in a future release. Use `if-necessary` instead.
+    Resolved 1 package in [TIME]
+    ");
+
+    insta::with_settings!({ filters => context.filters() }, {
+        assert_snapshot!(context.read("uv.lock"), @r#"
+        version = 1
+        revision = 3
+        requires-python = ">=3.12"
+
+        [options]
+        prerelease-mode = "disallow"
+
+        [options.prerelease-package]
+        bar = "explicit"
+        baz = "allow"
+        foo = "if-necessary"
+
+        [[package]]
+        name = "project"
+        version = "0.1.0"
+        source = { virtual = "." }
+        "#);
+    });
+
+    uv_snapshot!(context.filters(), context.lock()
+        .env_remove(EnvVars::UV_EXCLUDE_NEWER)
+        .arg("--locked")
+        .arg("--prerelease-package")
+        .arg("foo=if-necessary")
+        .arg("--prerelease-package")
+        .arg("baz=allow"), @"
+    exit_code: 0 (success)
+    ----- stderr -----
+    Resolved 1 package in [TIME]
+    ");
+
+    uv_snapshot!(context.filters(), context.lock()
+        .env_remove(EnvVars::UV_EXCLUDE_NEWER)
+        .arg("--locked")
+        .arg("--prerelease-package")
+        .arg("foo=allow")
+        .arg("--prerelease-package")
+        .arg("baz=allow"), @"
+    exit_code: 1 (failure)
+    ----- stderr -----
+    Resolved 1 package in [TIME]
+    error: The lockfile at `uv.lock` needs to be updated, but `--locked` was provided.
+
+    hint: To update the lockfile, run `uv lock`.
     ");
 
     Ok(())
